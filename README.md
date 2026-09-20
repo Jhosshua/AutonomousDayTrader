@@ -128,6 +128,12 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8005
 cd frontend && npm run dev
 ```
 
+### Production Deployment
+
+Live Railway dashboard: https://autonomousdaytrader-production.up.railway.app
+
+The deployed `/health` endpoint is the source of truth for upstream readiness; the current verified state reports stock, news, and VIX connected. The system remains paper-trading only.
+
 ### Running Test Suites
 ```bash
 # Run the complete opaque-box E2E test suite (293 tests with port audit)

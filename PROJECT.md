@@ -83,7 +83,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | M3 | `ui_mobile_streaming` | Apple Music Mobile UI (Next.js/Tailwind/Framer), Obsidian Glassmorphism, Momentum Gradient Blur, Strategy Cards, "Now Playing" Drawer, Real-Time WS State Streaming | M1, M2 | IMPLEMENTED; build and visual suite pass |
 | M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_READY | VERIFIED (293/293 E2E, 140/140 backend tests) |
 | M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | VERIFIED in `MONDAY_SIMULATION_REPORT.md`; simulation only |
-| M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | Pending remote deployment verification |
+| M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | VERIFIED — Railway production health/UI verified; ports clean |
 
 ### E2E Testing Track (Parallel)
 | Track | Scope | Outputs | Status |
