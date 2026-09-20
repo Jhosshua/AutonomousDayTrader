@@ -13,15 +13,15 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from backend.app.config import settings
 from backend.app.core.account import PaperTradingAccount, PositionSide
-from backend.app.core.bracket import BracketChildType, DynamicBracketManager
-from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType, TimeInForce
+from backend.app.core.bracket import BracketChildType, BracketStatus, DynamicBracketManager
+from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
 from backend.app.core.event_bus import event_bus
-from backend.app.core.flattening import FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
-from backend.app.core.risk import BreakerStatus, InstitutionalRiskEngine
+from backend.app.core.flattening import ET_TZ, FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
+from backend.app.core.risk import BreakerStatus, InstitutionalRiskEngine, RiskEngineConfig
 from backend.app.ingestion.news_ws import NewsWebSocketClient
 from backend.app.ingestion.stock_ws import StockWebSocketClient
 from backend.app.ingestion.vix_client import VixClient
@@ -37,8 +37,18 @@ logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL.upper(), logging.I
 log = logging.getLogger("AutonomousDayTrader")
 
 # System Components
-account = PaperTradingAccount(initial_cash=settings.INITIAL_CASH)
-risk_engine = InstitutionalRiskEngine()
+account = PaperTradingAccount(
+    initial_cash=settings.INITIAL_CASH,
+    leverage=settings.DAY_TRADING_LEVERAGE,
+    max_position_notional=settings.MAX_POSITION_NOTIONAL,
+)
+risk_engine = InstitutionalRiskEngine(config=RiskEngineConfig(
+    starting_equity=settings.INITIAL_CASH,
+    hard_max_daily_loss_dollars=settings.MAX_DAILY_LOSS_LIMIT,
+    base_trade_risk_pct=settings.PER_POSITION_RISK_PCT,
+    max_position_equity_pct=settings.MAX_POSITION_NOTIONAL / settings.INITIAL_CASH,
+    max_concurrent_positions=settings.MAX_CONCURRENT_POSITIONS,
+))
 bracket_manager = DynamicBracketManager()
 flattening_engine = ZeroOvernightFlatteningEngine()
 
@@ -47,7 +57,10 @@ orb_strategy = OpeningRangeBreakoutStrategy()
 vwap_strategy = VWAPPullbackStrategy()
 news_strategy = NewsMomentumStrategy()
 mean_reversion_strategy = MeanReversionStrategy()
-adaptation_engine = DynamicAdaptationEngine()
+adaptation_engine = DynamicAdaptationEngine(
+    max_concurrent_positions=settings.MAX_CONCURRENT_POSITIONS,
+    base_risk_pct=settings.PER_POSITION_RISK_PCT,
+)
 
 strategies: List[Strategy] = [
     orb_strategy,
@@ -65,6 +78,8 @@ bracket_realized_pnl: Dict[str, float] = {}
 relay_statuses: Dict[str, str] = {"stock": "unconfigured", "news": "unconfigured", "vix": "unconfigured"}
 runtime_tasks: Set[asyncio.Task] = set()
 simulation_mode: bool = False
+last_session_date: Optional[Any] = None
+completed_brackets_recorded: Set[str] = set()
 
 
 def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[bool, str]:
@@ -154,9 +169,11 @@ def _serialize_position(symbol: str) -> Dict[str, Any]:
         "symbol": pos.symbol,
         "side": pos.side.value,
         "shares": pos.shares,
+        "qty": pos.shares,
         "entry_price": pos.avg_entry_price,
         "avg_entry_price": pos.avg_entry_price,
         "market_price": pos.market_price,
+        "current_price": pos.market_price,
         "market_value": pos.market_value,
         "cost_basis": pos.cost_basis,
         "unrealized_pnl": pos.unrealized_pnl,
@@ -234,16 +251,19 @@ def _apply_bracket_directive(bracket_id: str, directive: Any) -> None:
             continue
         if "new_qty" in modification:
             new_qty = int(modification["new_qty"])
-            order.qty = new_qty
             order.remaining_qty = new_qty
+            order.qty = order.filled_qty + new_qty
         if "new_stop_price" in modification:
             order.stop_price = float(modification["new_stop_price"])
 
 
 def _record_completed_bracket(bracket_id: str) -> None:
+    if bracket_id in completed_brackets_recorded:
+        return
     bracket = bracket_manager.brackets.get(bracket_id)
     if not bracket:
         return
+    completed_brackets_recorded.add(bracket_id)
     strategy = strategy_map.get(bracket.strategy_id)
     if strategy:
         strategy.record_trade(bracket_realized_pnl.get(bracket_id, 0.0))
@@ -287,6 +307,8 @@ def _reconcile_fills(fills: List[Any]) -> None:
                         engine.cancel_order(order.id, reason="PARTIAL_ENTRY_PROTECTED_SIZE")
                     except Exception:
                         pass
+            if order.status.value in ("FILLED", "CANCELLED", "REJECTED"):
+                entry_order_to_bracket.pop(order.id, None)
             continue
 
         mapping = bracket_manager.order_to_bracket.get(order.id)
@@ -303,6 +325,53 @@ def _reconcile_fills(fills: List[Any]) -> None:
         _apply_bracket_directive(child_bracket_id, directive)
         if directive.bracket_status.value.startswith("COMPLETED"):
             _record_completed_bracket(child_bracket_id)
+
+
+def _flatten_symbol(sym: str, price: float, timestamp: datetime) -> List[Any]:
+    """Liquidate a full position, looping process_bar past the 10% volume participation cap."""
+    fills: List[Any] = []
+    for _ in range(50):
+        if sym not in account.positions:
+            break
+        batch = engine.process_bar(sym, price, price, price, price, 100000, timestamp)
+        if not batch:
+            break
+        fills.extend(batch)
+    return fills
+
+
+def _trip_circuit_breaker(timestamp: datetime) -> None:
+    """Halt trading and liquidate all open positions after a daily-loss breach."""
+    account.status = account.status.__class__.CIRCUIT_HALTED
+    engine.cancel_all_orders("CIRCUIT_BREAKER_HALT")
+    for sym, pos in list(account.positions.items()):
+        side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
+        bracket_id = bracket_manager.symbol_to_bracket.get(sym)
+        liq_order = engine.create_order(
+            symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
+            strategy_id="CIRCUIT_BREAKER", parent_order_id=bracket_id,
+        )
+        engine.submit_order(liq_order.id)
+        liq_fills = _flatten_symbol(sym, pos.market_price, timestamp)
+        _reconcile_fills(liq_fills)
+
+
+def _check_session_boundary(now_dt: datetime) -> None:
+    """Reset daily risk, flattening, and account metrics when the ET session date changes."""
+    global last_session_date
+    if now_dt.tzinfo is None:
+        now_dt = now_dt.replace(tzinfo=timezone.utc)
+    session_date = now_dt.astimezone(ET_TZ).date()
+    if last_session_date == session_date:
+        return
+    is_first_observation = last_session_date is None
+    last_session_date = session_date
+    if is_first_observation:
+        return
+    log.info("New ET session %s detected; resetting daily session state", session_date)
+    risk_engine.reset_daily_metrics(account.equity)
+    flattening_engine.reset_for_new_session()
+    account.reset_daily_metrics(account.equity)
 
 
 async def broadcast_ui_state() -> None:
@@ -388,13 +457,30 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             engine.submit_order(order.id)
             fill_p = bar.close if bar else existing_pos.market_price
             fill_dt = bar.timestamp if bar else datetime.now(timezone.utc)
-            fills = engine.process_bar(sym, fill_p, fill_p, fill_p, fill_p, 100000, fill_dt)
+            fills = _flatten_symbol(sym, fill_p, fill_dt)
             _reconcile_fills(fills)
         return
 
     # 2. Position-opening entry signal
     if signal.entry_price <= 0:
         return
+
+    # Reject duplicate entries: a working entry order or live bracket for this
+    # symbol must not be overwritten (that would orphan the existing bracket).
+    existing_bracket_id = bracket_manager.symbol_to_bracket.get(sym)
+    if existing_bracket_id:
+        existing_bracket = bracket_manager.brackets.get(existing_bracket_id)
+        if existing_bracket and existing_bracket.status in (BracketStatus.PENDING_ENTRY, BracketStatus.ACTIVE):
+            log.warning(
+                "Rejecting duplicate entry signal for %s: bracket %s already %s",
+                sym, existing_bracket_id, existing_bracket.status.value,
+            )
+            return
+    for working in engine.working_orders.values():
+        if working.symbol == sym and working.id in entry_order_to_bracket:
+            log.warning("Rejecting duplicate entry signal for %s: entry order %s still working", sym, working.id)
+            return
+
     latest_market_prices[sym] = signal.entry_price if bar is None else bar.close
     adapted_stop = adaptation_engine.calculate_adapted_stop(signal)
     is_active = sym in account.positions
@@ -489,7 +575,13 @@ async def handle_bar_event(bar: BarEvent) -> None:
         flattening_engine.clock.set_simulated_time(bar.timestamp)
     else:
         flattening_engine.clock.clear_simulated_time()
+    _check_session_boundary(bar.timestamp)
     adaptation_engine.update_clock(bar.timestamp)
+    for strat in strategies:
+        try:
+            strat.on_time_tick(bar.timestamp)
+        except Exception as e:
+            log.error(f"Strategy {strat.strategy_id} error on time tick: {e}")
 
     directive = flattening_engine.check_time_tick()
     if directive:
@@ -530,19 +622,7 @@ async def handle_bar_event(bar: BarEvent) -> None:
         timestamp=bar.timestamp,
     )
     if status == BreakerStatus.HALTED_DAILY_LOSS:
-        account.status = account.status.__class__.CIRCUIT_HALTED
-        engine.cancel_all_orders("CIRCUIT_BREAKER_HALT")
-        # Liquidate positions
-        for sym, pos in list(account.positions.items()):
-            side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
-            bracket_id = bracket_manager.symbol_to_bracket.get(sym)
-            liq_order = engine.create_order(
-                symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
-                strategy_id="CIRCUIT_BREAKER", parent_order_id=bracket_id,
-            )
-            engine.submit_order(liq_order.id)
-            liq_fills = engine.process_bar(sym, bar.close, bar.close, bar.close, bar.close, 100000, bar.timestamp)
-            _reconcile_fills(liq_fills)
+        _trip_circuit_breaker(bar.timestamp)
 
     # Trailing stop update
     atr_est = max(0.01, bar.high - bar.low)
@@ -578,6 +658,18 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         timestamp=quote.timestamp,
     )
     _reconcile_fills(fills)
+
+    # Circuit breaker is evaluated on quotes too, not only on bars
+    status = risk_engine.evaluate_account_state(
+        equity=account.equity,
+        cash=account.cash,
+        realized_pnl=account.realized_pnl,
+        unrealized_pnl=account.unrealized_pnl,
+        timestamp=quote.timestamp,
+    )
+    if status == BreakerStatus.HALTED_DAILY_LOSS:
+        _trip_circuit_breaker(quote.timestamp)
+
     await broadcast_ui_state()
 
 
@@ -597,6 +689,9 @@ async def handle_news_event(news: NewsEvent) -> None:
     # Update monitored positions for news contradiction circuit breaker
     for sym, pos in account.positions.items():
         news_strategy.update_monitored_position(sym, pos.side.value)
+    for sym in list(news_strategy.monitored_positions.keys()):
+        if sym not in account.positions:
+            news_strategy.update_monitored_position(sym, None)
 
     exit_signals = news_strategy.on_news(news)
     for sig in exit_signals:
@@ -608,7 +703,13 @@ async def handle_vix_print(vprint: VixPrint) -> None:
     """Update VIX print and scale risk and adaptation parameters."""
     global last_vix_print
     last_vix_print = vprint
-    adaptation_engine.on_vix_print(vprint)
+    if vprint.is_stale or vprint.is_fallback:
+        log.warning(
+            "Skipping regime update for stale/fallback VIX print %.2f (state=%s, upstream=%s)",
+            vprint.value, vprint.state, vprint.upstream,
+        )
+    else:
+        adaptation_engine.on_vix_print(vprint)
     for strat in strategies:
         try:
             strat.on_vix(vprint)
@@ -632,7 +733,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
                 strategy_id="AUTO_FLATTEN", parent_order_id=bracket_id,
             )
             engine.submit_order(liq_order.id)
-            fills = engine.process_bar(sym, pos.market_price, pos.market_price, pos.market_price, pos.market_price, 100000, now_dt)
+            fills = _flatten_symbol(sym, pos.market_price, now_dt)
             _reconcile_fills(fills)
 
     if directive.run_audit:
@@ -652,8 +753,13 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
                     strategy_id="EMERGENCY_SWEEP", parent_order_id=bracket_id,
                 )
                 engine.submit_order(sweep_order.id)
-                fills = engine.process_bar(sym, pos.market_price, pos.market_price, pos.market_price, pos.market_price, 100000, now_dt)
+                fills = _flatten_symbol(sym, pos.market_price, now_dt)
                 _reconcile_fills(fills)
+            # Re-verify the book after the emergency sweep so the audit can pass
+            audit_res = flattening_engine.execute_phase_4_audit(
+                open_positions=account.positions,
+                working_orders=list(engine.working_orders.values()),
+            )
 
         if audit_res.audit_passed:
             account.status = account.status.__class__.EOD_FLAT
@@ -670,6 +776,14 @@ async def _runtime_clock_loop() -> None:
                 await asyncio.sleep(1.0)
                 continue
             flattening_engine.clock.clear_simulated_time()
+            now_dt = flattening_engine.clock.now()
+            _check_session_boundary(now_dt)
+            adaptation_engine.update_clock(now_dt)
+            for strat in strategies:
+                try:
+                    strat.on_time_tick(now_dt)
+                except Exception as e:
+                    log.error(f"Strategy {strat.strategy_id} error on time tick: {e}")
             directive = flattening_engine.check_time_tick()
             if directive:
                 await handle_flattening_directive(directive)
@@ -681,14 +795,20 @@ async def _runtime_clock_loop() -> None:
             await asyncio.sleep(1.0)
 
 
+async def handle_trade_event(trade: TradeEvent) -> None:
+    """Track the latest trade print price for pre-trade risk valuation."""
+    latest_market_prices[trade.symbol.upper()] = trade.price
+
+
 async def _handle_relay_status(status: RelayStatusEvent) -> None:
     relay_statuses[status.feed_type] = status.status
 
 
 def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     """Reset in-memory session state for deterministic replay and test isolation."""
-    global last_vix_print, simulation_mode
+    global last_vix_print, simulation_mode, last_session_date
     simulation_mode = False
+    last_session_date = None
     flattening_engine.clock.clear_simulated_time()
     account.positions.clear()
     account.cash = settings.INITIAL_CASH if starting_equity is None else starting_equity
@@ -707,6 +827,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     bracket_manager.order_to_bracket.clear()
     entry_order_to_bracket.clear()
     bracket_realized_pnl.clear()
+    completed_brackets_recorded.clear()
     latest_market_prices.clear()
     market_history.clear()
     recent_news.clear()
@@ -732,6 +853,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Register bus event handlers
     event_bus.subscribe(BarEvent, handle_bar_event)
     event_bus.subscribe(QuoteEvent, handle_quote_event)
+    event_bus.subscribe(TradeEvent, handle_trade_event)
     event_bus.subscribe(NewsEvent, handle_news_event)
     event_bus.subscribe(VixPrint, handle_vix_print)
     event_bus.subscribe(RelayStatusEvent, _handle_relay_status)
@@ -746,8 +868,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await stock_ws_client.start()
         await news_ws_client.start()
         await vix_client.start()
-        clock_task = asyncio.create_task(_runtime_clock_loop(), name="TradingRuntimeClock")
-        runtime_tasks.add(clock_task)
+
+    # The runtime clock drives EOD flattening and session resets even without relay clients
+    clock_task = asyncio.create_task(_runtime_clock_loop(), name="TradingRuntimeClock")
+    runtime_tasks.add(clock_task)
 
     yield
 
@@ -890,6 +1014,8 @@ async def submit_order(req: OrderCreateRequest) -> Dict[str, Any]:
         otype = OrderType(req.order_type.upper())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if otype == OrderType.STOP_LIMIT:
+        raise HTTPException(status_code=400, detail="STOP_LIMIT orders are not supported by the execution engine")
 
     order = engine.create_order(
         symbol=req.symbol,
@@ -945,7 +1071,7 @@ async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]
                 strategy_id="MANUAL_FLATTEN", parent_order_id=bracket_id,
             )
             engine.submit_order(order.id)
-            fills = engine.process_bar(sym, pos.market_price, pos.market_price, pos.market_price, pos.market_price, 100000, now_dt)
+            fills = _flatten_symbol(sym, pos.market_price, now_dt)
             _reconcile_fills(fills)
             flattened.append(sym)
 
@@ -973,7 +1099,13 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                     await manual_flatten()
                 elif action == "TIGHTEN_STOP":
                     sym = msg.get("symbol", "").upper()
-                    new_stop = float(msg.get("new_stop", 0.0))
+                    try:
+                        new_stop = float(msg.get("new_stop", 0.0))
+                    except (TypeError, ValueError):
+                        new_stop = 0.0
+                    if new_stop <= 0:
+                        log.warning("Rejected TIGHTEN_STOP for %s: invalid new_stop %s", sym, msg.get("new_stop"))
+                        continue
                     bracket_dir = None
                     if hasattr(bracket_manager, "tighten_stop"):
                         bracket_dir = bracket_manager.tighten_stop(sym, new_stop)
@@ -984,9 +1116,6 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                             oid = mod.get("order_id")
                             if oid and oid in engine.working_orders:
                                 engine.working_orders[oid].stop_price = mod.get("new_stop_price", new_stop)
-                    for wo in engine.working_orders.values():
-                        if wo.symbol == sym and wo.order_type in (OrderType.STOP, OrderType.STOP_LIMIT):
-                            wo.stop_price = new_stop
                     await broadcast_ui_state()
             except Exception as e:
                 log.error(f"Error handling UI action: {e}")

@@ -96,7 +96,14 @@ class PaperTradingAccount:
     PDT_MINIMUM_EQUITY: float = 25000.00
     MAX_POSITION_ALLOCATION_PCT: float = 0.25  # 25% max buying power ($50k) per symbol
 
-    def __init__(self, initial_cash: float = INITIAL_CAPITAL) -> None:
+    def __init__(
+        self,
+        initial_cash: float = INITIAL_CAPITAL,
+        leverage: float = 4.0,
+        max_position_notional: Optional[float] = None,
+    ) -> None:
+        self.leverage: float = leverage
+        self.max_position_notional: Optional[float] = max_position_notional
         self.initial_balance: float = initial_cash
         self.daily_starting_equity: float = initial_cash
         self.cash: float = initial_cash
@@ -107,7 +114,7 @@ class PaperTradingAccount:
         self.fees_paid: float = 0.0
         self.maintenance_margin: float = 0.0
         self.margin_excess: float = initial_cash
-        self.buying_power: float = round(initial_cash * 4.0, 2)
+        self.buying_power: float = round(initial_cash * self.leverage, 2)
         self.daily_drawdown_dollars: float = 0.0
         self.daily_drawdown_pct: float = 0.0
         self.positions: Dict[str, Position] = {}
@@ -136,7 +143,9 @@ class PaperTradingAccount:
         order_value = qty * est_price
 
         # Check per-position allocation ceiling ($50,000 max = 25% of $200k initial BP)
-        max_alloc = self.initial_balance * 4.0 * self.MAX_POSITION_ALLOCATION_PCT
+        max_alloc = self.initial_balance * self.leverage * self.MAX_POSITION_ALLOCATION_PCT
+        if self.max_position_notional is not None:
+            max_alloc = min(max_alloc, self.max_position_notional)
         current_alloc = abs(existing_pos.market_value) if existing_pos else 0.0
 
         # Determine if order is position-reducing
@@ -170,7 +179,7 @@ class PaperTradingAccount:
                         req_margin = max(0.30 * flip_val, 5.00 * flip_qty)
                     else:
                         req_margin = max(1.00 * flip_val, 2.50 * flip_qty)
-                    bp_needed = round(req_margin * 4.0, 2)
+                    bp_needed = round(req_margin * self.leverage, 2)
                     if bp_needed > self.buying_power + 0.01:
                         return False, f"Insufficient Day Trading Buying Power: needed ${bp_needed:,.2f}, available ${self.buying_power:,.2f}"
                     return True, "Approved"
@@ -184,7 +193,7 @@ class PaperTradingAccount:
                     if flip_val > max_alloc + 0.01:
                         return False, f"Order exceeds per-position concentration cap of ${max_alloc:,.2f}"
                     req_margin = 0.25 * flip_val
-                    bp_needed = round(req_margin * 4.0, 2)
+                    bp_needed = round(req_margin * self.leverage, 2)
                     if bp_needed > self.buying_power + 0.01:
                         return False, f"Insufficient Day Trading Buying Power: needed ${bp_needed:,.2f}, available ${self.buying_power:,.2f}"
                     return True, "Approved"
@@ -211,7 +220,7 @@ class PaperTradingAccount:
                 else:
                     req_margin = max(1.00 * order_value, 2.50 * qty)
 
-            bp_needed = round(req_margin * 4.0, 2)
+            bp_needed = round(req_margin * self.leverage, 2)
             if bp_needed > self.buying_power + 0.01:
                 return False, f"Insufficient Day Trading Buying Power: needed ${bp_needed:,.2f}, available ${self.buying_power:,.2f}"
 
@@ -405,15 +414,18 @@ class PaperTradingAccount:
         is_pdt = self.equity >= self.PDT_MINIMUM_EQUITY
         if is_pdt:
             self.margin_excess = max(0.0, round(self.equity - self.maintenance_margin, 2))
-            self.buying_power = round(self.margin_excess * 4.0, 2)
+            self.buying_power = round(self.margin_excess * self.leverage, 2)
         else:
             # Below $25k PDT threshold, no 4x intraday leverage
             self.margin_excess = max(0.0, round(self.equity - self.maintenance_margin, 2))
             self.buying_power = max(0.0, round(self.cash, 2))
 
-        # Check margin call condition
-        if self.equity < self.maintenance_margin:
+        # Margin call: auto-set only from ACTIVE, auto-recover when cleared, and
+        # never override externally imposed CIRCUIT_HALTED / EOD_FLAT states.
+        if self.status == AccountStatus.ACTIVE and self.equity < self.maintenance_margin:
             self.status = AccountStatus.MARGIN_CALL
+        elif self.status == AccountStatus.MARGIN_CALL and self.equity >= self.maintenance_margin:
+            self.status = AccountStatus.ACTIVE
 
         # Compute drawdown from the current session start, not the original account deposit.
         dd_dollars = max(0.0, round(self.daily_starting_equity - self.equity, 2))

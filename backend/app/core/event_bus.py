@@ -21,7 +21,6 @@ class EventBus:
 
     def __init__(self) -> None:
         self._subscribers: Dict[Type, List[HandlerFunc]] = defaultdict(list)
-        self._lock = asyncio.Lock()
         self._published_count: int = 0
         self._error_count: int = 0
 

@@ -255,6 +255,14 @@ class DynamicBracketManager:
 
         # 1. Stop-Loss Triggered
         if child_type == BracketChildType.STOP_LOSS:
+            bracket.remaining_qty = max(0, bracket.remaining_qty - filled_qty)
+            if bracket.remaining_qty > 0:
+                # Partial stop fill: the position is still open, so keep the
+                # bracket and its OCO targets alive for the remaining shares.
+                return BracketUpdateDirective(
+                    action="NO_ACTION",
+                    bracket_status=bracket.status,
+                )
             bracket.status = BracketStatus.COMPLETED_STOP
             orders_to_cancel = []
             if bracket.target_1_order_id and not bracket.target_1_filled:
@@ -263,7 +271,6 @@ class DynamicBracketManager:
                 orders_to_cancel.append(bracket.target_2_order_id)
 
             self.symbol_to_bracket.pop(bracket.symbol, None)
-            bracket.remaining_qty = max(0, bracket.remaining_qty - filled_qty)
             return BracketUpdateDirective(
                 action="CANCEL_ORDER",
                 orders_to_cancel=orders_to_cancel,
