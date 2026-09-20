@@ -194,6 +194,27 @@ def calculate_rsi(prices: List[float], period: int = 14) -> float:
     return round(rsi, 2)
 
 
+MIN_STOP_DISTANCE_PCT = 0.0040  # Must match InstitutionalRiskEngine's 0.4% floor.
+
+
+def resolve_stop(entry_price: float, raw_dist: float, is_long: bool) -> Tuple[float, float]:
+    """Place a stop at raw_dist from entry, widened to the risk engine's 0.4% floor.
+
+    A stop that is too WIDE is returned untouched. The risk engine rejects that
+    signal, which is the correct outcome: pulling the stop in to satisfy the
+    4.0% ceiling would move it inside the structure that justified the trade.
+
+    The stop is rounded away from entry so the realised distance can never land
+    a fraction below the floor and trip a knife-edge rejection.
+    """
+    risk = max(entry_price * MIN_STOP_DISTANCE_PCT, raw_dist)
+    if is_long:
+        stop = math.floor((entry_price - risk) * 10000) / 10000
+    else:
+        stop = math.ceil((entry_price + risk) * 10000) / 10000
+    return stop, abs(entry_price - stop)
+
+
 def calculate_rvol(current_volume: float, baseline_volume: float) -> float:
     """Calculate Relative Volume (RVOL)."""
     if baseline_volume <= 0:

@@ -17,6 +17,7 @@ from backend.app.strategies.base import (
     StrategyStatus,
     calculate_sma,
     calculate_atr,
+    resolve_stop,
 )
 
 
@@ -234,12 +235,10 @@ class NewsMomentumStrategy(Strategy):
         signals: List[SignalEvent] = []
 
         if cat.sentiment >= self.sentiment_threshold:
-            # Bullish catalyst breakout with safe interior buffer [0.42%, 3.80%]
-            min_dist = round(entry_price * 0.0042, 4)
-            max_dist = round(entry_price * 0.0380, 4)
+            # Bullish catalyst breakout: stop under the bar low, widened to the
+            # 0.4% floor. A wide stop is left for the risk engine to reject.
             raw_dist = max(0.10, entry_price - round(bar.low - 0.02, 4))
-            risk = max(min_dist, min(max_dist, raw_dist))
-            stop_loss = round(entry_price - risk, 4)
+            stop_loss, risk = resolve_stop(entry_price, raw_dist, True)
             tp1 = round(entry_price + 1.5 * risk, 4)
             tp2 = round(entry_price + 2.5 * risk, 4)
 
@@ -261,12 +260,10 @@ class NewsMomentumStrategy(Strategy):
             self.monitored_positions[sym] = "LONG"
 
         elif cat.sentiment <= -self.sentiment_threshold:
-            # Bearish catalyst breakdown with safe interior buffer [0.42%, 3.80%]
-            min_dist = round(entry_price * 0.0042, 4)
-            max_dist = round(entry_price * 0.0380, 4)
+            # Bearish catalyst breakdown: stop above the bar high, widened to the
+            # 0.4% floor. A wide stop is left for the risk engine to reject.
             raw_dist = max(0.10, round(bar.high + 0.02, 4) - entry_price)
-            risk = max(min_dist, min(max_dist, raw_dist))
-            stop_loss = round(entry_price + risk, 4)
+            stop_loss, risk = resolve_stop(entry_price, raw_dist, False)
             tp1 = round(entry_price - 1.5 * risk, 4)
             tp2 = round(entry_price - 2.5 * risk, 4)
 

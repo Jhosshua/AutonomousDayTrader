@@ -249,7 +249,7 @@ class InstitutionalRiskEngine:
         )
 
         q_risk = int(math.floor(target_risk_dollars / stop_dist))
-        # 25% max position concentration
+        # Max single-position notional (max_position_equity_pct of equity)
         max_notional = account_equity * self.config.max_position_equity_pct
         q_alloc = int(math.floor(max_notional / entry_price))
         # Buying power capacity

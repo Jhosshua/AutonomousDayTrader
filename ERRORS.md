@@ -1,0 +1,49 @@
+# ERRORS.md — AutonomousDayTrader
+
+## 2026-09-20: A "float precision fix" that was really a behaviour change
+
+**What did not work**: Clamping strategy stop distances to `[0.0042, 0.0380]` in `orb.py`,
+`vwap_pullback.py` and `news_momentum.py` to stop IEEE 754 knife-edge rejections at the risk
+engine's `[0.0040, 0.0400]` boundary. The clamp was 5% inside each limit; float error is ~1e-6.
+The extra margin was not precision, it was a silent trading-behaviour change: a signal whose
+structural stop was wider than 4.0% used to be REJECTED (no trade) and instead became a live
+trade with its stop pulled inside the structure that justified it.
+
+**What worked instead**: Two separate, correctly-sized fixes.
+1. `EPS = 1e-6` tolerance in `risk.py` — this alone fixes the actual float problem.
+2. `resolve_stop()` in `strategies/base.py` — widens a too-tight stop to the 0.4% floor, leaves a
+   wide stop alone, and rounds the stop *away* from entry so the realised distance can never land
+   a fraction under the floor.
+
+**Note for next time**: When a fix's magnitude is far larger than the problem it names, it is a
+behaviour change in disguise. Size the fix to the defect. And if a "precision fix" moves a stop,
+it is an exit change and needs a backtest before it ships.
+
+## 2026-09-20: Clearing state to make a failure go away
+
+**What did not work**: `account.positions.clear()` in `_check_session_boundary` so that day-2
+trading starts flat. It does start flat, but only in this process's memory. A position on the book
+at ET rollover means the prior day's 15:55 flatten failed; there is no broker reconciliation in
+this codebase, so clearing it left the broker holding shares nothing would ever close.
+
+**What worked instead**: Liquidate at the boundary with a `SESSION_BOUNDARY_LIQUIDATION` market
+order per symbol, log at ERROR, and if liquidation does not complete, leave the position on the
+book so the next flatten sweep retries.
+
+**Note for next time**: "Reset to a clean state" is only safe when the state is purely local.
+When it mirrors something external (a broker position), resetting is forgetting. Fail closed.
+
+## 2026-09-20: Tests that locked in the bug
+
+**What did not work**: 10 E2E tests in `test_challenger_bracket_2.py` asserted the clamp contract
+(`assert stop_dist == round(entry * 0.0380, 4)`). They passed, so the release read as green while
+pinning the wrong behaviour. A separate new unit test for the session boundary would also have
+passed against the buggy code, because asserting "the book is empty" is satisfied by both
+liquidating *and* clearing.
+
+**What worked instead**: Mutation-checking every new test — reinstate the old code and confirm the
+test fails — before trusting it. Assert the mechanism (a liquidating SELL order exists), not the
+end state.
+
+**Note for next time**: A green suite proves the tests agree with the code, not that the code is
+right. Run the mutation check.

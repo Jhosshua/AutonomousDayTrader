@@ -265,3 +265,35 @@ def test_session_boundary_purges_working_orders():
 
     assert len(engine.working_orders) == 0
     assert o.status == OrderState.CANCELLED
+
+
+def test_session_boundary_liquidates_a_position_that_survived_the_flatten():
+    """A position still on the book at ET rollover is closed, not silently dropped.
+
+    Dropping it would leave the broker holding shares the process no longer
+    tracks, so nothing would ever close them.
+    """
+    from backend.app.main import _check_session_boundary, engine, account
+
+    d1 = datetime(2026, 10, 5, 14, 0, 0, tzinfo=timezone.utc)
+    _check_session_boundary(d1)
+
+    entry = engine.create_order("MSFT", OrderSide.BUY, OrderType.MARKET, 25)
+    engine.submit_order(entry.id)
+    engine.process_bar("MSFT", 300.0, 300.5, 299.5, 300.0, 500000, d1)
+    assert "MSFT" in account.positions, "setup failed: no position to carry over"
+
+    d2 = datetime(2026, 10, 6, 14, 0, 0, tzinfo=timezone.utc)
+    _check_session_boundary(d2)
+
+    # The book being empty is not enough: the old code cleared it without
+    # closing anything. Require a real liquidating SELL to have been placed.
+    liquidations = [
+        o for o in engine.orders.values()
+        if o.symbol == "MSFT"
+        and o.side == OrderSide.SELL
+        and o.strategy_id == "SESSION_BOUNDARY_LIQUIDATION"
+    ]
+    assert liquidations, "no liquidating sell was placed for the carried-over position"
+    assert sum(o.filled_qty for o in liquidations) == 25
+    assert "MSFT" not in account.positions, "carried-over position was not liquidated"

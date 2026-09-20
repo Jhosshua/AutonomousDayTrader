@@ -392,12 +392,35 @@ def _check_session_boundary(now_dt: datetime) -> None:
         log.warning("Session boundary detected with %d open working orders; cancelling all", len(engine.working_orders))
         engine.cancel_all_orders("SESSION_BOUNDARY_PURGE")
         engine.working_orders.clear()
+    # A position still on the book at a session boundary means the prior day's
+    # 15:55 flatten did not complete. Liquidate it. Clearing positions blind
+    # would leave the broker holding shares this process no longer tracks, and
+    # nothing would ever close them.
+    if account.positions:
+        log.error(
+            "Session boundary with %d open position(s); prior-day flatten failed. Liquidating: %s",
+            len(account.positions),
+            ", ".join(sorted(account.positions)),
+        )
+        for sym, pos in list(account.positions.items()):
+            side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
+            liq_order = engine.create_order(
+                symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
+                strategy_id="SESSION_BOUNDARY_LIQUIDATION",
+            )
+            engine.submit_order(liq_order.id)
+            _reconcile_fills(_flatten_symbol(sym, pos.market_price, now_dt))
+        if account.positions:
+            log.error(
+                "Session boundary liquidation incomplete; still open: %s. Book kept so the "
+                "next flatten sweep retries.",
+                ", ".join(sorted(account.positions)),
+            )
     risk_engine.reset_daily_metrics(account.equity)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
-    # At a session boundary the book must be flat: clear bracket/linkage state
-    # and open positions so no stale state blocks a symbol on the new day.
-    account.positions.clear()
+    # Bracket/linkage state is per-session: clear it so no stale PENDING_ENTRY
+    # bracket blocks a symbol on the new day.
     bracket_manager.brackets.clear()
     bracket_manager.symbol_to_bracket.clear()
     bracket_manager.order_to_bracket.clear()

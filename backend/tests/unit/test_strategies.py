@@ -466,3 +466,59 @@ def test_news_momentum_stop_distance_clamping():
     stop_pct = stop_dist / sig.entry_price
     assert 0.004 <= stop_pct <= 0.040
     assert stop_dist >= round(sig.entry_price * 0.004, 4)
+
+
+# ---------------------------------------------------------------------------
+# Stop placement: a wide stop must reach the risk engine as-is, not be clamped
+# ---------------------------------------------------------------------------
+
+def test_resolve_stop_widens_a_too_tight_stop_to_the_risk_floor():
+    from backend.app.strategies.base import resolve_stop
+
+    stop, risk = resolve_stop(100.0, 0.05, is_long=True)   # 0.05% requested
+    assert risk / 100.0 >= 0.0040
+    assert stop < 100.0
+
+
+def test_resolve_stop_leaves_a_wide_stop_untouched_for_the_risk_engine_to_reject():
+    """A 6% opening range must NOT be pulled in to 3.8%.
+
+    Clamping would turn a signal the risk engine is meant to reject into a
+    live trade whose stop sits inside the range that justified it.
+    """
+    from backend.app.strategies.base import resolve_stop
+
+    stop, risk = resolve_stop(100.0, 6.0, is_long=True)
+    assert stop == pytest.approx(94.0, abs=0.001), "wide stop was moved off structure"
+    assert risk / 100.0 == pytest.approx(0.06, abs=1e-6)
+    assert _risk_verdict(100.0, stop).rejection_code == "STOP_DISTANCE_TOO_WIDE"
+
+
+@pytest.mark.parametrize("entry", [9.97, 10.0, 47.31, 100.0, 233.33, 1041.07])
+def test_resolve_stop_never_trips_the_risk_engine_floor(entry):
+    """Knife-edge guard: a floor-width stop is never rejected as TOO_TIGHT."""
+    from backend.app.strategies.base import resolve_stop
+
+    for is_long in (True, False):
+        stop, _ = resolve_stop(entry, 0.0, is_long)
+        verdict = _risk_verdict(entry, stop, side="BUY" if is_long else "SELL")
+        assert verdict.rejection_code != "STOP_DISTANCE_TOO_TIGHT", (
+            f"entry={entry} is_long={is_long} stop={stop} was rejected as too tight"
+        )
+
+
+def _risk_verdict(entry_price, stop_price, side="BUY"):
+    from backend.app.core.risk import InstitutionalRiskEngine
+
+    return InstitutionalRiskEngine().evaluate_order_request(
+        symbol="TEST",
+        side=side,
+        requested_qty=10,
+        entry_price=entry_price,
+        stop_price=stop_price,
+        account_equity=50000.0,
+        buying_power=200000.0,
+        active_positions_count=0,
+        active_symbols=set(),
+        active_sectors=set(),
+    )

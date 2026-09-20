@@ -2,6 +2,13 @@
 
 ## Decisions
 
+### 2026-09-20 (post-release audit): stop clamping reverted, session boundary made fail-closed
+- **Strategies no longer clamp a stop to a 3.80% maximum.** Why: the clamp silently converted a signal the risk engine is meant to REJECT (stop wider than 4.0%) into a live trade whose stop sat inside the structure that justified it. Worked example: ORB entry $100, range midpoint $94 (6% structural stop). Old = rejected, no trade. Clamped = traded with the stop at $96.20, inside the opening range. The clamp was shipped as an "IEEE 754 precision fix"; float error is ~1e-6, the clamp was 5% of the limit, so it was a behaviour change wearing a precision-fix label. Rejected: keeping the clamp and backtesting later — an unbacktested exit change was already live.
+- **Stop placement is now one shared helper, `resolve_stop()` in `strategies/base.py`.** It widens a too-tight stop to the 0.4% floor, leaves a wide stop untouched, and rounds the stop AWAY from entry so the realised distance can never land a hair under the floor. Why: three strategies had three divergent copies of the clamp maths. Rejected: per-strategy constants (the original shape) — that is how they diverged.
+- **A position still on the book at an ET session boundary is LIQUIDATED, not cleared.** Why: `account.positions.clear()` made a failed 15:55 flatten invisible. There is no broker reconciliation anywhere in this codebase, so `account.positions` is the only book: clearing it would leave the broker holding shares nothing would ever close. Now it places a `SESSION_BOUNDARY_LIQUIDATION` market order per symbol, and if liquidation does not complete the position STAYS on the book so the next flatten sweep retries. Rejected: clear-and-log (fail-open).
+- **Flagged, not changed: `max_position_equity_pct` is 1.000.** A single position may be 100% of equity ($50k), up from 0.500 ($25k). It was logged as intentional in an earlier entry but was never surfaced in the release summary. Left as-is pending an explicit call.
+
+
 ### 2026-09-20: Full audit & hardening cycle
 - **Canonical VIX regime map is 15/25/35 with sizing 1.20/1.00/0.70/0.35.** Why: the adaptation engine and enum docstring used it, and boundary tests expected it. Rejected: vix_client's divergent 15/22/30 (0.60/0.25) map — three sources of truth for the same regime logic caused silent sizing divergence at VIX 22-25.
 - **Duplicate entry signals are rejected while a symbol has a working entry order or live bracket (PENDING_ENTRY/ACTIVE/TARGET_1_HIT).** Why: overwriting `symbol_to_bracket` orphaned brackets and left unprotected stop orders after flatten. Rejected: allowing overwrite (old behavior) — it leaked brackets.
@@ -19,6 +26,14 @@
 - **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
 
 ## Session log
+
+### 2026-09-20 (audit of the release): two fail-open defects fixed
+- **Worked on**: Independent verification of the "VICTORY CONFIRMED" release report, then remediation of what it missed.
+- **Verified true**: 163/163 backend, 320/320 E2E, 17/17 Playwright visual tests (real browser, not source greps), frontend build clean, commit 32d0d6a pushed to origin/main, Railway deployment live and /health 200. User-facing music terminology is genuinely gone from components.
+- **Report overclaims**: "0 occurrences of music terminology" — `frontend/components/NowPlayingTray.tsx` still existed as an unreferenced re-export shim (now deleted); ORIGINAL_REQUEST.md and .agents notes still carry the terms (expected, they are historical). MEMORY said 318 E2E, the report said 320; 320 is correct.
+- **Defects the release missed**: (1) the [0.0042, 0.0380] stop clamp turned risk-engine rejections into live trades with stops inside structure; (2) `account.positions.clear()` at the session boundary silently dropped positions that survived a failed flatten. Neither was covered by a test — the 10 E2E tests that touched the clamp asserted the wrong contract.
+- **Completed**: Both fixed, both pinned by tests proven to FAIL on the old code (mutation-checked). Stale "25% max position concentration" comment corrected. 172/172 backend (9 new), 320/320 E2E, 17/17 visual, frontend build clean, Monday dry run reproduces $50,398.30, ports clean.
+- **Next session priorities**: decide on `max_position_equity_pct` 1.0 vs 0.5; note the Monday dry run is a scripted 62-event replay, so its +$398.30 is a plumbing check, not evidence of edge.
 
 ### 2026-09-20
 - **Worked on**: Full independent audit of the entire codebase (3 audit agents), fixing ~45 findings (2 CRITICAL, ~13 MAJOR), independent diff review (2 reviewers), follow-up fixes, full QA, deploy prep.

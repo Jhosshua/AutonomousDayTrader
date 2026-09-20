@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import zoneinfo
 
 from backend.app.models.events import BarEvent, OrderSide, OrderType
-from backend.app.strategies.base import Strategy, SignalEvent, StrategyStatus, calculate_atr
+from backend.app.strategies.base import Strategy, SignalEvent, StrategyStatus, calculate_atr, resolve_stop
 
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 
@@ -175,12 +175,10 @@ class OpeningRangeBreakoutStrategy(Strategy):
             atr = calculate_atr(state.all_bars, period=14)
             raw_dist = max(0.10, atr)
 
-        # Institutional stop distance clamping with safe interior buffer [0.42%, 3.80%]
-        # Prevents IEEE 754 precision issues and decimal truncation from landing on risk limits.
-        min_dist = round(entry_price * 0.0042, 4)
-        max_dist = round(entry_price * 0.0380, 4)
-        risk = max(min_dist, min(max_dist, raw_dist))
-        stop_loss = round(entry_price - risk if sig_type == "BUY" else entry_price + risk, 4)
+        # Widen a too-tight stop to the 0.4% floor. An oversized opening range is
+        # left alone and rejected by the risk engine rather than having its stop
+        # pulled inside the range.
+        stop_loss, risk = resolve_stop(entry_price, raw_dist, sig_type == "BUY")
 
         if sig_type == "BUY":
             tp1 = round(entry_price + self.target_1_r * risk, 4)

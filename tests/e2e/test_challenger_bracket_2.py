@@ -66,6 +66,25 @@ def _make_bar(
 # 1. ORB Stop Distance Clamping Tests ($5.00, $150.00, $1000.00)
 # ============================================================================
 
+def _risk_rejection(sig) -> str:
+    """Run a strategy signal past the live risk engine and return its rejection code."""
+    from backend.app.core.risk import InstitutionalRiskEngine
+
+    res = InstitutionalRiskEngine().evaluate_order_request(
+        symbol=sig.symbol,
+        side=sig.side.value if hasattr(sig.side, "value") else str(sig.side),
+        requested_qty=10,
+        entry_price=sig.entry_price,
+        stop_price=sig.stop_loss,
+        account_equity=50000.0,
+        buying_power=200000.0,
+        active_positions_count=0,
+        active_symbols=set(),
+        active_sectors=set(),
+    )
+    return res.rejection_code or ""
+
+
 class TestOrbStopDistanceClamping:
     """Stress tests stop distance clamping across extreme stock prices for ORB."""
 
@@ -148,13 +167,17 @@ class TestOrbStopDistanceClamping:
         sig = sigs[0]
         assert sig.side == OrderSide.BUY
 
+        mid = price  # opening range is symmetric around `price`
         stop_dist = abs(sig.entry_price - sig.stop_loss)
         ratio = stop_dist / sig.entry_price
 
-        # Clamping contract: strictly between 0.4% and 4.0%
-        assert 0.004 - 1e-6 <= ratio <= 0.040 + 1e-6, f"ORB BUY wide clamp violated: ratio={ratio:.6f} for price={price}"
-        expected_max_dist = round(entry * 0.0380, 4)
-        assert math.isclose(stop_dist, expected_max_dist, abs_tol=0.001)
+        # Contract: a wide opening range keeps its structural stop. The stop is
+        # NOT pulled in to 3.8%; the risk engine rejects the signal instead.
+        # Clamping here would convert "too volatile, no trade" into a live
+        # trade whose stop sits inside the range that justified it.
+        assert ratio > 0.040, f"wide ORB stop was clamped: ratio={ratio:.6f} for price={price}"
+        assert math.isclose(sig.stop_loss, mid, abs_tol=0.01), "stop moved off the range midpoint"
+        assert _risk_rejection(sig) == "STOP_DISTANCE_TOO_WIDE"
 
     @pytest.mark.parametrize("price", [5.00, 150.00, 1000.00])
     def test_orb_bearish_breakdown_stop_distance_clamping(self, price: float):
@@ -287,9 +310,10 @@ class TestNewsMomentumStopDistanceClamping:
 
         stop_dist_w = abs(sig_w.entry_price - sig_w.stop_loss)
         ratio_w = stop_dist_w / sig_w.entry_price
-        assert 0.004 - 1e-6 <= ratio_w <= 0.040 + 1e-6, f"News Momentum BUY wide clamp violated: ratio={ratio_w:.6f} for price={price}"
-        expected_max = round(price * 0.0380, 4)
-        assert math.isclose(stop_dist_w, expected_max, abs_tol=0.001)
+        # A wide catalyst bar keeps its structural stop (under the bar low).
+        # The risk engine rejects it rather than the strategy pulling it in.
+        assert ratio_w > 0.040, f"wide News Momentum BUY stop was clamped: ratio={ratio_w:.6f}"
+        assert _risk_rejection(sig_w) == "STOP_DISTANCE_TOO_WIDE"
 
     @pytest.mark.parametrize("price", [5.00, 150.00, 1000.00])
     def test_news_momentum_bearish_tight_and_wide_stops(self, price: float):
@@ -331,9 +355,9 @@ class TestNewsMomentumStopDistanceClamping:
 
         stop_dist = abs(sig.entry_price - sig.stop_loss)
         ratio = stop_dist / sig.entry_price
-        assert 0.004 - 1e-6 <= ratio <= 0.040 + 1e-6, f"News Momentum SELL clamp violated: ratio={ratio:.6f} for price={price}"
-        expected_max = round(price * 0.0380, 4)
-        assert math.isclose(stop_dist, expected_max, abs_tol=0.001)
+        # A wide catalyst bar keeps its structural stop (above the bar high).
+        assert ratio > 0.040, f"wide News Momentum SELL stop was clamped: ratio={ratio:.6f}"
+        assert _risk_rejection(sig) == "STOP_DISTANCE_TOO_WIDE"
 
 
 class TestFuzzStopClampingAcrossPrices:
@@ -687,5 +711,11 @@ class TestExtremePricesClamping:
 
         stop_dist = abs(sig.entry_price - sig.stop_loss)
         ratio = stop_dist / sig.entry_price
-        assert 0.004 - 1e-6 <= ratio <= 0.040 + 1e-6, f"Extreme ORB violated: price={price}, ratio={ratio}"
+        # Floor is enforced by the strategy; the ceiling is enforced by the risk
+        # engine rejecting the order, not by the strategy moving the stop.
+        # At $1.00 the ATR fallback's $0.10 floor is ~10% of price, so the
+        # signal is correctly refused rather than traded on a clamped stop.
+        assert ratio >= 0.004 - 1e-6, f"Extreme ORB floor violated: price={price}, ratio={ratio}"
+        if ratio > 0.040:
+            assert _risk_rejection(sig) == "STOP_DISTANCE_TOO_WIDE"
 
