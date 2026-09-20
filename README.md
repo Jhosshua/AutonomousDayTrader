@@ -132,6 +132,8 @@ cd frontend && npm run dev
 
 Live Railway dashboard: https://autonomousdaytrader-production.up.railway.app
 
+The Railway service `AutonomousDayTrader` is connected to the GitHub repo `Jhosshua/AutonomousDayTrader` (`main` branch) with an automatic deployment trigger: every push to `main` rebuilds and redeploys production. No manual `railway up` is needed. `scripts/deploy_and_push.sh` wraps this flow with test/build gates and a post-push `/health` verification.
+
 The deployed `/health` endpoint is the source of truth for upstream readiness; the current verified state reports stock, news, and VIX connected. The system remains paper-trading only.
 
 ### Running Test Suites
