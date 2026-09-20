@@ -15,6 +15,6 @@
 
 ### 2026-09-20
 - **Worked on**: Full independent audit of the entire codebase (3 audit agents), fixing ~45 findings (2 CRITICAL, ~13 MAJOR), independent diff review (2 reviewers), follow-up fixes, full QA, deploy prep.
-- **Completed**: All audit findings fixed and re-verified; QA green (140 backend, 293 E2E, Monday dry run re-certified, frontend build clean); notes updated (PROJECT.md audit history, contract doc drift corrected).
-- **In progress**: Commit, push, Railway redeploy verification.
-- **Next session priorities**: Confirm production health after redeploy; observe first live Monday session behavior with the new session-boundary reset.
+- **Completed**: All audit findings fixed and re-verified; QA green (140 backend, 293 E2E, Monday dry run re-certified, frontend build clean); notes updated (PROJECT.md audit history, contract doc drift corrected); committed (1071b10, 5deff66), pushed to origin main, and deployed to Railway (deployment 7ae3c12a SUCCESS, production /health verified with new build hash).
+- **In progress**: Nothing.
+- **Next session priorities**: Observe first live Monday session behavior with the new session-boundary reset; note the Railway GitHub webhook did not auto-deploy on push (used `railway up --service AutonomousDayTrader`) — reconnect the repo integration if auto-deploy is wanted.
