@@ -87,11 +87,11 @@ def test_sentiment_sub_millisecond_benchmark():
 def test_vix_regime_classification_boundaries():
     assert VixClient.classify_regime(14.99) == (VixRegime.LOW, 1.20)
     assert VixClient.classify_regime(15.00) == (VixRegime.NORMAL, 1.00)
-    assert VixClient.classify_regime(21.99) == (VixRegime.NORMAL, 1.00)
-    assert VixClient.classify_regime(22.00) == (VixRegime.ELEVATED, 0.60)
-    assert VixClient.classify_regime(29.99) == (VixRegime.ELEVATED, 0.60)
-    assert VixClient.classify_regime(30.00) == (VixRegime.CRISIS, 0.25)
-    assert VixClient.classify_regime(45.00) == (VixRegime.CRISIS, 0.25)
+    assert VixClient.classify_regime(24.99) == (VixRegime.NORMAL, 1.00)
+    assert VixClient.classify_regime(25.00) == (VixRegime.ELEVATED, 0.70)
+    assert VixClient.classify_regime(34.99) == (VixRegime.ELEVATED, 0.70)
+    assert VixClient.classify_regime(35.00) == (VixRegime.CRISIS, 0.35)
+    assert VixClient.classify_regime(45.00) == (VixRegime.CRISIS, 0.35)
 
 
 @pytest.mark.asyncio

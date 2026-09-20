@@ -7,8 +7,8 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "🚀 Starting AutonomousDayTrader Development Environment..."
 
-# Clean up any lingering processes on project ports first
-"${PROJECT_ROOT}/scripts/verify_port_hygiene.sh" || true
+# Fail fast if any project port is already occupied
+"${PROJECT_ROOT}/scripts/verify_port_hygiene.sh"
 
 cleanup() {
   echo ""
@@ -27,8 +27,25 @@ echo "▶ Starting Backend Trading Engine & WebSocket Server on http://127.0.0.1
 python3 -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8005 --log-level info &
 BACKEND_PID=$!
 
-# Wait for backend to be responsive
-sleep 2
+# Poll /health for readiness; fail fast if uvicorn dies (e.g. bind error)
+echo "⏳ Waiting for backend readiness on /health..."
+READY=0
+for _ in $(seq 1 30); do
+  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "❌ Backend process exited before becoming ready (check logs above for bind errors)." >&2
+    exit 1
+  fi
+  if curl -fsS "http://127.0.0.1:8005/health" >/dev/null 2>&1; then
+    READY=1
+    break
+  fi
+  sleep 1
+done
+
+if [ "$READY" -ne 1 ]; then
+  echo "❌ Backend did not become healthy within 30s." >&2
+  exit 1
+fi
 
 # 2. Start Next.js Apple Music Mobile UI (Port 3005)
 echo "▶ Starting Next.js Mobile UI on http://localhost:3005..."

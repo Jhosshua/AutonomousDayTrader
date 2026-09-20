@@ -9,7 +9,7 @@ This report is a deterministic replay through the production ingestion, executio
   "fixture": "tests/e2e/fixtures/monday_open_session.json",
   "events_processed": 62,
   "event_bus_errors": 0,
-  "duration_seconds": 1.083,
+  "duration_seconds": 1.105,
   "account": {
     "equity": 49961.26,
     "cash": 49961.26,
@@ -210,7 +210,8 @@ This report is a deterministic replay through the production ingestion, executio
       "status": "ACTIVE",
       "daily_pnl": 14.21,
       "win_rate": 0.5,
-      "trades_count": 2
+      "trades_count": 2,
+      "sharpe": 0.05
     },
     {
       "id": "vwap_pullback",
@@ -218,7 +219,8 @@ This report is a deterministic replay through the production ingestion, executio
       "status": "ACTIVE",
       "daily_pnl": -42.51,
       "win_rate": 0.0,
-      "trades_count": 1
+      "trades_count": 1,
+      "sharpe": 0.0
     },
     {
       "id": "news_momentum",
@@ -226,7 +228,8 @@ This report is a deterministic replay through the production ingestion, executio
       "status": "ACTIVE",
       "daily_pnl": -10.44,
       "win_rate": 0.0,
-      "trades_count": 1
+      "trades_count": 1,
+      "sharpe": 0.0
     },
     {
       "id": "mean_reversion",
@@ -234,7 +237,8 @@ This report is a deterministic replay through the production ingestion, executio
       "status": "ACTIVE",
       "daily_pnl": 0.0,
       "win_rate": 0.0,
-      "trades_count": 0
+      "trades_count": 0,
+      "sharpe": 0.0
     }
   ],
   "ui": {

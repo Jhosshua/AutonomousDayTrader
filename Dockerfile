@@ -21,5 +21,5 @@ COPY tests ./tests
 COPY scripts ./scripts
 COPY README.md PROJECT.md ORIGINAL_REQUEST.md ./
 
-EXPOSE 8000
-CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+EXPOSE 8005
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8005}"]

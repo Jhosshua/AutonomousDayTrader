@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 
 class EventType(str, Enum):
@@ -25,6 +25,27 @@ class VixRegime(str, Enum):
     NORMAL = "NORMAL"       # 15.0 <= VIX < 25.0: Sizing 1.0x, standard stops
     ELEVATED = "ELEVATED"   # 25.0 <= VIX < 35.0: Sizing 0.7x, wider stops
     CRISIS = "CRISIS"       # VIX >= 35.0: Sizing 0.35x, freeze breakout entries
+
+
+# Single source of truth for VIX regime boundaries and multipliers.
+VIX_REGIME_BOUNDARIES: Tuple[float, float, float] = (15.0, 25.0, 35.0)
+VIX_REGIME_SIZING_MULTIPLIERS: Tuple[float, float, float, float] = (1.20, 1.00, 0.70, 0.35)
+VIX_REGIME_STOP_MULTIPLIERS: Tuple[float, float, float, float] = (0.85, 1.00, 1.40, 2.00)
+
+
+def classify_vix_regime(vix: float) -> Tuple[VixRegime, float, float]:
+    """Map raw VIX value to (regime, sizing_multiplier, stop_multiplier)."""
+    low, normal, elevated = VIX_REGIME_BOUNDARIES
+    if vix < low:
+        idx = 0
+    elif vix < normal:
+        idx = 1
+    elif vix < elevated:
+        idx = 2
+    else:
+        idx = 3
+    regime = (VixRegime.LOW, VixRegime.NORMAL, VixRegime.ELEVATED, VixRegime.CRISIS)[idx]
+    return regime, VIX_REGIME_SIZING_MULTIPLIERS[idx], VIX_REGIME_STOP_MULTIPLIERS[idx]
 
 
 class CatalystCategory(str, Enum):

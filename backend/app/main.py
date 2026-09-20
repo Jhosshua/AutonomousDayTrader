@@ -308,6 +308,8 @@ def _reconcile_fills(fills: List[Any]) -> None:
                     except Exception:
                         pass
             if order.status.value in ("FILLED", "CANCELLED", "REJECTED"):
+                if order.filled_qty == 0 and order.status.value in ("CANCELLED", "REJECTED"):
+                    bracket_manager.cancel_pending_entry_bracket(order.symbol)
                 entry_order_to_bracket.pop(order.id, None)
             continue
 
@@ -327,6 +329,22 @@ def _reconcile_fills(fills: List[Any]) -> None:
             _record_completed_bracket(child_bracket_id)
 
 
+def _release_dead_entry_brackets() -> None:
+    """Clear PENDING_ENTRY brackets whose entry order was cancelled/rejected without filling.
+
+    Covers cancel paths that emit no fill event (order purge, circuit breaker,
+    audit sweep, API cancel), which _reconcile_fills never sees.
+    """
+    for order_id, bracket_id in list(entry_order_to_bracket.items()):
+        order = engine.orders.get(order_id)
+        if order is None or order.status.value not in ("CANCELLED", "REJECTED") or order.filled_qty > 0:
+            continue
+        bracket = bracket_manager.brackets.get(bracket_id)
+        if bracket is not None:
+            bracket_manager.cancel_pending_entry_bracket(bracket.symbol)
+        entry_order_to_bracket.pop(order_id, None)
+
+
 def _flatten_symbol(sym: str, price: float, timestamp: datetime) -> List[Any]:
     """Liquidate a full position, looping process_bar past the 10% volume participation cap."""
     fills: List[Any] = []
@@ -344,6 +362,7 @@ def _trip_circuit_breaker(timestamp: datetime) -> None:
     """Halt trading and liquidate all open positions after a daily-loss breach."""
     account.status = account.status.__class__.CIRCUIT_HALTED
     engine.cancel_all_orders("CIRCUIT_BREAKER_HALT")
+    _release_dead_entry_brackets()
     for sym, pos in list(account.positions.items()):
         side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
         bracket_id = bracket_manager.symbol_to_bracket.get(sym)
@@ -372,6 +391,16 @@ def _check_session_boundary(now_dt: datetime) -> None:
     risk_engine.reset_daily_metrics(account.equity)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
+    # At a session boundary the book must be flat: clear bracket/linkage state
+    # so no stale PENDING_ENTRY bracket blocks a symbol on the new day.
+    bracket_manager.brackets.clear()
+    bracket_manager.symbol_to_bracket.clear()
+    bracket_manager.order_to_bracket.clear()
+    entry_order_to_bracket.clear()
+    bracket_realized_pnl.clear()
+    completed_brackets_recorded.clear()
+    for strategy in strategies:
+        strategy.reset_daily_stats()
 
 
 async def broadcast_ui_state() -> None:
@@ -470,7 +499,11 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     existing_bracket_id = bracket_manager.symbol_to_bracket.get(sym)
     if existing_bracket_id:
         existing_bracket = bracket_manager.brackets.get(existing_bracket_id)
-        if existing_bracket and existing_bracket.status in (BracketStatus.PENDING_ENTRY, BracketStatus.ACTIVE):
+        if existing_bracket and existing_bracket.status in (
+            BracketStatus.PENDING_ENTRY,
+            BracketStatus.ACTIVE,
+            BracketStatus.TARGET_1_HIT,
+        ):
             log.warning(
                 "Rejecting duplicate entry signal for %s: bracket %s already %s",
                 sym, existing_bracket_id, existing_bracket.status.value,
@@ -722,6 +755,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
     """Apply auto-flattening directives."""
     if directive.cancel_all_orders:
         engine.cancel_all_orders("FLATTENING_DIRECTIVE")
+        _release_dead_entry_brackets()
 
     if directive.liquidate_all_positions:
         now_dt = directive.timestamp
@@ -743,6 +777,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         )
         if audit_res.cancel_all_orders and engine.working_orders:
             engine.cancel_all_orders("AUDIT_EMERGENCY_SWEEP")
+            _release_dead_entry_brackets()
         if audit_res.liquidate_all_positions and account.positions:
             now_dt = audit_res.timestamp
             for sym, pos in list(account.positions.items()):
@@ -1040,6 +1075,7 @@ async def cancel_order(order_id: str) -> Dict[str, Any]:
     """Cancel a working order."""
     try:
         cancelled = engine.cancel_order(order_id, reason="API_REQUEST")
+        _release_dead_entry_brackets()
         return {"order_id": cancelled.id, "status": cancelled.status.value}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1106,11 +1142,7 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                     if new_stop <= 0:
                         log.warning("Rejected TIGHTEN_STOP for %s: invalid new_stop %s", sym, msg.get("new_stop"))
                         continue
-                    bracket_dir = None
-                    if hasattr(bracket_manager, "tighten_stop"):
-                        bracket_dir = bracket_manager.tighten_stop(sym, new_stop)
-                    elif hasattr(bracket_manager, "manual_tighten_stop"):
-                        bracket_dir = bracket_manager.manual_tighten_stop(sym, new_stop)
+                    bracket_dir = bracket_manager.manual_tighten_stop(sym, new_stop)
                     if bracket_dir and getattr(bracket_dir, "orders_to_modify", None):
                         for mod in bracket_dir.orders_to_modify:
                             oid = mod.get("order_id")

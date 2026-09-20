@@ -114,7 +114,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
   - `on_vix(vix: VixPrint) -> None`
   - `on_time_tick(market_time: datetime) -> None`
 - Dynamic Context:
-  - `RegimeState`: `vix_regime` (LOW, NORMAL, ELEVATED, CRISIS), `time_phase` (PRE_MARKET, OPEN_FLUSH, TREND, MIDDAY_CHOP, POWER_HOUR, EOD_FLATTEN).
+  - `RegimeState`: `vix_regime` (LOW, NORMAL, ELEVATED, CRISIS), `time_phase` (PRE_MARKET, OPEN_VOLATILITY_FLUSH, TREND_CONTINUATION, MIDDAY_CHOP, AFTERNOON_PUSH, POWER_HOUR, EOD_FLATTEN, POST_MARKET).
   - Risk budget scaling factor: `sizing_multiplier` $\in [0.25, 1.25]$.
 
 ### 3. Trading Engine ↔ Paper Account & Risk
@@ -140,7 +140,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
     "market_context": {
       "vix": 18.5,
       "vix_regime": "NORMAL",
-      "time_phase": "TREND",
+      "time_phase": "TREND_CONTINUATION",
       "market_status": "OPEN"
     },
     "strategies": [
@@ -150,7 +150,8 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
         "status": "ACTIVE",
         "daily_pnl": 280.00,
         "win_rate": 0.67,
-        "trades_count": 3
+        "trades_count": 3,
+        "sharpe": 1.42
       }
     ],
     "primary_position": {
@@ -167,9 +168,12 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
       "chart_points": [...]
     },
     "all_positions": [...],
-    "recent_activity": [...]
+    "recent_activity": [...],
+    "ingestion": {"stock": "connected", "news": "connected", "vix": "connected"},
+    "recent_news": [...]
   }
   ```
+  Position objects carry both `qty`/`current_price` (canonical) and `shares`/`market_price` (aliases) for backward compatibility.
 - UI Action Ingestion:
   - `{"action": "FLATTEN_POSITION", "symbol": "AAPL"}`
   - `{"action": "FLATTEN_ALL"}`
@@ -248,3 +252,15 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | Web UI (Next.js) | 3000 (Occupied by `Massage`) | **3005** | HTTP / WebSocket |
 | Trading Engine & UI WS | 8000 (Occupied by `MarketCards`) | **8005** | HTTP / WebSocket |
 | Mock AlpacaRelay Replay Server | 8080 | **8080** | HTTP / WebSocket |
+
+## Audit History
+
+### 2026-09-20: Full-Stack Independent Audit & Hardening Cycle
+Three parallel audit agents reviewed all backend, frontend, and deploy code against this contract; ~45 verified findings were fixed and independently re-reviewed. QA evidence: 140/140 backend unit tests, 293/293 E2E tests, Monday dry run re-certified, `tsc --noEmit` + `npm run build` clean, ports verified free after every run.
+
+Key fixes by area:
+- **Risk/execution**: TIGHTEN_STOP can no longer loosen stops (bracket directives only, `new_stop<=0` rejected); duplicate entry signals rejected while an entry order or PENDING_ENTRY/ACTIVE/TARGET_1_HIT bracket exists; partial stop fills keep the bracket alive and resize OCO targets so exit qty never exceeds the remaining position; liquidation loops until flat (10% volume-cap truncation removed); stale PENDING_ENTRY brackets cleared on no-fill cancels and at session boundary.
+- **Session lifecycle**: ET date-change reset now covers risk engine, flattening phases, account status, bracket manager, and all 4 strategies' daily state (previously day-2+ trading was impossible and ORB/VWAP state leaked across days); phase-4 flat audit re-verifies after emergency sweep and reaches EOD_FLAT; runtime clock runs even without relay credentials; circuit breaker also evaluates on quotes; MARGIN_CALL recovers and never overwrites CIRCUIT_HALTED/EOD_FLAT.
+- **Ingestion/protocol**: VIX regime thresholds single-sourced in `models/events.py` (15/25/35; sizing 1.20/1.00/0.70/0.35); stale/fallback VIX prints no longer move sizing; news client connects to `/news`, honors `SUBSCRIBE_NEWS`, and isolates per-message parse errors behind a queue; stock client always uses `/v2/stocks`; mock relay enforces WS paths (root kept as legacy alias); auth payloads match §1 exactly; 1x feed replay is true wall-clock (3s cap only above 1x).
+- **Strategies**: mean-reversion RSI/volume-climax thresholds use configured params only (hardcoded 70/30 and 2.0x fallbacks removed); ORB RVOL fallback and missed-open seeding fixed; per-strategy buffers session-gated and capped; pullback-zone flag clears on zone exit; strategies report per-trade Sharpe in `to_dict()`.
+- **Frontend/deploy**: manual controls only toast on confirmed dispatch and disable while disconnected; relay health (stock/news/vix) rendered in the Header; `NEXT_PUBLIC_WS_URL` override; audit-log REST fallback field mapping fixed; duplicate React keys and equity-hero remount flicker fixed; `.dockerignore` added (host `node_modules` no longer clobbers image builds); Dockerfile port aligned to 8005; `run_production_stack.sh` now mirrors the container path (build + uvicorn static serve); `deploy_and_push.sh` gates on tests/build and verifies production `/health` after push.

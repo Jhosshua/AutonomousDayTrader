@@ -54,6 +54,8 @@ export interface Position {
   take_profit_2?: number;
   strategy_id?: string;
   chart_points?: ChartPoint[];
+  cost_basis?: number;
+  realized_pnl?: number;
 }
 
 export interface AuditRecord {
@@ -68,6 +70,15 @@ export interface AuditRecord {
   side?: string;
 }
 
+export interface NewsItem {
+  headline: string;
+  symbols: string[];
+  score: number;
+  confidence: number;
+  category: string;
+  created_at: string;
+}
+
 export interface TradingState {
   type?: string;
   timestamp: string;
@@ -79,6 +90,8 @@ export interface TradingState {
   positions_count: number;
   working_orders_count: number;
   recent_activity: AuditRecord[];
+  ingestion: Record<string, string>;
+  recent_news: NewsItem[];
   isConnected: boolean;
   lastUpdated: Date;
 }

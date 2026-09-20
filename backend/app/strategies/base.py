@@ -219,6 +219,7 @@ class Strategy(ABC):
         self.wins_count: int = 0
         self.losses_count: int = 0
         self.win_rate: float = 0.0
+        self._trade_pnls: List[float] = []
 
     @abstractmethod
     def on_bar(self, bar: BarEvent) -> List[SignalEvent]:
@@ -245,11 +246,25 @@ class Strategy(ABC):
         """Record executed trade PnL and update performance metrics."""
         self.daily_pnl = round(self.daily_pnl + pnl, 2)
         self.trades_count += 1
+        self._trade_pnls.append(pnl)
         if pnl > 0:
             self.wins_count += 1
         elif pnl < 0:
             self.losses_count += 1
         self.win_rate = round(self.wins_count / self.trades_count, 2) if self.trades_count > 0 else 0.0
+
+    @property
+    def sharpe(self) -> float:
+        """Daily Sharpe approximation from per-trade PnL distribution (mean / std)."""
+        n = len(self._trade_pnls)
+        if n < 2:
+            return 0.0
+        mean = sum(self._trade_pnls) / n
+        variance = sum((p - mean) ** 2 for p in self._trade_pnls) / n
+        std = math.sqrt(variance)
+        if std <= 0:
+            return 0.0
+        return round(mean / std, 2)
 
     def reset_daily_stats(self) -> None:
         """Reset daily performance metrics at start of session."""
@@ -258,6 +273,7 @@ class Strategy(ABC):
         self.wins_count = 0
         self.losses_count = 0
         self.win_rate = 0.0
+        self._trade_pnls.clear()
         self.status = StrategyStatus.ACTIVE
 
     def pause(self) -> None:
@@ -281,4 +297,5 @@ class Strategy(ABC):
             "daily_pnl": self.daily_pnl,
             "win_rate": self.win_rate,
             "trades_count": self.trades_count,
+            "sharpe": self.sharpe,
         }

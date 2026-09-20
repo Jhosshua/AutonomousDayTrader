@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import urlsplit
 import websockets
 from websockets.exceptions import ConnectionClosed
 
@@ -31,11 +32,10 @@ class StockWebSocketClient:
         bus: Optional[EventBus] = None,
     ) -> None:
         self.relay_url = relay_url or settings.RELAY_URL
-        # Ensure path for stock stream if base url provided without path
-        if not (self.relay_url.endswith("/v2/stocks") or self.relay_url.endswith("/")):
-            # If plain ws://127.0.0.1:8080 or wss://relay..., keep as is or append /v2/stocks
-            if "stocks" not in self.relay_url and not self.relay_url.endswith(":8080"):
-                self.relay_url = self.relay_url.rstrip("/") + "/v2/stocks"
+        # Contract: stock stream lives at /v2/stocks; append it whenever the
+        # configured URL carries no path.
+        if urlsplit(self.relay_url).path in ("", "/"):
+            self.relay_url = self.relay_url.rstrip("/") + "/v2/stocks"
 
         self.relay_token = relay_token or settings.RELAY_TOKEN
         self.symbols: Set[str] = set(symbols or settings.WATCHLIST_SYMBOLS)
@@ -55,7 +55,7 @@ class StockWebSocketClient:
         self.bars_received: int = 0
         self.quotes_received: int = 0
         self.trades_received: int = 0
-        self.dropped_quotes: int = 0
+        self.dropped_messages: int = 0
         self.reconnect_count: int = 0
 
     @property
@@ -178,8 +178,8 @@ class StockWebSocketClient:
         if not (isinstance(banner, list) and len(banner) > 0 and banner[0].get("T") == "success" and banner[0].get("msg") == "connected"):
             raise ConnectionError(f"Unexpected handshake banner: {banner_raw}")
 
-        # 2. Authenticate (send both token and key for universal compat)
-        auth_cmd = json.dumps({"action": "auth", "token": self.relay_token, "key": self.relay_token})
+        # 2. Authenticate per relay contract: {"action":"auth","key":<token>,"secret":""}
+        auth_cmd = json.dumps({"action": "auth", "key": self.relay_token, "secret": ""})
         await ws.send(auth_cmd)
 
         auth_resp_raw = await asyncio.wait_for(ws.recv(), timeout=settings.WS_AUTH_TIMEOUT_SEC)
@@ -214,7 +214,7 @@ class StockWebSocketClient:
             try:
                 self._queue.put_nowait(raw_msg)
             except asyncio.QueueFull:
-                self.dropped_quotes += 1
+                self.dropped_messages += 1
                 log.error("Ingestion queue full! Discarding message to prevent socket stall")
 
     async def _process_queue_loop(self) -> None:

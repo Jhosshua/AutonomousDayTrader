@@ -5,13 +5,13 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 from zoneinfo import ZoneInfo
 import httpx
 
 from backend.app.config import settings
 from backend.app.core.event_bus import EventBus, event_bus
-from backend.app.models.events import RelayStatusEvent, VixPrint, VixRegime
+from backend.app.models.events import RelayStatusEvent, VixPrint, VixRegime, classify_vix_regime
 
 log = logging.getLogger("VixClient")
 ET_TZ = ZoneInfo("America/New_York")
@@ -29,11 +29,15 @@ class VixClient:
         relay_token: Optional[str] = None,
         poll_interval: Optional[float] = None,
         bus: Optional[EventBus] = None,
+        time_source: Optional[Callable[[], datetime]] = None,
     ) -> None:
         self.base_url = (base_url or settings.RELAY_HTTP_URL).rstrip("/")
         self.relay_token = relay_token or settings.RELAY_TOKEN
         self.poll_interval = poll_interval or settings.VIX_POLL_INTERVAL_SEC
         self.bus: EventBus = bus or event_bus
+        # Injectable clock so replayed historical sessions do not mark
+        # prints stale against wall-clock market hours.
+        self._time_source: Callable[[], datetime] = time_source or (lambda: datetime.now(ET_TZ))
 
         self.last_print: Optional[VixPrint] = None
         self._running: bool = False
@@ -130,14 +134,8 @@ class VixClient:
     @staticmethod
     def classify_regime(vix: float) -> Tuple[VixRegime, float]:
         """Map raw VIX value to institutional volatility regime and sizing multiplier."""
-        if vix < 15.0:
-            return VixRegime.LOW, 1.20
-        elif vix < 22.0:
-            return VixRegime.NORMAL, 1.00
-        elif vix < 30.0:
-            return VixRegime.ELEVATED, 0.60
-        else:
-            return VixRegime.CRISIS, 0.25
+        regime, sizing, _stop = classify_vix_regime(vix)
+        return regime, sizing
 
     def _get_fallback_print(self, reason: str) -> VixPrint:
         """Generate safe fallback when live /vix endpoint fails."""
@@ -173,7 +171,8 @@ class VixClient:
 
     def _is_market_hours(self) -> bool:
         """Determine if current time is US regular trading hours (09:30-16:00 ET Mon-Fri)."""
-        now_et = datetime.now(ET_TZ)
+        now = self._time_source()
+        now_et = now.astimezone(ET_TZ) if now.tzinfo is not None else now.replace(tzinfo=ET_TZ)
         if now_et.weekday() > 4:  # Sat=5, Sun=6
             return False
         minutes_et = now_et.hour * 60 + now_et.minute

@@ -50,6 +50,10 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
     if (position.take_profit_1) allPrices.push(position.take_profit_1);
     if (position.take_profit_2) allPrices.push(position.take_profit_2);
 
+    if (allPrices.length === 0) {
+      return { minPrice: 0, maxPrice: 1, priceRange: 1 };
+    }
+
     const min = Math.min(...allPrices);
     const max = Math.max(...allPrices);
     const padding = (max - min) * 0.15 || 1.0;

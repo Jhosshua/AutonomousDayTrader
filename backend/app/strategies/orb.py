@@ -102,6 +102,9 @@ class OpeningRangeBreakoutStrategy(Strategy):
 
         state = self._get_state(bar.symbol)
         state.all_bars.append(bar)
+        # Cap buffer: RVOL baseline uses the last 20 bars, ATR fallback 14
+        if len(state.all_bars) > 60:
+            del state.all_bars[:-60]
 
         # Convert timestamp to ET
         ts = bar.timestamp
@@ -131,8 +134,15 @@ class OpeningRangeBreakoutStrategy(Strategy):
         # At or after range end: establish range if not already done
         if not state.range_established:
             if not state.opening_bars:
-                # If we missed the exact open bars, use what we have up to range_end
+                # Missed the open: seed the range from this bar but skip signal
+                # evaluation, since a range containing the current bar can never
+                # be broken out of on that same bar.
                 state.opening_bars.append(bar)
+                state.range_high = bar.high
+                state.range_low = bar.low
+                state.range_midpoint = round((bar.high + bar.low) / 2.0, 4)
+                state.range_established = True
+                return []
             state.range_high = max(b.high for b in state.opening_bars)
             state.range_low = min(b.low for b in state.opening_bars)
             state.range_midpoint = round((state.range_high + state.range_low) / 2.0, 4)
@@ -147,7 +157,7 @@ class OpeningRangeBreakoutStrategy(Strategy):
         if prior_bars:
             avg_vol = sum(b.volume for b in prior_bars) / len(prior_bars)
         elif state.baseline_volume > 0:
-            avg_vol = state.baseline_volume / 20.0
+            avg_vol = state.baseline_volume
         else:
             avg_vol = max(1.0, float(bar.volume))
         rvol = round(bar.volume / max(1.0, avg_vol), 2)

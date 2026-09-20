@@ -7,6 +7,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 import websockets
 from websockets.exceptions import ConnectionClosed
 
@@ -32,10 +33,10 @@ class NewsWebSocketClient:
         scorer: Optional[FinancialSentimentScorer] = None,
     ) -> None:
         base_url = (relay_url or settings.RELAY_URL).rstrip("/")
-        # AlpacaRelay multiplexes stock and news downstream clients on its
-        # root WebSocket. News is selected by the subscription channel, not a
-        # `/news` URL path. Preserve an explicit endpoint for test doubles or
-        # alternate relays that provide a dedicated path.
+        # Contract: news stream lives at /news; append it whenever the
+        # configured URL carries no path.
+        if urlsplit(base_url).path in ("", "/"):
+            base_url = base_url + "/news"
         self.relay_url = base_url
 
         self.relay_token = relay_token or settings.RELAY_TOKEN
@@ -45,10 +46,13 @@ class NewsWebSocketClient:
         self._running: bool = False
         self._connected: bool = False
         self._ws: Optional[Any] = None
+        self._queue: asyncio.Queue = asyncio.Queue(maxsize=settings.QUEUE_MAX_SIZE)
         self._runner_task: Optional[asyncio.Task] = None
+        self._worker_task: Optional[asyncio.Task] = None
 
         self.articles_received: int = 0
         self.catalysts_detected: int = 0
+        self.dropped_messages: int = 0
         self.reconnect_count: int = 0
 
     @property
@@ -60,6 +64,7 @@ class NewsWebSocketClient:
         if self._running:
             return
         self._running = True
+        self._worker_task = asyncio.create_task(self._process_queue_loop(), name="NewsWS_QueueWorker")
         self._runner_task = asyncio.create_task(self._reconnect_loop(), name="NewsWS_ReconnectLoop")
         log.info(f"NewsWebSocketClient started targeting {self.relay_url}")
 
@@ -80,6 +85,14 @@ class NewsWebSocketClient:
             except asyncio.CancelledError:
                 pass
             self._runner_task = None
+
+        if self._worker_task:
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except asyncio.CancelledError:
+                pass
+            self._worker_task = None
         log.info("NewsWebSocketClient stopped")
 
     async def _reconnect_loop(self) -> None:
@@ -99,15 +112,16 @@ class NewsWebSocketClient:
                     if not (isinstance(banner, list) and len(banner) > 0 and banner[0].get("T") == "success" and banner[0].get("msg") == "connected"):
                         raise ConnectionError(f"Unexpected banner: {banner_raw}")
 
-                    # 2. Auth
-                    await ws.send(json.dumps({"action": "auth", "token": self.relay_token, "key": self.relay_token}))
+                    # 2. Auth per relay contract: {"action":"auth","key":<token>}
+                    await ws.send(json.dumps({"action": "auth", "key": self.relay_token}))
                     auth_raw = await asyncio.wait_for(ws.recv(), timeout=settings.WS_AUTH_TIMEOUT_SEC)
                     auth_resp = json.loads(auth_raw)
                     if not (isinstance(auth_resp, list) and len(auth_resp) > 0 and auth_resp[0].get("T") == "success" and auth_resp[0].get("msg") == "authenticated"):
                         raise PermissionError(f"Auth failed: {auth_raw}")
 
                     # 3. Subscribe news wildcard
-                    await ws.send(json.dumps({"action": "subscribe", "news": ["*"]}))
+                    if settings.SUBSCRIBE_NEWS:
+                        await ws.send(json.dumps({"action": "subscribe", "news": ["*"]}))
                     self._connected = True
                     backoff = settings.WS_RECONNECT_INITIAL_BACKOFF_SEC
                     
@@ -115,9 +129,13 @@ class NewsWebSocketClient:
                         RelayStatusEvent(feed_type="news", status="connected", message="News feed connected")
                     )
 
-                    # 4. Message ingestion loop
+                    # 4. Message ingestion loop (buffered; processing happens in worker)
                     async for raw_msg in ws:
-                        await self._handle_news_message(raw_msg)
+                        try:
+                            self._queue.put_nowait(raw_msg)
+                        except asyncio.QueueFull:
+                            self.dropped_messages += 1
+                            log.error("News ingestion queue full! Discarding message to prevent socket stall")
 
             except ConnectionClosed as cc:
                 log.warning(f"News WS closed (code={cc.code}, reason={cc.reason}). Retry in {backoff:.1f}s")
@@ -142,6 +160,22 @@ class NewsWebSocketClient:
             except asyncio.CancelledError:
                 break
             backoff = min(backoff * settings.WS_RECONNECT_BACKOFF_MULTIPLIER, settings.WS_RECONNECT_MAX_BACKOFF_SEC)
+
+    async def _process_queue_loop(self) -> None:
+        """Worker task consuming buffered frames with per-message fault isolation."""
+        while self._running:
+            try:
+                raw_msg = await self._queue.get()
+                try:
+                    await self._handle_news_message(raw_msg)
+                except Exception as exc:
+                    log.exception(f"Error processing news message: {exc}")
+                finally:
+                    self._queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                log.exception(f"News queue worker error: {exc}")
 
     async def _handle_news_message(self, raw_msg: str) -> None:
         """Parse Benzinga news article and publish enriched NewsEvent."""

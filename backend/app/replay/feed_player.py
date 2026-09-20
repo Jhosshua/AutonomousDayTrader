@@ -99,8 +99,10 @@ class FeedPlayer:
                         if prev_ts is not None:
                             delta_sec = max(0.0, (curr_ts - prev_ts).total_seconds())
                             delay = delta_sec / self.speed
-                            # Cap delay to 3.0s in tests to avoid excessive waits
-                            delay = min(3.0, delay)
+                            # Cap delay only for accelerated playback so tests do not
+                            # stall on long fixture gaps; 1x stays true wall-clock.
+                            if self.speed > 1.0:
+                                delay = min(3.0, delay)
                             if delay > 0.001:
                                 await asyncio.sleep(delay)
                         prev_ts = curr_ts

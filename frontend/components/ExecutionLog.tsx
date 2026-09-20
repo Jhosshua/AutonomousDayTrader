@@ -65,7 +65,7 @@ export default function ExecutionLog({ records, maxItems = 20 }: ExecutionLogPro
         <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar pr-1">
           {displayRecords.map((item, idx) => (
             <motion.div
-              key={item.id || idx}
+              key={`${item.id}-${idx}`}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.2, delay: idx * 0.02 }}

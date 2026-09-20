@@ -31,6 +31,7 @@ export default function Home() {
         <Header
           account={state.account}
           marketContext={state.market_context}
+          ingestion={state.ingestion}
           isConnected={isConnected}
         />
 
@@ -110,6 +111,7 @@ export default function Home() {
       <NowPlayingTray
         position={state.primary_position}
         recentActivity={state.recent_activity}
+        isConnected={isConnected}
         onFlattenPosition={flattenPosition}
         onFlattenAll={flattenAll}
         onTightenStop={tightenStop}

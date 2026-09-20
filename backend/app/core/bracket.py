@@ -258,9 +258,34 @@ class DynamicBracketManager:
             bracket.remaining_qty = max(0, bracket.remaining_qty - filled_qty)
             if bracket.remaining_qty > 0:
                 # Partial stop fill: the position is still open, so keep the
-                # bracket and its OCO targets alive for the remaining shares.
+                # bracket alive. Scale the unfilled profit targets down so
+                # their combined qty equals the remaining position; both
+                # targets can fill within a single bar before OCO cancel
+                # reconciliation, so their total must not exceed it.
+                orders_to_modify: List[Dict[str, Any]] = []
+                orders_to_cancel: List[str] = []
+                t1_open = bracket.target_1_qty if (bracket.target_1_order_id and not bracket.target_1_filled) else 0
+                t2_open = bracket.target_2_qty if (bracket.target_2_order_id and not bracket.target_2_filled) else 0
+                open_target_qty = t1_open + t2_open
+                if open_target_qty > bracket.remaining_qty:
+                    t1_new = int(t1_open * bracket.remaining_qty / open_target_qty)
+                    t2_new = bracket.remaining_qty - t1_new
+                    if t1_open:
+                        if t1_new > 0:
+                            orders_to_modify.append({"order_id": bracket.target_1_order_id, "new_qty": t1_new})
+                        else:
+                            orders_to_cancel.append(bracket.target_1_order_id)
+                        bracket.target_1_qty = t1_new
+                    if t2_open:
+                        if t2_new > 0:
+                            orders_to_modify.append({"order_id": bracket.target_2_order_id, "new_qty": t2_new})
+                        else:
+                            orders_to_cancel.append(bracket.target_2_order_id)
+                        bracket.target_2_qty = t2_new
                 return BracketUpdateDirective(
-                    action="NO_ACTION",
+                    action="MODIFY_ORDER",
+                    orders_to_cancel=orders_to_cancel,
+                    orders_to_modify=orders_to_modify,
                     bracket_status=bracket.status,
                 )
             bracket.status = BracketStatus.COMPLETED_STOP
@@ -414,6 +439,23 @@ class DynamicBracketManager:
             }],
             bracket_status=bracket.status,
         )
+
+    def cancel_pending_entry_bracket(self, symbol: str) -> bool:
+        """Cancel a PENDING_ENTRY bracket whose entry order terminated without a fill."""
+        symbol_upper = symbol.upper()
+        bracket_id = self.symbol_to_bracket.get(symbol_upper)
+        if not bracket_id:
+            return False
+        bracket = self.brackets.get(bracket_id)
+        if not bracket or bracket.status != BracketStatus.PENDING_ENTRY:
+            return False
+        bracket.status = BracketStatus.CANCELLED
+        bracket.updated_at = datetime.now(timezone.utc)
+        self.symbol_to_bracket.pop(symbol_upper, None)
+        for oid in (bracket.stop_order_id, bracket.target_1_order_id, bracket.target_2_order_id):
+            if oid:
+                self.order_to_bracket.pop(oid, None)
+        return True
 
     def cancel_bracket_for_flattening(
         self,

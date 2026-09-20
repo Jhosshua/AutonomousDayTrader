@@ -91,7 +91,6 @@ class MeanReversionStrategy(Strategy):
             return []
 
         state = self._get_state(bar.symbol)
-        state.bars.append(bar)
 
         # Convert timestamp to ET
         ts = bar.timestamp
@@ -99,6 +98,16 @@ class MeanReversionStrategy(Strategy):
             ts = ts.replace(tzinfo=timezone.utc)
         ts_et = ts.astimezone(ET_TZ)
         t_time = ts_et.time()
+
+        # Only regular-session bars feed the indicator windows
+        if t_time < dtime(9, 30) or t_time >= dtime(16, 0):
+            return []
+
+        state.bars.append(bar)
+        # Cap buffer: longest lookback is max(period, rsi_period, ATR 14); keep headroom
+        max_bars = max(self.period, self.rsi_period, 14) * 3
+        if len(state.bars) > max_bars:
+            del state.bars[:-max_bars]
 
         # Invariant: Strategy 4 is disabled during OPEN_VOLATILITY_FLUSH (09:30-10:00 ET)
         # to avoid stepping in front of opening institutional order flow
@@ -146,9 +155,9 @@ class MeanReversionStrategy(Strategy):
 
         # 1. Short Exhaustion Fade (Overbought extreme: Z >= 2.50, RSI >= 75, Upper Wick >= 50%)
         if z >= self.z_threshold:
-            has_climax = vol_ratio >= self.volume_climax_multiplier or bar.volume > 2.0 * sma_vol
+            has_climax = vol_ratio >= self.volume_climax_multiplier
             has_wick_rejection = (upper_wick / candle_range) >= self.min_wick_ratio
-            is_rsi_overbought = rsi >= self.rsi_overbought or rsi >= 70.0
+            is_rsi_overbought = rsi >= self.rsi_overbought
 
             if has_wick_rejection and has_climax and is_rsi_overbought:
                 entry_price = bar.close
@@ -178,9 +187,9 @@ class MeanReversionStrategy(Strategy):
 
         # 2. Long Exhaustion Fade (Oversold extreme: Z <= -2.50, RSI <= 25, Lower Wick >= 50%)
         elif z <= -self.z_threshold:
-            has_climax = vol_ratio >= self.volume_climax_multiplier or bar.volume > 2.0 * sma_vol
+            has_climax = vol_ratio >= self.volume_climax_multiplier
             has_wick_rejection = (lower_wick / candle_range) >= self.min_wick_ratio
-            is_rsi_oversold = rsi <= self.rsi_oversold or rsi <= 30.0
+            is_rsi_oversold = rsi <= self.rsi_oversold
 
             if has_wick_rejection and has_climax and is_rsi_oversold:
                 entry_price = bar.close

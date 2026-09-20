@@ -3,9 +3,9 @@ AlpacaRelay Mock Server & Historical/Synthetic Replay Engine.
 
 Deterministic, protocol-accurate local mock server for downstream AlpacaRelay consumers.
 Implements:
-- Stock WebSocket (/v2/stocks or /) on port 8080:
+- Stock WebSocket (/v2/stocks, /news for the news channel; / accepted as legacy alias) on port 8080:
   - Connection banner: [{"T": "success", "msg": "connected"}]
-  - Auth: {"action": "auth", "token": "..."} or {"action": "auth", "key": "..."}
+  - Auth: {"action": "auth", "key": "..."} ("token" accepted as a legacy alias)
   - Subscription: {"action": "subscribe", "bars": [...], "quotes": [...], "trades": [...], "news": [...]}
   - Streaming message arrays for bars ('b'), quotes ('q'), trades ('t'), news ('n'), status ('relay')
 - News channel on the shared downstream WebSocket
@@ -209,6 +209,13 @@ class MockAlpacaRelayServer:
 
     async def _handle_ws(self, ws: Any, path: str) -> None:
         """Handles a connected WebSocket client session."""
+        # Enforce contract paths so protocol drift is caught by tests.
+        # "/" is retained as a legacy alias for older tests/tools.
+        if path not in ("/v2/stocks", "/news", "/"):
+            logger.warning(f"Rejecting WebSocket connection on unsupported path: {path}")
+            await ws.close(1008, f"unsupported path: {path}")
+            return
+
         self._client_counter += 1
         client_id = f"client_{self._client_counter}"
         client = MockRelayClient(ws, client_id, path)

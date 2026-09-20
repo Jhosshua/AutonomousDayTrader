@@ -77,6 +77,8 @@ const INITIAL_STATE: TradingState = {
   positions_count: 0,
   working_orders_count: 0,
   recent_activity: [],
+  ingestion: {},
+  recent_news: [],
   isConnected: false,
   lastUpdated: new Date(),
 };
@@ -99,8 +101,10 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     const wsProto = isSecure ? "wss:" : "ws:";
     const httpProto = isSecure ? "https:" : "http:";
 
-    let resolvedWsUrl = wsUrl;
-    if (isBrowser && (wsUrl === "ws://127.0.0.1:8005/ws/ui" || !wsUrl)) {
+    const envWsUrl = process.env.NEXT_PUBLIC_WS_URL;
+
+    let resolvedWsUrl = envWsUrl || wsUrl;
+    if (!envWsUrl && isBrowser && (wsUrl === "ws://127.0.0.1:8005/ws/ui" || !wsUrl)) {
       const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
       resolvedWsUrl = isLocalHost
         ? `${wsProto}//${hostname}:8005/ws/ui`
@@ -172,6 +176,9 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                   take_profit_1: first.take_profit_1,
                   take_profit_2: first.take_profit_2,
                   strategy_id: first.strategy_id || "ORB",
+                  chart_points: first.chart_points,
+                  cost_basis: first.cost_basis,
+                  realized_pnl: first.realized_pnl,
                 };
               }
 
@@ -192,6 +199,8 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 positions_count: payload.positions_count ?? (primary ? 1 : 0),
                 working_orders_count: payload.working_orders_count ?? prev.working_orders_count,
                 recent_activity: payload.recent_activity || prev.recent_activity,
+                ingestion: payload.ingestion || prev.ingestion,
+                recent_news: payload.recent_news || prev.recent_news,
                 isConnected: true,
                 lastUpdated: new Date(),
               };
@@ -242,11 +251,11 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 recent_activity: logs.map((l: any, i: number) => ({
                   id: String(l.order_id || i),
                   timestamp: l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
-                  type: l.event_type || "EXEC",
+                  type: l.event_trigger || "EXEC",
                   symbol: l.symbol,
-                  message: `${l.side || ""} ${l.qty || ""} ${l.symbol || ""} - ${l.status || l.reason || "PROCESSED"}`,
-                  price: l.price,
-                  qty: l.qty,
+                  message: `${l.from_state || ""} -> ${l.to_state || ""} (${l.event_trigger || "EXEC"}${l.reason ? `: ${l.reason}` : ""})`,
+                  price: l.fill_price,
+                  qty: l.fill_qty,
                 })),
               }));
             }
@@ -269,7 +278,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     };
   }, [connect, getResolvedEndpoints]);
 
-  const sendAction = useCallback((payload: Record<string, any>) => {
+  const sendAction = useCallback((payload: Record<string, any>): boolean => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(payload));
       return true;
@@ -282,20 +291,21 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: payload.symbol }),
       }).catch(console.error);
+      return true;
     }
     return false;
   }, [getResolvedEndpoints]);
 
-  const flattenPosition = useCallback((symbol: string) => {
-    sendAction({ action: "FLATTEN_POSITION", symbol });
+  const flattenPosition = useCallback((symbol: string): boolean => {
+    return sendAction({ action: "FLATTEN_POSITION", symbol });
   }, [sendAction]);
 
-  const flattenAll = useCallback(() => {
-    sendAction({ action: "FLATTEN_ALL" });
+  const flattenAll = useCallback((): boolean => {
+    return sendAction({ action: "FLATTEN_ALL" });
   }, [sendAction]);
 
-  const tightenStop = useCallback((symbol: string, newStop: number) => {
-    sendAction({ action: "TIGHTEN_STOP", symbol, new_stop: newStop });
+  const tightenStop = useCallback((symbol: string, newStop: number): boolean => {
+    return sendAction({ action: "TIGHTEN_STOP", symbol, new_stop: newStop });
   }, [sendAction]);
 
   return {

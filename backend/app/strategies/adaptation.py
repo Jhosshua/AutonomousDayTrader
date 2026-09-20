@@ -12,7 +12,7 @@ import math
 from typing import Any, Dict, List, Optional, Set, Tuple
 import zoneinfo
 
-from backend.app.models.events import OrderSide, VixPrint, VixRegime
+from backend.app.models.events import OrderSide, VixPrint, VixRegime, classify_vix_regime
 from backend.app.strategies.base import SignalEvent
 
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
@@ -35,14 +35,8 @@ def get_vix_regime(vix: float) -> Tuple[str, float, float]:
     Returns:
         (regime_str, sizing_multiplier, stop_multiplier)
     """
-    if vix < 15.0:
-        return "LOW", 1.20, 0.85
-    elif vix < 25.0:
-        return "NORMAL", 1.00, 1.00
-    elif vix < 35.0:
-        return "ELEVATED", 0.70, 1.40
-    else:
-        return "CRISIS", 0.35, 2.00
+    regime, sizing, stop = classify_vix_regime(vix)
+    return regime.value, sizing, stop
 
 
 def get_time_of_day_phase(t_et: dtime) -> str:
@@ -206,18 +200,6 @@ class DynamicAdaptationEngine:
             return round(signal.entry_price - adapted_dist, 4)
         else:
             return round(signal.entry_price + adapted_dist, 4)
-
-    def calculate_adapted_targets(
-        self, signal: SignalEvent, adapted_stop: Optional[float] = None
-    ) -> Tuple[float, float]:
-        """Calculate dynamic bracket targets (1.5R, 2.5R) based on adapted stop distance."""
-        stop = adapted_stop if adapted_stop is not None else self.calculate_adapted_stop(signal)
-        adapted_dist = abs(signal.entry_price - stop)
-        is_buy = signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY"
-        s = 1.0 if is_buy else -1.0
-        t1 = round(signal.entry_price + (s * 1.5 * adapted_dist), 2)
-        t2 = round(signal.entry_price + (s * 2.5 * adapted_dist), 2)
-        return t1, t2
 
     def calculate_adapted_size(
         self,

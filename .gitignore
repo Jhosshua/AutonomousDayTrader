@@ -30,6 +30,7 @@ htmlcov/
 
 # Next.js and Node dependencies & builds
 node_modules/
+*.tsbuildinfo
 frontend/node_modules/
 .next/
 frontend/.next/

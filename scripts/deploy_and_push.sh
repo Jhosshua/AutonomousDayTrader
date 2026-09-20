@@ -12,8 +12,15 @@ cd "${PROJECT_ROOT}"
 echo "🔍 1. Verifying process and port hygiene..."
 "${PROJECT_ROOT}/scripts/verify_port_hygiene.sh"
 
-# 2. Check Git initialization
-echo "📦 2. Checking Git repository state..."
+# 2. Build/test gates: nothing ships unless the backend suite and the UI build pass
+echo "🧪 2a. Running backend pytest gate..."
+python3 -m pytest -q
+
+echo "🏗️ 2b. Running frontend static-export build gate..."
+(cd "${PROJECT_ROOT}/frontend" && npm run build)
+
+# 3. Check Git initialization
+echo "📦 3. Checking Git repository state..."
 if [ ! -d ".git" ]; then
   echo "   Initializing local Git repository..."
   git init -b main
@@ -25,12 +32,12 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
   git checkout -B main
 fi
 
-# 3. Verify GitHub authentication
-echo "🔑 3. Checking GitHub authentication..."
+# 4. Verify GitHub authentication
+echo "🔑 4. Checking GitHub authentication..."
 gh auth status
 
-# 4. Stage files and create structured commit if needed
-echo "📝 4. Staging files and creating commit..."
+# 5. Stage files and create structured commit if needed
+echo "📝 5. Staging files and creating commit..."
 git add -A
 
 if git diff --staged --quiet; then
@@ -40,8 +47,8 @@ else
   git commit -m "$COMMIT_MSG"
 fi
 
-# 5. Check / configure remote origin
-echo "🌐 5. Checking remote origin configuration..."
+# 6. Check / configure remote origin
+echo "🌐 6. Checking remote origin configuration..."
 REMOTE_EXISTS=$(git remote get-url origin 2>/dev/null || echo "")
 
 if [ -z "$REMOTE_EXISTS" ]; then
@@ -55,17 +62,37 @@ if [ -z "$REMOTE_EXISTS" ]; then
   fi
 fi
 
-# 6. Push to remote main
-echo "⬆️ 6. Pushing to GitHub upstream (origin/main)..."
+# 7. Push to remote main
+echo "⬆️ 7. Pushing to GitHub upstream (origin/main)..."
 git push -u origin main
 
-# 7. Final status verification
-echo "📊 7. Final Git Status & Remote Log:"
+# 8. Post-push production health verification (Railway redeploys on push)
+echo "🏥 8. Verifying production deployment health..."
+PROD_HEALTH_URL="https://autonomousdaytrader-production.up.railway.app/health"
+HEALTHY=0
+for _ in $(seq 1 18); do
+  if curl -fsS "$PROD_HEALTH_URL" >/dev/null 2>&1; then
+    HEALTHY=1
+    break
+  fi
+  echo "   Waiting for Railway redeploy to become healthy..."
+  sleep 10
+done
+
+if [ "$HEALTHY" -eq 1 ]; then
+  echo "✅ Production health check PASSED: $PROD_HEALTH_URL"
+else
+  echo "❌ Production health check FAILED after 180s: $PROD_HEALTH_URL" >&2
+  exit 1
+fi
+
+# 9. Final status verification
+echo "📊 9. Final Git Status & Remote Log:"
 git status
 git log -3 --oneline
 
-# 8. Post-push port hygiene audit
-echo "🧹 8. Post-deployment port hygiene certification..."
+# 10. Post-push port hygiene audit
+echo "🧹 10. Post-deployment port hygiene certification..."
 "${PROJECT_ROOT}/scripts/verify_port_hygiene.sh"
 
 echo "✨ Upstream push and delivery hygiene verification COMPLETE!"

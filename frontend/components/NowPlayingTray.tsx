@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import { ChevronDown, Shield, Square, TrendingUp, TrendingDown, Layers, Activity } from "lucide-react";
+import { ChevronDown, Shield, Square, Layers, Activity } from "lucide-react";
 import { Position, AuditRecord } from "@/types/trading";
 import LiveChart from "./LiveChart";
 import ManualControls from "./ManualControls";
@@ -11,14 +11,16 @@ import ExecutionLog from "./ExecutionLog";
 interface NowPlayingTrayProps {
   position: Position | null;
   recentActivity: AuditRecord[];
-  onFlattenPosition: (symbol: string) => void;
-  onFlattenAll: () => void;
-  onTightenStop: (symbol: string, newStop: number) => void;
+  isConnected: boolean;
+  onFlattenPosition: (symbol: string) => boolean;
+  onFlattenAll: () => boolean;
+  onTightenStop: (symbol: string, newStop: number) => boolean;
 }
 
 export default function NowPlayingTray({
   position,
   recentActivity,
+  isConnected,
   onFlattenPosition,
   onFlattenAll,
   onTightenStop,
@@ -124,14 +126,16 @@ export default function NowPlayingTray({
                 <button
                   title="Lock Breakeven Stop"
                   onClick={() => onTightenStop(position.symbol, position.entry_price)}
-                  className="p-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 transition-colors"
+                  disabled={!isConnected}
+                  className="p-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 >
                   <Shield className="w-4 h-4" />
                 </button>
                 <button
                   title="Emergency Flatten"
                   onClick={() => onFlattenPosition(position.symbol)}
-                  className="p-2 rounded-xl bg-apple-red/15 hover:bg-apple-red/25 border border-apple-red/30 text-apple-red transition-colors"
+                  disabled={!isConnected}
+                  className="p-2 rounded-xl bg-apple-red/15 hover:bg-apple-red/25 border border-apple-red/30 text-apple-red transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 >
                   <Square className="w-4 h-4 fill-current" />
                 </button>
@@ -257,6 +261,7 @@ export default function NowPlayingTray({
                 </h3>
                 <ManualControls
                   position={position}
+                  isConnected={isConnected}
                   onFlattenPosition={onFlattenPosition}
                   onFlattenAll={onFlattenAll}
                   onTightenStop={onTightenStop}

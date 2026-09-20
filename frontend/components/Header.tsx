@@ -7,10 +7,31 @@ import { AccountState, MarketContext } from "@/types/trading";
 interface HeaderProps {
   account: AccountState;
   marketContext: MarketContext;
+  ingestion: Record<string, string>;
   isConnected: boolean;
 }
 
-export default function Header({ account, marketContext, isConnected }: HeaderProps) {
+const RELAY_FEEDS: { key: string; label: string }[] = [
+  { key: "stock", label: "STK WS" },
+  { key: "news", label: "NEWS WS" },
+  { key: "vix", label: "VIX REST" },
+];
+
+const getRelayDotClass = (status: string | undefined) => {
+  switch (status?.toLowerCase()) {
+    case "connected":
+      return "bg-apple-green";
+    case "connecting":
+      return "bg-apple-orange animate-pulse";
+    case "error":
+    case "disconnected":
+      return "bg-apple-red";
+    default:
+      return "bg-neutral-500";
+  }
+};
+
+export default function Header({ account, marketContext, ingestion, isConnected }: HeaderProps) {
   const isPositive = account.daily_pnl >= 0;
   const pnlSign = isPositive ? "+" : "";
 
@@ -96,6 +117,16 @@ export default function Header({ account, marketContext, isConnected }: HeaderPr
         </div>
       </div>
 
+      {/* Ingestion Relay Health Strip */}
+      <div className="flex items-center gap-3 px-3 mb-3 text-[10px] text-neutral-500">
+        {RELAY_FEEDS.map((feed) => (
+          <span key={feed.key} className="flex items-center gap-1" title={`${feed.label}: ${ingestion?.[feed.key] || "unknown"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full inline-block ${getRelayDotClass(ingestion?.[feed.key])}`} />
+            <span className="uppercase tracking-wider font-semibold">{feed.label}</span>
+          </span>
+        ))}
+      </div>
+
       {/* Circuit Breaker Alert Banner */}
       {account.is_circuit_broken && (
         <motion.div
@@ -128,7 +159,6 @@ export default function Header({ account, marketContext, isConnected }: HeaderPr
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between mt-1 gap-1">
           {/* Total Equity Big Number */}
           <motion.div
-            key={account.equity}
             initial={{ opacity: 0.8, scale: 0.99 }}
             animate={{ opacity: 1, scale: 1 }}
             className="text-4xl font-bold tracking-tight text-white num-tabular"

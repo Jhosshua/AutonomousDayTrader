@@ -66,7 +66,6 @@ class VWAPPullbackStrategy(Strategy):
             return []
 
         state = self._get_state(bar.symbol)
-        state.recent_bars.append(bar)
 
         # Convert timestamp to ET
         ts = bar.timestamp
@@ -81,6 +80,12 @@ class VWAPPullbackStrategy(Strategy):
 
         if t_time < open_bell or t_time >= eod_cutoff:
             return []
+
+        state.recent_bars.append(bar)
+        # Cap buffer: longest lookback is ema_slow_period; keep headroom
+        max_recent = self.ema_slow_period * 2
+        if len(state.recent_bars) > max_recent:
+            del state.recent_bars[:-max_recent]
 
         state.session_bars.append(bar)
         if len(state.session_bars) < 10:
@@ -109,7 +114,7 @@ class VWAPPullbackStrategy(Strategy):
             is_bullish_trend = ema_fast > ema_slow
             is_bearish_trend = ema_fast < ema_slow
         elif len(closes) >= self.ema_fast_period:
-            ema_fast = calculate_ema(closes, 10)
+            ema_fast = calculate_ema(closes, max(2, self.ema_fast_period // 2))
             ema_slow = calculate_ema(closes, self.ema_fast_period)
             is_bullish_trend = ema_fast > ema_slow
             is_bearish_trend = ema_fast < ema_slow
@@ -176,6 +181,8 @@ class VWAPPullbackStrategy(Strategy):
                 state.last_signal_timestamp = bar.timestamp
             elif tested_zone:
                 state.in_pullback_zone = True
+            else:
+                state.in_pullback_zone = False
 
         # 2. Bearish Pullback & Rejection
         elif is_bearish_trend:
@@ -217,5 +224,7 @@ class VWAPPullbackStrategy(Strategy):
                 state.last_signal_timestamp = bar.timestamp
             elif tested_zone:
                 state.in_pullback_zone = True
+            else:
+                state.in_pullback_zone = False
 
         return signals
