@@ -33,38 +33,9 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
       }));
     }
 
-    // Deterministic synthetic intraday progression for visualization
-    const count = 18;
-    const baseEntry = position.entry_price || 124.5;
-    const targetClose = position.market_price || 126.8;
-    const diff = targetClose - baseEntry;
-    const generated: CandleData[] = [];
-
-    let current = baseEntry - diff * 0.2;
-    const startTime = new Date();
-    startTime.setMinutes(startTime.getMinutes() - count * 2);
-
-    for (let i = 0; i < count; i++) {
-      const progress = i / (count - 1);
-      const trend = baseEntry + diff * progress;
-      const noise = (Math.sin(i * 1.3) * 0.35 + Math.cos(i * 0.7) * 0.2) * (diff ? Math.abs(diff) * 0.4 : 0.5);
-      const open = i === 0 ? current : generated[i - 1].close;
-      const close = i === count - 1 ? targetClose : trend + noise;
-      const high = Math.max(open, close) + 0.25 + Math.abs(noise) * 0.3;
-      const low = Math.min(open, close) - 0.2 - Math.abs(noise) * 0.2;
-
-      const barTime = new Date(startTime.getTime() + i * 2 * 60000);
-      generated.push({
-        time: barTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        open: Number(open.toFixed(2)),
-        high: Number(high.toFixed(2)),
-        low: Number(low.toFixed(2)),
-        close: Number(close.toFixed(2)),
-        volume: Math.floor(50000 + Math.random() * 120000),
-      });
-    }
-
-    return generated;
+    // Candles must come from the backend's retained market-bar pathway. Showing
+    // invented candles here made the dashboard look live while disconnected.
+    return [];
   }, [position.entry_price, position.market_price, position.chart_points]);
 
   // Price bounds calculation including bracket levels
@@ -121,6 +92,11 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
 
       {/* SVG Chart Area */}
       <div className="relative w-full overflow-hidden" style={{ height: `${height}px` }}>
+        {candles.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-500">
+            Waiting for real 1-minute bars from the trading feed…
+          </div>
+        )}
         <svg
           viewBox={`0 0 ${chartWidth} ${height}`}
           className="w-full h-full overflow-visible"

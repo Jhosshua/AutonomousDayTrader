@@ -40,7 +40,7 @@ class RiskEngineConfig(BaseModel):
     base_trade_risk_pct: float = 0.010       # 1.0% ($500)
     max_trade_risk_pct: float = 0.020        # 2.0% ($1,000 ceiling)
     max_trade_risk_dollars: float = 1000.00
-    max_position_equity_pct: float = 0.500   # 50% max equity / 25% DTBP per position ($25,000 on $50k)
+    max_position_equity_pct: float = 0.500   # $25,000 = 25% of $200,000 day-trading buying power
     max_concurrent_positions: int = 3
     min_stop_distance_pct: float = 0.004     # 0.4%
     max_stop_distance_pct: float = 0.040     # 4.0%
@@ -199,10 +199,14 @@ class InstitutionalRiskEngine:
 
         # 5. Stop Distance Safety Boundary Check
         stop_dist = abs(entry_price - stop_price)
-        if entry_price <= 0 or stop_dist <= 0:
+        direction_is_valid = (
+            (side.upper() == "BUY" and stop_price < entry_price)
+            or (side.upper() == "SELL" and stop_price > entry_price)
+        )
+        if entry_price <= 0 or stop_dist <= 0 or not direction_is_valid:
             return RiskCheckResult(
                 approved=False,
-                reason="INVALID_PRICE_GEOMETRY: Non-positive entry price or zero stop distance",
+                reason="INVALID_PRICE_GEOMETRY: Entry/stop direction or distance is invalid",
                 requested_qty=requested_qty,
                 authorized_qty=0,
                 estimated_risk_dollars=0.0,

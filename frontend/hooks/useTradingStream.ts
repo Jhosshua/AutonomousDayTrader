@@ -8,10 +8,10 @@ const DEFAULT_STRATEGIES: StrategyState[] = [
     id: "orb",
     name: "Opening Range Breakout",
     status: "ACTIVE",
-    daily_pnl: 280.0,
-    win_rate: 0.68,
-    trades_count: 3,
-    sharpe: 2.41,
+    daily_pnl: 0.0,
+    win_rate: 0.0,
+    trades_count: 0,
+    sharpe: null,
     subtitle: "5m / 15m Volatility Expansion",
     description: "Captures institutional opening drives breaking morning high/low with high relative volume.",
   },
@@ -19,104 +19,64 @@ const DEFAULT_STRATEGIES: StrategyState[] = [
     id: "vwap_pullback",
     name: "VWAP Trend Pullback",
     status: "ACTIVE",
-    daily_pnl: 340.0,
-    win_rate: 0.62,
-    trades_count: 2,
-    sharpe: 1.88,
+    daily_pnl: 0.0,
+    win_rate: 0.0,
+    trades_count: 0,
+    sharpe: null,
     subtitle: "Institutional Mean Continuation",
     description: "Enters shallow pullbacks to Anchored VWAP with EMA 20/50 trend alignment.",
   },
   {
     id: "news_momentum",
     name: "Catalyst News Momentum",
-    status: "STANDBY",
-    daily_pnl: 180.0,
-    win_rate: 0.71,
-    trades_count: 1,
-    sharpe: 2.15,
+    status: "ACTIVE",
+    daily_pnl: 0.0,
+    win_rate: 0.0,
+    trades_count: 0,
+    sharpe: null,
     subtitle: "Benzinga Breaking Sentiment",
     description: "Executes instant sentiment breakouts on verified high-confidence news catalysts.",
   },
   {
     id: "mean_reversion",
     name: "Statistical Mean Reversion",
-    status: "COOLDOWN",
+    status: "ACTIVE",
     daily_pnl: 0.0,
-    win_rate: 0.55,
+    win_rate: 0.0,
     trades_count: 0,
-    sharpe: 1.65,
+    sharpe: null,
     subtitle: "Bollinger / RSI Extreme Exhaustion",
     description: "Fades overextended 2.5-sigma bar deviations back into the 20-period moving average.",
   },
 ];
 
-const DEFAULT_POSITION: Position = {
-  symbol: "NVDA",
-  side: "LONG",
-  shares: 150,
-  entry_price: 124.5,
-  market_price: 126.8,
-  market_value: 19020.0,
-  unrealized_pnl: 345.0,
-  unrealized_pnl_pct: 1.85,
-  stop_loss: 123.75,
-  take_profit_1: 127.5,
-  take_profit_2: 129.0,
-  strategy_id: "orb",
-};
-
 const INITIAL_STATE: TradingState = {
   timestamp: new Date().toISOString(),
   account: {
-    equity: 50800.0,
-    cash: 48500.0,
-    buying_power: 194000.0,
-    daily_pnl: 800.0,
-    daily_pnl_pct: 1.6,
+    equity: 0.0,
+    cash: 0.0,
+    buying_power: 0.0,
+    daily_pnl: 0.0,
+    daily_pnl_pct: 0.0,
     daily_drawdown: 0.0,
     daily_drawdown_pct: 0.0,
     is_circuit_broken: false,
     risk_level: "NORMAL",
-    status: "HEALTHY",
+    status: "WAITING_FOR_BACKEND",
   },
   market_context: {
-    vix: 18.25,
-    vix_regime: "NORMAL",
-    time_phase: "TREND",
-    market_status: "OPEN",
+    vix: 0.0,
+    vix_regime: "UNKNOWN",
+    time_phase: "WAITING_FOR_BACKEND",
+    market_status: "UNKNOWN",
     sizing_multiplier: 1.0,
   },
   strategies: DEFAULT_STRATEGIES,
-  primary_position: DEFAULT_POSITION,
-  all_positions: [DEFAULT_POSITION],
-  positions_count: 1,
-  working_orders_count: 2,
-  recent_activity: [
-    {
-      id: "1",
-      timestamp: "09:30:02",
-      type: "SYSTEM",
-      message: "Market Open Bell Volatility Flush active. Guardrails armed.",
-    },
-    {
-      id: "2",
-      timestamp: "09:35:10",
-      type: "ORDER",
-      symbol: "NVDA",
-      message: "ORB 5-min breakout detected. BUY 150 NVDA filled @ $124.50",
-      side: "BUY",
-      qty: 150,
-      price: 124.5,
-    },
-    {
-      id: "3",
-      timestamp: "09:41:35",
-      type: "BRACKET",
-      symbol: "NVDA",
-      message: "Trailing stop advanced to $123.75 (locking risk buffer)",
-      price: 123.75,
-    },
-  ],
+  primary_position: null,
+  all_positions: [],
+  positions_count: 0,
+  working_orders_count: 0,
+  recent_activity: [],
   isConnected: false,
   lastUpdated: new Date(),
 };
@@ -141,10 +101,15 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
 
     let resolvedWsUrl = wsUrl;
     if (isBrowser && (wsUrl === "ws://127.0.0.1:8005/ws/ui" || !wsUrl)) {
-      resolvedWsUrl = `${wsProto}//${hostname}:8005/ws/ui`;
+      const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+      resolvedWsUrl = isLocalHost
+        ? `${wsProto}//${hostname}:8005/ws/ui`
+        : `${wsProto}//${window.location.host}/ws/ui`;
     }
 
-    let httpBase = `${httpProto}//${hostname}:8005`;
+    let httpBase = (isBrowser && window.location.port === "3005")
+      ? `${httpProto}//${hostname}:8005`
+      : `${httpProto}//${isBrowser ? window.location.host : `${hostname}:8005`}`;
     if (resolvedWsUrl.startsWith("ws://") || resolvedWsUrl.startsWith("wss://")) {
       const match = resolvedWsUrl.match(/^wss?:\/\/([^/]+)/);
       if (match) {
@@ -223,7 +188,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 },
                 strategies: mergedStrategies,
                 primary_position: primary !== undefined ? primary : prev.primary_position,
-                all_positions: payload.all_positions || prev.all_positions,
+                  all_positions: payload.all_positions ?? [],
                 positions_count: payload.positions_count ?? (primary ? 1 : 0),
                 working_orders_count: payload.working_orders_count ?? prev.working_orders_count,
                 recent_activity: payload.recent_activity || prev.recent_activity,

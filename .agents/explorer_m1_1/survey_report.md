@@ -90,7 +90,7 @@ class Settings(BaseSettings):
         description="AlpacaRelay HTTP base endpoint (or http://127.0.0.1:8765 for mock)"
     )
     RELAY_TOKEN: str = Field(
-        default="abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b",
+        default="",
         description="Shared authentication token for AlpacaRelay"
     )
 

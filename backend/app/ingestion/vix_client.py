@@ -11,7 +11,7 @@ import httpx
 
 from backend.app.config import settings
 from backend.app.core.event_bus import EventBus, event_bus
-from backend.app.models.events import VixPrint, VixRegime
+from backend.app.models.events import RelayStatusEvent, VixPrint, VixRegime
 
 log = logging.getLogger("VixClient")
 ET_TZ = ZoneInfo("America/New_York")
@@ -185,6 +185,13 @@ class VixClient:
         while self._running:
             try:
                 vprint = await self.fetch_vix()
+                await self.bus.publish(
+                    RelayStatusEvent(
+                        feed_type="vix",
+                        status="connected" if not vprint.is_fallback and vprint.upstream == "connected" else "degraded",
+                        message="VIX print available" if not vprint.is_fallback else "VIX fallback in use",
+                    )
+                )
                 await self.bus.publish(vprint)
             except asyncio.CancelledError:
                 break

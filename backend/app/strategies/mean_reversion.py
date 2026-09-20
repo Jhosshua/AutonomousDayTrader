@@ -112,6 +112,14 @@ class MeanReversionStrategy(Strategy):
         if len(state.bars) < self.period:
             return []
 
+        # Prevent repeated pyramiding on consecutive bars while the same
+        # exhaustion condition remains extreme. A new signal is allowed after a
+        # 15-minute cooldown, matching the strategy's intraday fade cadence.
+        if state.last_signal_time is not None:
+            elapsed = (bar.timestamp - state.last_signal_time).total_seconds()
+            if elapsed < 15 * 60:
+                return []
+
         closes = [b.close for b in state.bars]
         mean, std, z = evaluate_mean_reversion_zscore(closes)
 

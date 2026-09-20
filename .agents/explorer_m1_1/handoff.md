@@ -23,7 +23,7 @@
    await ws.send(json.dumps([{"T": "success", "msg": "authenticated"}]))
    ```
    - Observation: Initial handshake banner `[{"T":"success","msg":"connected"}]` is mandatory. The client must transmit `{"action":"auth","token": RELAY_TOKEN}` within 10 seconds.
-   - Live credential verified: `RELAY_TOKEN = "abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b"`.
+   - Live credential verified from a private environment variable; the token is intentionally omitted from this handoff.
 
 2. **Relay Backpressure Drop Mechanism**:
    - Source: `/Users/mo/AlpacaRelay/relay.py:71` & `CONGESTION_PLAN_2026-09-15.md`:
@@ -123,7 +123,7 @@ The technical implementation architecture and concrete blueprints for AlpacaRela
 3. **Live Probe Verification (Read-Only)**:
    ```bash
    # Test live VIX print (respects query-free rule)
-   curl -s -H "X-Relay-Token: abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b" \
+   curl -s -H "X-Relay-Token: <private relay token>" \
      https://alpacarelay-production.up.railway.app/vix | jq .
    ```
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# verify_port_hygiene.sh - Asserts no lingering trading processes on designated project ports
+# verify_port_hygiene.sh - Reports whether designated project ports are free.
+# This script is intentionally read-only: it must not kill an unrelated process.
 set -euo pipefail
 
 PORTS=(3005 8005 8080)
@@ -14,8 +15,6 @@ for port in "${PORTS[@]}"; do
     for pid in $PIDS; do
       CMD=$(ps -p "$pid" -o command= 2>/dev/null || echo "unknown")
       echo "   PID $pid details: $CMD"
-      echo "   Killing lingering PID $pid..."
-      kill -9 "$pid" 2>/dev/null || true
     done
     VIOLATIONS=$((VIOLATIONS + 1))
   else
@@ -24,7 +23,7 @@ for port in "${PORTS[@]}"; do
 done
 
 if [ "$VIOLATIONS" -gt 0 ]; then
-  echo "⚠️ Remediation applied: lingering test processes were forcefully terminated."
+  echo "⚠️ Ports are occupied. Stop only the project-owned process before retrying."
   exit 1
 fi
 

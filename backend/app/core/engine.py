@@ -60,6 +60,7 @@ class Fill:
     fee: float
     slippage: float
     timestamp: datetime
+    realized_pnl: float = 0.0
 
 
 @dataclass
@@ -72,6 +73,7 @@ class Order:
     qty: int
     limit_price: Optional[float] = None
     stop_price: Optional[float] = None
+    estimated_price: Optional[float] = None
     time_in_force: TimeInForce = TimeInForce.DAY
     strategy_id: str = "MANUAL"
     bracket_role: Optional[BracketRole] = None
@@ -123,6 +125,7 @@ class ExecutionEngine:
         qty: int,
         limit_price: Optional[float] = None,
         stop_price: Optional[float] = None,
+        estimated_price: Optional[float] = None,
         time_in_force: TimeInForce = TimeInForce.DAY,
         strategy_id: str = "MANUAL",
         client_order_id: Optional[str] = None,
@@ -149,6 +152,7 @@ class ExecutionEngine:
             qty=qty,
             limit_price=limit_price,
             stop_price=stop_price,
+            estimated_price=estimated_price,
             time_in_force=time_in_force,
             strategy_id=strategy_id,
             bracket_role=bracket_role,
@@ -178,7 +182,7 @@ class ExecutionEngine:
         self._record_audit(order, OrderState.SUBMITTED, "SUBMITTED", "Dispatched to engine")
 
         # 1. Account Buying Power & Concentration check
-        est_price = order.limit_price or order.stop_price or 100.0
+        est_price = order.limit_price or order.estimated_price or order.stop_price or 100.0
         can_afford, afford_reason = self.account.can_afford(
             order.symbol, order.side.value, order.qty, est_price
         )
@@ -290,8 +294,14 @@ class ExecutionEngine:
 
         fills: List[Fill] = []
         matching_orders = [o for o in list(self.working_orders.values()) if o.symbol == symbol]
+        # A stop is the conservative outcome when one quote crosses both an
+        # OCO stop and a profit target.  Process stops first and skip orders
+        # removed by an earlier fill/cancel operation.
+        matching_orders.sort(key=lambda order: order.order_type not in (OrderType.STOP, OrderType.STOP_LIMIT))
 
         for order in matching_orders:
+            if order.id not in self.working_orders:
+                continue
             fill_price: Optional[float] = None
             slippage = self.calculate_slippage(order, mid_price, bid=bid, ask=ask)
 
@@ -330,10 +340,16 @@ class ExecutionEngine:
 
         fills: List[Fill] = []
         matching_orders = [o for o in list(self.working_orders.values()) if o.symbol == symbol]
+        # Resolve an ambiguous OHLC bar conservatively: a stop is evaluated
+        # before profit targets, and OCO children removed by reconciliation are
+        # not allowed to fill later in the same snapshot.
+        matching_orders.sort(key=lambda order: order.order_type not in (OrderType.STOP, OrderType.STOP_LIMIT))
         # Max fillable quantity in bar under 10% participation cap
         max_fillable = max(10, int(volume * self.MAX_BAR_PARTICIPATION_RATE))
 
         for order in matching_orders:
+            if order.id not in self.working_orders:
+                continue
             fill_price: Optional[float] = None
             slippage = self.calculate_slippage(
                 order, close, bar_volume=volume, bar_high=high, bar_low=low
@@ -361,6 +377,10 @@ class ExecutionEngine:
                 exec_qty = min(order.remaining_qty, max_fillable)
                 fill = self._execute_fill(order, exec_qty, fill_price, slippage, timestamp)
                 fills.append(fill)
+                if order.order_type in (OrderType.STOP, OrderType.STOP_LIMIT):
+                    # A stop fill is an OCO terminal event.  The caller will
+                    # cancel sibling targets during fill reconciliation.
+                    break
 
         return fills
 
@@ -383,6 +403,7 @@ class ExecutionEngine:
             price=round(price, 4),
             fee=fee,
             slippage=round(slippage, 4),
+            realized_pnl=0.0,
             timestamp=timestamp,
         )
 
@@ -396,7 +417,7 @@ class ExecutionEngine:
         order.avg_fill_price = round(total_val / order.filled_qty, 4)
 
         # Apply to account ledger
-        self.account.apply_fill(
+        realized_delta, _ = self.account.apply_fill(
             order_id=order.id,
             symbol=order.symbol,
             side=order.side.value,
@@ -405,6 +426,7 @@ class ExecutionEngine:
             fee=fee,
             timestamp=timestamp,
         )
+        fill.realized_pnl = realized_delta
 
         if order.remaining_qty == 0:
             order.status = OrderState.FILLED

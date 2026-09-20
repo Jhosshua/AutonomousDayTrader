@@ -1,19 +1,20 @@
 # TEST_READY: AutonomousDayTrader E2E Test Suite Certification
 
-**Document Status**: CERTIFIED & PUBLISHED  
-**Date**: 2026-09-19  
-**Author**: `test_writer_e2e` (Dedicated Test Architect & QA Specialist)  
-**Target Root**: `/Users/mo/AutonomousDayTrader`  
-**Total Tests**: **248**  
-**Pass Rate**: **100% (248 / 248 Passed)**  
-**Execution Runtime**: ~0.35s  
-**Process Hygiene**: Verified (Ports 3005, 8005, 8080 100% liberated, zero lingering processes)  
+**Document Status**: VERIFIED & PUBLISHED
+**Date**: 2026-09-19
+**Author**: `test_writer_e2e` (Dedicated Test Architect & QA Specialist)
+**Target Root**: `/Users/mo/AutonomousDayTrader`
+**Current E2E Tests**: **293**
+**Pass Rate**: **100% (293 / 293 Passed)**
+**Backend Unit Tests**: **140 / 140 Passed**
+**Execution Runtime**: ~23s including visual checks
+**Process Hygiene**: Verified (Ports 3005, 8005, 8080 100% liberated, zero lingering processes)
 
 ---
 
 ## 1. Executive Summary
 
-The comprehensive opaque-box E2E testing framework for **AutonomousDayTrader** has been formulated, constructed, executed, and certified. The test suite verifies the end-to-end signal ingestion, virtual paper trading ledger, institutional risk circuit breakers, dynamic brackets, auto-flattening schedule, 4 intraday trading strategies, VIX self-adaptation, time-of-day dynamics, Apple Music UI contracts, and Monday market open simulation.
+The opaque-box E2E testing framework for **AutonomousDayTrader** has been executed against the current code. It verifies signal ingestion, the virtual paper ledger, circuit breakers, dynamic brackets, auto-flattening, the four strategies, VIX/time-of-day adaptation, UI contracts, responsive visual behavior, and replay infrastructure. This is software verification; it is not live-market or real-account certification.
 
 The complete deterministic AlpacaRelay mock server and replay engine has been built and verified under `backend/app/replay/mock_relay.py` and `backend/app/replay/feed_player.py`, complete with synthetic and historical market fixtures under `tests/e2e/fixtures/`.
 
@@ -23,7 +24,7 @@ The complete deterministic AlpacaRelay mock server and replay engine has been bu
 
 ### Primary Runner (Recommended)
 ```bash
-# Execute entire 4-tier suite (248 tests) with automated port hygiene audit
+# Execute the E2E suite with automated port hygiene audit
 python3 tests/e2e/runner.py
 
 # Or execute via shell script entrypoint with signal traps
@@ -68,17 +69,20 @@ python3 backend/app/replay/mock_relay.py --port 8080
 
 | Test Tier | Methodology | Scope | Test Count | Pass Count | Pass Rate |
 |---|---|---|:---:|:---:|:---:|
-| **Tier 1** | Category-Partition Method (CPM) | Isolated functional verification across all 21 features (F1 to F21) | 105 | 105 | **100%** |
+| **Tier 1** | Category-Partition Method (CPM) | Isolated functional verification across all 21 features | 105 | 105 | **100%** |
 | **Tier 2** | Boundary Value Analysis (BVA) | Exact operational limits ($1,500 drawdown, 15:55 close, position caps, wide spreads) | 105 | 105 | **100%** |
-| **Tier 3** | Combinatorial & Pairwise | All-pairs orthogonal matrix across Strategy x VIX x Phase x Drawdown x Fill | 32 | 32 | **100%** |
-| **Tier 4** | Real-World Application Scenarios | Complete open-to-close workflows (ORB, News Contradiction, Breaker, EOD, Monday Rehearsal) | 6 | 6 | **100%** |
-| **TOTAL** | **Full Opaque-Box Suite** | **Comprehensive System Lifecycle** | **248** | **248** | **100%** |
+| **Tier 3** | Combinatorial & Pairwise | Strategy x VIX x Phase x Drawdown x Fill combinations | 32 | 32 | **100%** |
+| **Tier 4** | Real-World Application Scenarios | Complete open-to-close workflows and Monday rehearsal | 6 | 6 | **100%** |
+| **Tier 5** | Adversarial Hardening | Socket drops, malformed data, order storms, breaker and bracket attacks | 24 | 24 | **100%** |
+| **UI Streaming** | Frontend resilience | Burst updates, malformed frames, action parity, REST fallback | 6 | 6 | **100%** |
+| **Visual QA** | Responsive browser checks | Static export, mobile viewports, tray/modal and overflow checks | 15 | 15 | **100%** |
+| **TOTAL** | **Current E2E Suite** | **Comprehensive system lifecycle + visual checks** | **293** | **293** | **100%** |
 
 ---
 
 ## 4. Feature Coverage Matrix (All 21 Features: F1 to F21)
 
-| Feature ID | Feature Name | Tier 1 (CPM) | Tier 2 (BVA) | Tier 3 (Pairwise) | Tier 4 (Scenario) | Total Tests | Status |
+| Feature ID | Feature Name | Core Tier 1 (CPM) | Core Tier 2 (BVA) | Core Tier 3 (Pairwise) | Core Tier 4 (Scenario) | Total Tests | Status |
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | **F1** | Stock WebSocket Client (`/v2/stocks`) | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
 | **F2** | News WebSocket Client (`/news`) | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
@@ -101,9 +105,11 @@ python3 backend/app/replay/mock_relay.py --port 8080
 | **F19** | Opaque-Box E2E Test Suite Framework | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
 | **F20** | Monday Market Open Simulation Dry Run | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
 | **F21** | Upstream Delivery & Process Hygiene | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
-| **TOTAL** | **Full Feature System Verification** | **105** | **105** | **32** | **6** | **248** | **100% PASS** |
+| **TOTAL** | **Current Feature System Verification** | **See pytest collection** | **See pytest collection** | **Included** | **Included** | **293** | **100% PASS** |
 
 ---
+
+The current verification total is 293 tests, including the full E2E directory and the visual/static-export checks. Earlier tier-only counts in archived planning notes are not the current total.
 
 ## 5. Artifact Manifest
 

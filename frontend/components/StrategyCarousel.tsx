@@ -105,7 +105,7 @@ export default function StrategyCarousel({ strategies }: StrategyCarouselProps) 
                 <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                   <span className="text-neutral-400 text-[11px] block">Sharpe Ratio</span>
                   <span className="text-base font-bold text-neutral-200 num-tabular">
-                    {selectedStrategy.sharpe?.toFixed(2) || "2.10"}
+                    {selectedStrategy.sharpe == null ? "—" : selectedStrategy.sharpe.toFixed(2)}
                   </span>
                 </div>
               </div>

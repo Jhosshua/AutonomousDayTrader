@@ -24,7 +24,7 @@ cd "${PROJECT_ROOT}"
 
 # 1. Start FastAPI Core Trading Engine (Port 8005)
 echo "▶ Starting Backend Trading Engine & WebSocket Server on http://127.0.0.1:8005..."
-uvicorn backend.app.main:app --host 127.0.0.1 --port 8005 --log-level info &
+python3 -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8005 --log-level info &
 BACKEND_PID=$!
 
 # Wait for backend to be responsive

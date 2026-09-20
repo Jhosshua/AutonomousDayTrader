@@ -15,7 +15,7 @@ echo "========================================================================"
 cd "${PROJECT_ROOT}"
 
 # Run simulation dry run script with all arguments passed
-python3 "${PROJECT_ROOT}/scripts/run_monday_dry_run.py" "$@"
+python3 "${PROJECT_ROOT}/scripts/run_integrated_monday_dry_run.py" "$@"
 SIM_EXIT=$?
 
 if [ ${SIM_EXIT} -ne 0 ]; then

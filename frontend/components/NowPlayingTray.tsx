@@ -113,7 +113,7 @@ export default function NowPlayingTray({
                   {pnlSign}${Math.abs(position.unrealized_pnl).toFixed(2)}
                 </div>
                 <div className="text-[10px] opacity-80">
-                  {pnlSign}{position.unrealized_pnl_pct.toFixed(2)}%
+                  {pnlSign}{(position.unrealized_pnl_pct * 100).toFixed(2)}%
                 </div>
               </div>
             )}

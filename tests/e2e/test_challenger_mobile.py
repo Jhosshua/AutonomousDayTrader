@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -55,34 +56,16 @@ def is_port_listening(port: int) -> bool:
         return False
 
 
-def kill_port_processes(port: int):
-    try:
-        res = subprocess.run(
-            ["lsof", "-tiTCP:" + str(port), "-sTCP:LISTEN"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        pids = [p.strip() for p in res.stdout.splitlines() if p.strip()]
-        for pid in pids:
-            try:
-                os.kill(int(pid), signal.SIGKILL)
-            except OSError:
-                pass
-    except Exception:
-        pass
-
-
 @pytest.fixture(scope="module")
 def nextjs_server():
     """Starts the Next.js production server on safe port 3005 and ensures clean teardown."""
-    # Ensure port is clean before starting
-    kill_port_processes(PORT)
-    time.sleep(0.3)
+    # Never terminate an unrelated process that happens to own the test port.
+    if is_port_listening(PORT):
+        raise RuntimeError(f"Port {PORT} is already occupied; stop the owning process before visual QA.")
 
-    # Start next start on port 3005 directly
-    next_bin = FRONTEND_DIR / "node_modules" / ".bin" / "next"
-    cmd = [str(next_bin), "start", "-p", str(PORT)]
+    # The production artifact is a static Next export in frontend/out, served
+    # by the same export server used by the single-service deployment.
+    cmd = ["npm", "run", "start"]
     proc = subprocess.Popen(
         cmd,
         cwd=str(FRONTEND_DIR),
@@ -125,7 +108,6 @@ def nextjs_server():
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except OSError:
             pass
-    kill_port_processes(PORT)
     time.sleep(0.5)
 
     # Enforce process hygiene post-teardown
@@ -148,7 +130,8 @@ def test_safe_port_3005_configuration():
     assert "dev" in scripts, "Missing dev script"
     assert "start" in scripts, "Missing start script"
     assert "-p 3005" in scripts["dev"], f"dev script must specify -p 3005: {scripts['dev']}"
-    assert "-p 3005" in scripts["start"], f"start script must specify -p 3005: {scripts['start']}"
+    assert ("-p 3005" in scripts["start"] or "--port 3005" in scripts["start"]), \
+        f"start script must specify port 3005: {scripts['start']}"
 
 
 # ============================================================================
@@ -265,9 +248,11 @@ def test_mobile_text_clipping_and_wrapping(nextjs_server, vp):
         page = context.new_page()
         page.goto(BASE_URL, wait_until="networkidle", timeout=10000)
 
-        # Verify key UI text elements are visible and have valid geometry
-        equity_text = page.locator("text=$").first
-        assert equity_text.is_visible(), "Portfolio equity text must be visible"
+        # Wait for the server-rendered dashboard shell and then select the actual
+        # currency value, avoiding a race with the initial client hydration.
+        page.get_by_text("Portfolio Equity", exact=True).wait_for(state="visible", timeout=5000)
+        equity_text = page.locator("main").get_by_text(re.compile(r"^\$[0-9,]+\.\d{2}$")).first
+        equity_text.wait_for(state="visible", timeout=5000)
 
         # Check telemetry boxes fit inside screen
         telemetry_boxes = page.locator("section.px-4 .grid > div")
@@ -326,6 +311,16 @@ def test_now_playing_tray_expansion_and_modal_elements(nextjs_server):
         modal_header = page.locator("text=Active Primary Trade")
         modal_header.wait_for(state="visible", timeout=3000)
         assert modal_header.is_visible(), "Expanded modal sheet header 'Active Primary Trade' must be visible"
+
+        # An unconnected/flat backend must remain honest: the export should
+        # show the empty-state panel rather than inventing a position or
+        # bracket levels just to make the visual test look populated.
+        if page.locator("text=No Open Position").is_visible():
+            assert page.locator("text=Awaiting signal breakout or position entry...").is_visible()
+            assert page.locator("svg text:has-text('TP2')").count() == 0
+            page.locator("button:has(svg.lucide-chevron-down)").click()
+            browser.close()
+            return
 
         # Verify Drag handle bar
         drag_handle = page.locator(".cursor-grab")

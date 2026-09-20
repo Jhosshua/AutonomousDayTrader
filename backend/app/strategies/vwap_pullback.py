@@ -21,6 +21,7 @@ from backend.app.strategies.base import (
 )
 
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
+MIN_STOP_DISTANCE_PCT = 0.004  # Must match InstitutionalRiskEngine's 0.4% floor.
 
 
 @dataclass
@@ -86,6 +87,15 @@ class VWAPPullbackStrategy(Strategy):
             # Need minimum sample for initial VWAP and SMA
             return []
 
+        # A pullback condition can remain true across several bars.  Enforce
+        # the configured bar cooldown before evaluating another entry so a
+        # single setup cannot create an order storm (including repeated risk
+        # rejects when its geometry is invalid).
+        if state.last_signal_timestamp is not None:
+            elapsed_seconds = (bar.timestamp - state.last_signal_timestamp).total_seconds()
+            if elapsed_seconds < self.cooldown_bars * 60:
+                return []
+
         # Calculate Anchored VWAP and standard deviation
         vwap, std = calculate_anchored_vwap(state.session_bars)
         if std <= 0.001:
@@ -136,8 +146,9 @@ class VWAPPullbackStrategy(Strategy):
             if (tested_zone or state.in_pullback_zone) and is_green_bounce and (has_hammer_wick or volume_confirmed):
                 entry_price = bar.close
                 stop_loss = round(vwap - (0.50 * std), 4)
-                if entry_price - stop_loss < 0.05:
-                    stop_loss = round(entry_price - max(0.10, std * 0.8), 4)
+                min_distance = entry_price * MIN_STOP_DISTANCE_PCT
+                if entry_price - stop_loss < min_distance:
+                    stop_loss = round(entry_price - max(min_distance, std * 0.8), 4)
                 risk = entry_price - stop_loss
                 tp1 = round(vwap + (1.0 * std), 4)
                 if tp1 <= entry_price:
@@ -176,8 +187,9 @@ class VWAPPullbackStrategy(Strategy):
             if (tested_zone or state.in_pullback_zone) and is_red_rejection and (has_inv_hammer_wick or volume_confirmed):
                 entry_price = bar.close
                 stop_loss = round(vwap + (0.50 * std), 4)
-                if stop_loss - entry_price < 0.05:
-                    stop_loss = round(entry_price + max(0.10, std * 0.8), 4)
+                min_distance = entry_price * MIN_STOP_DISTANCE_PCT
+                if stop_loss - entry_price < min_distance:
+                    stop_loss = round(entry_price + max(min_distance, std * 0.8), 4)
                 risk = stop_loss - entry_price
                 tp1 = round(vwap - (1.0 * std), 4)
                 if tp1 >= entry_price:

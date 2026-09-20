@@ -7,7 +7,7 @@ Can be run via:
 - pytest tests/e2e/
 
 Features:
-- Executes Tier 1 (CPM, >=105 tests), Tier 2 (BVA, >=105 tests), Tier 3 (Pairwise, 32 tests), Tier 4 (Scenarios, 6 tests)
+- Executes all collected E2E tests by default, including Tier 1-5 and visual checks; tier flags remain available for focused runs.
 - Aggregates pass/fail metrics and feature coverage table
 - Verifies port liberation and enforces process hygiene
 - Produces clean terminal reports and optional JSON summary
@@ -68,7 +68,7 @@ def run_tests(
 
     # Select target test files
     if tier == "all":
-        args.extend([str(p) for p in TIER_FILES.values()])
+        args.append(str(TESTS_E2E_DIR))
     elif tier in TIER_FILES:
         args.append(str(TIER_FILES[tier]))
     else:

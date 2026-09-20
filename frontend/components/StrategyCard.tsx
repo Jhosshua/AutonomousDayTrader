@@ -166,7 +166,7 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
               Sharpe
             </span>
             <span className="text-xs font-semibold text-neutral-200 num-tabular">
-              {strategy.sharpe?.toFixed(2) || "2.10"}
+              {strategy.sharpe == null ? "—" : strategy.sharpe.toFixed(2)}
             </span>
           </div>
         </div>

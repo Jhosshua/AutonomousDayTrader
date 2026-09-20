@@ -22,9 +22,9 @@ class EventType(str, Enum):
 
 class VixRegime(str, Enum):
     LOW = "LOW"             # VIX < 15.0: Sizing 1.2x, tight stops
-    NORMAL = "NORMAL"       # 15.0 <= VIX < 22.0: Sizing 1.0x, standard stops
-    ELEVATED = "ELEVATED"   # 22.0 <= VIX < 30.0: Sizing 0.6x, wider stops
-    CRISIS = "CRISIS"       # VIX >= 30.0: Sizing 0.25x, freeze breakout entries
+    NORMAL = "NORMAL"       # 15.0 <= VIX < 25.0: Sizing 1.0x, standard stops
+    ELEVATED = "ELEVATED"   # 25.0 <= VIX < 35.0: Sizing 0.7x, wider stops
+    CRISIS = "CRISIS"       # VIX >= 35.0: Sizing 0.35x, freeze breakout entries
 
 
 class CatalystCategory(str, Enum):
@@ -243,6 +243,7 @@ class FillEvent:
     price: float
     fee: float
     slippage: float
+    realized_pnl: float = 0.0
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 

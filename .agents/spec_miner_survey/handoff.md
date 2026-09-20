@@ -16,7 +16,7 @@ Direct evidence captured during the investigation:
    - Files inspected: `relay.py` (2259 lines), `README.md` (198 lines), `client_example.py` (46 lines), `test_downstream_e2e.py` (257 lines), `test_vix.py` (205 lines), `test_news.py` (227 lines).
    - Authoritative token extracted from `/Users/mo/AlpacaRelay/.env:1`:
      ```
-     RELAY_TOKEN=abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b
+     RELAY_TOKEN=<private relay token>
      ```
    - Downstream WebSocket handshake lines (`relay.py:517-529`):
      ```python
@@ -39,7 +39,7 @@ Direct evidence captured during the investigation:
      ```json
      {"upstream": "connected", "feed": "sip", "clients": 7, "news": {"upstream": "connected", "subscription": ["*"], "articles_received": 1178}, "vix": {"state": "ready", "upstream": "connected", "value": 14.81, "asof": "2026-09-18T20:15:01.213000+00:00"}}
      ```
-   - `curl -s -H "X-Relay-Token: abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b" https://alpacarelay-production.up.railway.app/vix` returned HTTP 200:
+   - A private-token probe against `https://alpacarelay-production.up.railway.app/vix` returned HTTP 200:
      ```json
      {"state": "ready", "source": "Tastytrade/dxFeed spot VIX (Trade.time)", "upstream": "connected", "value": 14.81, "asof": "2026-09-18T20:15:01.213000+00:00", "received_at": "2026-09-18T20:15:01.243725+00:00", "age_s": 98762.2, "observations": [...]}
      ```
@@ -78,7 +78,7 @@ Direct evidence captured during the investigation:
 1. **Relay Protocol Identification**:
    - Observation 1 details the exact Python websockets implementation in `/Users/mo/AlpacaRelay/relay.py`.
    - Observation 2 confirms live behavioral conformity across HTTP 200, HTTP 400, HTTP 401, and WebSocket handshake.
-   - *Deduction*: AutonomousDayTrader can connect directly to `wss://alpacarelay-production.up.railway.app` and `https://alpacarelay-production.up.railway.app` using `RELAY_TOKEN=abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b` without requiring new credential provisioning or Alpaca upstream slots.
+   - *Deduction*: AutonomousDayTrader can connect directly to `wss://alpacarelay-production.up.railway.app` and `https://alpacarelay-production.up.railway.app` using a privately supplied `RELAY_TOKEN` without requiring new credential provisioning or Alpaca upstream slots.
 
 2. **Need for Deterministic Mock Server**:
    - Observation 2 demonstrates that live stock feeds over weekends and off-market hours print no new 1-minute bars (`b`) or trades (`t`), and live VIX has `age_s > 90,000`s.
@@ -119,7 +119,7 @@ To independently verify all findings in this report:
 1. **Verify Live AlpacaRelay Health & VIX**:
    ```bash
    curl -s https://alpacarelay-production.up.railway.app/health
-   curl -s -H "X-Relay-Token: abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b" https://alpacarelay-production.up.railway.app/vix
+  curl -s -H "X-Relay-Token: <private relay token>" https://alpacarelay-production.up.railway.app/vix
    ```
    *Expected*: HTTP 200 with valid JSON containing upstream `connected` and VIX value.
 
@@ -130,7 +130,7 @@ To independently verify all findings in this report:
    async def test():
        async with websockets.connect("wss://alpacarelay-production.up.railway.app") as ws:
            assert json.loads(await ws.recv())[0]["msg"] == "connected"
-           await ws.send(json.dumps({"action": "auth", "token": "abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b"}))
+           await ws.send(json.dumps({"action": "auth", "token": os.environ["RELAY_TOKEN"]}))
            assert json.loads(await ws.recv())[0]["msg"] == "authenticated"
            print("Verification SUCCESS: Handshake authenticated")
    asyncio.run(test())

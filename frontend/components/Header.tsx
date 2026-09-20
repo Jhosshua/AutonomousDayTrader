@@ -35,13 +35,17 @@ export default function Header({ account, marketContext, isConnected }: HeaderPr
       case "PRE_MARKET":
         return "Pre-Market";
       case "OPEN_FLUSH":
+      case "OPEN_VOLATILITY_FLUSH":
         return "Open Flush (09:30–10:00)";
       case "TREND":
+      case "TREND_CONTINUATION":
         return "Trend Continuation (10:00–11:30)";
       case "MIDDAY_CHOP":
         return "Midday Chop (11:30–14:00)";
       case "POWER_HOUR":
-        return "Power Hour (15:00–16:00)";
+        return "Power Hour (15:00–15:45)";
+      case "AFTERNOON_PUSH":
+        return "Afternoon Push (14:00–15:00)";
       case "EOD_FLATTEN":
         return "EOD Auto-Flattening (15:55)";
       default:
@@ -81,7 +85,7 @@ export default function Header({ account, marketContext, isConnected }: HeaderPr
               marketContext.vix_regime
             )}`}
           >
-            VIX {marketContext.vix?.toFixed(2) || "18.25"} • {marketContext.vix_regime || "NORMAL"}
+            VIX {marketContext.vix > 0 ? marketContext.vix.toFixed(2) : "—"} • {marketContext.vix_regime || "UNKNOWN"}
           </div>
         </div>
 

@@ -214,7 +214,10 @@ class NewsMomentumStrategy(Strategy):
             return []
 
         # Volume confirmation check (>3.5x SMA20)
-        recent_volumes = [float(b.volume) for b in self.recent_bars[sym][-20:]]
+        # Exclude the candidate bar from its own baseline.  Including the
+        # surge in SMA20 dilutes the ratio and can suppress the very catalyst
+        # the rule is meant to detect.
+        recent_volumes = [float(b.volume) for b in self.recent_bars[sym][:-1][-20:]]
         sma20_vol = calculate_sma(recent_volumes, 20)
         if sma20_vol <= 0:
             sma20_vol = 100000.0

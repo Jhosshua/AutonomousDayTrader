@@ -44,7 +44,7 @@ logger = logging.getLogger("mock_relay")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 DEFAULT_RELAY_TOKEN = os.environ.get(
-    "RELAY_TOKEN", "abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b"
+    "RELAY_TOKEN", "local-mock-relay-token"
 )
 DEFAULT_PORT = int(os.environ.get("MOCK_PORT", os.environ.get("PORT", "8080")))
 
@@ -348,6 +348,12 @@ class MockAlpacaRelayServer:
         """Dispatch a single event by type."""
         ev_type = event.get("type")
         data = event.get("data", event)
+        if event.get("timestamp") and "t" not in data:
+            data = dict(data)
+            data["t"] = event["timestamp"]
+        if ev_type == "news" and event.get("timestamp") and "created_at" not in data:
+            data = dict(data)
+            data["created_at"] = event["timestamp"]
 
         if ev_type == "bar" or data.get("T") == "b":
             await self.broadcast_bar(data)

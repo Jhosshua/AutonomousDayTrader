@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3005",
     "build": "next build",
-    "start": "next start -p 3005",
+    "start": "node scripts/serve_export.mjs --port 3005",
     "lint": "next lint",
     "test": "node scripts/verify_ui.mjs && node scripts/test_websocket_resilience.mjs"
   },

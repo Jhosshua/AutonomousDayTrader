@@ -13,7 +13,7 @@
 Direct observations and execution outputs from the workspace:
 
 ### Code Artifacts Implemented
-- `backend/app/config.py`: 148 lines. Implements `Settings` via Pydantic `BaseSettings` with AlpacaRelay base endpoints, authentication `RELAY_TOKEN` (`abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b`), conflict-free safe port allocation (`API_PORT=8005`, `UI_PORT=3005`, `MOCK_PORT=8080`), and risk thresholds ($1,500 daily loss limit).
+- `backend/app/config.py`: 148 lines. Implements `Settings` via Pydantic `BaseSettings` with AlpacaRelay base endpoints, authentication via private `RELAY_TOKEN` environment configuration, conflict-free safe port allocation (`API_PORT=8005`, `UI_PORT=3005`, `MOCK_PORT=8080`), and risk thresholds ($1,500 daily loss limit).
 - `backend/app/models/events.py`: 205 lines. Implements immutable typed dataclasses: `BarEvent`, `QuoteEvent`, `TradeEvent`, `NewsEvent`, `VixPrint`, `RelayStatusEvent`, `OrderEvent`, `FillEvent`, `PositionState`, and `AccountState`.
 - `backend/app/core/event_bus.py`: 85 lines. Implements asynchronous typed publish/subscribe event bus with isolated try/except error boundaries preventing faulty subscribers from crashing ingestion.
 - `backend/app/core/account.py`: 320 lines. Implements $50,000 virtual paper trading account state machine with FINRA Rule 4210 Day Trading Buying Power ($200,000 4:1 intraday leverage), mark-to-market revaluation on every tick, position scaling, partial closing, and position flipping.

@@ -54,7 +54,7 @@ export default function Home() {
               <div className="flex items-center gap-1.5 mt-0.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-apple-green" />
                 <span className="font-bold text-white text-xs">
-                  {state.account.risk_level || "NORMAL"} (1.0% Max)
+                  {state.account.risk_level || "NORMAL"} (1.0% Base / 2.0% Hard)
                 </span>
               </div>
             </div>

@@ -1,6 +1,6 @@
 # AutonomousDayTrader 🚀📈
 
-> Production-grade, local, always-on algorithmic intraday day trading system for US equities connected downstream to **AlpacaRelay**, operating on a virtual **$50,000** paper trading account across 4 dynamically adapted, high Sharpe-ratio day trading strategies with an **Apple Music mobile-inspired** UI.
+> Intraday paper-trading system for US equities connected downstream to **AlpacaRelay**, operating on a virtual **$50,000** account across four dynamically adapted strategies with an **Apple Music mobile-inspired** UI.
 
 ---
 
@@ -110,6 +110,10 @@ pip install -r backend/requirements.txt  # or pip install fastapi uvicorn websoc
 cd frontend
 npm install
 cd ..
+
+# Production/live-feed mode requires the relay token as an environment variable.
+# Do not commit it to .env or source files.
+export RELAY_TOKEN="<private relay token>"
 ```
 
 ### Running the System
@@ -126,10 +130,10 @@ cd frontend && npm run dev
 
 ### Running Test Suites
 ```bash
-# Run complete opaque-box E2E test suite (272 tests with port audit)
+# Run the complete opaque-box E2E test suite (293 tests with port audit)
 python3 tests/e2e/runner.py
 
-# Run all tests using pytest (293 tests covering Tier 1-5 + UI resilience)
+# Run all E2E tests using pytest (293 tests covering Tier 1-5 + visual checks)
 pytest tests/e2e
 
 # Run backend unit test suite (140 tests)
@@ -139,9 +143,10 @@ pytest backend/tests
 cd frontend && npm test
 ```
 
-### Monday Market Open Live Dry Run
+### Monday Market Open Deterministic Simulation
 ```bash
-# Execute mock Monday 09:25 - 10:30 ET live session simulation
+# Execute the mock Monday 09:25 - 10:30 ET replay through the production path.
+# This is simulation evidence only; it does not certify live-market fills.
 ./scripts/run_monday_dry_run.sh
 ```
 
@@ -188,14 +193,16 @@ AutonomousDayTrader/
 │   ├── hooks/                    # useTradingStream WebSocket client hook
 │   └── scripts/                  # UI verification & streaming stress test scripts
 ├── tests/
-│   └── e2e/                      # Opaque-box E2E test suite (Tiers 1–5, 272+ tests)
+│   └── e2e/                      # Opaque-box E2E test suite (293 current tests)
 ├── scripts/
 │   ├── run_dev.sh                # Local development launcher
 │   ├── run_monday_dry_run.sh     # Monday market open live simulation script
-│   ├── run_monday_dry_run.py     # Simulation dry run execution engine
+│   ├── run_integrated_monday_dry_run.py # Production-path integration replay
+│   ├── run_monday_dry_run.py     # Legacy standalone simulator (not certification source)
+│   ├── run_production_stack.sh   # Requires RELAY_TOKEN; local production-like launcher
 │   ├── verify_port_hygiene.sh    # Process hygiene & port liberation auditor
 │   └── deploy_and_push.sh        # Git commit and push upstream deployment script
-├── MONDAY_SIMULATION_REPORT.md   # Monday dry run audit report (+$398.30 PnL)
+├── MONDAY_SIMULATION_REPORT.md   # Latest production-path deterministic replay report
 ├── TEST_INFRA.md                 # E2E test methodology & coverage matrix
 ├── TEST_READY.md                 # Test harness readiness certificate
 └── PROJECT.md                    # Project architectural blueprint & contract specs

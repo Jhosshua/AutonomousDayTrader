@@ -121,6 +121,16 @@ class FeedPlayer:
         """Dispatch event to mock relay server."""
         ev_type = event.get("type")
         data = event.get("data", event)
+        # Fixtures keep chronology in the envelope, while Alpaca-compatible
+        # downstream frames carry it as the wire-level ``t`` field.  Make the
+        # mock relay speak the real wire contract so replay cannot bypass the
+        # production parsers.
+        if event.get("timestamp") and "t" not in data:
+            data = dict(data)
+            data["t"] = event["timestamp"]
+        if ev_type == "news" and event.get("timestamp") and "created_at" not in data:
+            data = dict(data)
+            data["created_at"] = event["timestamp"]
 
         if ev_type == "bar" or data.get("T") == "b":
             await self.relay_server.broadcast_bar(data)

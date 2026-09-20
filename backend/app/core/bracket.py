@@ -42,6 +42,8 @@ class BracketOrder(BaseModel):
     target_2_price: float
     target_2_qty: int
     target_2_filled: bool = False
+    target_1_override: Optional[float] = None
+    target_2_override: Optional[float] = None
     r_distance: float
     status: BracketStatus = BracketStatus.PENDING_ENTRY
     use_trailing_target_2: bool = True
@@ -86,6 +88,8 @@ class DynamicBracketManager:
         strategy_id: str = "MANUAL",
         use_trailing_target_2: bool = True,
         trail_atr_multiplier: float = 1.5,
+        target_1_override: Optional[float] = None,
+        target_2_override: Optional[float] = None,
         timestamp: Optional[datetime] = None,
     ) -> BracketOrder:
         """
@@ -96,12 +100,20 @@ class DynamicBracketManager:
         side_norm = side.upper()
         if side_norm not in ("LONG", "SHORT"):
             raise ValueError(f"Invalid side: {side}")
+        if total_qty <= 0:
+            raise ValueError(f"Bracket quantity must be positive, got {total_qty}")
+        if entry_price <= 0 or stop_price <= 0:
+            raise ValueError("Bracket prices must be positive")
+        if (side_norm == "LONG" and stop_price >= entry_price) or (
+            side_norm == "SHORT" and stop_price <= entry_price
+        ):
+            raise ValueError("Stop price must be below a long entry and above a short entry")
 
         r_dist = abs(entry_price - stop_price)
         s = 1.0 if side_norm == "LONG" else -1.0
 
-        t1_price = round(entry_price + (s * 1.5 * r_dist), 2)
-        t2_price = round(entry_price + (s * 2.5 * r_dist), 2)
+        t1_price = round(target_1_override, 2) if target_1_override is not None else round(entry_price + (s * 1.5 * r_dist), 2)
+        t2_price = round(target_2_override, 2) if target_2_override is not None else round(entry_price + (s * 2.5 * r_dist), 2)
 
         q1 = max(1, total_qty // 2) if total_qty > 1 else 1
         q2 = total_qty - q1 if total_qty > 1 else 0
@@ -121,6 +133,8 @@ class DynamicBracketManager:
             target_1_qty=q1,
             target_2_price=t2_price,
             target_2_qty=q2,
+            target_1_override=target_1_override,
+            target_2_override=target_2_override,
             r_distance=round(r_dist, 4),
             status=BracketStatus.PENDING_ENTRY,
             use_trailing_target_2=use_trailing_target_2,
@@ -159,8 +173,31 @@ class DynamicBracketManager:
         if not bracket:
             raise KeyError(f"Bracket {bracket_id} not found")
 
+        if filled_qty <= 0:
+            raise ValueError("Cannot activate a bracket without a positive entry fill")
+
+        # Protect only the shares that actually filled. The previous implementation
+        # exposed the full requested size even when the simulator partially filled an
+        # entry, which could create an unprotected/over-sized exit bracket.
+        bracket.total_qty = min(filled_qty, bracket.total_qty)
+        bracket.remaining_qty = bracket.total_qty
+        bracket.target_1_qty = max(1, bracket.total_qty // 2) if bracket.total_qty > 1 else 1
+        bracket.target_2_qty = bracket.total_qty - bracket.target_1_qty if bracket.total_qty > 1 else 0
+        bracket.target_2_order_id = f"t2_{bracket_id}" if bracket.target_2_qty > 0 else None
+        bracket.r_distance = round(abs(fill_price - bracket.initial_stop_price), 4)
+        bracket.entry_price = round(fill_price, 4)
+        direction = 1.0 if bracket.side == "LONG" else -1.0
+        bracket.target_1_price = (
+            round(bracket.target_1_override, 2)
+            if bracket.target_1_override is not None
+            else round(bracket.entry_price + direction * 1.5 * bracket.r_distance, 2)
+        )
+        bracket.target_2_price = (
+            round(bracket.target_2_override, 2)
+            if bracket.target_2_override is not None
+            else round(bracket.entry_price + direction * 2.5 * bracket.r_distance, 2)
+        )
         bracket.status = BracketStatus.ACTIVE
-        bracket.entry_price = fill_price
         bracket.peak_price_since_entry = fill_price
         bracket.updated_at = timestamp
 
@@ -226,6 +263,7 @@ class DynamicBracketManager:
                 orders_to_cancel.append(bracket.target_2_order_id)
 
             self.symbol_to_bracket.pop(bracket.symbol, None)
+            bracket.remaining_qty = max(0, bracket.remaining_qty - filled_qty)
             return BracketUpdateDirective(
                 action="CANCEL_ORDER",
                 orders_to_cancel=orders_to_cancel,

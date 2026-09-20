@@ -26,7 +26,7 @@ export interface StrategyState {
   daily_pnl: number;
   win_rate: number;
   trades_count: number;
-  sharpe?: number;
+  sharpe?: number | null;
   subtitle?: string;
   description?: string;
 }

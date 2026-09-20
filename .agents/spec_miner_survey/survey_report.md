@@ -15,7 +15,7 @@ This report documents the exhaustive specification mining and environment survey
 1. **Authoritative AlpacaRelay Source & Credentials**:
    - The authoritative source code, documentation, test suites, and captured production telemetry reside locally in `/Users/mo/AlpacaRelay` (`relay.py`, `README.md`, `test_downstream_e2e.py`, `test_news.py`, `test_vix.py`).
    - The shared production relay is live on Railway at `https://alpacarelay-production.up.railway.app` and `wss://alpacarelay-production.up.railway.app`.
-   - Shared authentication token (`RELAY_TOKEN`): `abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b` (verified via live probe; returns live VIX print `14.81` and active WebSocket session streams).
+   - A private `RELAY_TOKEN` was verified via live probe; it returned a live VIX print and active WebSocket session streams. The token is omitted from this report.
 2. **Runtime & Package Ecosystem**:
    - **Python**: Python 3.9.6 (system default) and Python 3.11.15 (`/Users/mo/.local/bin/python3.11`). Python 3.9 has all essential packages pre-installed: `fastapi` (0.128.8), `uvicorn` (0.39.0), `websockets` (15.0.1), `pytest` (8.4.2), `pandas` (2.3.3), `numpy` (2.0.2), `scipy` (1.13.1), `httpx` (0.28.1), and `alpaca-py` (0.43.4).
    - **Node.js**: Node.js v22.22.2, npm 10.9.7. Full capability to scaffold Next.js 16/15, React 19, Tailwind CSS 4, and Framer Motion / Motion.
@@ -76,7 +76,7 @@ This report documents the exhaustive specification mining and environment survey
 ### 4.1 Local AlpacaRelay Repository
 - **Directory**: `/Users/mo/AlpacaRelay`
 - **Configuration**: `/Users/mo/AlpacaRelay/.env`
-  - `RELAY_TOKEN`: `abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b`
+  - `RELAY_TOKEN`: `<private relay token>`
 - **Key Modules**:
   - `relay.py`: Single-file multiplexer owning stock SIP connection (`wss://stream.data.alpaca.markets/v2/sip`), news connection (`wss://stream.data.alpaca.markets/v1beta1/news`), and Tastytrade dxLink spot VIX websocket.
   - `client_example.py`: Canonical client implementation with exponential backoff and message loop.
@@ -104,7 +104,7 @@ This report documents the exhaustive specification mining and environment survey
   2. **Banner**: Relay sends `[{"T": "success", "msg": "connected"}]`.
   3. **Auth**: Client must send within 10 seconds:
      ```json
-     {"action": "auth", "token": "abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b"}
+     {"action": "auth", "token": os.environ["RELAY_TOKEN"]}
      ```
      *(Alternative SDK format: `{"action": "auth", "key": "<token>", "secret": "..."}`)*
   4. **Auth Ack**:
@@ -214,8 +214,8 @@ This report documents the exhaustive specification mining and environment survey
 - **URL**: `https://alpacarelay-production.up.railway.app/vix`
 - **Method**: `GET`
 - **Headers**:
-  - `X-Relay-Token: abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b`
-  - *(or `APCA-API-KEY-ID: abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b`)*
+  - `X-Relay-Token: <private relay token>`
+  - *(or `APCA-API-KEY-ID: <private relay token>`)*
 - **Constraints**:
   - Query parameters strictly forbidden (`?` yields HTTP 400 `{"error":"/vix takes no query parameters"}`).
 - **Success Response (HTTP 200)**:
@@ -251,7 +251,7 @@ This report documents the exhaustive specification mining and environment survey
 - Forwarding pattern: `GET /data/<path>` $\rightarrow$ `https://data.alpaca.markets/<path>`
 - Sample bar retrieval:
   ```bash
-  curl -H "X-Relay-Token: abb49296c2dd0556388b4e4c8dbced1134eba074d6ba9f7b" \
+  curl -H "X-Relay-Token: <private relay token>" \
     "https://alpacarelay-production.up.railway.app/data/v2/stocks/NVDA/bars?timeframe=1Min&limit=100&feed=sip"
   ```
 

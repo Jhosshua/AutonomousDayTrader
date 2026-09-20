@@ -39,6 +39,7 @@ class FinancialSentimentScorer:
         "massive partnership": 0.85,
         "multibillion dollar deal": 0.9,
         "contract win": 0.8,
+        "awarded contract": 0.85,
         "shares surge": 0.8,
         "shares soar": 0.85,
         "stock climbs": 0.6,
@@ -64,6 +65,8 @@ class FinancialSentimentScorer:
         "profitable": 0.4,
         "acquisition": 0.5,
         "awarded": 0.5,
+        "milestone": 0.5,
+        "expansion": 0.35,
         "outperform": 0.6,
         "bullish": 0.6,
         "dividend": 0.3,
@@ -83,6 +86,7 @@ class FinancialSentimentScorer:
         "disappointing results": -0.8,
         # Regulatory, Legal & Accounting
         "sec investigation": -1.0,
+        "formal investigation": -0.9,
         "sec probe": -1.0,
         "subpoena": -0.9,
         "fraud investigation": -1.0,
@@ -121,6 +125,9 @@ class FinancialSentimentScorer:
         "bearish": -0.6,
         "rejection": -0.8,
         "fraud": -1.0,
+        "investigation": -0.8,
+        "fleet pause": -0.8,
+        "safety": -0.5,
     }
 
     NEGATIONS: Set[str] = {

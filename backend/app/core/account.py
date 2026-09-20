@@ -98,6 +98,7 @@ class PaperTradingAccount:
 
     def __init__(self, initial_cash: float = INITIAL_CAPITAL) -> None:
         self.initial_balance: float = initial_cash
+        self.daily_starting_equity: float = initial_cash
         self.cash: float = initial_cash
         self.equity: float = initial_cash
         self.status: AccountStatus = AccountStatus.ACTIVE
@@ -414,10 +415,18 @@ class PaperTradingAccount:
         if self.equity < self.maintenance_margin:
             self.status = AccountStatus.MARGIN_CALL
 
-        # Compute drawdown from session start ($50,000.00)
-        dd_dollars = max(0.0, round(self.initial_balance - self.equity, 2))
+        # Compute drawdown from the current session start, not the original account deposit.
+        dd_dollars = max(0.0, round(self.daily_starting_equity - self.equity, 2))
         self.daily_drawdown_dollars = dd_dollars
-        self.daily_drawdown_pct = round(dd_dollars / self.initial_balance, 4)
+        self.daily_drawdown_pct = round(dd_dollars / self.daily_starting_equity, 4) if self.daily_starting_equity else 0.0
+
+    def reset_daily_metrics(self, starting_equity: Optional[float] = None) -> None:
+        """Start a new trading session while preserving the account's lifetime ledger."""
+        self.daily_starting_equity = round(starting_equity if starting_equity is not None else self.equity, 2)
+        self.daily_drawdown_dollars = 0.0
+        self.daily_drawdown_pct = 0.0
+        self.status = AccountStatus.ACTIVE
+        self._recompute_account_state()
 
     def get_snapshot(self) -> AccountState:
         """Return an immutable snapshot of current account state."""
