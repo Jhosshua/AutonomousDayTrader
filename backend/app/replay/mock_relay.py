@@ -8,7 +8,7 @@ Implements:
   - Auth: {"action": "auth", "token": "..."} or {"action": "auth", "key": "..."}
   - Subscription: {"action": "subscribe", "bars": [...], "quotes": [...], "trades": [...], "news": [...]}
   - Streaming message arrays for bars ('b'), quotes ('q'), trades ('t'), news ('n'), status ('relay')
-- News WebSocket (/news)
+- News channel on the shared downstream WebSocket
 - Plain HTTP REST endpoints on the same port:
   - GET /vix: dxFeed spot VIX print (requires X-Relay-Token, rejects query params)
   - GET /health: Relay telemetry

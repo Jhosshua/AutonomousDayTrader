@@ -6,7 +6,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 ```
                   ┌────────────────────────────────────────────────────────┐
                   │                 AlpacaRelay Ingestion                  │
-                  │  (Stock WS /v2/stocks, News WS /news, REST GET /vix)   │
+                  │  (Stock WS + news channel, REST GET /vix)              │
                   │  [Production: alpacarelay-production.up.railway.app]  │
                   │  [Deterministic Replay: Local Mock Server Port 8080]  │
                   └───────────────────────────┬────────────────────────────┘

@@ -32,10 +32,11 @@ class NewsWebSocketClient:
         scorer: Optional[FinancialSentimentScorer] = None,
     ) -> None:
         base_url = (relay_url or settings.RELAY_URL).rstrip("/")
-        if not base_url.endswith("/news") and "news" not in base_url and not base_url.endswith(":8080"):
-            self.relay_url = base_url + "/news"
-        else:
-            self.relay_url = base_url
+        # AlpacaRelay multiplexes stock and news downstream clients on its
+        # root WebSocket. News is selected by the subscription channel, not a
+        # `/news` URL path. Preserve an explicit endpoint for test doubles or
+        # alternate relays that provide a dedicated path.
+        self.relay_url = base_url
 
         self.relay_token = relay_token or settings.RELAY_TOKEN
         self.bus: EventBus = bus or event_bus

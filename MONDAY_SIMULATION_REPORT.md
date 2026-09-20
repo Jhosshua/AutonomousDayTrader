@@ -9,7 +9,7 @@ This report is a deterministic replay through the production ingestion, executio
   "fixture": "tests/e2e/fixtures/monday_open_session.json",
   "events_processed": 62,
   "event_bus_errors": 0,
-  "duration_seconds": 1.085,
+  "duration_seconds": 1.083,
   "account": {
     "equity": 49961.26,
     "cash": 49961.26,
