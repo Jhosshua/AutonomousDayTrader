@@ -94,14 +94,17 @@ Deliver a fully local, always-on US stock market day trading system connected to
 | challenger_tier5 | teamwork_preview_challenger | Tier 5 Adversarial & Monday Dry Run Challenger | completed | ea23dfd6-3655-4fe1-9cf2-cb27fa8d0b28 |
 | reviewer_m5 | teamwork_preview_reviewer | Milestone 5 Reviewer | completed | 89bbee16-50ac-4c93-93fd-e202c1d2252a |
 | auditor_m5 | teamwork_preview_auditor | Forensic Integrity Auditor for M5 | completed | 5bca31a9-9f3f-4cdb-ba9c-61568a423aa2 |
-| worker_m6 | teamwork_preview_worker | Delivery & Hygiene Worker | in-progress | 0368a507-37ee-458d-9af7-933701318106 |
+| worker_m6 | teamwork_preview_worker | Delivery & Hygiene Worker | completed | 0368a507-37ee-458d-9af7-933701318106 |
+| reviewer_m6 | teamwork_preview_reviewer | Delivery & Hygiene Reviewer | completed | 4c23e871-2ae0-4da9-a9ac-41e4c07eaf81 |
+| auditor_m6 | teamwork_preview_auditor | Forensic Integrity Auditor for M6 | completed | 44faae72-0fc1-4c1e-84da-348bd1eed5c8 |
 
 ## Succession Status
-- Succession required: no (continuing orchestration directly up to 128 quota)
-- Spawn count: 39 / 128
-- Pending subagents: 0368a507-37ee-458d-9af7-933701318106
+- Succession required: no (project complete)
+- Spawn count: 41 / 128
+- Pending subagents: none
 - Predecessor: none
-- Successor: none (orchestrating directly)
+- Successor: none
+
 
 ## Active Timers
 - Heartbeat cron: task-181
