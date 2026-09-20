@@ -1,7 +1,7 @@
 # Project: AutonomousDayTrader
 
 ## Architecture
-AutonomousDayTrader is a local intraday paper-trading system for US equities connected downstream to AlpacaRelay, operating on a $50,000 virtual account. It features four dynamically adapted trading strategies, institutional risk guardrails, an Apple Music mobile-inspired web interface, real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
+AutonomousDayTrader is a local intraday paper-trading system for US equities connected downstream to AlpacaRelay, operating on a $50,000 virtual account. It features four dynamically adapted trading strategies, institutional risk guardrails, a fluid obsidian mobile-first web interface, real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
 
 ```
                   ┌────────────────────────────────────────────────────────┐
@@ -40,11 +40,11 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
                                               │ WebSocket Sync
                                               ▼
                   ┌────────────────────────────────────────────────────────┐
-                  │          Apple Music Mobile-First UI (Port 3005)       │
+                  │          Mobile-First Trading UI (Port 3005)           │
                   │  - Next.js 15 / React 19 / Tailwind CSS / Framer Motion│
                   │  - Obsidian Dark Theme & Dynamic Momentum Gradient Blur│
-                  │  - "Playlists / Albums" Strategy Performance Cards     │
-                  │  - "Now Playing" Expandable Bottom Drawer & Live Chart │
+                  │  - Trading Strategy Performance Cards                  │
+                  │  - "Active Position" Expandable Bottom Drawer & Live   │
                   └────────────────────────────────────────────────────────┘
 ```
 
@@ -64,9 +64,9 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | F11 | Strategy 4: Mean Reversion | 1-min bar $Z$-score $\ge 2.5$, RSI-14 extremes with divergence, volume climax fade back to 20-SMA | M2 | ORIGINAL_REQUEST §R2 |
 | F12 | Dynamic VIX Adaptation | Self-adaptation across 4 regimes (Low, Normal, Elevated, Crisis) with invariant dollar risk scaling and dynamic stop widths | M2 | ORIGINAL_REQUEST §R2 |
 | F13 | Time-of-Day Dynamics | 5 intraday execution regimes: Pre-market (08:00–09:30), Open Flush (09:30–10:00), Trend (10:00–11:30), Chop (11:30–14:00), Power Hour (15:00–16:00) | M2 | ORIGINAL_REQUEST §R2 |
-| F14 | Apple Music UI Aesthetic | Obsidian dark palette (`#000000`), dynamic glassmorphism (`backdrop-blur-xl`), animated background gradient blur tinted by portfolio momentum | M3 | ORIGINAL_REQUEST §R3 |
-| F15 | Strategy "Playlists/Albums" Cards | Carousel/grid presenting 4 strategies, live PnL, win rate, Sharpe, active status badges | M3 | ORIGINAL_REQUEST §R3 |
-| F16 | "Now Playing" Bottom Tray | Docked mini-tray showing active primary trade; spring physics expansion to full modal with live ticker chart, bracket lines, manual controls | M3 | ORIGINAL_REQUEST §R3 |
+| F14 | Obsidian Dark UI Aesthetic | Obsidian dark palette (`#000000`), dynamic glassmorphism (`backdrop-blur-xl`), animated background gradient blur tinted by portfolio momentum | M3 | ORIGINAL_REQUEST §R3 |
+| F15 | Trading Strategy Cards | Carousel/grid presenting 4 strategies, live PnL, win rate, Sharpe, active status badges | M3 | ORIGINAL_REQUEST §R3 |
+| F16 | "Active Position" Bottom Tray | Docked mini-tray showing active primary trade; spring physics expansion to full modal with live ticker chart, bracket lines, manual controls | M3 | ORIGINAL_REQUEST §R3 |
 | F17 | Real-Time UI WebSocket Streaming | High-throughput sub-second state sync from backend (Port 8005) to UI (Port 3005) with zero full-page reloads | M3 | ORIGINAL_REQUEST §R3 |
 | F18 | Mock & Replay Market Feed | Protocol-matching deterministic mock server and historical feed replay engine supporting 1x–10x speeds | Test Infra | ORIGINAL_REQUEST §R4 |
 | F19 | Opaque-Box E2E Test Suite | Five-tier functional/adversarial suite plus UI streaming and visual checks with 100% pass criterion | M4 | ORIGINAL_REQUEST §R4 |
@@ -78,17 +78,17 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 ### Implementation Track
 | # | Milestone Name | Scope | Dependencies | Status |
 |---|----------------|-------|--------------|--------|
-| M1 | `engine_ingestion` | AlpacaRelay Ingestion (Stock WS, News WS, REST /vix), $50k Paper Account, Institutional Risk Circuit Breakers, Bracket Orders, Auto-Flattening Engine | None | IMPLEMENTED; 140 backend tests pass |
+| M1 | `engine_ingestion` | AlpacaRelay Ingestion (Stock WS, News WS, REST /vix), $50k Paper Account, Institutional Risk Circuit Breakers, Bracket Orders, Auto-Flattening Engine | None | IMPLEMENTED; 163 backend tests pass |
 | M2 | `strategies_adaptation` | 4 Dynamic Strategies (ORB, VWAP Pullback, News Momentum, Mean Reversion), VIX Volatility Regime Scaling, Time-of-Day Phase Engine | M1 | IMPLEMENTED; covered by E2E and integrated replay |
-| M3 | `ui_mobile_streaming` | Apple Music Mobile UI (Next.js/Tailwind/Framer), Obsidian Glassmorphism, Momentum Gradient Blur, Strategy Cards, "Now Playing" Drawer, Real-Time WS State Streaming | M1, M2 | IMPLEMENTED; build and visual suite pass |
-| M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_READY | VERIFIED (293/293 E2E, 140/140 backend tests) |
-| M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | VERIFIED in `MONDAY_SIMULATION_REPORT.md`; simulation only |
+| M3 | `ui_mobile_streaming` | Mobile Trading UI (Next.js/Tailwind/Framer), Obsidian Glassmorphism, Momentum Gradient Blur, Trading Strategy Cards, "Active Position" Tray, Real-Time WS State Streaming | M1, M2 | IMPLEMENTED; build and visual suite pass |
+| M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_READY | VERIFIED (318/318 E2E, 163/163 backend tests) |
+| M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | VERIFIED in `MONDAY_SIMULATION_REPORT.md` ($50,398.30 equity, +$398.30 PnL, 62/62 UI payloads) |
 | M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | VERIFIED — Railway production health/UI verified; ports clean |
 
 ### E2E Testing Track (Parallel)
 | Track | Scope | Outputs | Status |
 |-------|-------|---------|--------|
-| `e2e_testing_track` | Requirement-driven opaque-box test suite, AlpacaRelay mock replay harness, automated test runner | `TEST_INFRA.md`, `tests/e2e/`, `TEST_READY.md` | VERIFIED (293/293 tests pass) |
+| `e2e_testing_track` | Requirement-driven opaque-box test suite, AlpacaRelay mock replay harness, automated test runner | `TEST_INFRA.md`, `tests/e2e/`, `TEST_READY.md` | VERIFIED (318/318 tests pass) |
 
 ## Interface Contracts
 
@@ -122,7 +122,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 - `FillEvent`: `order_id`, `symbol`, `side`, `filled_qty`, `fill_price`, `fee`, `timestamp`.
 - `AccountState`: `cash: float`, `equity: float`, `buying_power: float`, `realized_pnl: float`, `unrealized_pnl: float`, `daily_drawdown: float`, `is_circuit_broken: bool`, `positions: Dict[str, Position]`.
 
-### 4. Backend ↔ Apple Music UI (WebSocket Port 8005)
+### 4. Backend ↔ Mobile Trading UI (WebSocket Port 8005)
 - Endpoint: `ws://127.0.0.1:8005/ws/ui`
 - UI Push Payload (`trading_state`):
   ```json
@@ -211,7 +211,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 │   └── tests/
 │       ├── unit/                 # Fast backend unit tests
 │       └── integration/          # Core engine integration tests
-├── frontend/                     # Apple Music Mobile UI (Next.js / React 19)
+├── frontend/                     # Mobile Trading UI (Next.js / React 19)
 │   ├── package.json              # Next.js 15, Tailwind CSS 3, Framer Motion, Lucide icons
 │   ├── tsconfig.json
 │   ├── app/
@@ -221,9 +221,9 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 │   ├── components/
 │   │   ├── Header.tsx            # Portfolio status & momentum glow indicator
 │   │   ├── AmbientBackground.tsx # Momentum-tinted background gradient blur
-│   │   ├── StrategyCarousel.tsx  # "Playlists / Albums" strategy cards
-│   │   ├── StrategyCard.tsx      # Individual strategy performance album art
-│   │   ├── NowPlayingTray.tsx    # Collapsible/expandable bottom tray with spring physics
+│   │   ├── StrategyCarousel.tsx  # Trading Strategy cards
+│   │   ├── StrategyCard.tsx      # Individual strategy performance card
+│   │   ├── ActivePositionTray.tsx# Collapsible/expandable active position bottom tray
 │   │   ├── LiveChart.tsx         # Real-time ticker candlestick/line chart & brackets
 │   │   ├── ManualControls.tsx    # Quick Flatten and Tighten Stop buttons
 │   │   └── ExecutionLog.tsx      # Audit trail of fills and circuit alerts
@@ -264,3 +264,13 @@ Key fixes by area:
 - **Ingestion/protocol**: VIX regime thresholds single-sourced in `models/events.py` (15/25/35; sizing 1.20/1.00/0.70/0.35); stale/fallback VIX prints no longer move sizing; news client connects to `/news`, honors `SUBSCRIBE_NEWS`, and isolates per-message parse errors behind a queue; stock client always uses `/v2/stocks`; mock relay enforces WS paths (root kept as legacy alias); auth payloads match §1 exactly; 1x feed replay is true wall-clock (3s cap only above 1x).
 - **Strategies**: mean-reversion RSI/volume-climax thresholds use configured params only (hardcoded 70/30 and 2.0x fallbacks removed); ORB RVOL fallback and missed-open seeding fixed; per-strategy buffers session-gated and capped; pullback-zone flag clears on zone exit; strategies report per-trade Sharpe in `to_dict()`.
 - **Frontend/deploy**: manual controls only toast on confirmed dispatch and disable while disconnected; relay health (stock/news/vix) rendered in the Header; `NEXT_PUBLIC_WS_URL` override; audit-log REST fallback field mapping fixed; duplicate React keys and equity-hero remount flicker fixed; `.dockerignore` added (host `node_modules` no longer clobbers image builds); Dockerfile port aligned to 8005; `run_production_stack.sh` now mirrors the container path (build + uvicorn static serve); `deploy_and_push.sh` gates on tests/build and verifies production `/health` after push.
+
+### 2026-09-20: Architectural Audit Remediation, Terminology De-themification & Hardening Release
+A comprehensive multi-agent adversarial audit and remediation cycle eliminated remaining edge cases, enforced mathematical risk boundaries, completed full terminology de-themification, and hardened test harnesses across the codebase.
+- **Mathematical floating-point risk clamp**: Strategy stop distances in `orb.py`, `news_momentum.py`, and `vwap_pullback.py` are clamped to interior bounds `[0.0042, 0.0380]` (42 to 380 bps). Coupled with `EPS = 1e-6` floating-point tolerance in `risk.py` (`stop_dist_pct < min_stop - EPS` and `stop_dist_pct > max_stop + EPS`), this completely eliminates false order rejections caused by IEEE 754 precision artifacts while preserving institutional guardrails.
+- **Bracket lifecycle invariants**: In `bracket.py`, `manual_tighten_stop` strictly enforces that stops may only be tightened for brackets in `ACTIVE` or `TARGET_1_HIT` states, preventing mutations on `PENDING_ENTRY` or already closed brackets. Test harnesses invoke `activate_bracket_on_fill` to mirror real-world execution.
+- **Ingestion telemetry accuracy**: Telemetry counters (`bars_received`, `quotes_received`, `trades_received`, `articles_received`) in `stock_ws.py` and `news_ws.py` are incremented strictly after domain event object instantiation and successful event bus publication, eliminating metric drift on malformed frames.
+- **Flat-book session boundary reset**: In `main.py` `_check_session_boundary`, `account.positions.clear()` and working order cancellation guarantee that the account begins each trading day 100% flat with zero orphaned positions or dangling brackets.
+- **Terminology de-themification**: Completely purged music, album, and playlist analogies across the codebase, frontend components, models, and tests. Replaced with institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
+- **Test harness & process isolation**: Added test fixture cleanup for positions and brackets, robust port 3005 polling and teardown in `test_challenger_mobile.py`, grace periods in port hygiene audits, and fixed shell script exit status traps.
+- **Verification results**: 163/163 backend tests pass (100%), 318/318 E2E tests pass (100%), Monday dry-run simulation certified ($50,398.30 final equity, +$398.30 PnL, 62/62 UI payloads validated, 0 unhandled exceptions), 17/17 visual UI tests pass on mobile (390x844) and desktop (1440x900), clean Next.js build (0 errors).

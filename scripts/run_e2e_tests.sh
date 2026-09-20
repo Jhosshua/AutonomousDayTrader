@@ -12,8 +12,15 @@ echo "▶ Running AutonomousDayTrader E2E Test Suite..."
 cd "${PROJECT_ROOT}"
 
 # Run test runner with passed arguments (or default to all)
-python3 "${PROJECT_ROOT}/tests/e2e/runner.py" "$@"
-EXIT_CODE=$?
+EXIT_CODE=0
+python3 "${PROJECT_ROOT}/tests/e2e/runner.py" "$@" || EXIT_CODE=$?
+
+# Multi-layered post-flight port audit
+"${PROJECT_ROOT}/scripts/verify_port_hygiene.sh" || HYGIENE_CODE=$?
+if [ "${HYGIENE_CODE:-0}" -ne 0 ]; then
+  echo "❌ Port hygiene check failed following test run."
+  EXIT_CODE=1
+fi
 
 if [ ${EXIT_CODE} -eq 0 ]; then
   echo "✅ All E2E tests executed and passed successfully."

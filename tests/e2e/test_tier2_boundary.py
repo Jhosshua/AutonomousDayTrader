@@ -645,7 +645,7 @@ def test_f13_bva_clock_at_155959_vs_160000():
 
 
 # ============================================================================
-# F14: Apple Music UI Aesthetic Boundaries (5 tests)
+# F14: Obsidian Dark UI Aesthetic Boundaries (5 tests)
 # ============================================================================
 
 def test_f14_bva_glow_at_exact_zero_pnl():
@@ -683,7 +683,7 @@ def test_f14_bva_glow_at_minus_500_boundary():
 
 
 # ============================================================================
-# F15: Strategy Playlists Cards Boundaries (5 tests)
+# F15: Trading Strategy Cards Boundaries (5 tests)
 # ============================================================================
 
 def test_f15_bva_strategy_winrate_at_zero():
@@ -715,7 +715,7 @@ def test_f15_bva_empty_strategies_array():
 
 
 # ============================================================================
-# F16: "Now Playing" Bottom Tray Boundaries (5 tests)
+# F16: "Active Position" Bottom Tray Boundaries (5 tests)
 # ============================================================================
 
 def test_f16_bva_zero_open_positions_tray():

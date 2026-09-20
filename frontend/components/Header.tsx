@@ -144,7 +144,7 @@ export default function Header({ account, marketContext, ingestion, isConnected 
         </motion.div>
       )}
 
-      {/* Hero Portfolio Value Section (Apple Music Album Hero Header Style) */}
+      {/* Hero Portfolio Value Section (Portfolio Hero Header Style) */}
       <div className="py-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-widest text-neutral-400">

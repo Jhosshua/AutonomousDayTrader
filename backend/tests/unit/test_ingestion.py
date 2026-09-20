@@ -393,3 +393,55 @@ async def test_news_ws_live_handshake_and_sentiment_enrichment():
         await client.stop()
         await server.stop()
 
+
+@pytest.mark.asyncio
+async def test_stock_ws_queue_processing_resilience():
+    import json
+    from backend.app.ingestion.stock_ws import StockWebSocketClient
+    bus = EventBus()
+    received_bars = []
+
+    async def on_bar(b):
+        received_bars.append(b)
+
+    bus.subscribe(BarEvent, on_bar)
+
+    client = StockWebSocketClient(
+        relay_url="ws://127.0.0.1:8080/v2/stocks",
+        relay_token="mock_token",
+        bus=bus,
+    )
+    client._running = True
+    process_task = asyncio.create_task(client._process_queue_loop())
+
+    try:
+        # 1. Put malformed JSON: task_done must still be called without hanging
+        await client._queue.put("INVALID_JSON{[[")
+
+        # 2. Put batch with one corrupt item and one valid item: valid item must be processed
+        valid_bar = {
+            "T": "b",
+            "S": "AAPL",
+            "o": 150.0,
+            "h": 151.0,
+            "l": 149.0,
+            "c": 150.5,
+            "v": 5000,
+            "t": "2026-09-21T09:35:00Z",
+        }
+        corrupted_item = {"T": "b", "S": "CORRUPT", "o": "NOT_A_FLOAT"}
+        batch = json.dumps([corrupted_item, valid_bar])
+        await client._queue.put(batch)
+
+        # 3. Queue join must succeed without deadlocking because task_done is in finally:
+        await asyncio.wait_for(client._queue.join(), timeout=2.0)
+        assert len(received_bars) == 1
+        assert received_bars[0].symbol == "AAPL"
+    finally:
+        client._running = False
+        process_task.cancel()
+        try:
+            await process_task
+        except asyncio.CancelledError:
+            pass
+

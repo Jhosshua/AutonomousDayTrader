@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AutonomousDayTrader • Live Terminal",
-  description: "Always-on algorithmic day trading terminal with Apple Music design language",
+  description: "Always-on algorithmic day trading terminal with fluid obsidian execution interface",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

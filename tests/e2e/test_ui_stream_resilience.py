@@ -31,9 +31,11 @@ def test_high_frequency_broadcast_and_receipt(client):
     Empirically verify high-frequency state updates (100 msgs roundtrip burst) across WebSocket.
     Ensures connection remains open, frames are received, and state payload schema passes.
     """
-    # Setup test bracket & position for AAPL
+    # Setup test bracket & position for AAPL with state isolation
+    account.positions.clear()
     account.positions["AAPL"] = Position("AAPL", PositionSide.LONG, 100, 150.0, 152.0)
     bracket_manager.create_bracket("brk_hf_test", "AAPL", "LONG", 100, 150.0, 148.0)
+    bracket_manager.activate_bracket_on_fill("brk_hf_test", 100, 150.0, datetime.now(timezone.utc))
 
     try:
         with client.websocket_connect("/ws/ui") as ws:
@@ -64,6 +66,7 @@ def test_high_frequency_broadcast_and_receipt(client):
             throughput = 100.0 / duration
             assert throughput >= 100.0
     finally:
+        bracket_manager.brackets.pop("brk_hf_test", None)
         bracket_manager.symbol_to_bracket.pop("AAPL", None)
         account.positions.pop("AAPL", None)
 

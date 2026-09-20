@@ -80,7 +80,7 @@ class Settings(BaseSettings):
 
     # Safe Host Port Allocations (Collision Free)
     API_PORT: int = Field(default=8005, description="FastAPI core engine & WS port")
-    UI_PORT: int = Field(default=3005, description="Apple Music mobile UI frontend port")
+    UI_PORT: int = Field(default=3005, description="Mobile trading UI frontend port")
     MOCK_PORT: int = Field(default=8080, description="Mock AlpacaRelay replay server port")
 
 

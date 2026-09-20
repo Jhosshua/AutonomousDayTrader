@@ -783,7 +783,7 @@ def test_f13_time_phase_power_hour():
 
 
 # ============================================================================
-# F14: Apple Music UI Aesthetic (5 tests)
+# F14: Obsidian Dark UI Aesthetic (5 tests)
 # ============================================================================
 
 def test_f14_ui_obsidian_palette_tokens():
@@ -822,11 +822,11 @@ def test_f14_ui_momentum_glow_strobe_on_halt():
 
 
 # ============================================================================
-# F15: Strategy "Playlists/Albums" Cards (5 tests)
+# F15: Trading Strategy Cards (5 tests)
 # ============================================================================
 
 def test_f15_strategy_card_schema():
-    """F15.1: Verify strategy playlist card data contract schema."""
+    """F15.1: Verify trading strategy card data contract schema."""
     card = {
         "id": "orb",
         "name": "Opening Range Breakout",
@@ -839,7 +839,7 @@ def test_f15_strategy_card_schema():
 
 
 def test_f15_strategy_card_4_strategies_present():
-    """F15.2: Verify all 4 required strategy albums are registered."""
+    """F15.2: Verify all 4 required strategies are registered."""
     expected_ids = {"orb", "vwap_pullback", "news_momentum", "mean_reversion"}
     registered_ids = {"orb", "vwap_pullback", "news_momentum", "mean_reversion"}
     assert expected_ids == registered_ids
@@ -871,10 +871,10 @@ def test_f15_strategy_card_pnl_aggregation():
 
 
 # ============================================================================
-# F16: "Now Playing" Bottom Tray (5 tests)
+# F16: "Active Position" Bottom Tray (5 tests)
 # ============================================================================
 
-def test_f16_now_playing_primary_position_contract():
+def test_f16_active_position_primary_position_contract():
     """F16.1: Verify primary position payload contract for bottom tray."""
     primary = {
         "symbol": "NVDA",
@@ -888,7 +888,7 @@ def test_f16_now_playing_primary_position_contract():
     assert primary["unrealized_pnl"] == 150.00
 
 
-def test_f16_now_playing_bracket_levels():
+def test_f16_active_position_bracket_levels():
     """F16.2: Verify bracket price lines exist for interactive chart display."""
     levels = {
         "stop_loss": 123.50,
@@ -898,21 +898,21 @@ def test_f16_now_playing_bracket_levels():
     assert levels["stop_loss"] < levels["take_profit_1"] < levels["take_profit_2"]
 
 
-def test_f16_now_playing_action_flatten_position():
+def test_f16_active_position_action_flatten_position():
     """F16.3: Verify FLATTEN_POSITION UI action command schema."""
     action = {"action": "FLATTEN_POSITION", "symbol": "NVDA"}
     assert action["action"] == "FLATTEN_POSITION"
     assert action["symbol"] == "NVDA"
 
 
-def test_f16_now_playing_action_tighten_stop():
+def test_f16_active_position_action_tighten_stop():
     """F16.4: Verify TIGHTEN_STOP UI action command schema."""
     action = {"action": "TIGHTEN_STOP", "symbol": "NVDA", "new_stop": 125.00}
     assert action["action"] == "TIGHTEN_STOP"
     assert action["new_stop"] == 125.00
 
 
-def test_f16_now_playing_action_flatten_all():
+def test_f16_active_position_action_flatten_all():
     """F16.5: Verify FLATTEN_ALL emergency UI action command schema."""
     action = {"action": "FLATTEN_ALL"}
     assert action["action"] == "FLATTEN_ALL"

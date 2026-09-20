@@ -234,9 +234,12 @@ class NewsMomentumStrategy(Strategy):
         signals: List[SignalEvent] = []
 
         if cat.sentiment >= self.sentiment_threshold:
-            # Bullish catalyst breakout
-            stop_loss = round(bar.low - 0.02, 4)
-            risk = max(0.10, entry_price - stop_loss)
+            # Bullish catalyst breakout with safe interior buffer [0.42%, 3.80%]
+            min_dist = round(entry_price * 0.0042, 4)
+            max_dist = round(entry_price * 0.0380, 4)
+            raw_dist = max(0.10, entry_price - round(bar.low - 0.02, 4))
+            risk = max(min_dist, min(max_dist, raw_dist))
+            stop_loss = round(entry_price - risk, 4)
             tp1 = round(entry_price + 1.5 * risk, 4)
             tp2 = round(entry_price + 2.5 * risk, 4)
 
@@ -258,9 +261,12 @@ class NewsMomentumStrategy(Strategy):
             self.monitored_positions[sym] = "LONG"
 
         elif cat.sentiment <= -self.sentiment_threshold:
-            # Bearish catalyst breakdown
-            stop_loss = round(bar.high + 0.02, 4)
-            risk = max(0.10, stop_loss - entry_price)
+            # Bearish catalyst breakdown with safe interior buffer [0.42%, 3.80%]
+            min_dist = round(entry_price * 0.0042, 4)
+            max_dist = round(entry_price * 0.0380, 4)
+            raw_dist = max(0.10, round(bar.high + 0.02, 4) - entry_price)
+            risk = max(min_dist, min(max_dist, raw_dist))
+            stop_loss = round(entry_price + risk, 4)
             tp1 = round(entry_price - 1.5 * risk, 4)
             tp2 = round(entry_price - 2.5 * risk, 4)
 

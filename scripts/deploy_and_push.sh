@@ -43,7 +43,7 @@ git add -A
 if git diff --staged --quiet; then
   echo "   No staged changes detected. Working tree is clean."
 else
-  COMMIT_MSG="${1:-feat: deliver AutonomousDayTrader production release with 4 strategies, Apple Music UI, and certified Monday dry run}"
+  COMMIT_MSG="${1:-feat: deliver AutonomousDayTrader production release with 4 strategies, mobile trading UI, and certified Monday dry run}"
   git commit -m "$COMMIT_MSG"
 fi
 

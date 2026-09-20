@@ -13,8 +13,8 @@ interface StrategyCardProps {
 export default function StrategyCard({ strategy, onSelect, isSelected }: StrategyCardProps) {
   const isPositive = strategy.daily_pnl >= 0;
 
-  // Custom artwork gradient and icon per strategy
-  const getArtwork = (id: string) => {
+  // Custom theme gradient and icon per strategy
+  const getStrategyTheme = (id: string) => {
     switch (id) {
       case "orb":
         return {
@@ -59,7 +59,7 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
     }
   };
 
-  const artwork = getArtwork(strategy.id);
+  const theme = getStrategyTheme(strategy.id);
 
   const getStatusBadge = (status: string) => {
     switch (status?.toUpperCase()) {
@@ -108,27 +108,27 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
         isSelected
           ? "bg-white/[0.08] border-white/30 shadow-2xl shadow-apple-purple/20 ring-1 ring-white/20"
           : "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06]"
-      } ${artwork.border}`}
+      } ${theme.border}`}
     >
-      {/* Top Album Artwork Square */}
+      {/* Top Strategy Visual Banner */}
       <div
-        className={`relative w-full aspect-[16/10] rounded-2xl overflow-hidden bg-gradient-to-br ${artwork.gradient} p-3 flex flex-col justify-between border border-white/[0.08] shadow-inner mb-3`}
+        className={`relative w-full aspect-[16/10] rounded-2xl overflow-hidden bg-gradient-to-br ${theme.gradient} p-3 flex flex-col justify-between border border-white/[0.08] shadow-inner mb-3`}
       >
         <div className="flex items-center justify-between">
           <div className="p-2 rounded-xl bg-black/40 backdrop-blur-md border border-white/10">
-            {artwork.icon}
+            {theme.icon}
           </div>
           {getStatusBadge(strategy.status)}
         </div>
 
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-white/70 block">
-            Playlist / Strategy
+            Trading Strategy
           </span>
           <h3 className="text-base font-bold text-white tracking-tight leading-tight">
             {strategy.name}
           </h3>
-          <p className="text-[11px] text-white/60 line-clamp-1">{artwork.tagline}</p>
+          <p className="text-[11px] text-white/60 line-clamp-1">{theme.tagline}</p>
         </div>
       </div>
 

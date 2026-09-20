@@ -37,21 +37,28 @@ TIER_FILES = {
 }
 
 
-def audit_ports(ports: List[int]) -> Dict[int, bool]:
-    """Check if project ports are free."""
+def audit_ports(ports: List[int], timeout: float = 2.0) -> Dict[int, bool]:
+    """Check if project ports are free, waiting up to timeout seconds for transient sockets to drain."""
     status = {}
+    start = time.time()
     for p in ports:
-        try:
-            res = subprocess.run(
-                ["lsof", "-tiTCP:" + str(p), "-sTCP:LISTEN"],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            is_free = not bool(res.stdout.strip())
-            status[p] = is_free
-        except Exception:
-            status[p] = True
+        is_free = False
+        while time.time() - start < timeout:
+            try:
+                res = subprocess.run(
+                    ["lsof", "-tiTCP:" + str(p), "-sTCP:LISTEN"],
+                    capture_output=True,
+                    text=True,
+                    check=False
+                )
+                if not bool(res.stdout.strip()):
+                    is_free = True
+                    break
+            except Exception:
+                is_free = True
+                break
+            time.sleep(0.2)
+        status[p] = is_free
     return status
 
 

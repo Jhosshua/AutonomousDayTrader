@@ -92,9 +92,9 @@ Exercises full intraday trading workflows from market data ingestion to order ro
 | **F11** | Strategy 4: Mean Reversion | 5 | 5 | Yes | Yes | $\ge 10$ |
 | **F12** | Dynamic VIX Regime Adaptation | 5 | 5 | Yes | Yes | $\ge 10$ |
 | **F13** | Time-of-Day Session Dynamics | 5 | 5 | Yes | Yes | $\ge 10$ |
-| **F14** | Apple Music UI Aesthetic | 5 | 5 | N/A | Yes | $\ge 10$ |
-| **F15** | Strategy "Playlists/Albums" Cards | 5 | 5 | N/A | Yes | $\ge 10$ |
-| **F16** | "Now Playing" Bottom Tray | 5 | 5 | N/A | Yes | $\ge 10$ |
+| **F14** | Obsidian Dark UI Aesthetic | 5 | 5 | N/A | Yes | $\ge 10$ |
+| **F15** | Trading Strategy Cards | 5 | 5 | N/A | Yes | $\ge 10$ |
+| **F16** | "Active Position" Bottom Tray | 5 | 5 | N/A | Yes | $\ge 10$ |
 | **F17** | Real-Time UI WebSocket Streaming | 5 | 5 | Yes | Yes | $\ge 10$ |
 | **F18** | Mock & Replay Market Feed | 5 | 5 | Yes | Yes | $\ge 10$ |
 | **F19** | Opaque-Box E2E Test Suite | 5 | 5 | Yes | Yes | $\ge 10$ |

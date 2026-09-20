@@ -222,32 +222,45 @@ class StockWebSocketClient:
         while self._running:
             try:
                 raw_msg = await self._queue.get()
-                msgs = json.loads(raw_msg)
-                if not isinstance(msgs, list):
-                    msgs = [msgs]
+                try:
+                    msgs = json.loads(raw_msg)
+                    if not isinstance(msgs, list):
+                        msgs = [msgs]
 
-                for m in msgs:
-                    t = m.get("T")
-                    if t == "b":
-                        self.bars_received += 1
-                        await self.bus.publish(BarEvent.from_relay_dict(m))
-                    elif t == "q":
-                        self.quotes_received += 1
-                        await self.bus.publish(QuoteEvent.from_relay_dict(m))
-                    elif t == "t":
-                        self.trades_received += 1
-                        await self.bus.publish(TradeEvent.from_relay_dict(m))
-                    elif t == "relay":
-                        msg_text = m.get("msg", "")
-                        status = "connected" if "connected" in msg_text else "disconnected"
-                        await self.bus.publish(RelayStatusEvent(feed_type="stock", status=status, message=msg_text))
-                    elif t in ("subscription", "success"):
-                        log.debug(f"Relay control message: {m}")
-                    elif t == "error":
-                        log.error(f"Upstream relay error: {m}")
-
-                self._queue.task_done()
+                    for m in msgs:
+                        try:
+                            if not isinstance(m, dict):
+                                continue
+                            t = m.get("T")
+                            if t == "b":
+                                bar_event = BarEvent.from_relay_dict(m)
+                                await self.bus.publish(bar_event)
+                                self.bars_received += 1
+                            elif t == "q":
+                                quote_event = QuoteEvent.from_relay_dict(m)
+                                await self.bus.publish(quote_event)
+                                self.quotes_received += 1
+                            elif t == "t":
+                                trade_event = TradeEvent.from_relay_dict(m)
+                                await self.bus.publish(trade_event)
+                                self.trades_received += 1
+                            elif t == "relay":
+                                msg_text = m.get("msg", "")
+                                status = "connected" if "connected" in msg_text else "disconnected"
+                                await self.bus.publish(RelayStatusEvent(feed_type="stock", status=status, message=msg_text))
+                            elif t in ("subscription", "success"):
+                                log.debug(f"Relay control message: {m}")
+                            elif t == "error":
+                                log.error(f"Upstream relay error: {m}")
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as item_err:
+                            log.exception(f"Error processing individual market item: {item_err}")
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    log.exception(f"Error processing market message: {exc}")
+                finally:
+                    self._queue.task_done()
             except asyncio.CancelledError:
                 break
-            except Exception as exc:
-                log.exception(f"Error processing market message: {exc}")

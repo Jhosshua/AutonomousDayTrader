@@ -4,7 +4,7 @@ import { useTradingStream } from "@/hooks/useTradingStream";
 import AmbientBackground from "@/components/AmbientBackground";
 import Header from "@/components/Header";
 import StrategyCarousel from "@/components/StrategyCarousel";
-import NowPlayingTray from "@/components/NowPlayingTray";
+import ActivePositionTray from "@/components/ActivePositionTray";
 import ExecutionLog from "@/components/ExecutionLog";
 import { ShieldCheck, Activity, Terminal, AlertCircle } from "lucide-react";
 
@@ -98,7 +98,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Strategy Playlists Carousel */}
+        {/* Trading Strategies Carousel */}
         <StrategyCarousel strategies={state.strategies} />
 
         {/* Execution & Audit Feed Section */}
@@ -107,8 +107,8 @@ export default function Home() {
         </section>
       </div>
 
-      {/* Docked Apple Music Mini-Player & Expandable Modal Sheet */}
-      <NowPlayingTray
+      {/* Docked Active Position Tray & Expandable Modal Sheet */}
+      <ActivePositionTray
         position={state.primary_position}
         recentActivity={state.recent_activity}
         isConnected={isConnected}

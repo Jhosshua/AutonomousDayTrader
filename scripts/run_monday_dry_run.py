@@ -96,6 +96,7 @@ class MondaySimulationAuditor:
         self.mean_reversion_trades: int = 0
         self.orb_trades: int = 0
         self.news_trades: int = 0
+        self.ui_payloads_validated: int = 0
 
     def set_phase(self, phase_name: str):
         self.current_phase_name = phase_name
@@ -104,6 +105,77 @@ class MondaySimulationAuditor:
     def record_phase_event(self, msg: str):
         log.info(f"[{self.current_phase_name}] {msg}")
         self.phase_logs[self.current_phase_name].append(msg)
+
+
+def serialize_ui_state(
+    account: PaperTradingAccount,
+    risk_engine: InstitutionalRiskEngine,
+    adaptation_engine: DynamicAdaptationEngine,
+    strategies: List[Any],
+    bracket_manager: DynamicBracketManager,
+    latest_prices: Dict[str, float],
+    timestamp: datetime,
+) -> Dict[str, Any]:
+    """Serialize system state matching Port 8005 UI WebSocket streaming schema."""
+    snapshot = account.get_snapshot()
+    primary_pos = None
+    if account.positions:
+        sym = next(iter(account.positions))
+        pos = account.positions[sym]
+        m_p = latest_prices.get(sym, pos.market_price)
+        bracket_id = bracket_manager.symbol_to_bracket.get(sym)
+        bracket = bracket_manager.brackets.get(bracket_id) if bracket_id else None
+        primary_pos = {
+            "symbol": sym,
+            "side": pos.side.value,
+            "qty": pos.shares,
+            "shares": pos.shares,
+            "entry_price": pos.avg_entry_price,
+            "avg_entry_price": pos.avg_entry_price,
+            "current_price": m_p,
+            "market_price": m_p,
+            "market_value": pos.market_value,
+            "cost_basis": pos.cost_basis,
+            "unrealized_pnl": pos.unrealized_pnl,
+            "unrealized_pnl_pct": pos.unrealized_pnl_pct,
+            "stop_loss": bracket.current_stop_price if bracket else None,
+            "take_profit_1": bracket.target_1_price if bracket else None,
+            "take_profit_2": bracket.target_2_price if bracket else None,
+            "strategy_id": bracket.strategy_id if bracket else "dry_run",
+            "chart_points": [],
+        }
+    daily_pnl = round(snapshot.equity - account.daily_starting_equity, 2)
+    daily_pnl_pct = (
+        round((daily_pnl / account.daily_starting_equity) * 100.0, 2)
+        if account.daily_starting_equity
+        else 0.0
+    )
+    return {
+        "type": "STATE_UPDATE",
+        "timestamp": timestamp.isoformat(),
+        "account": {
+            "equity": snapshot.equity,
+            "cash": snapshot.cash,
+            "buying_power": snapshot.buying_power,
+            "daily_pnl": daily_pnl,
+            "daily_pnl_pct": daily_pnl_pct,
+            "daily_drawdown": snapshot.daily_drawdown_dollars,
+            "daily_drawdown_pct": snapshot.daily_drawdown_pct,
+            "is_circuit_broken": snapshot.is_circuit_broken,
+            "risk_level": risk_engine.risk_level.value,
+            "status": snapshot.status,
+            "daily_starting_equity": account.daily_starting_equity,
+        },
+        "market_context": adaptation_engine.get_market_context(),
+        "strategies": [s.to_dict() for s in strategies],
+        "primary_position": primary_pos,
+        "all_positions": [primary_pos] if primary_pos else [],
+        "positions_count": len(account.positions),
+        "working_orders_count": 0,
+        "ingestion": {"stock": "connected", "news": "connected", "vix": "connected"},
+        "recent_news": [],
+        "recent_activity": [],
+    }
 
 
 async def execute_monday_simulation(
@@ -236,10 +308,9 @@ async def execute_monday_simulation(
                     auditor.set_phase("Phase F")
 
                 auditor.record_phase_event(f"Control: {desc}")
-                continue
 
             # Handle VIX Prints
-            if ev_type == "vix":
+            elif ev_type == "vix":
                 val = float(data.get("value", 18.25))
                 vp = VixPrint(
                     value=val,
@@ -260,10 +331,9 @@ async def execute_monday_simulation(
                     f"(Sizing Multiplier: {adaptation_engine.current_sizing_multiplier:.2f}x, "
                     f"Stop Multiplier: {adaptation_engine.current_stop_multiplier:.2f}x)"
                 )
-                continue
 
             # Handle Quotes
-            if ev_type == "quote" or data.get("T") == "q":
+            elif ev_type == "quote" or data.get("T") == "q":
                 q_sym = data["S"].upper()
                 bid = float(data["bp"])
                 ask = float(data["ap"])
@@ -283,17 +353,15 @@ async def execute_monday_simulation(
                 for s in strategies:
                     s.on_quote(q_ev)
                 engine.process_quote(q_sym, bid, ask, event_dt)
-                continue
 
             # Handle Trades
-            if ev_type == "trade" or data.get("T") == "t":
+            elif ev_type == "trade" or data.get("T") == "t":
                 t_sym = data["S"].upper()
                 t_price = float(data["p"])
                 latest_prices[t_sym] = t_price
-                continue
 
             # Handle News
-            if ev_type == "news" or data.get("T") == "n":
+            elif ev_type == "news" or data.get("T") == "n":
                 headline = data.get("headline", "")
                 summary = data.get("summary", "")
                 if "sentiment" in data:
@@ -355,10 +423,9 @@ async def execute_monday_simulation(
                             engine.process_bar(c_sym, m_p, m_p, m_p, m_p, 500000, event_dt)
                             auditor.orders_filled += 1
                             auditor.record_phase_event(f"✅ {c_sym} Position successfully liquidated to cash.")
-                continue
 
             # Handle Bars
-            if ev_type == "bar" or data.get("T") == "b":
+            elif ev_type == "bar" or data.get("T") == "b":
                 b_sym = data["S"].upper()
                 o = float(data["o"])
                 h = float(data["h"])
@@ -485,15 +552,30 @@ async def execute_monday_simulation(
                                 f"Closed {brk.total_qty} shares at profit!"
                             )
 
-                # Check Institutional Risk Engine circuit breaker state
-                breaker_status = risk_engine.evaluate_account_state(
-                    equity=account.equity,
-                    cash=account.cash,
-                    realized_pnl=account.realized_pnl,
-                    unrealized_pnl=account.unrealized_pnl,
-                    timestamp=event_dt,
-                )
-                assert breaker_status != BreakerStatus.HALTED_DAILY_LOSS, "Daily Loss Circuit Breaker unexpectedly tripped!"
+            # Check Institutional Risk Engine circuit breaker state
+            breaker_status = risk_engine.evaluate_account_state(
+                equity=account.equity,
+                cash=account.cash,
+                realized_pnl=account.realized_pnl,
+                unrealized_pnl=account.unrealized_pnl,
+                timestamp=event_dt,
+            )
+            assert breaker_status != BreakerStatus.HALTED_DAILY_LOSS, "Daily Loss Circuit Breaker unexpectedly tripped!"
+
+            # UI WebSocket state serialization and contract verification
+            ui_payload = serialize_ui_state(
+                account=account,
+                risk_engine=risk_engine,
+                adaptation_engine=adaptation_engine,
+                strategies=strategies,
+                bracket_manager=bracket_manager,
+                latest_prices=latest_prices,
+                timestamp=event_dt,
+            )
+            assert validate_ui_state_payload(ui_payload), "UI state payload failed contract validation"
+            raw_json = json.dumps(ui_payload, default=str)
+            assert len(raw_json) > 0, "UI payload serialization resulted in empty JSON"
+            auditor.ui_payloads_validated += 1
 
     finally:
         await relay_server.stop()
@@ -512,6 +594,7 @@ async def execute_monday_simulation(
     log.info("=" * 75)
     log.info(f" Runtime:                {duration:.2f}s ({speed}x accelerated playback)")
     log.info(f" Events Processed:       {auditor.events_processed}")
+    log.info(f" UI Payloads Validated:  {auditor.ui_payloads_validated} (Port 8005 WS schema)")
     log.info(f" Unhandled Exceptions:   {auditor.exceptions_caught}")
     log.info(f" Initial Equity:         $50,000.00")
     log.info(f" Final Equity:           ${final_equity:,.2f}")
@@ -532,6 +615,7 @@ async def execute_monday_simulation(
     assert abs(final_cash - final_equity) < 0.01, f"Cash and equity mismatch! Cash=${final_cash}, Equity=${final_equity}"
     assert final_equity >= 50000.00, f"Simulation resulted in net loss: ${final_equity}"
     assert risk_engine.status == BreakerStatus.ARMED, "Circuit breaker not ARMED at conclusion!"
+    assert auditor.ui_payloads_validated == auditor.events_processed, "Not all events produced valid UI payloads!"
 
     # 5. Generate Comprehensive Certification Report MONDAY_SIMULATION_REPORT.md
     generate_certification_report(report_path, auditor, account, risk_engine, adaptation_engine, duration, speed)
@@ -638,6 +722,7 @@ The system demonstrated:
 | **Circuit Breaker Status** | ARMED & Operational | **ARMED (No Tripping)** | ✅ CERTIFIED |
 | **Buying Power Non-Negative** | $BP \\ge 0.00$ at all times | **$BP = ${account.buying_power:,.2f}** | ✅ CERTIFIED |
 | **Ledger Reconciliation** | $\\text{{Cash}} + \\text{{MV}} = \\text{{Equity}}$ | **$\\Delta = $0.00** | ✅ CERTIFIED |
+| **UI WebSocket Serialization** | 100% Validated (Port 8005) | **{auditor.ui_payloads_validated}/{auditor.events_processed} Payloads Validated** | ✅ CERTIFIED |
 | **Host Port Liberation** | Ports 8080, 8005, 3005 Free | **100% Liberated** | ✅ CERTIFIED |
 
 ---
@@ -661,7 +746,7 @@ The system demonstrated:
 All background simulation tasks, mock relay servers, and testing sockets have been cleanly terminated via asynchronous context handlers and explicit teardowns:
 - **Port 8080 (Mock AlpacaRelay)**: Free & Liberated
 - **Port 8005 (Trading Engine API & WS)**: Free & Liberated
-- **Port 3005 (Apple Music Web UI)**: Free & Liberated
+- **Port 3005 (Mobile Trading Web UI)**: Free & Liberated
 - **Lingering Daemons**: Zero
 
 **Final Verdict**: AutonomousDayTrader is fully certified and operationally ready for live market open deployment on Monday!

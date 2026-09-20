@@ -1,6 +1,6 @@
 # AutonomousDayTrader 🚀📈
 
-> Intraday paper-trading system for US equities connected downstream to **AlpacaRelay**, operating on a virtual **$50,000** account across four dynamically adapted strategies with an **Apple Music mobile-inspired** UI.
+> Intraday paper-trading system for US equities connected downstream to **AlpacaRelay**, operating on a virtual **$50,000** account across four dynamically adapted strategies with a **fluid obsidian mobile-first** UI.
 
 ---
 
@@ -43,11 +43,11 @@
                                               │ WebSocket Sync
                                               ▼
                   ┌────────────────────────────────────────────────────────┐
-                  │          Apple Music Mobile-First UI (Port 3005)       │
+                  │          Mobile-First Trading UI (Port 3005)           │
                   │  - Next.js 15 / React 19 / Tailwind CSS / Framer Motion│
                   │  - Obsidian Dark Theme & Dynamic Momentum Gradient Blur│
-                  │  - "Playlists / Albums" Strategy Performance Cards     │
-                  │  - "Now Playing" Expandable Bottom Drawer & Live Chart │
+                  │  - Trading Strategy Performance Cards                  │
+                  │  - "Active Position" Expandable Bottom Drawer & Live   │
                   └────────────────────────────────────────────────────────┘
 ```
 
@@ -71,10 +71,10 @@
 4. **Statistical Mean Reversion / Exhaustion Fades**: 1-minute $Z$-score ($\ge 2.5\sigma$) and RSI-14 extreme overbought/oversold fades back to the 20-period moving average.
 - **Dynamic Self-Adaptation**: Adapts position sizing, entry criteria, and stop widths dynamically across 4 VIX Volatility Regimes (Low, Normal, Elevated, Crisis) and 5 Time-of-Day Execution Phases (Pre-market scan, Open flush, Trend continuation, Midday chop defense, Power hour).
 
-### 3. Apple Music Mobile-Inspired UI
+### 3. Mobile-First Trading UI
 - **Design System**: Obsidian dark palette (`#000000`), backdrop glassmorphism (`backdrop-blur-xl`), animated background gradient mesh dynamically tinted by portfolio momentum (green for profit, red for drawdown, violet for neutral).
-- **Strategy "Albums / Playlists"**: Horizontal carousel showcasing the 4 strategies with cover artwork, live daily PnL, win rate badges, and active state indicators.
-- **"Now Playing" Expandable Drawer**: Docked mini-tray displaying the primary active position; spring-physics gesture expansion (`stiffness: 350, damping: 32`) reveals live ticker candlestick charts, bracket orders, and manual intervention controls (Quick Flatten, Tighten Stop).
+- **Trading Strategies Carousel**: Horizontal carousel showcasing the 4 strategies with strategy banners, live daily PnL, win rate badges, and active state indicators.
+- **"Active Position" Expandable Drawer**: Docked mini-tray displaying the primary active position; spring-physics gesture expansion (`stiffness: 350, damping: 32`) reveals live ticker candlestick charts, bracket orders, and manual intervention controls (Quick Flatten, Tighten Stop).
 - **Sub-Second Streaming**: Bi-directional WebSocket synchronization over Port 8005 with zero page reloads.
 
 ---
@@ -85,7 +85,7 @@ To prevent port conflicts with other services running on the host machine:
 
 | Service | Default (Occupied) | Safe Project Port | Protocol | Description |
 |---------|--------------------|-------------------|----------|-------------|
-| **Web UI** | 3000 | **3005** | HTTP / WS | Next.js Apple Music Mobile Dashboard |
+| **Web UI** | 3000 | **3005** | HTTP / WS | Next.js Mobile Trading Dashboard |
 | **Backend Core** | 8000 | **8005** | HTTP / WS | FastAPI Core Engine & WebSocket Server |
 | **Mock Replay** | - | **8080** | HTTP / WS | AlpacaRelay deterministic feed replay |
 
@@ -195,9 +195,9 @@ AutonomousDayTrader/
 │   │       ├── mock_relay.py     # Protocol-accurate AlpacaRelay mock server
 │   │       └── feed_player.py    # Historical & synthetic feed replay player
 │   └── tests/                    # Unit and stress test suites (140 tests)
-├── frontend/                     # Apple Music Mobile UI (Next.js 15 / React 19)
+├── frontend/                     # Mobile Trading UI (Next.js 15 / React 19)
 │   ├── app/                      # App router layout, page, and globals
-│   ├── components/               # Header, Album Cards, NowPlayingTray, LiveChart
+│   ├── components/               # Header, Strategy Cards, ActivePositionTray, LiveChart
 │   ├── hooks/                    # useTradingStream WebSocket client hook
 │   └── scripts/                  # UI verification & streaming stress test scripts
 ├── tests/

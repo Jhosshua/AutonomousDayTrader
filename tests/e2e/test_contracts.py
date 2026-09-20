@@ -9,7 +9,7 @@ Derived directly from ORIGINAL_REQUEST.md, PROJECT.md, and survey reports:
 - 4 Strategy logic oracles (ORB, VWAP, News Momentum, Mean Reversion)
 - VIX volatility regime self-adaptation
 - Time-of-day execution phases
-- Apple Music UI state contracts and momentum glow calculation
+- Mobile trading UI state contracts and momentum glow calculation
 """
 
 from __future__ import annotations
@@ -321,11 +321,11 @@ def get_time_of_day_phase(t_et: time) -> str:
 
 
 # ============================================================================
-# F14-F17: Apple Music UI Aesthetic & WebSocket State Payload
+# F14-F17: Obsidian UI Aesthetic & WebSocket State Payload
 # ============================================================================
 
 def get_momentum_glow(daily_pnl: float, vix: float, is_halted: bool) -> Dict[str, Any]:
-    """Derive Apple Music dynamic momentum glow colors and intensity."""
+    """Derive dynamic momentum glow colors and intensity."""
     if is_halted:
         return {
             "primary": "rgba(255, 69, 58, 0.45)",

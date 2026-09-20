@@ -169,12 +169,18 @@ class OpeningRangeBreakoutStrategy(Strategy):
 
         entry_price = bar.close
         stop_loss = state.range_midpoint
-        risk = abs(entry_price - stop_loss)
-        if risk < 0.05:
+        raw_dist = abs(entry_price - stop_loss)
+        if raw_dist < 0.05:
             # Fallback to ATR-based risk if range is ultra-tight
             atr = calculate_atr(state.all_bars, period=14)
-            risk = max(0.10, atr)
-            stop_loss = round(entry_price - risk if sig_type == "BUY" else entry_price + risk, 4)
+            raw_dist = max(0.10, atr)
+
+        # Institutional stop distance clamping with safe interior buffer [0.42%, 3.80%]
+        # Prevents IEEE 754 precision issues and decimal truncation from landing on risk limits.
+        min_dist = round(entry_price * 0.0042, 4)
+        max_dist = round(entry_price * 0.0380, 4)
+        risk = max(min_dist, min(max_dist, raw_dist))
+        stop_loss = round(entry_price - risk if sig_type == "BUY" else entry_price + risk, 4)
 
         if sig_type == "BUY":
             tp1 = round(entry_price + self.target_1_r * risk, 4)

@@ -72,12 +72,12 @@ def test_risk_engine_stop_too_wide():
 
 def test_risk_engine_max_concentration_cap():
     engine = InstitutionalRiskEngine(RiskEngineConfig(starting_equity=50000.00))
-    # 25% max position equity on $50k = $12,500. At $10 entry price -> max 1,250 shares.
-    # Even if stop distance is $0.05 (allowing 10,000 shares on risk), concentration clamps to 1,250.
+    # 100% max position equity on $50k = $50,000. At $10 entry price -> max 5,000 shares.
+    # Even if stop distance is $0.05 (allowing 10,000 shares on risk), concentration clamps to 5,000.
     res = engine.evaluate_order_request(
         symbol="CHEAP",
         side="BUY",
-        requested_qty=5000,
+        requested_qty=8000,
         entry_price=10.00,
         stop_price=9.95,  # 0.5% stop distance
         account_equity=50000.00,
@@ -87,7 +87,8 @@ def test_risk_engine_max_concentration_cap():
         active_sectors=set(),
     )
     assert res.approved is True
-    assert res.authorized_qty == 2500  # Clamped by 50% equity ($25k) concentration cap
+    assert res.authorized_qty == 5000  # Clamped by 100% equity ($50k) concentration cap
+    assert res.estimated_risk_dollars == 250.00  # min(8000, 5000) * 0.05
 
 
 def test_risk_engine_max_concurrent_positions():
@@ -154,3 +155,30 @@ def test_circuit_breaker_hard_halt_at_1500_loss():
     )
     assert res.approved is False
     assert "CIRCUIT_BREAKER_HALTED" in res.reason
+
+
+def test_risk_config_defaults_and_estimated_risk_dollars():
+    cfg = RiskEngineConfig()
+    # Task 7: max_position_equity_pct must default to 1.000 ($50k)
+    assert cfg.max_position_equity_pct == 1.000
+
+    engine = InstitutionalRiskEngine(cfg)
+    # Entry $100, Stop $98 -> stop_dist = $2.00
+    # On $50k equity with 1% risk ($500), authorized capacity is 250 shares.
+    # When requesting 10 shares, estimated_risk_dollars must be 10 * $2.00 = $20.00, NOT 250 * $2.00 = $500.00.
+    res = engine.evaluate_order_request(
+        symbol="AAPL",
+        side="BUY",
+        requested_qty=10,
+        entry_price=100.00,
+        stop_price=98.00,
+        account_equity=50000.00,
+        buying_power=200000.00,
+        active_positions_count=0,
+        active_symbols=set(),
+        active_sectors=set(),
+    )
+    assert res.approved is True
+    assert res.authorized_qty == 250
+    assert res.requested_qty == 10
+    assert res.estimated_risk_dollars == 20.00

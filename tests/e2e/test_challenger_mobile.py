@@ -10,7 +10,7 @@ Stress tests:
    ensuring NO horizontal page overflow (scrollWidth <= innerWidth) and no unintended text clipping.
 2. Framer Motion drawer spring configuration (stiffness: 350, damping: 32) and presence of expandable modal elements.
 3. LiveChart SVG bracket levels (Stop Loss, Entry, TP1, TP2, Laser price pulse).
-4. Interactive modal flows: NowPlayingTray expansion, Flatten confirmation prompt, Strategy Inspector sheet.
+4. Interactive modal flows: ActivePositionTray expansion, Flatten confirmation prompt, Strategy Inspector sheet.
 5. Safe UI port 3005 configuration in package.json & host isolation.
 6. Process hygiene and clean port release (zero lingering processes).
 """
@@ -99,16 +99,27 @@ def nextjs_server():
 
     yield proc
 
-    # Teardown: terminate cleanly
+    # Teardown: terminate cleanly and ensure port liberation
+    pgid = None
     try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        proc.wait(timeout=4)
+        pgid = os.getpgid(proc.pid)
+        os.killpg(pgid, signal.SIGTERM)
+        proc.wait(timeout=3)
     except Exception:
+        pass
+
+    # Wait up to 5 seconds for port 3005 to be completely liberated
+    deadline = time.time() + 5.0
+    while time.time() < deadline and is_port_listening(PORT):
+        time.sleep(0.1)
+
+    # If still listening, escalate to SIGKILL
+    if is_port_listening(PORT) and pgid is not None:
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            os.killpg(pgid, signal.SIGKILL)
         except OSError:
             pass
-    time.sleep(0.5)
+        time.sleep(0.2)
 
     # Enforce process hygiene post-teardown
     hygiene_script = PROJECT_ROOT / "scripts" / "verify_port_hygiene.sh"
@@ -139,24 +150,24 @@ def test_safe_port_3005_configuration():
 # ============================================================================
 def test_framer_motion_drawer_spring_configuration():
     """Verify spring physics (stiffness: 350, damping: 32) and drawer elements in code."""
-    drawer_file = FRONTEND_DIR / "components" / "NowPlayingTray.tsx"
-    assert drawer_file.exists(), f"NowPlayingTray.tsx missing at {drawer_file}"
+    drawer_file = FRONTEND_DIR / "components" / "ActivePositionTray.tsx"
+    assert drawer_file.exists(), f"ActivePositionTray.tsx missing at {drawer_file}"
     code = drawer_file.read_text(encoding="utf-8")
 
     # Verify spring transition parameters
-    assert "stiffness: 350" in code, "NowPlayingTray must specify stiffness: 350"
-    assert "damping: 32" in code, "NowPlayingTray must specify damping: 32"
-    assert 'type: "spring"' in code or "type: 'spring'" in code, "NowPlayingTray must use spring physics"
+    assert "stiffness: 350" in code, "ActivePositionTray must specify stiffness: 350"
+    assert "damping: 32" in code, "ActivePositionTray must specify damping: 32"
+    assert 'type: "spring"' in code or "type: 'spring'" in code, "ActivePositionTray must use spring physics"
 
     # Verify gesture dismissal and drag constraints
-    assert 'drag="y"' in code or "drag='y'" in code, "NowPlayingTray must support drag='y' gesture"
-    assert "onDragEnd={handleDragEnd}" in code, "NowPlayingTray must handle drag end dismissal"
+    assert 'drag="y"' in code or "drag='y'" in code, "ActivePositionTray must support drag='y' gesture"
+    assert "onDragEnd={handleDragEnd}" in code, "ActivePositionTray must handle drag end dismissal"
 
     # Verify expandable modal sheet elements
-    assert "LiveChart" in code, "NowPlayingTray must embed LiveChart component"
-    assert "ManualControls" in code, "NowPlayingTray must embed ManualControls component"
-    assert "ExecutionLog" in code, "NowPlayingTray must embed ExecutionLog component"
-    assert "ChevronDown" in code, "NowPlayingTray must have dismiss ChevronDown button"
+    assert "LiveChart" in code, "ActivePositionTray must embed LiveChart component"
+    assert "ManualControls" in code, "ActivePositionTray must embed ManualControls component"
+    assert "ExecutionLog" in code, "ActivePositionTray must embed ExecutionLog component"
+    assert "ChevronDown" in code, "ActivePositionTray must have dismiss ChevronDown button"
 
 
 # ============================================================================
@@ -272,10 +283,10 @@ def test_mobile_text_clipping_and_wrapping(nextjs_server, vp):
 
 
 # ============================================================================
-# Test 5: Interactive NowPlayingTray Expansion & Modal Sheet Verification
+# Test 5: Interactive ActivePositionTray Expansion & Modal Sheet Verification
 # ============================================================================
-def test_now_playing_tray_expansion_and_modal_elements(nextjs_server):
-    """Test interactive NowPlayingTray expansion into full modal sheet on 375px mobile viewport."""
+def test_active_position_tray_expansion_and_modal_elements(nextjs_server):
+    """Test interactive ActivePositionTray expansion into full modal sheet on 375px mobile viewport."""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
@@ -288,9 +299,9 @@ def test_now_playing_tray_expansion_and_modal_elements(nextjs_server):
         page = context.new_page()
         page.goto(BASE_URL, wait_until="networkidle", timeout=10000)
 
-        # 1. Docked Mini-Player Bar verification
+        # 1. Docked Active Position Bar verification
         docked_tray = page.locator("div.fixed.bottom-4")
-        assert docked_tray.is_visible(), "Docked NowPlayingTray must be visible at bottom of page"
+        assert docked_tray.is_visible(), "Docked ActivePositionTray must be visible at bottom of page"
 
         # Check docked bar position info
         assert docked_tray.locator("text=Active").count() > 0 or docked_tray.locator("text=NVDA").count() > 0 or docked_tray.locator("text=No Active Position").count() > 0
@@ -302,7 +313,7 @@ def test_now_playing_tray_expansion_and_modal_elements(nextjs_server):
             assert breakeven_btn.is_visible()
             assert flatten_btn.is_visible()
 
-        # 2. Expand NowPlayingTray on click (click left album avatar or trade ticker)
+        # 2. Expand ActivePositionTray on click (click left ticker badge or trade ticker)
         expand_trigger = docked_tray.locator("span:has-text('NVDA'), span:has-text('Active'), span:has-text('No Active Position')").first
         assert expand_trigger.is_visible(), "Docked tray trade trigger must be visible"
         expand_trigger.click()
@@ -394,8 +405,8 @@ def test_strategy_carousel_and_inspector_modal(nextjs_server):
         page.goto(BASE_URL, wait_until="networkidle", timeout=10000)
 
         # 1. Verify Strategy Carousel section
-        carousel_heading = page.locator("text=Curated Playlists")
-        assert carousel_heading.is_visible(), "Curated Playlists header must be visible"
+        carousel_heading = page.locator("text=Trading Strategies")
+        assert carousel_heading.is_visible(), "Trading Strategies header must be visible"
 
         # 2. Verify all 4 Strategy Cards are present in carousel
         strategies_expected = [
@@ -435,7 +446,150 @@ def test_strategy_carousel_and_inspector_modal(nextjs_server):
 
 
 # ============================================================================
-# Test 7: Non-Colliding Ports Isolation During Execution
+# Test 7: Desktop Viewport (1440x900) Layout, Component Inspection & No Overflow
+# ============================================================================
+def test_desktop_viewport_1440x900_layout_and_no_overflow(nextjs_server):
+    """Verify visual UI layout and absence of horizontal overflow on desktop (1440x900)."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            viewport={"width": 1440, "height": 900},
+            device_scale_factor=1,
+            is_mobile=False,
+            has_touch=False,
+        )
+        page = context.new_page()
+        page.goto(BASE_URL, wait_until="networkidle", timeout=10000)
+
+        # 1. Document-level overflow check on 1440x900
+        scroll_width = page.evaluate("() => document.documentElement.scrollWidth")
+        client_width = page.evaluate("() => document.documentElement.clientWidth")
+        inner_width = page.evaluate("() => window.innerWidth")
+
+        assert scroll_width <= inner_width, (
+            f"Desktop horizontal overflow detected: scrollWidth={scroll_width}px > innerWidth={inner_width}px"
+        )
+        assert client_width <= inner_width, (
+            f"Desktop clientWidth exceeds innerWidth: clientWidth={client_width}px > innerWidth={inner_width}px"
+        )
+
+        # 2. Check for child element overflow on desktop
+        overflow_elements = page.evaluate("""
+            () => {
+                const overflowing = [];
+                const innerW = window.innerWidth;
+                const all = document.querySelectorAll('header, section, div, main, nav, p, span, h1, h2, h3');
+                for (const el of all) {
+                    if (el.closest('.overflow-x-auto') || el.closest('.overflow-x-scroll') || el.closest('.overflow-hidden') || el.closest('[aria-hidden="true"]')) {
+                        continue;
+                    }
+                    const rect = el.getBoundingClientRect();
+                    if (rect.right > innerW + 1 && rect.width > 0) {
+                        overflowing.push({
+                            tag: el.tagName,
+                            className: el.className,
+                            right: rect.right,
+                            width: rect.width,
+                            innerW: innerW
+                        });
+                    }
+                }
+                return overflowing;
+            }
+        """)
+        assert len(overflow_elements) == 0, f"Found overflowing elements on desktop: {overflow_elements[:3]}"
+
+        # 3. Verify Telemetry grid in 4-column layout on desktop
+        page.get_by_text("Portfolio Equity", exact=True).wait_for(state="visible", timeout=5000)
+        telemetry_boxes = page.locator("section.px-4 .grid > div")
+        count = telemetry_boxes.count()
+        assert count == 4, f"Expected 4 telemetry cards, found {count}"
+
+        # In sm:grid-cols-4, each box width should be properly sized
+        container_rect = page.locator("section.px-4 .grid").bounding_box()
+        assert container_rect is not None
+        for i in range(count):
+            box = telemetry_boxes.nth(i)
+            box_rect = box.bounding_box()
+            assert box_rect is not None
+            assert box_rect["width"] > 180, f"Box {i} unexpectedly narrow on desktop: {box_rect['width']}px"
+
+        # 4. Verify Strategy Carousel header & cards
+        assert page.locator("text=Trading Strategies").is_visible()
+        strategies_expected = [
+            "Opening Range Breakout",
+            "VWAP Trend Pullback",
+            "Catalyst News Momentum",
+            "Statistical Mean Reversion",
+        ]
+        for name in strategies_expected:
+            assert page.locator(f"h3:has-text('{name}')").count() > 0, f"Missing strategy card '{name}'"
+
+        # 5. Verify Docked ActivePositionTray is centered and within max-w-xl
+        docked_tray = page.locator("div.fixed.bottom-4")
+        assert docked_tray.is_visible(), "Docked ActivePositionTray must be visible on desktop"
+        tray_rect = docked_tray.bounding_box()
+        assert tray_rect is not None
+        assert tray_rect["width"] <= 576 + 32, f"Tray wider than max-w-xl on desktop: {tray_rect['width']}px"
+
+        browser.close()
+
+
+# ============================================================================
+# Test 8: Desktop Viewport Interactive Modal, LiveChart & Strategy Inspector
+# ============================================================================
+def test_desktop_viewport_interactive_modal_and_inspector(nextjs_server):
+    """Verify desktop interactive modals: ActivePositionTray modal sheet and Strategy Inspector."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            viewport={"width": 1440, "height": 900},
+            device_scale_factor=1,
+            is_mobile=False,
+            has_touch=False,
+        )
+        page = context.new_page()
+        page.goto(BASE_URL, wait_until="networkidle", timeout=10000)
+
+        # 1. Expand ActivePositionTray on desktop
+        docked_tray = page.locator("div.fixed.bottom-4")
+        expand_trigger = docked_tray.locator("span:has-text('NVDA'), span:has-text('Active'), span:has-text('No Active Position')").first
+        expand_trigger.click()
+
+        # 2. Verify modal sheet is centered on desktop (sm:items-center)
+        modal_header = page.locator("text=Active Primary Trade")
+        modal_header.wait_for(state="visible", timeout=3000)
+        assert modal_header.is_visible()
+
+        # Check modal sheet bounding box
+        modal_sheet = page.locator("div.fixed.inset-0 .relative.max-w-2xl")
+        sheet_rect = modal_sheet.bounding_box()
+        assert sheet_rect is not None
+        # Centered horizontally within 1440px
+        center_x = sheet_rect["x"] + sheet_rect["width"] / 2.0
+        assert abs(center_x - 720.0) < 50.0, f"Modal sheet not centered on desktop: center_x={center_x}"
+
+        # 3. Dismiss modal
+        close_btn = page.locator("button:has(svg.lucide-chevron-down)")
+        close_btn.click()
+        modal_header.wait_for(state="detached", timeout=3000)
+
+        # 4. Open Strategy Inspector on desktop
+        first_card = page.locator("div.snap-center").first
+        first_card.click()
+        page.wait_for_timeout(300)
+
+        inspector_title = page.locator("text=Strategy Inspector")
+        assert inspector_title.is_visible(), "Strategy Inspector modal must open on desktop"
+        close_inspector_btn = page.locator("button:has-text('Close Inspector')")
+        close_inspector_btn.click()
+        page.locator("text=Strategy Inspector").wait_for(state="detached", timeout=3000)
+
+        browser.close()
+
+
+# ============================================================================
+# Test 9: Non-Colliding Ports Isolation During Execution
 # ============================================================================
 def test_ports_isolation_during_execution(nextjs_server):
     """Verify backend ports (8005, 8080) and host port 3000 remain unmolested during UI execution."""
@@ -452,3 +606,4 @@ if __name__ == "__main__":
     print("🚀 Launching Challenger Mobile Responsiveness Test Suite...")
     exit_code = pytest.main([__file__, "-v", "-s"])
     sys.exit(exit_code)
+

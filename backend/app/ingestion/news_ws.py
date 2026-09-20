@@ -191,7 +191,6 @@ class NewsWebSocketClient:
         for m in msgs:
             t = m.get("T")
             if t == "n":
-                self.articles_received += 1
                 headline = m.get("headline", "")
                 summary = m.get("summary", "")
                 content = m.get("content", "")
@@ -199,8 +198,8 @@ class NewsWebSocketClient:
 
                 # Run algorithmic sentiment & catalyst classification
                 score, confidence, category = self.scorer.score(headline=headline, summary=summary)
-                if abs(score) >= 0.6:
-                    self.catalysts_detected += 1
+                is_high_impact = abs(score) >= 0.6
+                if is_high_impact:
                     log.info(f"High-impact news catalyst: [{category.value}] Score={score:.2f} ({symbols}) '{headline}'")
 
                 created_raw = m.get("created_at") or datetime.now(timezone.utc).isoformat()
@@ -231,6 +230,9 @@ class NewsWebSocketClient:
                     catalyst_category=category,
                 )
                 await self.bus.publish(event)
+                self.articles_received += 1
+                if is_high_impact:
+                    self.catalysts_detected += 1
 
             elif t == "relay":
                 msg_text = m.get("msg", "")

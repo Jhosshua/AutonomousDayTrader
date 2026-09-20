@@ -40,7 +40,7 @@ class RiskEngineConfig(BaseModel):
     base_trade_risk_pct: float = 0.010       # 1.0% ($500)
     max_trade_risk_pct: float = 0.020        # 2.0% ($1,000 ceiling)
     max_trade_risk_dollars: float = 1000.00
-    max_position_equity_pct: float = 0.500   # $25,000 = 25% of $200,000 day-trading buying power
+    max_position_equity_pct: float = 1.000   # $50,000 max single position (100% of equity / 25% of DTBP)
     max_concurrent_positions: int = 3
     min_stop_distance_pct: float = 0.004     # 0.4%
     max_stop_distance_pct: float = 0.040     # 4.0%
@@ -215,7 +215,8 @@ class InstitutionalRiskEngine:
             )
 
         stop_dist_pct = stop_dist / entry_price
-        if stop_dist_pct < self.config.min_stop_distance_pct:
+        EPS = 1e-6  # Tolerance for IEEE 754 floating-point representation discrepancies
+        if stop_dist_pct < self.config.min_stop_distance_pct - EPS:
             return RiskCheckResult(
                 approved=False,
                 reason=f"STOP_DISTANCE_TOO_TIGHT: Stop distance {stop_dist_pct:.4f} < min {self.config.min_stop_distance_pct:.4f}",
@@ -226,7 +227,7 @@ class InstitutionalRiskEngine:
                 rejection_code="STOP_DISTANCE_TOO_TIGHT",
             )
 
-        if stop_dist_pct > self.config.max_stop_distance_pct:
+        if stop_dist_pct > self.config.max_stop_distance_pct + EPS:
             return RiskCheckResult(
                 approved=False,
                 reason=f"STOP_DISTANCE_TOO_WIDE: Stop distance {stop_dist_pct:.4f} > max {self.config.max_stop_distance_pct:.4f}",
@@ -266,7 +267,8 @@ class InstitutionalRiskEngine:
                 rejection_code="INSUFFICIENT_RISK_BUDGET",
             )
 
-        estimated_risk = round(authorized_qty * stop_dist, 2)
+        effective_qty = min(requested_qty, authorized_qty)
+        estimated_risk = round(effective_qty * stop_dist, 2)
         return RiskCheckResult(
             approved=True,
             reason="Approved",

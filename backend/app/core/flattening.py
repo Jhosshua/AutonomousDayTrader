@@ -12,6 +12,7 @@ ET_TZ = ZoneInfo("America/New_York")
 
 
 class FlatteningPhase(str, Enum):
+    PRE_MARKET = "PRE_MARKET"                       # Before 09:30:00 ET
     NORMAL_TRADING = "NORMAL_TRADING"               # 09:30:00 - 15:44:59 ET
     ENTRY_LOCKOUT = "ENTRY_LOCKOUT"                 # 15:45:00 - 15:49:59 ET (Phase 1)
     ORDER_PURGE = "ORDER_PURGE"                     # 15:50:00 - 15:54:59 ET (Phase 2)
@@ -66,6 +67,7 @@ class FlatteningDirective(BaseModel):
 
 
 class FlatteningSchedule(BaseModel):
+    market_open_time: time = time(9, 30, 0)
     phase1_lockout_time: time = time(15, 45, 0)
     phase2_purge_time: time = time(15, 50, 0)
     phase3_liquidation_time: time = time(15, 55, 0)
@@ -159,6 +161,16 @@ class ZeroOvernightFlatteningEngine:
                     cancel_all_orders=True,
                 )
 
+        # Pre-Market: Before 09:30:00 ET
+        elif t < self.schedule.market_open_time:
+            self.current_phase = FlatteningPhase.PRE_MARKET
+            return None
+
+        # Normal Trading: 09:30:00 - 15:44:59 ET
+        else:
+            self.current_phase = FlatteningPhase.NORMAL_TRADING
+            return None
+
         return None
 
     def execute_phase_1_lockout(self) -> FlatteningDirective:
@@ -249,3 +261,20 @@ class ZeroOvernightFlatteningEngine:
         self.phase4_executed = False
         self.audit_passed = False
         self.audit_retries = 0
+
+    def get_phase_at_time(self, t: time) -> FlatteningPhase:
+        """Return the scheduled FlatteningPhase for any given ET time-of-day."""
+        if t < self.schedule.market_open_time:
+            return FlatteningPhase.PRE_MARKET
+        elif t < self.schedule.phase1_lockout_time:
+            return FlatteningPhase.NORMAL_TRADING
+        elif t < self.schedule.phase2_purge_time:
+            return FlatteningPhase.ENTRY_LOCKOUT
+        elif t < self.schedule.phase3_liquidation_time:
+            return FlatteningPhase.ORDER_PURGE
+        elif t < self.schedule.phase4_audit_time:
+            return FlatteningPhase.MANDATORY_LIQUIDATION
+        elif t < self.schedule.market_close_time:
+            return FlatteningPhase.ZERO_AUDIT
+        else:
+            return FlatteningPhase.MARKET_CLOSED

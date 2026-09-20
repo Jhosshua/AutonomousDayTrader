@@ -47,7 +47,7 @@ if [ "$READY" -ne 1 ]; then
   exit 1
 fi
 
-# 2. Start Next.js Apple Music Mobile UI (Port 3005)
+# 2. Start Next.js Mobile Trading UI (Port 3005)
 echo "▶ Starting Next.js Mobile UI on http://localhost:3005..."
 cd "${PROJECT_ROOT}/frontend"
 npm run dev &
@@ -55,7 +55,7 @@ FRONTEND_PID=$!
 
 echo "======================================================================"
 echo " ✅ AutonomousDayTrader is running!"
-echo "   - Apple Music UI:    http://localhost:3005"
+echo "   - Mobile Trading UI: http://localhost:3005"
 echo "   - Backend Core API:  http://127.0.0.1:8005"
 echo "   - UI WebSocket:      ws://127.0.0.1:8005/ws/ui"
 echo "   - Press Ctrl+C to terminate cleanly."

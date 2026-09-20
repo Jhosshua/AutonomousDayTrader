@@ -81,3 +81,34 @@ def test_market_close_transition():
     assert d is not None
     assert d.phase == FlatteningPhase.MARKET_CLOSED
     assert engine.current_phase == FlatteningPhase.MARKET_CLOSED
+
+
+def test_pre_market_phase_and_open_transition():
+    clock = MarketClock()
+    clock.set_simulated_time(datetime(2026, 9, 21, 9, 15, 0, tzinfo=ET))
+    engine = ZeroOvernightFlatteningEngine(clock=clock)
+
+    # 1. At 09:15 ET (Pre-Market), check_time_tick sets phase to PRE_MARKET
+    d = engine.check_time_tick()
+    assert d is None
+    assert engine.current_phase == FlatteningPhase.PRE_MARKET
+
+    # 2. At 09:30 ET (Market Open), check_time_tick transitions to NORMAL_TRADING
+    clock.set_simulated_time(datetime(2026, 9, 21, 9, 30, 0, tzinfo=ET))
+    d2 = engine.check_time_tick()
+    assert d2 is None
+    assert engine.current_phase == FlatteningPhase.NORMAL_TRADING
+
+
+def test_get_phase_at_time():
+    from datetime import time
+    engine = ZeroOvernightFlatteningEngine()
+    assert engine.get_phase_at_time(time(8, 0)) == FlatteningPhase.PRE_MARKET
+    assert engine.get_phase_at_time(time(9, 29, 59)) == FlatteningPhase.PRE_MARKET
+    assert engine.get_phase_at_time(time(9, 30)) == FlatteningPhase.NORMAL_TRADING
+    assert engine.get_phase_at_time(time(15, 44, 59)) == FlatteningPhase.NORMAL_TRADING
+    assert engine.get_phase_at_time(time(15, 45)) == FlatteningPhase.ENTRY_LOCKOUT
+    assert engine.get_phase_at_time(time(15, 50)) == FlatteningPhase.ORDER_PURGE
+    assert engine.get_phase_at_time(time(15, 55)) == FlatteningPhase.MANDATORY_LIQUIDATION
+    assert engine.get_phase_at_time(time(15, 58)) == FlatteningPhase.ZERO_AUDIT
+    assert engine.get_phase_at_time(time(16, 0)) == FlatteningPhase.MARKET_CLOSED

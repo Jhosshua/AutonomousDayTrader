@@ -15,12 +15,12 @@ export default function StrategyCarousel({ strategies }: StrategyCarouselProps) 
 
   return (
     <section className="py-3">
-      {/* Section Header (Apple Music Curated Playlist Style) */}
+      {/* Section Header (Trading Strategies Header Style) */}
       <div className="px-4 mb-3 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-1.5 text-xs font-semibold text-apple-purple uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5 text-apple-purple" />
-            <span>Curated Playlists</span>
+            <span>Trading Strategies</span>
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight">Active Strategies</h2>
         </div>

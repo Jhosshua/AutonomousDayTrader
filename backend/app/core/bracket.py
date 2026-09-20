@@ -251,6 +251,14 @@ class DynamicBracketManager:
         if not bracket:
             return BracketUpdateDirective(action="NO_ACTION", bracket_status=BracketStatus.ACTIVE)
 
+        if bracket.status in (
+            BracketStatus.COMPLETED_PROFIT,
+            BracketStatus.COMPLETED_STOP,
+            BracketStatus.COMPLETED_FLATTEN,
+            BracketStatus.CANCELLED,
+        ):
+            return BracketUpdateDirective(action="NO_ACTION", bracket_status=bracket.status)
+
         bracket.updated_at = timestamp
 
         # 1. Stop-Loss Triggered
@@ -296,6 +304,9 @@ class DynamicBracketManager:
                 orders_to_cancel.append(bracket.target_2_order_id)
 
             self.symbol_to_bracket.pop(bracket.symbol, None)
+            for oid in (bracket.stop_order_id, bracket.target_1_order_id, bracket.target_2_order_id):
+                if oid:
+                    self.order_to_bracket.pop(oid, None)
             return BracketUpdateDirective(
                 action="CANCEL_ORDER",
                 orders_to_cancel=orders_to_cancel,
@@ -310,6 +321,9 @@ class DynamicBracketManager:
             if bracket.remaining_qty <= 0:
                 bracket.status = BracketStatus.COMPLETED_PROFIT
                 self.symbol_to_bracket.pop(bracket.symbol, None)
+                for oid in (bracket.stop_order_id, bracket.target_1_order_id, bracket.target_2_order_id):
+                    if oid:
+                        self.order_to_bracket.pop(oid, None)
                 return BracketUpdateDirective(
                     action="CANCEL_ORDER",
                     orders_to_cancel=[bracket.stop_order_id] if bracket.stop_order_id else [],
@@ -340,16 +354,31 @@ class DynamicBracketManager:
 
         # 3. Target 2 Filled
         elif child_type == BracketChildType.TAKE_PROFIT_2:
-            bracket.target_2_filled = True
-            bracket.remaining_qty -= filled_qty
-            bracket.status = BracketStatus.COMPLETED_PROFIT
-            self.symbol_to_bracket.pop(bracket.symbol, None)
+            bracket.remaining_qty = max(0, bracket.remaining_qty - filled_qty)
+            if bracket.remaining_qty <= 0:
+                bracket.target_2_filled = True
+                bracket.status = BracketStatus.COMPLETED_PROFIT
+                self.symbol_to_bracket.pop(bracket.symbol, None)
+                for oid in (bracket.stop_order_id, bracket.target_1_order_id, bracket.target_2_order_id):
+                    if oid:
+                        self.order_to_bracket.pop(oid, None)
 
-            return BracketUpdateDirective(
-                action="CANCEL_ORDER",
-                orders_to_cancel=[bracket.stop_order_id] if bracket.stop_order_id else [],
-                bracket_status=BracketStatus.COMPLETED_PROFIT,
-            )
+                return BracketUpdateDirective(
+                    action="CANCEL_ORDER",
+                    orders_to_cancel=[bracket.stop_order_id] if bracket.stop_order_id else [],
+                    bracket_status=BracketStatus.COMPLETED_PROFIT,
+                )
+            else:
+                bracket.target_2_qty = max(0, bracket.target_2_qty - filled_qty)
+                return BracketUpdateDirective(
+                    action="MODIFY_ORDER",
+                    orders_to_modify=[{
+                        "order_id": bracket.stop_order_id,
+                        "new_qty": bracket.remaining_qty,
+                        "new_stop_price": bracket.current_stop_price,
+                    }],
+                    bracket_status=bracket.status,
+                )
 
         return BracketUpdateDirective(action="NO_ACTION", bracket_status=bracket.status)
 
@@ -422,13 +451,25 @@ class DynamicBracketManager:
         if not bracket_id:
             return BracketUpdateDirective(action="NO_ACTION", bracket_status=BracketStatus.COMPLETED_FLATTEN)
 
-        bracket = self.brackets[bracket_id]
+        bracket = self.brackets.get(bracket_id)
+        if not bracket:
+            return BracketUpdateDirective(action="NO_ACTION", bracket_status=BracketStatus.COMPLETED_FLATTEN)
+
+        if bracket.status not in (BracketStatus.ACTIVE, BracketStatus.TARGET_1_HIT):
+            return BracketUpdateDirective(action="NO_ACTION", bracket_status=bracket.status)
+
+        tightened = False
         if bracket.side == "LONG":
             if new_stop_price > bracket.current_stop_price:
                 bracket.current_stop_price = new_stop_price
+                tightened = True
         else:
             if new_stop_price < bracket.current_stop_price:
                 bracket.current_stop_price = new_stop_price
+                tightened = True
+
+        if not tightened:
+            return BracketUpdateDirective(action="NO_ACTION", bracket_status=bracket.status)
 
         return BracketUpdateDirective(
             action="MODIFY_ORDER",
@@ -480,6 +521,10 @@ class DynamicBracketManager:
             orders_to_cancel.append(bracket.target_1_order_id)
         if bracket.target_2_order_id:
             orders_to_cancel.append(bracket.target_2_order_id)
+
+        for oid in (bracket.stop_order_id, bracket.target_1_order_id, bracket.target_2_order_id):
+            if oid:
+                self.order_to_bracket.pop(oid, None)
 
         return BracketUpdateDirective(
             action="CANCEL_ORDER",

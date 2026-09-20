@@ -11,7 +11,7 @@ Validates:
 3. Strategy engine processes market data and triggers signals (ORB & News Momentum).
 4. Risk engine approves and sizes order with dynamic brackets.
 5. Execution engine fills orders, marks to market, and updates paper account.
-6. Real-time UI WebSocket clients receive sub-second STATE_UPDATE payloads matching Apple Music UI contract.
+6. Real-time UI WebSocket clients receive sub-second STATE_UPDATE payloads matching trading UI contract.
 7. UI Action roundtrip: TIGHTEN_STOP and FLATTEN_POSITION executed via UI WebSocket.
 8. Replayed market feed (monday_open_session.json) processes without error.
 9. Process hygiene: all connections, servers, and ports cleanly closed and freed.

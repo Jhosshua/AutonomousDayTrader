@@ -244,3 +244,24 @@ def test_audit_trail_completeness():
     assert last.fill_qty == 100
     assert last.account_cash_after < 50000.00
     assert len(engine.audit_log) >= 4
+
+
+def test_session_boundary_purges_working_orders():
+    from backend.app.main import _check_session_boundary, engine
+    import backend.app.main as main_mod
+
+    # Setup initial session date
+    d1 = datetime(2026, 9, 21, 10, 0, 0, tzinfo=timezone.utc)
+    _check_session_boundary(d1)
+
+    # Place working limit order
+    o = engine.create_order("AAPL", OrderSide.BUY, OrderType.LIMIT, 10, limit_price=100.0)
+    engine.submit_order(o.id)
+    assert o.id in engine.working_orders
+
+    # Next session date (2026-09-22) triggers boundary purge
+    d2 = datetime(2026, 9, 22, 10, 0, 0, tzinfo=timezone.utc)
+    _check_session_boundary(d2)
+
+    assert len(engine.working_orders) == 0
+    assert o.status == OrderState.CANCELLED

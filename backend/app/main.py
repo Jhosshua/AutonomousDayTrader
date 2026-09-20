@@ -388,11 +388,16 @@ def _check_session_boundary(now_dt: datetime) -> None:
     if is_first_observation:
         return
     log.info("New ET session %s detected; resetting daily session state", session_date)
+    if engine.working_orders:
+        log.warning("Session boundary detected with %d open working orders; cancelling all", len(engine.working_orders))
+        engine.cancel_all_orders("SESSION_BOUNDARY_PURGE")
+        engine.working_orders.clear()
     risk_engine.reset_daily_metrics(account.equity)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
     # At a session boundary the book must be flat: clear bracket/linkage state
-    # so no stale PENDING_ENTRY bracket blocks a symbol on the new day.
+    # and open positions so no stale state blocks a symbol on the new day.
+    account.positions.clear()
     bracket_manager.brackets.clear()
     bracket_manager.symbol_to_bracket.clear()
     bracket_manager.order_to_bracket.clear()
@@ -404,7 +409,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
 
 
 async def broadcast_ui_state() -> None:
-    """Broadcast current system state to connected Apple Music UI clients."""
+    """Broadcast current system state to connected mobile trading UI clients."""
     if not ui_clients:
         return
 
@@ -1118,7 +1123,7 @@ async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]
 # Real-Time UI WebSocket Endpoint (Port 8005)
 @app.websocket("/ws/ui")
 async def ui_websocket_endpoint(websocket: WebSocket) -> None:
-    """Real-time bi-directional streaming for the Apple Music mobile UI."""
+    """Real-time bi-directional streaming for the mobile trading UI."""
     await websocket.accept()
     ui_clients.add(websocket)
     try:

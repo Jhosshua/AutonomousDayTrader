@@ -394,3 +394,75 @@ def test_strategy_performance_tracking():
     strat.reset_daily_stats()
     assert strat.trades_count == 0
     assert strat.daily_pnl == 0.0
+
+
+def test_orb_stop_distance_clamping_to_risk_window():
+    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.5)
+
+    # 5 bars establishing an ultra-tight range on a $300 stock: [300.00, 300.20], midpoint 300.10
+    bars = [
+        _make_bar(open_p=300.05, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
+        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
+        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
+        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
+        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
+    ]
+    for b in bars:
+        strat.on_bar(b)
+
+    # Breakout bar with close = 300.30 (raw dist to midpoint = 0.20, which is only 0.067% < 0.40% min)
+    bo_bar = _make_bar(
+        open_p=300.15,
+        high_p=300.40,
+        low_p=300.10,
+        close_p=300.30,
+        vol=200000,
+        ts_str="2026-09-21T09:35:00-04:00",
+    )
+    sigs = strat.on_bar(bo_bar)
+    assert len(sigs) == 1
+    sig = sigs[0]
+    stop_dist = abs(sig.entry_price - sig.stop_loss)
+    stop_pct = stop_dist / sig.entry_price
+    # Must be clamped within [0.4%, 4.0%]
+    assert 0.004 <= stop_pct <= 0.040
+    assert stop_dist >= round(sig.entry_price * 0.004, 4)
+
+
+def test_news_momentum_stop_distance_clamping():
+    strat = NewsMomentumStrategy(sentiment_threshold=0.60, volume_surge_multiplier=3.0)
+
+    # Ingest baseline bars for a $250 stock
+    for i in range(20):
+        strat.on_bar(_make_bar(symbol="TSLA", open_p=250.0, high_p=250.5, low_p=249.5, close_p=250.0, vol=10000, ts_str=f"2026-09-21T10:{i:02d}:00-04:00"))
+
+    # Catalyst arrives
+    news = NewsEvent(
+        article_id=99,
+        headline="TSLA Secures Massive Megapack Contract with Utility Giant",
+        summary="...",
+        symbols=["TSLA"],
+        source="Benzinga",
+        created_at=datetime.fromisoformat("2026-09-21T10:20:00-04:00"),
+        sentiment_score=0.90,
+    )
+    strat.on_news(news)
+
+    # Breakout bar where low is very close to close (e.g. low 249.95, close 250.00)
+    # Raw dist = 250.00 - 249.93 = 0.07 (0.028% < 0.40%)
+    bo_bar = _make_bar(
+        symbol="TSLA",
+        open_p=249.98,
+        high_p=250.10,
+        low_p=249.95,
+        close_p=250.00,
+        vol=50000,
+        ts_str="2026-09-21T10:21:00-04:00",
+    )
+    sigs = strat.on_bar(bo_bar)
+    assert len(sigs) == 1
+    sig = sigs[0]
+    stop_dist = abs(sig.entry_price - sig.stop_loss)
+    stop_pct = stop_dist / sig.entry_price
+    assert 0.004 <= stop_pct <= 0.040
+    assert stop_dist >= round(sig.entry_price * 0.004, 4)

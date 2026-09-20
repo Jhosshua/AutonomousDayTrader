@@ -97,9 +97,9 @@ python3 backend/app/replay/mock_relay.py --port 8080
 | **F11** | Strategy 4: Mean Reversion / Fades | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
 | **F12** | Dynamic VIX Regime Adaptation | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
 | **F13** | Time-of-Day Session Dynamics | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
-| **F14** | Apple Music UI Aesthetic & Glow Tokens | 5 | 5 | Contract | Yes | 10+ | ✅ PASSED |
-| **F15** | Strategy "Playlists/Albums" Cards | 5 | 5 | Contract | Yes | 10+ | ✅ PASSED |
-| **F16** | "Now Playing" Bottom Tray & Controls | 5 | 5 | Contract | Yes | 10+ | ✅ PASSED |
+| **F14** | Obsidian Dark UI Aesthetic & Glow Tokens | 5 | 5 | Contract | Yes | 10+ | ✅ PASSED |
+| **F15** | Trading Strategy Cards | 5 | 5 | Contract | Yes | 10+ | ✅ PASSED |
+| **F16** | "Active Position" Bottom Tray & Controls | 5 | 5 | Contract | Yes | 10+ | ✅ PASSED |
 | **F17** | Real-Time UI WebSocket Streaming | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
 | **F18** | Mock & Replay Market Feed Engine | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |
 | **F19** | Opaque-Box E2E Test Suite Framework | 5 | 5 | Yes | Yes | 10+ | ✅ PASSED |

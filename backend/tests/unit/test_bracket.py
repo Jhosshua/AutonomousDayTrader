@@ -134,3 +134,106 @@ def test_manual_tighten_stop():
     assert brk.current_stop_price == 149.00
     assert directive.action == "MODIFY_ORDER"
     assert directive.orders_to_modify[0]["new_stop_price"] == 149.00
+
+
+def test_target_2_partial_fill_keeps_bracket_alive_and_resizes_stop():
+    manager = DynamicBracketManager()
+    brk = manager.create_bracket(
+        bracket_id="b_p2",
+        symbol="MSFT",
+        side="LONG",
+        total_qty=100,
+        entry_price=400.00,
+        stop_price=395.00,
+    )
+    now = datetime.now(timezone.utc)
+    manager.activate_bracket_on_fill("b_p2", 100, 400.00, now)
+
+    # 1. Fill Target 1 (50 shares)
+    d1 = manager.on_child_order_fill(brk.target_1_order_id, 407.50, 50, now)
+    assert d1.action == "MODIFY_ORDER"
+    assert brk.status == BracketStatus.TARGET_1_HIT
+    assert brk.remaining_qty == 50
+
+    # 2. Partial fill on Target 2 (20 shares out of 50)
+    d2 = manager.on_child_order_fill(brk.target_2_order_id, 412.50, 20, now)
+    assert d2.action == "MODIFY_ORDER"
+    assert d2.orders_to_modify[0]["order_id"] == brk.stop_order_id
+    assert d2.orders_to_modify[0]["new_qty"] == 30
+    assert brk.remaining_qty == 30
+    assert brk.status == BracketStatus.TARGET_1_HIT
+    assert brk.target_2_filled is False
+    assert "MSFT" in manager.symbol_to_bracket
+    assert brk.stop_order_id in manager.order_to_bracket
+
+    # 3. Final fill on Target 2 (remaining 30 shares)
+    d3 = manager.on_child_order_fill(brk.target_2_order_id, 413.00, 30, now)
+    assert d3.action == "CANCEL_ORDER"
+    assert d3.bracket_status == BracketStatus.COMPLETED_PROFIT
+    assert brk.status == BracketStatus.COMPLETED_PROFIT
+    assert brk.target_2_filled is True
+    assert brk.remaining_qty == 0
+    assert "MSFT" not in manager.symbol_to_bracket
+    assert brk.stop_order_id not in manager.order_to_bracket
+    assert brk.target_2_order_id not in manager.order_to_bracket
+
+
+def test_bracket_order_to_bracket_pruned_on_stop_and_flatten():
+    manager = DynamicBracketManager()
+    brk = manager.create_bracket(
+        bracket_id="b_prune",
+        symbol="TSLA",
+        side="LONG",
+        total_qty=50,
+        entry_price=200.00,
+        stop_price=195.00,
+    )
+    now = datetime.now(timezone.utc)
+    manager.activate_bracket_on_fill("b_prune", 50, 200.00, now)
+
+    # Flatten the bracket
+    dir_flatten = manager.cancel_bracket_for_flattening("TSLA")
+    assert dir_flatten.action == "CANCEL_ORDER"
+    assert brk.status == BracketStatus.COMPLETED_FLATTEN
+    assert "TSLA" not in manager.symbol_to_bracket
+    assert brk.stop_order_id not in manager.order_to_bracket
+    assert brk.target_1_order_id not in manager.order_to_bracket
+
+    # Late fill on already-flattened bracket must return NO_ACTION
+    late_dir = manager.on_child_order_fill(brk.stop_order_id, 194.00, 50, now)
+    assert late_dir.action == "NO_ACTION"
+
+
+def test_manual_tighten_stop_validation_guards():
+    manager = DynamicBracketManager()
+    brk = manager.create_bracket(
+        bracket_id="b_guards",
+        symbol="NVDA",
+        side="LONG",
+        total_qty=50,
+        entry_price=120.00,
+        stop_price=118.00,
+    )
+    # 1. While PENDING_ENTRY: tightening must be rejected
+    d_pending = manager.manual_tighten_stop("NVDA", 119.00)
+    assert d_pending.action == "NO_ACTION"
+    assert brk.current_stop_price == 118.00
+
+    # 2. Activate bracket
+    now = datetime.now(timezone.utc)
+    manager.activate_bracket_on_fill("b_guards", 50, 120.00, now)
+
+    # 3. Loosening stop (below current $118) must return NO_ACTION
+    d_loosen = manager.manual_tighten_stop("NVDA", 116.00)
+    assert d_loosen.action == "NO_ACTION"
+    assert brk.current_stop_price == 118.00
+
+    # 4. Equal stop must return NO_ACTION
+    d_equal = manager.manual_tighten_stop("NVDA", 118.00)
+    assert d_equal.action == "NO_ACTION"
+
+    # 5. Valid tightening raises stop and emits MODIFY_ORDER
+    d_tighten = manager.manual_tighten_stop("NVDA", 119.00)
+    assert d_tighten.action == "MODIFY_ORDER"
+    assert brk.current_stop_price == 119.00
+    assert d_tighten.orders_to_modify[0]["new_stop_price"] == 119.00

@@ -11,6 +11,13 @@
 - **STOP_LIMIT is rejected (HTTP 400) at the order API.** Why: the execution engine has no stop-limit trigger branch, so such orders hung forever. Rejected: implementing trigger-then-limit matching — not worth the risk surface for a paper bot.
 - **TIGHTEN_STOP applies only through bracket modify directives.** Why: the old fallback rewrote every stop order unconditionally and could loosen protection below entry.
 
+### 2026-09-20: Architectural Audit Remediation, Terminology De-themification & Hardening Release
+- **Mathematical floating-point risk clamp: interior stop clamping `[0.0042, 0.0380]` with `EPS = 1e-6` in `risk.py`.** Why: In IEEE 754 floating-point arithmetic, boundary calculations such as `(150.0 - 149.4) / 150.0 = 0.003999999999999962` evaluate strictly below `0.0040`, causing valid 40 bps stop orders to be falsely rejected by the risk engine. Clamping strategy stops in `orb.py`, `news_momentum.py`, and `vwap_pullback.py` to `[0.0042, 0.0380]` and adding `EPS = 1e-6` tolerance in `risk.py` (`stop_dist_pct < min_stop - EPS` and `stop_dist_pct > max_stop + EPS`) completely eliminates floating-point collision on knife-edge boundaries while preserving strict [0.0040, 0.0400] risk guardrails.
+- **Bracket lifecycle invariants in `manual_tighten_stop` require `ACTIVE` or `TARGET_1_HIT`.** Why: Tightening stops on `PENDING_ENTRY` or already filled/cancelled brackets corrupts bracket state and leaks orphaned stop orders. In tests, `activate_bracket_on_fill` must explicitly transition status upon simulated fill.
+- **Telemetry counter increments occur strictly post-publish.** In `stock_ws.py` and `news_ws.py`, counters (`bars_received`, `quotes_received`, `trades_received`, `articles_received`) are updated only after valid event instantiation and successful `bus.publish()`, preventing false count inflation on malformed or discarded frames.
+- **Flat-book session boundary reset clears `account.positions`.** In `main.py` `_check_session_boundary`, `account.positions.clear()` runs alongside working order purges to guarantee that day-2+ trading starts with a completely flat book and zero position leakage across calendar days.
+- **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
+
 ## Session log
 
 ### 2026-09-20
@@ -21,3 +28,18 @@
 
 ### 2026-09-20 (update): GitHub auto-deploy restored
 - Railway service `AutonomousDayTrader` reconnected to repo `Jhosshua/AutonomousDayTrader` branch `main` via `railway service source connect` — pushes to `main` now auto-deploy. Verified end to end: docs push a41caa6 triggered deployment 973b7d25 automatically, SUCCESS, /health healthy. `railway up` is no longer needed.
+
+### 2026-09-20 (Release): Architectural Audit Remediation, Terminology De-themification & Hardening Release
+- **Worked on**: Full architectural codebase audit remediation (10 issues fixed across risk math, bracket lifecycle, telemetry counting, session boundary resets, and test isolation); complete music de-themification to trading terminology ("Trading Strategies", "Active Position"); adversarial diff review; Monday market open simulation dry run; mobile and desktop visual UI audit; release engineering and deployment.
+- **Completed**:
+  - Remediated all 10 architectural and numerical issues (risk stop clamping, bracket lifecycle, telemetry counters, session boundary resets, port 3005 teardown race, test fixture isolation).
+  - Complete terminology de-themification verified (0 music/playlist terms across repo).
+  - Comprehensive test suite verification: 163/163 backend tests pass (100%), 318/318 E2E tests pass (100%).
+  - Monday market open simulation certified: $50,000.00 $\to$ $50,398.30 equity, +$398.30 PnL, zero overnight holds, 62/62 UI WebSocket payloads validated, 0 unhandled exceptions. Published in `MONDAY_SIMULATION_REPORT.md`.
+  - Mobile & desktop visual UI verification: Next.js clean production build, 17/17 visual UI tests passing across mobile (390x844) and desktop (1440x900) viewports with zero horizontal overflow and zero component truncation.
+  - Changes committed and pushed to GitHub `origin main`.
+  - Railway auto-deploy verified with status `SUCCESS`.
+  - Remote production health endpoint verified (`GET https://autonomousdaytrader-production.up.railway.app/health` returns `{"status":"ok"}`).
+  - Local process hygiene verified: zero lingering daemons, ports 8005, 3005, and 8080 clean and liberated.
+- **In progress**: None (Release certified and deployed).
+- **Next session priorities**: Monitor live market open Monday session performance and telemetry feeds.
