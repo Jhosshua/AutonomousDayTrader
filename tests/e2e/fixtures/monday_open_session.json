@@ -1,0 +1,607 @@
+[
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T13:25:00Z",
+    "phase": "PRE_MARKET",
+    "description": "Phase A (09:25 ET): Pre-market session initialization, gap scanner active, watchlist populated with AAPL, TSLA, NVDA"
+  },
+  {
+    "type": "vix",
+    "timestamp": "2026-09-21T13:25:05Z",
+    "data": { "value": 18.25, "regime": "NORMAL" }
+  },
+  {
+    "type": "news",
+    "timestamp": "2026-09-21T13:26:00Z",
+    "data": {
+      "T": "n",
+      "id": 8001,
+      "headline": "Semiconductor Sector Pre-Market Momentum Strong Ahead of Opening Bell",
+      "summary": "Analyst sentiment bullish across mega-cap tech and semiconductor equities.",
+      "symbols": ["NVDA"],
+      "source": "benzinga",
+      "sentiment": 0.65
+    }
+  },
+  {
+    "type": "quote",
+    "timestamp": "2026-09-21T13:28:00Z",
+    "data": {
+      "T": "q",
+      "S": "AAPL",
+      "bp": 150.10,
+      "ap": 150.15,
+      "bs": 100,
+      "as": 120
+    }
+  },
+  {
+    "type": "quote",
+    "timestamp": "2026-09-21T13:29:00Z",
+    "data": {
+      "T": "q",
+      "S": "TSLA",
+      "bp": 214.80,
+      "ap": 214.90,
+      "bs": 80,
+      "as": 90
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T13:30:00Z",
+    "phase": "OPEN_VOLATILITY_FLUSH",
+    "description": "Phase B (09:30 ET): Market Open Bell volatility flush, establishing 5-minute Opening Range on NVDA, AAPL, TSLA"
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:30:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 124.00,
+      "h": 124.80,
+      "l": 123.60,
+      "c": 124.50,
+      "v": 250000,
+      "vw": 124.30
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:30:00Z",
+    "data": {
+      "T": "b",
+      "S": "AAPL",
+      "o": 150.00,
+      "h": 150.50,
+      "l": 149.80,
+      "c": 150.20,
+      "v": 100000,
+      "vw": 150.10
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:30:00Z",
+    "data": {
+      "T": "b",
+      "S": "TSLA",
+      "o": 214.80,
+      "h": 216.20,
+      "l": 213.50,
+      "c": 215.10,
+      "v": 200000,
+      "vw": 214.90
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:31:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 124.50,
+      "h": 124.70,
+      "l": 123.90,
+      "c": 124.20,
+      "v": 180000,
+      "vw": 124.25
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:31:00Z",
+    "data": {
+      "T": "b",
+      "S": "AAPL",
+      "o": 150.20,
+      "h": 150.40,
+      "l": 149.90,
+      "c": 150.10,
+      "v": 100000,
+      "vw": 150.15
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:31:00Z",
+    "data": {
+      "T": "b",
+      "S": "TSLA",
+      "o": 215.10,
+      "h": 215.80,
+      "l": 214.20,
+      "c": 214.60,
+      "v": 150000,
+      "vw": 214.80
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:32:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 124.20,
+      "h": 124.60,
+      "l": 124.10,
+      "c": 124.40,
+      "v": 140000,
+      "vw": 124.35
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:32:00Z",
+    "data": {
+      "T": "b",
+      "S": "AAPL",
+      "o": 150.10,
+      "h": 150.30,
+      "l": 149.85,
+      "c": 150.05,
+      "v": 100000,
+      "vw": 150.10
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:32:00Z",
+    "data": {
+      "T": "b",
+      "S": "TSLA",
+      "o": 214.60,
+      "h": 215.20,
+      "l": 214.00,
+      "c": 214.90,
+      "v": 140000,
+      "vw": 214.60
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:33:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 124.40,
+      "h": 124.65,
+      "l": 124.15,
+      "c": 124.30,
+      "v": 130000,
+      "vw": 124.32
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:33:00Z",
+    "data": {
+      "T": "b",
+      "S": "AAPL",
+      "o": 150.05,
+      "h": 150.35,
+      "l": 149.95,
+      "c": 150.25,
+      "v": 100000,
+      "vw": 150.15
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:33:00Z",
+    "data": {
+      "T": "b",
+      "S": "TSLA",
+      "o": 214.90,
+      "h": 215.50,
+      "l": 214.50,
+      "c": 215.20,
+      "v": 130000,
+      "vw": 215.00
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:34:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 124.30,
+      "h": 124.55,
+      "l": 124.05,
+      "c": 124.45,
+      "v": 160000,
+      "vw": 124.35
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:34:00Z",
+    "data": {
+      "T": "b",
+      "S": "AAPL",
+      "o": 150.25,
+      "h": 150.45,
+      "l": 149.90,
+      "c": 150.15,
+      "v": 100000,
+      "vw": 150.20
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:34:00Z",
+    "data": {
+      "T": "b",
+      "S": "TSLA",
+      "o": 215.20,
+      "h": 215.70,
+      "l": 214.60,
+      "c": 215.00,
+      "v": 150000,
+      "vw": 215.10
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T13:35:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "Phase C (09:35 ET): 5-Minute Opening Range Complete on all watchlist assets. Monitoring ORB breakout triggers"
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:35:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 124.45,
+      "h": 125.10,
+      "l": 124.40,
+      "c": 124.95,
+      "v": 450000,
+      "vw": 124.80
+    }
+  },
+  {
+    "type": "quote",
+    "timestamp": "2026-09-21T13:35:01Z",
+    "data": {
+      "T": "q",
+      "S": "NVDA",
+      "bp": 124.95,
+      "ap": 124.98,
+      "bs": 100,
+      "as": 80
+    }
+  },
+  {
+    "type": "trade",
+    "timestamp": "2026-09-21T13:35:02Z",
+    "data": {
+      "T": "t",
+      "S": "NVDA",
+      "p": 124.96,
+      "s": 150
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:36:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 124.95,
+      "h": 125.80,
+      "l": 124.90,
+      "c": 125.60,
+      "v": 410000,
+      "vw": 125.40
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:38:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 125.60,
+      "h": 126.50,
+      "l": 125.50,
+      "c": 126.30,
+      "v": 480000,
+      "vw": 126.10
+    }
+  },
+  {
+    "type": "quote",
+    "timestamp": "2026-09-21T13:38:05Z",
+    "data": {
+      "T": "q",
+      "S": "NVDA",
+      "bp": 126.25,
+      "ap": 126.32,
+      "bs": 120,
+      "as": 100
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T13:40:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "NVDA Target 1 Hit: Scaled out 50%, Stop Ratcheted to Breakeven $124.97"
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:42:00Z",
+    "data": {
+      "T": "b",
+      "S": "NVDA",
+      "o": 126.30,
+      "h": 127.20,
+      "l": 126.20,
+      "c": 127.05,
+      "v": 520000,
+      "vw": 126.80
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T13:44:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "NVDA Target 2 Hit @ $127.05: Full profit realized, 0 NVDA positions remaining"
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T13:45:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "Phase D (09:45 ET): Ingestion of breaking Benzinga catalyst news, momentum trade entry, and contradiction exit"
+  },
+  {
+    "type": "news",
+    "timestamp": "2026-09-21T13:46:00Z",
+    "data": {
+      "T": "n",
+      "id": 8003,
+      "headline": "Tesla awarded contract for major commercial fleet expansion milestone",
+      "summary": "Commercial autonomous fleet expansion approved under expedited delivery schedule.",
+      "symbols": ["TSLA"],
+      "source": "benzinga",
+      "sentiment": 0.82
+    }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:47:00Z",
+    "data": {
+      "T": "b",
+      "S": "TSLA",
+      "o": 215.00,
+      "h": 218.50,
+      "l": 214.80,
+      "c": 218.10,
+      "v": 850000,
+      "vw": 217.20
+    }
+  },
+  {
+    "type": "quote",
+    "timestamp": "2026-09-21T13:47:05Z",
+    "data": {
+      "T": "q",
+      "S": "TSLA",
+      "bp": 218.05,
+      "ap": 218.15,
+      "bs": 200,
+      "as": 180
+    }
+  },
+  {
+    "type": "trade",
+    "timestamp": "2026-09-21T13:47:10Z",
+    "data": {
+      "T": "t",
+      "S": "TSLA",
+      "p": 218.10,
+      "s": 100
+    }
+  },
+  {
+    "type": "news",
+    "timestamp": "2026-09-21T13:52:00Z",
+    "data": {
+      "T": "n",
+      "id": 8004,
+      "headline": "NHTSA Opens Formal Defect Investigation into Tesla Cybercab Steering and Demands Immediate Fleet Pause",
+      "summary": "Federal safety regulators cite critical steering anomaly in pending deployment.",
+      "symbols": ["TSLA"],
+      "source": "benzinga",
+      "sentiment": -0.85
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T13:52:05Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "NEWS_CONTRADICTION_CIRCUIT_BREAKER Triggered: Adverse headline forces immediate market liquidation of TSLA LONG position"
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T13:53:00Z",
+    "data": {
+      "T": "b",
+      "S": "TSLA",
+      "o": 217.50,
+      "h": 217.60,
+      "l": 214.00,
+      "c": 214.50,
+      "v": 920000,
+      "vw": 215.20
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T14:00:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "Phase E (10:00 ET): Real-time VIX dxFeed print update from /vix, volatility regime scaling"
+  },
+  {
+    "type": "vix",
+    "timestamp": "2026-09-21T14:00:05Z",
+    "data": { "value": 26.50, "regime": "ELEVATED" }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:01:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.1, "h": 150.3, "l": 149.9, "c": 150.0, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:02:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.0, "h": 150.2, "l": 149.8, "c": 150.1, "v": 100000, "vw": 150.0 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:03:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.1, "h": 150.3, "l": 149.9, "c": 150.2, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:04:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.2, "h": 150.4, "l": 149.9, "c": 150.0, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:05:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.0, "h": 150.3, "l": 149.8, "c": 150.1, "v": 100000, "vw": 150.0 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:06:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.1, "h": 150.3, "l": 149.9, "c": 150.2, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:07:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.2, "h": 150.4, "l": 149.9, "c": 150.0, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:08:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.0, "h": 150.3, "l": 149.8, "c": 150.1, "v": 100000, "vw": 150.0 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:09:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.1, "h": 150.3, "l": 149.9, "c": 150.2, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:10:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.2, "h": 150.4, "l": 149.9, "c": 150.0, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:11:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.0, "h": 150.3, "l": 149.8, "c": 150.1, "v": 100000, "vw": 150.0 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:12:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.1, "h": 150.3, "l": 149.9, "c": 150.2, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:13:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.2, "h": 150.4, "l": 149.9, "c": 150.0, "v": 100000, "vw": 150.1 }
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:14:00Z",
+    "data": { "T": "b", "S": "AAPL", "o": 150.0, "h": 150.3, "l": 149.8, "c": 150.1, "v": 100000, "vw": 150.0 }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T14:15:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "Phase F (10:15 ET): Statistical mean reversion exhaustion fade execution and take-profit exit"
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:19:00Z",
+    "data": {
+      "T": "b",
+      "S": "AAPL",
+      "o": 153.00,
+      "h": 155.00,
+      "l": 152.80,
+      "c": 153.60,
+      "v": 400000,
+      "vw": 153.20
+    }
+  },
+  {
+    "type": "quote",
+    "timestamp": "2026-09-21T14:19:05Z",
+    "data": {
+      "T": "q",
+      "S": "AAPL",
+      "bp": 153.55,
+      "ap": 153.65,
+      "bs": 150,
+      "as": 140
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T14:20:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "AAPL Multi-Sigma Exhaustion Fade Triggered: Z=4.33, RSI=83.4, Upper Wick=64% -> Short Position Entered"
+  },
+  {
+    "type": "bar",
+    "timestamp": "2026-09-21T14:24:00Z",
+    "data": {
+      "T": "b",
+      "S": "AAPL",
+      "o": 153.50,
+      "h": 153.60,
+      "l": 150.10,
+      "c": 150.25,
+      "v": 480000,
+      "vw": 151.20
+    }
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T14:25:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "AAPL Mean Reversion Take Profit Hit: Reverted to 20-SMA $150.25, Position Closed Flat"
+  },
+  {
+    "type": "control",
+    "timestamp": "2026-09-21T14:30:00Z",
+    "phase": "TREND_CONTINUATION",
+    "description": "Monday Market Open Session Complete (10:30 ET). All Positions Flat. Ledger Certified."
+  }
+]

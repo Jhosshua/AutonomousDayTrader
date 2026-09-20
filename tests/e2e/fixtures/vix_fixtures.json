@@ -1,0 +1,46 @@
+{
+  "low": {
+    "state": "ready",
+    "source": "Tastytrade/dxFeed spot VIX (Trade.time)",
+    "value": 13.80,
+    "asof": "2026-09-21T13:30:00Z",
+    "received_at": "2026-09-21T13:30:01Z",
+    "age_s": 1.0,
+    "observations": [
+      { "value": 13.80, "asof": "2026-09-21T13:30:00Z" }
+    ]
+  },
+  "normal": {
+    "state": "ready",
+    "source": "Tastytrade/dxFeed spot VIX (Trade.time)",
+    "value": 18.45,
+    "asof": "2026-09-21T13:30:00Z",
+    "received_at": "2026-09-21T13:30:01Z",
+    "age_s": 1.2,
+    "observations": [
+      { "value": 18.45, "asof": "2026-09-21T13:30:00Z" }
+    ]
+  },
+  "elevated": {
+    "state": "ready",
+    "source": "Tastytrade/dxFeed spot VIX (Trade.time)",
+    "value": 27.20,
+    "asof": "2026-09-21T13:30:00Z",
+    "received_at": "2026-09-21T13:30:01Z",
+    "age_s": 0.8,
+    "observations": [
+      { "value": 27.20, "asof": "2026-09-21T13:30:00Z" }
+    ]
+  },
+  "crisis": {
+    "state": "ready",
+    "source": "Tastytrade/dxFeed spot VIX (Trade.time)",
+    "value": 38.60,
+    "asof": "2026-09-21T13:30:00Z",
+    "received_at": "2026-09-21T13:30:01Z",
+    "age_s": 0.5,
+    "observations": [
+      { "value": 38.60, "asof": "2026-09-21T13:30:00Z" }
+    ]
+  }
+}

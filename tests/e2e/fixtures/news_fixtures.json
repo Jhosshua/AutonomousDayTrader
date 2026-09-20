@@ -1,0 +1,52 @@
+[
+  {
+    "T": "n",
+    "id": 9001,
+    "headline": "NVIDIA Partners with Major Hyperscaler for Blackwell Ultra GPU Deployment; Beats Revenue Projections",
+    "summary": "NVIDIA announced a landmark partnership to deploy next-generation AI infrastructure, exceeding quarterly expectations.",
+    "symbols": ["NVDA"],
+    "source": "benzinga",
+    "created_at": "2026-09-21T13:35:10Z",
+    "sentiment": 0.85
+  },
+  {
+    "T": "n",
+    "id": 9002,
+    "headline": "Tesla Unveils Autonomous Fleet Milestone in Urban Test Grid; Raises Full-Year Delivery Guidance",
+    "summary": "Tesla reported successful autonomous vehicle deployment and increased forward production guidance.",
+    "symbols": ["TSLA"],
+    "source": "benzinga",
+    "created_at": "2026-09-21T13:36:30Z",
+    "sentiment": 0.78
+  },
+  {
+    "T": "n",
+    "id": 9003,
+    "headline": "Tesla Recalls 50,000 Units Due to Steering Firmware Glitch; SEC Opens Preliminary Inquiry",
+    "summary": "Regulatory authorities have requested information regarding autonomous driving software after recall notification.",
+    "symbols": ["TSLA"],
+    "source": "benzinga",
+    "created_at": "2026-09-21T13:42:00Z",
+    "sentiment": -0.82
+  },
+  {
+    "T": "n",
+    "id": 9004,
+    "headline": "Apple Completes Annual Supplier Responsibility Audit with Unchanged Outlook",
+    "summary": "Routine supplier review completed with operational standards meeting targets.",
+    "symbols": ["AAPL"],
+    "source": "benzinga",
+    "created_at": "2026-09-21T13:33:00Z",
+    "sentiment": 0.05
+  },
+  {
+    "T": "n",
+    "id": 9005,
+    "headline": "Federal Reserve Chair Comments on Economic Growth Stability at Morning Financial Summit",
+    "summary": "Central bank remarks suggest economic trajectory remains aligned with prior baseline forecasts.",
+    "symbols": ["SPY"],
+    "source": "benzinga",
+    "created_at": "2026-09-21T13:31:00Z",
+    "sentiment": 0.20
+  }
+]
