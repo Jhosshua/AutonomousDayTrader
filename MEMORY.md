@@ -68,6 +68,15 @@
 
 ## Session log
 
+### 2026-09-21 (close): first full live session. 5 trades, -$21.34, zero reached a target
+- **Result**: $50,000.00 -> $49,978.66, **-$21.34** (-0.043%). ORB 2 trades -$12.09, VWAP pullback 3 trades -$9.25. News momentum and mean reversion took nothing.
+- **Every trade died the same way.** Four scratched by the trailing stop, one clipped: TSLA long $375.25 -> $375.81 (+$18.39) against a $377.72 target, so it banked 23% of the intended move. Not one trade reached Target 1 all day. Stop distances at exit were 0.088% to 0.22% of entry, against structural stops of 0.44% to 0.55% at entry.
+- **Zero-overnight held.** All four flatten stages fired on the minute: 15:45 ENTRY_LOCKOUT, 15:50 ORDER_PURGE, 15:55 MANDATORY_LIQUIDATION, 15:58 ZERO_AUDIT with `audit_passed: true`, status EOD_FLAT, 0 positions, 16:00 MARKET_CLOSED.
+- **The VIX stale guard shipped the night before worked on its first real test.** 09:24-09:32 the relay's dxFeed VIX died; at 09:30 the print crossed 300s and sizing was clamped 1.20 -> 1.00 while the value sat frozen at 14.90. Recovered at 09:32 and returned to 1.20.
+- **Position sizing was $12,300-$12,500 on every trade**, i.e. the adaptation engine's 25% cap, confirming again that the risk engine's $25,000 is a backstop and not the binding limit.
+- **Nothing was deployed during the session, by design.** Branch `fix/trailing-atr` holds three fixes (ATR average, trail gated to TARGET_1_HIT, /health VIX value-age telemetry), pushed to GitHub but never merged to `main`. Railway stayed on 9b6e90a the whole day.
+- **Next session priorities**: (1) merge and deploy the branch; (2) a REAL backtest of the trailing change over many sessions, the 62-event fixture is not evidence; (3) decide the relay's VIX keepalive margin and never-resetting backoff; (4) decide whether the three position caps should derive from one number.
+
 ### 2026-09-21 (market open): first live session watched end to end
 - **09:24-09:32**: relay VIX upstream died (dxFeed "Bye"), value froze at 14.90. At 09:30 the new staleness rule caught it and `apply_stale_vix_guard()` clamped sizing 1.20 -> 1.00. Recovered 09:32, sizing returned to 1.20. **The guard shipped last night worked, live, on its first real test.**
 - **09:38-09:43**: first trade, NVDA ORB long, scratched for -$9.37 by the trailing-stop defects above.
