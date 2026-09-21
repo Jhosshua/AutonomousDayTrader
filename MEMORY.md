@@ -9,6 +9,7 @@
 - **Rejected: leaving it at 1.0 and relying on the stop.** A stop does not protect against a gap or a halt, which is exactly the tail the notional cap exists for.
 - **Rejected: 0.25 ($12,500).** That binds below a 4% stop, which is the entire legal stop range, so it would have become the sizing rule for every trade and quietly replaced the risk engine.
 - Pinned by 4 mutation-checked tests in `backend/tests/unit/test_risk.py`, including one that asserts the *wired production* engine and account, not the dataclass default.
+- **`/health` now also publishes a `limits` block** read live off the wired risk engine (daily loss limit, single-position notional and pct, concurrency, per-trade risk, stop range). Why: nothing outside the process could show which limits the deployed build was actually running, so a config change that never reached production would have looked identical to one that did. Verifying it by submitting an order was rejected: that would leave a real working order on the live book before the open.
 - **Flagged:** `scripts/run_monday_dry_run.py` builds its own `InstitutionalRiskEngine()` and `PaperTradingAccount(initial_cash=50000.00)` instead of importing `main`'s wiring, so its certification does not prove production config. `scripts/run_integrated_monday_dry_run.py` does use `main`. Both reproduce unchanged after this change ($50,398.30 and $49,961.26) because the fixture's stops are all wider than 2%, so the cap never binds there.
 
 ### 2026-09-21: /health publishes per-feed liveness so a silent feed is visible

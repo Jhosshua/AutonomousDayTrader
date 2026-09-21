@@ -1034,6 +1034,21 @@ async def get_health() -> Dict[str, Any]:
             "mock": settings.MOCK_PORT,
         },
         "relay": relay_statuses,
+        # Read live off the wired engine, not from config constants, so the deployed
+        # build's actual limits are verifiable from outside without placing an order.
+        "limits": {
+            "max_daily_loss_dollars": risk_engine.config.hard_max_daily_loss_dollars,
+            "max_position_notional": round(
+                account.equity * risk_engine.config.max_position_equity_pct, 2
+            ),
+            "max_position_equity_pct": risk_engine.config.max_position_equity_pct,
+            "max_concurrent_positions": risk_engine.config.max_concurrent_positions,
+            "base_trade_risk_pct": risk_engine.config.base_trade_risk_pct,
+            "stop_distance_pct": [
+                risk_engine.config.min_stop_distance_pct,
+                risk_engine.config.max_stop_distance_pct,
+            ],
+        },
         "feeds": {
             "bars": {
                 "received": stock_ws_client.bars_received if stock_ws_client else 0,

@@ -81,3 +81,18 @@ async def test_reset_runtime_state_clears_feed_ages():
     assert (await main.get_health())["feeds"]["trades"]["last_age_sec"] is not None
     main.reset_runtime_state()
     assert (await main.get_health())["feeds"]["trades"]["last_age_sec"] is None
+
+
+@pytest.mark.asyncio
+async def test_health_publishes_the_live_risk_limits():
+    """The deployed build's limits must be readable without placing an order.
+
+    These come off the wired risk engine, so a config change that failed to reach
+    production shows up here instead of only in the repo.
+    """
+    limits = (await main.get_health())["limits"]
+    assert limits["max_position_notional"] == 25000.0
+    assert limits["max_position_equity_pct"] == 0.500
+    assert limits["max_daily_loss_dollars"] == 1500.0
+    assert limits["max_concurrent_positions"] == 3
+    assert limits["stop_distance_pct"] == [0.004, 0.040]
