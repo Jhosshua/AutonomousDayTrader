@@ -61,6 +61,7 @@
 - **Institutional Risk Guardrails**:
   - Hard Daily Circuit Breaker: Automatically halts trading and liquidates upon reaching $1,500 (3%) daily drawdown.
   - Per-Position Risk Cap: 1–2% maximum risk budget per trade.
+  - Single-Position Concentration Cap: $25,000 notional (50% of equity, 12.5% of 4:1 DTBP). With the 3-position concurrency limit the whole book tops out at $75,000 (1.5x equity), and a 5% adverse gap on the largest allowed position costs $1,250, inside the $1,500 daily breaker.
   - Dynamic Brackets: Multi-target profit scaling (Target 1 at 1.5R with 50% scale-out, Target 2 at 2.5R or trailing ATR stop).
   - 4-Phase Zero-Overnight Flattening: 15:45 entry lockout $\to$ 15:50 working order purge $\to$ 15:55 market liquidation $\to$ 15:58 flat audit before 16:00 ET.
 

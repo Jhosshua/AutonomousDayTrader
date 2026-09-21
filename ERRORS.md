@@ -47,3 +47,9 @@ end state.
 
 **Note for next time**: A green suite proves the tests agree with the code, not that the code is
 right. Run the mutation check.
+
+## 2026-09-21: the "certified" Monday dry run does not use production wiring
+- **What did not work**: Treating `scripts/run_monday_dry_run.py` as proof that a production risk-config change is safe. It builds its own `InstitutionalRiskEngine()` and `PaperTradingAccount(initial_cash=50000.00)` with library defaults, so anything set in `config.py` or wired in `main.py` is invisible to it.
+- **What worked instead**: `scripts/run_integrated_monday_dry_run.py`, which imports `backend.app.main` and exercises the real wiring, plus a unit test that asserts `main.risk_engine.config` and `main.account` directly rather than `RiskEngineConfig()`.
+- **Note for next time**: When a config value changes, assert the object production actually builds. A passing dry run that constructs its own engine proves nothing about the deployed configuration.
+

@@ -2,6 +2,15 @@
 
 ## Decisions
 
+### 2026-09-21: single-position cap set to $25,000 (50% of equity), down from $50,000
+- **`MAX_POSITION_NOTIONAL` is now 25000.0, so `max_position_equity_pct` derives to 0.500 and `account.max_position_notional` is $25,000.** Both caps move together because `main.py` derives one from the other; changing only `risk.py`'s dataclass default would have been inert, since `main.py` overrides it.
+- **Why.** The $1,500 daily circuit breaker is the system's loss ceiling, and at $50,000 notional a single name only had to gap 3% to spend the entire day's limit in one print. The watchlist is SPY, QQQ, AAPL, NVDA, TSLA; NVDA and TSLA gap 3-5% on news routinely. At $25,000 a 5% adverse gap costs $1,250, which stays inside the breaker, and it takes a 6% gap to reach it. Three concurrent positions now top out at $75,000 (1.5x equity) instead of $150,000 (3x).
+- **What it costs.** The cap binds only when the stop is tighter than 2%: at a 0.5% stop the risk budget would fund $100,000 of stock, so size is cut. It can never cause a rejection (a $25,000 cap always funds at least 1 share), so the bot does not trade less often, only smaller on tight-stop setups.
+- **Rejected: leaving it at 1.0 and relying on the stop.** A stop does not protect against a gap or a halt, which is exactly the tail the notional cap exists for.
+- **Rejected: 0.25 ($12,500).** That binds below a 4% stop, which is the entire legal stop range, so it would have become the sizing rule for every trade and quietly replaced the risk engine.
+- Pinned by 4 mutation-checked tests in `backend/tests/unit/test_risk.py`, including one that asserts the *wired production* engine and account, not the dataclass default.
+- **Flagged:** `scripts/run_monday_dry_run.py` builds its own `InstitutionalRiskEngine()` and `PaperTradingAccount(initial_cash=50000.00)` instead of importing `main`'s wiring, so its certification does not prove production config. `scripts/run_integrated_monday_dry_run.py` does use `main`. Both reproduce unchanged after this change ($50,398.30 and $49,961.26) because the fixture's stops are all wider than 2%, so the cap never binds there.
+
 ### 2026-09-21: /health publishes per-feed liveness so a silent feed is visible
 - **`/health` now carries a `feeds` block: per-feed ingest counts and the age in seconds of the last event actually ingested (bars, quotes, trades, news, vix).** Why: `relay_statuses` is written once at handshake, so a feed that connects and then goes silent reports `"connected"` forever and looks identical to a working one. With no bar counter exposed anywhere, a starved session could not be told apart from a quiet one from outside the process. Rejected: reading the counters out of Railway logs — the logs show only the VIX poller, and bars are not logged at all.
 - Additive telemetry only. No trading path touched; the Monday dry run still reproduces $50,398.30 exactly.
@@ -31,6 +40,12 @@
 - **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
 
 ## Session log
+
+### 2026-09-21 (watch shift, part 2): single-position cap lowered to $25,000
+- **Worked on**: Resolving the `max_position_equity_pct` question carried over from 09-20, then holding watch for the 09-22 open.
+- **Completed**: Cap set to $25,000 (see Decisions), README risk-guardrail list updated to state it, 179/179 backend (4 new here, 5 earlier), 320/320 E2E, both Monday dry runs reproduce their prior figures exactly, deployed and verified live.
+- **Checked for stale displays**: no frontend component, dashboard, or doc carried the old $50,000 cap, so nothing else needed changing.
+- **In progress**: Live watch of the 2026-09-22 open.
 
 ### 2026-09-21 (watch shift): pre-open readiness check, feed-liveness telemetry shipped
 - **Worked on**: Standing watch on the live Railway deployment ahead of the Monday 2026-09-22 open.

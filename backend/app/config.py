@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     DAY_TRADING_LEVERAGE: float = Field(default=4.0, description="FINRA Rule 4210 Day Trading Buying Power (4:1)")
     MAX_DAILY_LOSS_LIMIT: float = Field(default=1500.0, description="Hard daily drawdown circuit breaker ($1,500)")
     PER_POSITION_RISK_PCT: float = Field(default=0.01, description="Max account equity risk per trade (1%)")
-    MAX_POSITION_NOTIONAL: float = Field(default=50000.0, description="Max single position value ($50,000 / 25% of buying power)")
+    MAX_POSITION_NOTIONAL: float = Field(default=25000.0, description="Max single position value ($25,000 = 50% of equity, 12.5% of 4:1 DTBP)")
     MAX_CONCURRENT_POSITIONS: int = Field(default=3, description="Max simultaneous open positions")
 
     # Safe Host Port Allocations (Collision Free)

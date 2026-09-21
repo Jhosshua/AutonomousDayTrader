@@ -40,7 +40,7 @@ class RiskEngineConfig(BaseModel):
     base_trade_risk_pct: float = 0.010       # 1.0% ($500)
     max_trade_risk_pct: float = 0.020        # 2.0% ($1,000 ceiling)
     max_trade_risk_dollars: float = 1000.00
-    max_position_equity_pct: float = 1.000   # $50,000 max single position (100% of equity / 25% of DTBP)
+    max_position_equity_pct: float = 0.500   # $25,000 max single position (50% of equity / 12.5% of DTBP)
     max_concurrent_positions: int = 3
     min_stop_distance_pct: float = 0.004     # 0.4%
     max_stop_distance_pct: float = 0.040     # 4.0%
