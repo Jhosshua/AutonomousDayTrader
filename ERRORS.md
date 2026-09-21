@@ -58,3 +58,8 @@ right. Run the mutation check.
 - **What worked instead**: On stale data, actively move to the neutral setting (`apply_stale_vix_guard()` clamps sizing to 1.00), and only ever in the tightening direction so an already-defensive regime is not loosened.
 - **Note for next time**: "We ignore bad data" is not a safety property. Ask what the system keeps doing while it ignores it. Also: check the actual weekday with `date` before reasoning about which session a timestamp belongs to. I misread 2026-09-21 as a Sunday and nearly logged a frozen-feed incident that did not exist.
 
+## 2026-09-21: both Monday dry-run scripts write the same report file
+- **What did not work**: Reading `MONDAY_SIMULATION_REPORT.md` as "the" certification. `scripts/run_monday_dry_run.py` and `scripts/run_integrated_monday_dry_run.py` both publish to that one path, so whichever ran last defines the file. The two runs legitimately differ ($50,398.30 standalone vs $49,961.26 integrated) because they exercise different wiring, so the file silently changes meaning depending on run order.
+- **What worked instead**: Running both and reading each script's own stdout, and treating the integrated run (production wiring) as the one that speaks for the deployed configuration.
+- **Note for next time**: Check which script last wrote a shared report before quoting a number from it. Left as-is deliberately; renaming the output path risks breaking whatever else reads that filename.
+
