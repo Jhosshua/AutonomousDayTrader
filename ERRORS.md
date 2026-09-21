@@ -66,7 +66,8 @@ right. Run the mutation check.
 ## 2026-09-21: a liveness metric that counts failed attempts is not a liveness metric
 - **What did not work**: Reading `feeds.vix.last_age_sec` from `/health` to judge whether VIX data was fresh. It showed 4 seconds while the actual VIX value was 380 seconds stale, because `_mark_feed_event("vix")` runs in `handle_vix_print` for every print including stale and fallback ones. It measured "the poller is breathing", not "the data is fresh".
 - **What worked instead**: Reading the relay's own `/vix` `age_s` and `upstream` fields, and cross-checking `api/market-context` for the regime the bot actually derived.
-- **Note for next time**: When adding a freshness metric, ask what it reads when the upstream is dead. If the answer is "the same as when it is healthy", it is a heartbeat for the wrong component. Fix pending: report the print's own age alongside the poll age.
+- **Note for next time**: When adding a freshness metric, ask what it reads when the upstream is dead. If the answer is "the same as when it is healthy", it is a heartbeat for the wrong component. Fixed: `/health` now reports `last_poll_age_sec` (the poller) and `value_age_sec` + `stale` (the data) as separate numbers.
+- **Second note**: I told the user "I have the fix" when I had only the diagnosis. Check the file before reporting a fix as written.
 
 ## 2026-09-21: fixing the obvious half of a defect proved nothing
 - **What did not work**: Correcting the trailing stop's "ATR" (a single bar's high-low) and assuming that fixed the tight-stop problem. With a correct 14-bar ATR the stop still landed 0.137% from entry on the live geometry, because the real fault was that the trail ran from entry at all instead of from Target 1.

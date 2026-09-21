@@ -1034,9 +1034,11 @@ async def get_health() -> Dict[str, Any]:
     configured = bool(settings.RELAY_TOKEN)
     bound_api_port = int(os.getenv("PORT", str(settings.API_PORT)))
 
+    now_utc = datetime.now(timezone.utc)
+
     def _feed_age(feed: str) -> Optional[float]:
         ts = feed_last_event.get(feed)
-        return None if ts is None else round((datetime.now(timezone.utc) - ts).total_seconds(), 1)
+        return None if ts is None else round((now_utc - ts).total_seconds(), 1)
 
     operational_status = "healthy" if configured and all(
         relay_statuses.get(feed) == "connected" for feed in ("stock", "news", "vix")
@@ -1101,7 +1103,22 @@ async def get_health() -> Dict[str, Any]:
                 "received": news_ws_client.articles_received if news_ws_client else 0,
                 "last_age_sec": _feed_age("news"),
             },
-            "vix": {"last_age_sec": _feed_age("vix")},
+            # last_poll_age_sec only proves the poller is breathing: handle_vix_print
+            # marks an event for stale and fallback prints too, so it read ~4s during a
+            # live outage on 2026-09-21 while the VIX value itself was 380s old. The age
+            # of the VALUE is measured from the print's own asof, and `stale` is the flag
+            # the sizing guard actually acts on.
+            "vix": {
+                "last_poll_age_sec": _feed_age("vix"),
+                "value_age_sec": (
+                    round((now_utc - last_vix_print.asof).total_seconds(), 1)
+                    if last_vix_print else None
+                ),
+                "stale": (
+                    bool(last_vix_print.is_stale or last_vix_print.is_fallback)
+                    if last_vix_print else None
+                ),
+            },
         },
     }
 

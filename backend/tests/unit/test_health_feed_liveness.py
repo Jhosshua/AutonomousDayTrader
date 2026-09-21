@@ -6,7 +6,7 @@ event ages and counts that make that difference visible from outside the process
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -27,8 +27,10 @@ def _clean_runtime():
 async def test_health_reports_null_feed_ages_before_any_event():
     health = await main.get_health()
     feeds = health["feeds"]
-    for key in ("bars", "quotes", "trades", "news", "vix"):
+    for key in ("bars", "quotes", "trades", "news"):
         assert feeds[key]["last_age_sec"] is None, f"{key} age should be unknown before any event"
+    assert feeds["vix"]["last_poll_age_sec"] is None
+    assert feeds["vix"]["value_age_sec"] is None
 
 
 @pytest.mark.asyncio
@@ -70,7 +72,7 @@ async def test_vix_feed_age_is_recorded_even_for_a_stale_print():
         is_stale=True,
     ))
     feeds = (await main.get_health())["feeds"]
-    assert feeds["vix"]["last_age_sec"] is not None
+    assert feeds["vix"]["last_poll_age_sec"] is not None
 
 
 @pytest.mark.asyncio
@@ -96,3 +98,40 @@ async def test_health_publishes_the_live_risk_limits():
     assert limits["max_daily_loss_dollars"] == 1500.0
     assert limits["max_concurrent_positions"] == 3
     assert limits["stop_distance_pct"] == [0.004, 0.040]
+
+
+@pytest.mark.asyncio
+async def test_vix_health_reports_the_values_age_not_just_the_polls():
+    """A dead upstream must not read as fresh.
+
+    Observed live 2026-09-21: /health showed the vix feed ~4s old while the underlying
+    VIX value was 380s stale, because a stale print still marks a feed event. The poll
+    age and the value age must be reported separately.
+    """
+    from backend.app.models.events import VixRegime
+
+    stale_asof = datetime.now(timezone.utc) - timedelta(seconds=380)
+    await main.handle_vix_print(VixPrint(
+        value=14.90, asof=stale_asof, received_at=datetime.now(timezone.utc),
+        age_s=380.0, state="stale", upstream="down", regime=VixRegime.LOW,
+        sizing_multiplier=1.20, is_stale=True,
+    ))
+    vix = (await main.get_health())["feeds"]["vix"]
+
+    assert vix["last_poll_age_sec"] < 30.0, "the poller did just run"
+    assert vix["value_age_sec"] > 300.0, "but the value is stale and must say so"
+    assert vix["stale"] is True
+
+
+@pytest.mark.asyncio
+async def test_vix_health_reports_a_fresh_print_as_fresh():
+    from backend.app.models.events import VixRegime
+
+    now = datetime.now(timezone.utc)
+    await main.handle_vix_print(VixPrint(
+        value=14.90, asof=now, received_at=now, age_s=2.0, state="ready",
+        upstream="connected", regime=VixRegime.LOW, sizing_multiplier=1.20,
+    ))
+    vix = (await main.get_health())["feeds"]["vix"]
+    assert vix["value_age_sec"] < 30.0
+    assert vix["stale"] is False
