@@ -53,3 +53,8 @@ right. Run the mutation check.
 - **What worked instead**: `scripts/run_integrated_monday_dry_run.py`, which imports `backend.app.main` and exercises the real wiring, plus a unit test that asserts `main.risk_engine.config` and `main.account` directly rather than `RiskEngineConfig()`.
 - **Note for next time**: When a config value changes, assert the object production actually builds. A passing dry run that constructs its own engine proves nothing about the deployed configuration.
 
+## 2026-09-21: skipping an update on stale data is fail-open, not fail-safe
+- **What did not work**: Guarding against a stale VIX print by skipping the regime update. Skipping changes nothing, so whatever regime was accepted last stays in force. A LOW print read before the feed went dark would have held sizing at 1.20 for the whole session, and the longer the data was stale the longer the stale decision applied.
+- **What worked instead**: On stale data, actively move to the neutral setting (`apply_stale_vix_guard()` clamps sizing to 1.00), and only ever in the tightening direction so an already-defensive regime is not loosened.
+- **Note for next time**: "We ignore bad data" is not a safety property. Ask what the system keeps doing while it ignores it. Also: check the actual weekday with `date` before reasoning about which session a timestamp belongs to. I misread 2026-09-21 as a Sunday and nearly logged a frozen-feed incident that did not exist.
+

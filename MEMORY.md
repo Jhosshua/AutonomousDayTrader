@@ -2,6 +2,17 @@
 
 ## Decisions
 
+### 2026-09-21 (pre-market watch): a VIX the system cannot vouch for may not hold sizing above neutral
+- **Observed on the live deployment, Monday 2026-09-21 ~01:05 ET.** The relay's dxFeed VIX upstream cycles between healthy and `dxLink ERROR: The timeout for KEEPALIVE has been reached`, 247 reconnects. Sampling `GET /vix` 60 times over three minutes returned `upstream=down, state=stale` on roughly a third of calls. The bot's own `/health` therefore flips to `degraded` for a few seconds every couple of minutes and self-heals.
+- **Not concluded: that the relay's VIX is broken.** The served value (14.81, asof Friday 2026-09-18 16:15 ET) is Friday's closing print, which is exactly right for a pre-market Monday, and a 60-second keepalive gap is expected when the index is not printing. Whether this persists once VIX ticks live at 09:30 is unknown and is the thing to watch at the open.
+- **Two real holes it exposed, both fixed.**
+  1. `VixClient` evaluated staleness only during regular hours, so off-hours a print of ANY age was accepted. Now a print is stale if it predates the most recent weekday 16:00 ET close. Friday's close read pre-market on Monday stays fresh (correct); a print from before that close does not. Holidays are not modelled, which errs toward neutral sizing.
+  2. A stale print only caused the regime update to be SKIPPED, which is fail-open: the last accepted regime stays in force, so a LOW reading (sizing 1.20) taken before the feed went dark would keep sizing 20% above base for the whole session. `adaptation_engine.apply_stale_vix_guard()` now clamps sizing to neutral 1.00. It only ever tightens: ELEVATED (0.70) and CRISIS (0.35) are left alone.
+- **Rejected: also neutralising the stop multiplier.** Sizing down is unambiguously risk-reducing; moving stops changes where trades exit and needs its own evidence.
+- **Rejected: alerting on every `degraded` blip.** It self-heals in seconds and would drown a real outage in noise. The watchdog now requires the condition to persist.
+- **Consequence to expect at the open:** until the first fresh VIX print lands after 09:30, Friday's print reads stale in-hours and sizing sits at 1.00 rather than 1.20. That is the intended fail-closed behaviour, not a fault.
+- 187/187 backend (7 new, 5 mutation-checked; the other 2 pin existing-correct behaviour). Both Monday dry runs unchanged ($50,398.30 and $49,961.26).
+
 ### 2026-09-21: single-position cap set to $25,000 (50% of equity), down from $50,000
 - **`MAX_POSITION_NOTIONAL` is now 25000.0, so `max_position_equity_pct` derives to 0.500 and `account.max_position_notional` is $25,000.** Both caps move together because `main.py` derives one from the other; changing only `risk.py`'s dataclass default would have been inert, since `main.py` overrides it.
 - **Why.** The $1,500 daily circuit breaker is the system's loss ceiling, and at $50,000 notional a single name only had to gap 3% to spend the entire day's limit in one print. The watchlist is SPY, QQQ, AAPL, NVDA, TSLA; NVDA and TSLA gap 3-5% on news routinely. At $25,000 a 5% adverse gap costs $1,250, which stays inside the breaker, and it takes a 6% gap to reach it. Three concurrent positions now top out at $75,000 (1.5x equity) instead of $150,000 (3x).
@@ -41,6 +52,12 @@
 - **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
 
 ## Session log
+
+### 2026-09-21 (pre-market watch): VIX staleness fail-open found and closed
+- **Worked on**: Live watch of the deployment ahead of today's 09:30 ET open. A watchdog alert on `relay.vix=degraded` led to the two VIX defects above.
+- **Correction to my own earlier note in this session**: I initially read the calendar wrong and recorded that the VIX print had been frozen through a trading session. It had not. 2026-09-21 is a Monday, the print is Friday's close, and that is correct. The fixes stand on the fail-open logic, not on a frozen feed.
+- **Completed**: Both VIX holes fixed and pinned, 187/187 backend, 320/320 E2E, both dry runs unchanged, deployed and verified live.
+- **Next**: watch the 09:30 ET open. Two specific things: does `feeds.bars.last_age_sec` stay under ~90s, and does a fresh VIX print arrive so sizing lifts off the neutral clamp.
 
 ### 2026-09-21 (watch shift, part 2): single-position cap lowered to $25,000
 - **Worked on**: Resolving the `max_position_equity_pct` question carried over from 09-20, then holding watch for the 09-22 open.

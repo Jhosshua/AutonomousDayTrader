@@ -3,7 +3,7 @@ REST Client for AlpacaRelay GET /vix spot volatility prints and regime adaptatio
 """
 from __future__ import annotations
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 from typing import Any, Callable, Dict, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -113,8 +113,7 @@ class VixClient:
 
         regime, multiplier = self.classify_regime(val)
 
-        # Freshness check during regular market hours
-        is_stale = (age_s > settings.VIX_MAX_STALE_AGE_SEC) if self._is_market_hours() else False
+        is_stale = self._is_stale(asof_dt, age_s)
 
         vix_print = VixPrint(
             value=val,
@@ -168,6 +167,36 @@ class VixClient:
             is_stale=True,
             is_fallback=True,
         )
+
+    def _is_stale(self, asof_dt: datetime, age_s: float) -> bool:
+        """Decide whether a print is too old to steer risk.
+
+        During regular hours the index prints continuously, so plain age is the test.
+        Outside regular hours age proves nothing (VIX does not print overnight), but a
+        print from BEFORE the most recent close is from an earlier session and must not
+        be treated as current. Gating staleness on market hours alone let a print from a
+        prior session in through the back door overnight and then froze it in place for
+        the whole next session, because the in-hours check only skips updates, it never
+        revises what was already accepted.
+
+        Market holidays are not modelled: on a holiday the previous close has already
+        passed, so a print from the session before it reads as stale. That errs toward
+        neutral sizing, which is the safe direction.
+        """
+        if self._is_market_hours():
+            return age_s > settings.VIX_MAX_STALE_AGE_SEC
+        return asof_dt < self._last_session_close()
+
+    def _last_session_close(self) -> datetime:
+        """The most recent weekday 16:00 ET, as an aware UTC datetime."""
+        now = self._time_source()
+        now_et = now.astimezone(ET_TZ) if now.tzinfo is not None else now.replace(tzinfo=ET_TZ)
+        candidate = now_et.replace(hour=16, minute=0, second=0, microsecond=0)
+        if candidate > now_et:
+            candidate -= timedelta(days=1)
+        while candidate.weekday() > 4:  # Sat=5, Sun=6
+            candidate -= timedelta(days=1)
+        return candidate.astimezone(timezone.utc)
 
     def _is_market_hours(self) -> bool:
         """Determine if current time is US regular trading hours (09:30-16:00 ET Mon-Fri)."""

@@ -784,6 +784,13 @@ async def handle_vix_print(vprint: VixPrint) -> None:
             "Skipping regime update for stale/fallback VIX print %.2f (state=%s, upstream=%s)",
             vprint.value, vprint.state, vprint.upstream,
         )
+        # Skipping the update alone is fail-open: the last accepted regime stays in
+        # force, so a LOW print taken before the feed froze keeps sizing 20% above base.
+        if adaptation_engine.apply_stale_vix_guard():
+            log.warning(
+                "Stale VIX: sizing multiplier clamped to neutral 1.00 (regime NORMAL) "
+                "until a fresh print arrives"
+            )
     else:
         adaptation_engine.on_vix_print(vprint)
     for strat in strategies:

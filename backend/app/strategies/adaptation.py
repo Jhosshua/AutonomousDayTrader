@@ -131,6 +131,25 @@ class DynamicAdaptationEngine:
         self.current_stop_multiplier = stop_m
         self.last_update = vprint.received_at
 
+    def apply_stale_vix_guard(self) -> bool:
+        """Never let an unknown VIX justify sizing above neutral.
+
+        Skipping the update on a stale print leaves whatever regime was accepted last
+        still in force, so a LOW reading taken before the data went stale keeps sizing
+        20% above base indefinitely. This clamps sizing to neutral and returns True when
+        it changed something. It only ever tightens: an ELEVATED or CRISIS regime is
+        already more defensive than neutral and is left alone.
+
+        The stop multiplier is deliberately untouched. Sizing down is unambiguously
+        risk-reducing; moving stops changes where trades exit, which is a separate
+        decision that needs its own evidence.
+        """
+        if self.current_sizing_multiplier <= 1.00:
+            return False
+        self.current_vix_regime = VixRegime.NORMAL.value
+        self.current_sizing_multiplier = 1.00
+        return True
+
     def update_clock(self, dt: datetime) -> str:
         """Update session time and return current TimeOfDayPhase string."""
         if dt.tzinfo is None:
