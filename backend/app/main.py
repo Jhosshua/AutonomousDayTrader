@@ -76,6 +76,17 @@ market_history: Dict[str, List[Dict[str, Any]]] = {}
 entry_order_to_bracket: Dict[str, str] = {}
 bracket_realized_pnl: Dict[str, float] = {}
 relay_statuses: Dict[str, str] = {"stock": "unconfigured", "news": "unconfigured", "vix": "unconfigured"}
+# Wall-clock time of the last event actually ingested per feed. A relay status of
+# "connected" is set once at handshake, so a live-but-silent feed looks identical to a
+# working one. /health publishes these ages so feed starvation is visible from outside.
+feed_last_event: Dict[str, Optional[datetime]] = {
+    "bar": None, "quote": None, "trade": None, "news": None, "vix": None,
+}
+
+
+def _mark_feed_event(feed: str) -> None:
+    feed_last_event[feed] = datetime.now(timezone.utc)
+
 runtime_tasks: Set[asyncio.Task] = set()
 simulation_mode: bool = False
 last_session_date: Optional[Any] = None
@@ -622,6 +633,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 async def handle_bar_event(bar: BarEvent) -> None:
     """Ingest bar, update clocks, match orders, process strategies, check risk, update trailing stops."""
     latest_market_prices[bar.symbol.upper()] = bar.close
+    _mark_feed_event("bar")
     history = market_history.setdefault(bar.symbol.upper(), [])
     history.append({
         "time": bar.timestamp.isoformat(),
@@ -706,6 +718,7 @@ async def handle_bar_event(bar: BarEvent) -> None:
 async def handle_quote_event(quote: QuoteEvent) -> None:
     """Ingest quote and match working orders."""
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
+    _mark_feed_event("quote")
     for strat in strategies:
         try:
             strat.on_quote(quote)
@@ -736,6 +749,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
 
 async def handle_news_event(news: NewsEvent) -> None:
     """Record news, trigger catalyst events and contradiction checks."""
+    _mark_feed_event("news")
     recent_news.append({
         "headline": news.headline,
         "symbols": news.symbols,
@@ -764,6 +778,7 @@ async def handle_vix_print(vprint: VixPrint) -> None:
     """Update VIX print and scale risk and adaptation parameters."""
     global last_vix_print
     last_vix_print = vprint
+    _mark_feed_event("vix")
     if vprint.is_stale or vprint.is_fallback:
         log.warning(
             "Skipping regime update for stale/fallback VIX print %.2f (state=%s, upstream=%s)",
@@ -861,6 +876,7 @@ async def _runtime_clock_loop() -> None:
 async def handle_trade_event(trade: TradeEvent) -> None:
     """Track the latest trade print price for pre-trade risk valuation."""
     latest_market_prices[trade.symbol.upper()] = trade.price
+    _mark_feed_event("trade")
 
 
 async def _handle_relay_status(status: RelayStatusEvent) -> None:
@@ -892,6 +908,8 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     bracket_realized_pnl.clear()
     completed_brackets_recorded.clear()
     latest_market_prices.clear()
+    for _feed in feed_last_event:
+        feed_last_event[_feed] = None
     market_history.clear()
     recent_news.clear()
     last_vix_print = None
@@ -980,6 +998,11 @@ async def get_health() -> Dict[str, Any]:
     """System health telemetry and component statuses."""
     configured = bool(settings.RELAY_TOKEN)
     bound_api_port = int(os.getenv("PORT", str(settings.API_PORT)))
+
+    def _feed_age(feed: str) -> Optional[float]:
+        ts = feed_last_event.get(feed)
+        return None if ts is None else round((datetime.now(timezone.utc) - ts).total_seconds(), 1)
+
     operational_status = "healthy" if configured and all(
         relay_statuses.get(feed) == "connected" for feed in ("stock", "news", "vix")
     ) else "degraded" if configured else "unconfigured"
@@ -1011,6 +1034,25 @@ async def get_health() -> Dict[str, Any]:
             "mock": settings.MOCK_PORT,
         },
         "relay": relay_statuses,
+        "feeds": {
+            "bars": {
+                "received": stock_ws_client.bars_received if stock_ws_client else 0,
+                "last_age_sec": _feed_age("bar"),
+            },
+            "quotes": {
+                "received": stock_ws_client.quotes_received if stock_ws_client else 0,
+                "last_age_sec": _feed_age("quote"),
+            },
+            "trades": {
+                "received": stock_ws_client.trades_received if stock_ws_client else 0,
+                "last_age_sec": _feed_age("trade"),
+            },
+            "news": {
+                "received": news_ws_client.articles_received if news_ws_client else 0,
+                "last_age_sec": _feed_age("news"),
+            },
+            "vix": {"last_age_sec": _feed_age("vix")},
+        },
     }
 
 

@@ -2,6 +2,11 @@
 
 ## Decisions
 
+### 2026-09-21: /health publishes per-feed liveness so a silent feed is visible
+- **`/health` now carries a `feeds` block: per-feed ingest counts and the age in seconds of the last event actually ingested (bars, quotes, trades, news, vix).** Why: `relay_statuses` is written once at handshake, so a feed that connects and then goes silent reports `"connected"` forever and looks identical to a working one. With no bar counter exposed anywhere, a starved session could not be told apart from a quiet one from outside the process. Rejected: reading the counters out of Railway logs — the logs show only the VIX poller, and bars are not logged at all.
+- Additive telemetry only. No trading path touched; the Monday dry run still reproduces $50,398.30 exactly.
+- Pinned by 5 tests in `backend/tests/unit/test_health_feed_liveness.py`, all mutation-checked (all 5 fail on the pre-change `main.py`).
+
 ### 2026-09-20 (post-release audit): stop clamping reverted, session boundary made fail-closed
 - **Strategies no longer clamp a stop to a 3.80% maximum.** Why: the clamp silently converted a signal the risk engine is meant to REJECT (stop wider than 4.0%) into a live trade whose stop sat inside the structure that justified it. Worked example: ORB entry $100, range midpoint $94 (6% structural stop). Old = rejected, no trade. Clamped = traded with the stop at $96.20, inside the opening range. The clamp was shipped as an "IEEE 754 precision fix"; float error is ~1e-6, the clamp was 5% of the limit, so it was a behaviour change wearing a precision-fix label. Rejected: keeping the clamp and backtesting later — an unbacktested exit change was already live.
 - **Stop placement is now one shared helper, `resolve_stop()` in `strategies/base.py`.** It widens a too-tight stop to the 0.4% floor, leaves a wide stop untouched, and rounds the stop AWAY from entry so the realised distance can never land a hair under the floor. Why: three strategies had three divergent copies of the clamp maths. Rejected: per-strategy constants (the original shape) — that is how they diverged.
@@ -26,6 +31,14 @@
 - **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
 
 ## Session log
+
+### 2026-09-21 (watch shift): pre-open readiness check, feed-liveness telemetry shipped
+- **Worked on**: Standing watch on the live Railway deployment ahead of the Monday 2026-09-22 open.
+- **Verified**: Railway service Online, deployment 044be226 = commit c70e8c0 = local HEAD (deployed revision checked, not assumed). `/health` healthy, relay stock/news/vix all connected, account flat at $50,000, risk ARMED/NORMAL, all 4 strategies ACTIVE, audit log empty, VIX 14.81 (LOW, sizing 1.20). Logs clean: no errors, VIX polling every 5s.
+- **Gap found and fixed**: no way to see, from outside, whether market data was actually arriving. Added the `feeds` block to `/health` (see Decisions).
+- **Tests**: 177/177 backend (5 new), 320/320 E2E, Monday dry run $50,398.30 unchanged.
+- **Open question carried forward**: `max_position_equity_pct` is still 1.0 (one position may be 100% of equity). Unresolved from the 09-20 session, needs an explicit call.
+- **Next**: watch the 09-22 open. Expect `feeds.bars.last_age_sec` under ~90s during RTH; if it climbs while `relay.stock` still reads "connected", the feed is silently dead.
 
 ### 2026-09-20 (audit of the release): two fail-open defects fixed
 - **Worked on**: Independent verification of the "VICTORY CONFIRMED" release report, then remediation of what it missed.
