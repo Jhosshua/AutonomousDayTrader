@@ -450,10 +450,18 @@ def test_adv_trailing_stop_monotonicity_under_whipsaw():
     bracket = bm.create_bracket("brk_adv_003", "NVDA", "LONG", 100, 100.0, 98.0, timestamp=now_dt)
     bm.activate_bracket_on_fill(bracket.bracket_id, 100, 100.0, now_dt)
 
-    initial_stop = bracket.current_stop_price  # 98.00
+    # The ATR trail is the Target 2 runner's, so put the bracket where it lives. While
+    # the bracket is ACTIVE the structural stop stands and a rally must not move it.
+    assert bm.update_trailing_stop("NVDA", current_bar_high=106.00, current_bar_low=103.00,
+                                   current_atr=1.50, timestamp=now_dt) is None
+    assert bracket.current_stop_price == 98.0
+
+    bracket.status = BracketStatus.TARGET_1_HIT
+    bracket.current_stop_price = 100.02  # breakeven + buffer, set when Target 1 filled
+    initial_stop = bracket.current_stop_price
 
     # Bar 1: Price surges to high of $106.00, low $103.00, ATR $1.50
-    # Trailing target: peak ($106) - 1.5 * 1.50 = 103.75 > 98.00
+    # Trailing target: peak ($106) - 1.5 * 1.50 = 103.75 > 100.02
     bm.update_trailing_stop("NVDA", current_bar_high=106.00, current_bar_low=103.00, current_atr=1.50, timestamp=now_dt)
     advanced_stop = bracket.current_stop_price
     assert advanced_stop > initial_stop

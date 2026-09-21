@@ -171,6 +171,34 @@ recent_news: List[Dict[str, Any]] = []
 last_vix_print: Optional[VixPrint] = None
 
 
+def _atr_estimate(symbol: str, bar: BarEvent, period: int = 14) -> float:
+    """Average true range over `period` bars, for the trailing stop distance.
+
+    This used to be one bar's high minus its low. The trailing ratchet multiplies this
+    and never loosens, so a single quiet minute collapsed the trail to a few cents and
+    jammed the stop under the market permanently. Observed live 2026-09-21: an NVDA ORB
+    entry's stop walked from 0.55% of entry to 0.127% in three minutes and was scratched
+    for -$9.37 six minutes after entry, with its 1.5R target left unreachable.
+
+    True range is the usual max(high-low, |high-prev_close|, |low-prev_close|), so gaps
+    between bars count. Falls back to the current bar's range only when there is not yet
+    enough history to average.
+    """
+    history = market_history.get(symbol.upper(), [])
+    if len(history) < 2:
+        return max(0.01, bar.high - bar.low)
+    window = history[-(period + 1):]
+    true_ranges = [
+        max(cur["high"] - cur["low"],
+            abs(cur["high"] - prev["close"]),
+            abs(cur["low"] - prev["close"]))
+        for prev, cur in zip(window, window[1:])
+    ]
+    if not true_ranges:
+        return max(0.01, bar.high - bar.low)
+    return max(0.01, sum(true_ranges) / len(true_ranges))
+
+
 def _serialize_position(symbol: str) -> Dict[str, Any]:
     """Serialize one position with the bracket and chart data that actually backs the UI."""
     pos = account.positions[symbol]
@@ -698,7 +726,7 @@ async def handle_bar_event(bar: BarEvent) -> None:
         _trip_circuit_breaker(bar.timestamp)
 
     # Trailing stop update
-    atr_est = max(0.01, bar.high - bar.low)
+    atr_est = _atr_estimate(bar.symbol, bar)
     bracket_dir = bracket_manager.update_trailing_stop(
         symbol=bar.symbol,
         current_bar_high=bar.high,

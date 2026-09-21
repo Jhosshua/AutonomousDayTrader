@@ -63,3 +63,13 @@ right. Run the mutation check.
 - **What worked instead**: Running both and reading each script's own stdout, and treating the integrated run (production wiring) as the one that speaks for the deployed configuration.
 - **Note for next time**: Check which script last wrote a shared report before quoting a number from it. Left as-is deliberately; renaming the output path risks breaking whatever else reads that filename.
 
+## 2026-09-21: a liveness metric that counts failed attempts is not a liveness metric
+- **What did not work**: Reading `feeds.vix.last_age_sec` from `/health` to judge whether VIX data was fresh. It showed 4 seconds while the actual VIX value was 380 seconds stale, because `_mark_feed_event("vix")` runs in `handle_vix_print` for every print including stale and fallback ones. It measured "the poller is breathing", not "the data is fresh".
+- **What worked instead**: Reading the relay's own `/vix` `age_s` and `upstream` fields, and cross-checking `api/market-context` for the regime the bot actually derived.
+- **Note for next time**: When adding a freshness metric, ask what it reads when the upstream is dead. If the answer is "the same as when it is healthy", it is a heartbeat for the wrong component. Fix pending: report the print's own age alongside the poll age.
+
+## 2026-09-21: fixing the obvious half of a defect proved nothing
+- **What did not work**: Correcting the trailing stop's "ATR" (a single bar's high-low) and assuming that fixed the tight-stop problem. With a correct 14-bar ATR the stop still landed 0.137% from entry on the live geometry, because the real fault was that the trail ran from entry at all instead of from Target 1.
+- **What worked instead**: Writing the failing test from the observed live numbers FIRST (entry $223.9502, peak $224.13, stop ending at 0.127%), then letting it stay red until the actual root cause was fixed. The test refused the partial fix.
+- **Note for next time**: Anchor the test in the observed production numbers before touching code. A test written after a plausible fix tends to agree with it.
+
