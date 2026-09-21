@@ -171,6 +171,34 @@ recent_news: List[Dict[str, Any]] = []
 last_vix_print: Optional[VixPrint] = None
 
 
+def _atr_estimate(symbol: str, bar: BarEvent, period: int = 14) -> float:
+    """Average true range over `period` bars, for the trailing stop distance.
+
+    This used to be one bar's high minus its low. The trailing ratchet multiplies this
+    and never loosens, so a single quiet minute collapsed the trail to a few cents and
+    jammed the stop under the market permanently. Observed live 2026-09-21: an NVDA ORB
+    entry's stop walked from 0.55% of entry to 0.127% in three minutes and was scratched
+    for -$9.37 six minutes after entry, with its 1.5R target left unreachable.
+
+    True range is the usual max(high-low, |high-prev_close|, |low-prev_close|), so gaps
+    between bars count. Falls back to the current bar's range only when there is not yet
+    enough history to average.
+    """
+    history = market_history.get(symbol.upper(), [])
+    if len(history) < 2:
+        return max(0.01, bar.high - bar.low)
+    window = history[-(period + 1):]
+    true_ranges = [
+        max(cur["high"] - cur["low"],
+            abs(cur["high"] - prev["close"]),
+            abs(cur["low"] - prev["close"]))
+        for prev, cur in zip(window, window[1:])
+    ]
+    if not true_ranges:
+        return max(0.01, bar.high - bar.low)
+    return max(0.01, sum(true_ranges) / len(true_ranges))
+
+
 def _serialize_position(symbol: str) -> Dict[str, Any]:
     """Serialize one position with the bracket and chart data that actually backs the UI."""
     pos = account.positions[symbol]
@@ -698,7 +726,7 @@ async def handle_bar_event(bar: BarEvent) -> None:
         _trip_circuit_breaker(bar.timestamp)
 
     # Trailing stop update
-    atr_est = max(0.01, bar.high - bar.low)
+    atr_est = _atr_estimate(bar.symbol, bar)
     bracket_dir = bracket_manager.update_trailing_stop(
         symbol=bar.symbol,
         current_bar_high=bar.high,
@@ -1006,9 +1034,11 @@ async def get_health() -> Dict[str, Any]:
     configured = bool(settings.RELAY_TOKEN)
     bound_api_port = int(os.getenv("PORT", str(settings.API_PORT)))
 
+    now_utc = datetime.now(timezone.utc)
+
     def _feed_age(feed: str) -> Optional[float]:
         ts = feed_last_event.get(feed)
-        return None if ts is None else round((datetime.now(timezone.utc) - ts).total_seconds(), 1)
+        return None if ts is None else round((now_utc - ts).total_seconds(), 1)
 
     operational_status = "healthy" if configured and all(
         relay_statuses.get(feed) == "connected" for feed in ("stock", "news", "vix")
@@ -1073,7 +1103,22 @@ async def get_health() -> Dict[str, Any]:
                 "received": news_ws_client.articles_received if news_ws_client else 0,
                 "last_age_sec": _feed_age("news"),
             },
-            "vix": {"last_age_sec": _feed_age("vix")},
+            # last_poll_age_sec only proves the poller is breathing: handle_vix_print
+            # marks an event for stale and fallback prints too, so it read ~4s during a
+            # live outage on 2026-09-21 while the VIX value itself was 380s old. The age
+            # of the VALUE is measured from the print's own asof, and `stale` is the flag
+            # the sizing guard actually acts on.
+            "vix": {
+                "last_poll_age_sec": _feed_age("vix"),
+                "value_age_sec": (
+                    round((now_utc - last_vix_print.asof).total_seconds(), 1)
+                    if last_vix_print else None
+                ),
+                "stale": (
+                    bool(last_vix_print.is_stale or last_vix_print.is_fallback)
+                    if last_vix_print else None
+                ),
+            },
         },
     }
 

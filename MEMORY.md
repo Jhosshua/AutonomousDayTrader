@@ -2,6 +2,21 @@
 
 ## Decisions
 
+### 2026-09-21 (live session): the trailing stop was strangling its own trades. Two defects, fixed on a branch, NOT deployed mid-session
+- **Observed live.** First trade of the session: NVDA ORB long, 55 shares @ $223.9502, structural stop $222.7303 (0.545% of entry), T1 $225.78, T2 $227.00. Within three minutes the stop had walked to $223.4549 (0.221%) then $223.6655 (0.127%). Stopped out 09:43:57 at $223.7864 for **-$9.37**, five minutes 57 seconds after entry, T1 never reachable.
+- **Defect 1: "ATR" was one bar's range.** `main.py` passed `max(0.01, bar.high - bar.low)` as `current_atr`. On a quiet minute that is a couple of cents, so the trail distance collapsed with it. Now `_atr_estimate()` averages true range (`max(h-l, |h-prev_close|, |l-prev_close|)`) over 14 bars from `market_history`, falling back to the bar range only before there is history.
+- **Defect 2, the root cause: the ATR trail ran from entry.** `update_trailing_stop` accepted `ACTIVE` or `TARGET_1_HIT`. The documented design (class docstring, and the `TARGET_1_HIT` enum comment "Scaled out 50%, stop ratcheted to breakeven") is that the ATR trail belongs to the **Target 2 runner**, after Target 1 scales out 50% and the stop ratchets to breakeven. Running it while ACTIVE overwrites the strategy's structural stop before the trade has made any progress, and because the ratchet never loosens, `peak - k*ATR` pins the stop under a peak barely above entry. Now gated to `TARGET_1_HIT` only.
+- **Fixing the ATR alone was NOT enough.** With a correct ATR of ~$0.34 and the live peak of $224.13 (18c above entry), `peak - 1.5*ATR` still lands at $223.62, 0.137% below entry, inside the noise. The test that proved this is kept.
+- **Two existing tests were pinning the defect** and were corrected, not deleted: `test_bracket_trailing_stop_monotonicity` and `test_adv_trailing_stop_monotonicity_under_whipsaw` both asserted that an ACTIVE bracket's stop ratchets on a rally. Their real intent (monotonicity, never loosening) is preserved by moving them to a `TARGET_1_HIT` bracket.
+- **NOT DEPLOYED.** Pushing to `main` auto-deploys and restarts the process, and this bot holds account, positions and brackets in memory only, so a mid-session deploy wipes the live book. Work sits on branch `fix/trailing-atr`. Merge after 16:00 ET.
+- **Evidence is thin and must not be oversold.** The integrated dry run moves $49,961.26 -> $50,376.05 (+$414.79) on the same 62-event fixture. That fixture is a hand-built plumbing scenario, not a backtest, and a +$415 swing on it is not evidence of edge. It shows the exits stop scratching, nothing more. A real backtest over many sessions is still owed before trusting the number.
+- 193/193 backend (6 new, 5 mutation-checked), 320/320 E2E.
+
+### 2026-09-21 (correction): the $25,000 cap is a backstop, not the binding limit
+- **`DynamicAdaptationEngine.max_alloc_pct` is 0.25**, i.e. 25% of equity = **$12,500**, and `calculate_position_size` applies it before the risk engine ever sees the order. The live NVDA trade sized to exactly `floor(12500 / 223.9502) = 55` shares, confirming which cap binds.
+- So yesterday's change of `MAX_POSITION_NOTIONAL` from $50,000 to $25,000 lowered the **risk engine's** cap, which sits behind a tighter one for strategy trades. It is not inert: manual orders through `POST /api/orders` bypass the adaptation layer and are capped by the risk engine alone. But the claim "the effective single-position limit is halved" was wrong for strategy trades, where it was already $12,500.
+- **Left as-is pending a decision**, same as before: the three caps ($12,500 adaptation / $25,000 risk engine / $25,000 account notional) should probably be derived from one number instead of three.
+
 ### 2026-09-21 (pre-market watch): a VIX the system cannot vouch for may not hold sizing above neutral
 - **Observed on the live deployment, Monday 2026-09-21 ~01:05 ET.** The relay's dxFeed VIX upstream cycles between healthy and `dxLink ERROR: The timeout for KEEPALIVE has been reached`, 247 reconnects. Sampling `GET /vix` 60 times over three minutes returned `upstream=down, state=stale` on roughly a third of calls. The bot's own `/health` therefore flips to `degraded` for a few seconds every couple of minutes and self-heals.
 - **Not concluded: that the relay's VIX is broken.** The served value (14.81, asof Friday 2026-09-18 16:15 ET) is Friday's closing print, which is exactly right for a pre-market Monday, and a 60-second keepalive gap is expected when the index is not printing. Whether this persists once VIX ticks live at 09:30 is unknown and is the thing to watch at the open.
@@ -52,6 +67,23 @@
 - **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
 
 ## Session log
+
+### 2026-09-21 (close): first full live session. 5 trades, -$21.34, zero reached a target
+- **Result**: $50,000.00 -> $49,978.66, **-$21.34** (-0.043%). ORB 2 trades -$12.09, VWAP pullback 3 trades -$9.25. News momentum and mean reversion took nothing.
+- **Every trade died the same way.** Four scratched by the trailing stop, one clipped: TSLA long $375.25 -> $375.81 (+$18.39) against a $377.72 target, so it banked 23% of the intended move. Not one trade reached Target 1 all day. Stop distances at exit were 0.088% to 0.22% of entry, against structural stops of 0.44% to 0.55% at entry.
+- **Zero-overnight held.** All four flatten stages fired on the minute: 15:45 ENTRY_LOCKOUT, 15:50 ORDER_PURGE, 15:55 MANDATORY_LIQUIDATION, 15:58 ZERO_AUDIT with `audit_passed: true`, status EOD_FLAT, 0 positions, 16:00 MARKET_CLOSED.
+- **The VIX stale guard shipped the night before worked on its first real test.** 09:24-09:32 the relay's dxFeed VIX died; at 09:30 the print crossed 300s and sizing was clamped 1.20 -> 1.00 while the value sat frozen at 14.90. Recovered at 09:32 and returned to 1.20.
+- **Position sizing was $12,300-$12,500 on every trade**, i.e. the adaptation engine's 25% cap, confirming again that the risk engine's $25,000 is a backstop and not the binding limit.
+- **Nothing was deployed during the session, by design.** Branch `fix/trailing-atr` holds three fixes (ATR average, trail gated to TARGET_1_HIT, /health VIX value-age telemetry), pushed to GitHub but never merged to `main`. Railway stayed on 9b6e90a the whole day.
+- **Next session priorities**: (1) merge and deploy the branch; (2) a REAL backtest of the trailing change over many sessions, the 62-event fixture is not evidence; (3) decide the relay's VIX keepalive margin and never-resetting backoff; (4) decide whether the three position caps should derive from one number.
+
+### 2026-09-21 (market open): first live session watched end to end
+- **09:24-09:32**: relay VIX upstream died (dxFeed "Bye"), value froze at 14.90. At 09:30 the new staleness rule caught it and `apply_stale_vix_guard()` clamped sizing 1.20 -> 1.00. Recovered 09:32, sizing returned to 1.20. **The guard shipped last night worked, live, on its first real test.**
+- **09:38-09:43**: first trade, NVDA ORB long, scratched for -$9.37 by the trailing-stop defects above.
+- **Found**: three position caps with the tightest ($12,500) not the one I changed; trailing "ATR" was a single bar's range; ATR trail ran from entry instead of from Target 1; `feeds.vix.last_age_sec` marks an event on failed polls too, so it read 4s while the value was 380s stale.
+- **Shipped to production**: nothing during the session, deliberately.
+- **On branch `fix/trailing-atr`, awaiting the close**: both trailing-stop fixes. Still to write: the `feeds.vix` freshness fix (report the print's own age, not the poll's).
+- **Open with the user**: whether to fix the relay's VIX keepalive margin and its never-resetting backoff.
 
 ### 2026-09-21 (pre-market watch): VIX staleness fail-open found and closed
 - **Worked on**: Live watch of the deployment ahead of today's 09:30 ET open. A watchdog alert on `relay.vix=degraded` led to the two VIX defects above.

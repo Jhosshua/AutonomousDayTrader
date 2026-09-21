@@ -88,8 +88,20 @@ def test_bracket_trailing_stop_monotonicity():
     now = datetime.now(timezone.utc)
     manager.activate_bracket_on_fill("b3", 100, 100.00, now)
 
+    # The ATR trail belongs to the Target 2 runner. While the bracket is still ACTIVE the
+    # strategy's structural stop stands, so a rally alone must not move it. (This test
+    # previously asserted the opposite and was pinning the defect that scratched a live
+    # NVDA trade on 2026-09-21.)
+    assert manager.update_trailing_stop("AAPL", current_bar_high=104.00, current_bar_low=102.00,
+                                        current_atr=1.0, timestamp=now) is None
+    assert brk.current_stop_price == 98.00
+
+    # Target 1 fills at 1.5R ($103.00): 50% scales out and the stop ratchets to breakeven.
+    brk.status = BracketStatus.TARGET_1_HIT
+    brk.current_stop_price = 100.02
+
     # Bar 1: Stock rallies to High $104.00, ATR = 1.0. Trail distance = 1.5 * 1.0 = 1.50.
-    # Potential stop = 104.00 - 1.50 = 102.50 > 98.00 -> Ratchets to 102.50!
+    # Potential stop = 104.00 - 1.50 = 102.50 > 100.02 -> Ratchets to 102.50!
     d1 = manager.update_trailing_stop("AAPL", current_bar_high=104.00, current_bar_low=102.00, current_atr=1.0, timestamp=now)
     assert d1 is not None
     assert brk.current_stop_price == 102.50

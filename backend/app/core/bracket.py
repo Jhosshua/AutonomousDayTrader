@@ -399,7 +399,14 @@ class DynamicBracketManager:
             return None
 
         bracket = self.brackets.get(bracket_id)
-        if not bracket or bracket.status not in (BracketStatus.ACTIVE, BracketStatus.TARGET_1_HIT):
+        # The ATR trail belongs to the Target 2 runner, which only exists once Target 1
+        # has scaled out 50% and the stop has ratcheted to breakeven. Running it while the
+        # bracket is still ACTIVE overwrites the structural stop the strategy chose, before
+        # the trade has made any progress: because the ratchet never loosens, peak minus
+        # k*ATR can pin the stop under a peak that is barely above entry. Observed live
+        # 2026-09-21 on an NVDA ORB long, stop walked 0.55% -> 0.127% of entry in three
+        # minutes and the trade was scratched with its 1.5R target unreachable.
+        if not bracket or bracket.status != BracketStatus.TARGET_1_HIT:
             return None
 
         if not bracket.use_trailing_target_2:
