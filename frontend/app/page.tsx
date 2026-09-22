@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import StrategyCarousel from "@/components/StrategyCarousel";
 import ActivePositionTray from "@/components/ActivePositionTray";
 import ExecutionLog from "@/components/ExecutionLog";
+import TradeHistory from "@/components/TradeHistory";
 import { ShieldCheck, Activity, Terminal, AlertCircle } from "lucide-react";
 
 export default function Home() {
@@ -47,7 +48,7 @@ export default function Home() {
 
         {/* Risk & Regime Telemetry Bar */}
         <section className="px-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div data-testid="risk-telemetry" className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
               <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
                 Risk Engine
@@ -100,6 +101,12 @@ export default function Home() {
 
         {/* Trading Strategies Carousel */}
         <StrategyCarousel strategies={state.strategies} />
+
+        {/* Durable Account Ledger & Completed Trade History */}
+        <TradeHistory
+          ledgerRevision={state.ledger_revision}
+          streamPersistence={state.persistence}
+        />
 
         {/* Execution & Audit Feed Section */}
         <section className="px-4 pt-2">

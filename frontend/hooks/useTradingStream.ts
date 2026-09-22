@@ -79,6 +79,12 @@ const INITIAL_STATE: TradingState = {
   recent_activity: [],
   ingestion: {},
   recent_news: [],
+  ledger_revision: 0,
+  persistence: {
+    status: "disabled",
+    last_checkpoint_at: null,
+    restored_at: null,
+  },
   isConnected: false,
   lastUpdated: new Date(),
 };
@@ -201,6 +207,8 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 recent_activity: payload.recent_activity || prev.recent_activity,
                 ingestion: payload.ingestion || prev.ingestion,
                 recent_news: payload.recent_news || prev.recent_news,
+                ledger_revision: payload.ledger_revision ?? prev.ledger_revision,
+                persistence: payload.persistence || prev.persistence,
                 isConnected: true,
                 lastUpdated: new Date(),
               };

@@ -137,6 +137,28 @@ The Railway service `AutonomousDayTrader` is connected to the GitHub repo `Jhoss
 
 The deployed `/health` endpoint is the source of truth for upstream readiness; the current verified state reports stock, news, and VIX connected. The system remains paper-trading only.
 
+### Durable Account Ledger
+
+Production persists the complete paper account, active positions, orders, brackets,
+risk/flattening state, strategy runtime windows, audit history, and completed trades
+to an atomic SQLite ledger on a dedicated Railway volume. The service refuses to
+start when production persistence is required but its checkpoint is missing or
+corrupt; it never silently falls back to a fresh $50,000 account.
+
+Required production configuration:
+
+```bash
+PERSISTENCE_ENABLED=true
+PERSISTENCE_REQUIRED=true
+STATE_DB_PATH=/data/trading_state.sqlite3
+STATE_BACKUP_PATH=/data/trading_state.backup.sqlite3
+```
+
+The dashboard's **Trade History** panel and `GET /api/trades` expose durable status,
+session summaries, and completed-trade execution legs. The September 21 recovery is
+stored as `LEGACY_SUMMARY_IMPORT`: its verified $49,978.66 closing equity, five-trade
+count, and -$21.34 session result are preserved without inventing lost fills.
+
 ### Running Test Suites
 ```bash
 # Run the complete opaque-box E2E test suite (293 tests with port audit)

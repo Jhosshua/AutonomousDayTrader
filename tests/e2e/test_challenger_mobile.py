@@ -266,7 +266,7 @@ def test_mobile_text_clipping_and_wrapping(nextjs_server, vp):
         equity_text.wait_for(state="visible", timeout=5000)
 
         # Check telemetry boxes fit inside screen
-        telemetry_boxes = page.locator("section.px-4 .grid > div")
+        telemetry_boxes = page.locator('[data-testid="risk-telemetry"] > div')
         count = telemetry_boxes.count()
         assert count == 4, f"Expected 4 risk telemetry cards, found {count}"
 
@@ -501,12 +501,12 @@ def test_desktop_viewport_1440x900_layout_and_no_overflow(nextjs_server):
 
         # 3. Verify Telemetry grid in 4-column layout on desktop
         page.get_by_text("Portfolio Equity", exact=True).wait_for(state="visible", timeout=5000)
-        telemetry_boxes = page.locator("section.px-4 .grid > div")
+        telemetry_boxes = page.locator('[data-testid="risk-telemetry"] > div')
         count = telemetry_boxes.count()
         assert count == 4, f"Expected 4 telemetry cards, found {count}"
 
         # In sm:grid-cols-4, each box width should be properly sized
-        container_rect = page.locator("section.px-4 .grid").bounding_box()
+        container_rect = page.locator('[data-testid="risk-telemetry"]').bounding_box()
         assert container_rect is not None
         for i in range(count):
             box = telemetry_boxes.nth(i)
@@ -606,4 +606,3 @@ if __name__ == "__main__":
     print("🚀 Launching Challenger Mobile Responsiveness Test Suite...")
     exit_code = pytest.main([__file__, "-v", "-s"])
     sys.exit(exit_code)
-

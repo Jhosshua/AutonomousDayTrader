@@ -25,6 +25,7 @@ const requiredFiles = [
   "components/LiveChart.tsx",
   "components/ManualControls.tsx",
   "components/ExecutionLog.tsx",
+  "components/TradeHistory.tsx",
 ];
 
 for (const file of requiredFiles) {

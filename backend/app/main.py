@@ -4,12 +4,13 @@ FastAPI Core Trading Engine API Server & Real-Time WebSocket Streaming (Port 800
 from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional, Set
+from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -21,7 +22,14 @@ from backend.app.core.bracket import BracketChildType, BracketStatus, DynamicBra
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
 from backend.app.core.event_bus import event_bus
 from backend.app.core.flattening import ET_TZ, FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
+from backend.app.core.persistence import (
+    SCHEMA_VERSION,
+    PersistenceError,
+    TradingStateStore,
+    encode_runtime_value,
+)
 from backend.app.core.risk import BreakerStatus, InstitutionalRiskEngine, RiskEngineConfig
+from backend.app.core.runtime_state import capture_runtime_state, restore_runtime_state
 from backend.app.ingestion.news_ws import NewsWebSocketClient
 from backend.app.ingestion.stock_ws import StockWebSocketClient
 from backend.app.ingestion.vix_client import VixClient
@@ -121,6 +129,11 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
         elif existing_pos.side == PositionSide.SHORT and order.side == OrderSide.BUY:
             is_exit = True
 
+    # A failed durable write must never be followed by more exposure that only
+    # exists in volatile memory. Position-reducing orders remain available.
+    if state_store is not None and not persistence_healthy and not is_exit:
+        return False, "PERSISTENCE_RECOVERY_HALT: durable ledger is unavailable"
+
     # Estimate entry price (do NOT set est_price = order.stop_price!)
     sym = order.symbol.upper()
     est_price = order.limit_price
@@ -169,6 +182,179 @@ vix_client: Optional[VixClient] = None
 ui_clients: Set[WebSocket] = set()
 recent_news: List[Dict[str, Any]] = []
 last_vix_print: Optional[VixPrint] = None
+
+# Durable state is opt-in outside production so deterministic test/replay runs
+# cannot contaminate the live paper ledger. Railway enables it on a volume.
+state_store: Optional[TradingStateStore] = (
+    TradingStateStore(settings.STATE_DB_PATH) if settings.PERSISTENCE_ENABLED else None
+)
+persistence_healthy: bool = state_store is not None or not settings.PERSISTENCE_REQUIRED
+persistence_error: Optional[str] = None
+persistence_restored: bool = False
+persistence_revision: int = 0
+ledger_revision: int = 0
+pending_trade_records: Dict[str, Dict[str, Any]] = {}
+pending_session_summaries: Dict[str, Dict[str, Any]] = {}
+pending_processed_events: Dict[str, str] = {}
+inflight_event_keys: Set[str] = set()
+
+
+def _capture_checkpoint() -> Dict[str, Any]:
+    return capture_runtime_state(
+        account=account,
+        engine=engine,
+        bracket_manager=bracket_manager,
+        risk_engine=risk_engine,
+        flattening_engine=flattening_engine,
+        adaptation_engine=adaptation_engine,
+        strategies=strategies,
+        entry_order_to_bracket=entry_order_to_bracket,
+        bracket_realized_pnl=bracket_realized_pnl,
+        completed_brackets_recorded=completed_brackets_recorded,
+        latest_market_prices=latest_market_prices,
+        market_history=market_history,
+        recent_news=recent_news,
+        last_session_date=last_session_date,
+        last_vix_print=last_vix_print,
+        ledger_revision=ledger_revision,
+    )
+
+
+def _checkpoint_runtime(
+    reason: str, processed_event: Optional[Tuple[str, str]] = None
+) -> bool:
+    """Atomically persist all recovery state and pending immutable ledger rows."""
+    global persistence_healthy, persistence_error, persistence_revision, ledger_revision
+    if state_store is None or simulation_mode:
+        return True
+    # Nested mutations (session rollover, flattening) can occur while a market
+    # input is being applied. They must not checkpoint a half-applied input;
+    # the outer handler commits the complete result with the inbox marker.
+    if inflight_event_keys and not pending_processed_events and processed_event is None:
+        return True
+    if processed_event is not None:
+        pending_processed_events[processed_event[0]] = processed_event[1]
+    try:
+        revision, inserted_trades = state_store.save_checkpoint(
+            _capture_checkpoint(),
+            reason=reason,
+            trades=list(pending_trade_records.values()),
+            session_summaries=list(pending_session_summaries.values()),
+            processed_events=list(pending_processed_events.items()),
+        )
+        persistence_revision = revision
+        ledger_revision += inserted_trades
+        pending_trade_records.clear()
+        pending_session_summaries.clear()
+        for event_key in list(pending_processed_events):
+            inflight_event_keys.discard(event_key)
+        pending_processed_events.clear()
+        persistence_healthy = True
+        persistence_error = None
+        if settings.STATE_BACKUP_PATH and reason in {"SESSION_BOUNDARY", "GRACEFUL_SHUTDOWN"}:
+            state_store.backup(settings.STATE_BACKUP_PATH)
+        return True
+    except Exception as exc:
+        persistence_healthy = False
+        persistence_error = f"{type(exc).__name__}: {exc}"
+        log.exception("Durable checkpoint failed; new entries are locked out")
+        # Remove only exposure-increasing orders. Protective/position-reducing
+        # orders stay live so recovery halt cannot strand an open position.
+        for order_id, order in list(engine.working_orders.items()):
+            position = account.positions.get(order.symbol)
+            is_reducing = bool(
+                position
+                and (
+                    (position.side == PositionSide.LONG and order.side == OrderSide.SELL)
+                    or (position.side == PositionSide.SHORT and order.side == OrderSide.BUY)
+                )
+            )
+            is_pending_entry = order_id in entry_order_to_bracket
+            if is_pending_entry or (order.parent_order_id is None and not is_reducing):
+                try:
+                    engine.cancel_order(order_id, reason="PERSISTENCE_RECOVERY_HALT")
+                except Exception:
+                    log.exception("Could not cancel opening order %s during recovery halt", order_id)
+        _release_dead_entry_brackets()
+        return False
+
+
+def _event_key(event_type: str, event: Any) -> str:
+    encoded = encode_runtime_value(event)
+    raw = json.dumps(encoded, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return f"{event_type.lower()}:{hashlib.sha256(raw.encode('utf-8')).hexdigest()}"
+
+
+def _begin_durable_event(event_type: str, event: Any) -> Tuple[bool, Optional[str]]:
+    """Write an input to the durable inbox before it can fill or mutate state."""
+    global persistence_healthy, persistence_error
+    if state_store is None or simulation_mode:
+        return True, None
+    event_key = _event_key(event_type, event)
+    if event_key in inflight_event_keys:
+        return False, event_key
+    try:
+        should_process = state_store.begin_event(event_key, event_type, event)
+    except Exception as exc:
+        persistence_healthy = False
+        persistence_error = f"{type(exc).__name__}: {exc}"
+        log.exception("Could not stage %s input; event rejected before mutation", event_type)
+        return False, event_key
+    if not should_process:
+        return False, event_key
+    inflight_event_keys.add(event_key)
+    return True, event_key
+
+
+def _restore_checkpoint() -> bool:
+    """Restore production state before any relay or clock task can mutate it."""
+    global last_session_date, last_vix_print, persistence_healthy
+    global persistence_error, persistence_restored, persistence_revision, ledger_revision
+    if state_store is None:
+        if settings.PERSISTENCE_REQUIRED:
+            raise PersistenceError("Persistence is required but PERSISTENCE_ENABLED is false")
+        return False
+    state_store.integrity_check()
+    loaded = state_store.load_checkpoint()
+    if loaded is None:
+        if settings.PERSISTENCE_REQUIRED:
+            raise PersistenceError(
+                "Persistence is required but the durable store has no runtime checkpoint"
+            )
+        _checkpoint_runtime("INITIALIZE_FRESH_ACCOUNT")
+        return False
+    payload, revision, _saved_at = loaded
+    restored = restore_runtime_state(
+        payload,
+        account=account,
+        engine=engine,
+        bracket_manager=bracket_manager,
+        risk_engine=risk_engine,
+        flattening_engine=flattening_engine,
+        adaptation_engine=adaptation_engine,
+        strategies=strategies,
+        entry_order_to_bracket=entry_order_to_bracket,
+        bracket_realized_pnl=bracket_realized_pnl,
+        completed_brackets_recorded=completed_brackets_recorded,
+        latest_market_prices=latest_market_prices,
+        market_history=market_history,
+        recent_news=recent_news,
+    )
+    last_session_date = restored["last_session_date"]
+    last_vix_print = restored["last_vix_print"]
+    persistence_revision = revision
+    ledger_revision = max(restored["ledger_revision"], state_store.trade_count())
+    persistence_healthy = True
+    persistence_error = None
+    persistence_restored = True
+    log.info(
+        "Restored durable trading state revision %d: equity=$%.2f, positions=%d, trades=%d",
+        revision,
+        account.equity,
+        len(account.positions),
+        state_store.trade_count(),
+    )
+    return True
 
 
 def _atr_estimate(symbol: str, bar: BarEvent, period: int = 14) -> float:
@@ -296,6 +482,91 @@ def _apply_bracket_directive(bracket_id: str, directive: Any) -> None:
             order.stop_price = float(modification["new_stop_price"])
 
 
+def _completed_trade_record(bracket_id: str, realized_pnl: float) -> Optional[Dict[str, Any]]:
+    """Build one immutable closed-trade row from its entry and exit fill legs."""
+    bracket = bracket_manager.brackets.get(bracket_id)
+    if not bracket:
+        return None
+    entry_order_id = bracket_id[4:] if bracket_id.startswith("brk_") else None
+    entry_order = engine.orders.get(entry_order_id or "")
+    entry_fills = list(entry_order.fills) if entry_order else []
+    exit_orders = [order for order in engine.orders.values() if order.parent_order_id == bracket_id]
+    exit_fills = [fill for order in exit_orders for fill in order.fills]
+    if not entry_fills or not exit_fills:
+        return None
+    entry_qty = sum(fill.qty for fill in entry_fills)
+    exit_qty = sum(fill.qty for fill in exit_fills)
+    avg_entry = sum(fill.qty * fill.price for fill in entry_fills) / max(1, entry_qty)
+    avg_exit = sum(fill.qty * fill.price for fill in exit_fills) / max(1, exit_qty)
+    opened_at = min(fill.timestamp for fill in entry_fills)
+    closed_at = max(fill.timestamp for fill in exit_fills)
+    opened_et = opened_at.astimezone(ET_TZ) if opened_at.tzinfo else opened_at.replace(tzinfo=timezone.utc).astimezone(ET_TZ)
+    all_fills = entry_fills + exit_fills
+    return {
+        "trade_id": bracket_id,
+        # A recovery liquidation after midnight still belongs to the session
+        # where exposure was opened; otherwise the prior-day summary omits it.
+        "session_date": opened_et.date().isoformat(),
+        "symbol": bracket.symbol,
+        "side": bracket.side,
+        "status": "CLOSED",
+        "strategy_id": bracket.strategy_id,
+        "opened_at": opened_at.isoformat(),
+        "closed_at": closed_at.isoformat(),
+        "quantity": min(entry_qty, exit_qty),
+        "avg_entry_price": round(avg_entry, 4),
+        "avg_exit_price": round(avg_exit, 4),
+        "realized_pnl": round(realized_pnl, 2),
+        "fees": round(sum(fill.fee for fill in all_fills), 4),
+        "exit_reason": bracket.status.value,
+        "aggregate_only": False,
+        "fill_legs": [
+            {
+                "fill_id": fill.fill_id,
+                "order_id": fill.order_id,
+                "side": fill.side.value,
+                "qty": fill.qty,
+                "price": fill.price,
+                "fee": fill.fee,
+                "realized_pnl": fill.realized_pnl,
+                "timestamp": fill.timestamp.isoformat(),
+            }
+            for fill in all_fills
+        ],
+    }
+
+
+def _session_summary(session_day: Any, source: str = "SYSTEM") -> Dict[str, Any]:
+    session_date = session_day.isoformat() if hasattr(session_day, "isoformat") else str(session_day)
+    trades_by_id: Dict[str, Dict[str, Any]] = {}
+    if state_store is not None:
+        for trade in state_store.list_trades_for_session(session_date):
+            trades_by_id[trade["trade_id"]] = trade
+    for trade in pending_trade_records.values():
+        if trade.get("session_date") == session_date:
+            trades_by_id[trade["trade_id"]] = trade
+    session_fees = sum(float(trade.get("fees", 0.0)) for trade in trades_by_id.values())
+    return {
+        "session_date": session_date,
+        "opening_equity": round(account.daily_starting_equity, 2),
+        "closing_equity": round(account.equity, 2),
+        "realized_pnl": round(account.equity - account.daily_starting_equity, 2),
+        "trades_count": len(trades_by_id),
+        "wins": sum(1 for trade in trades_by_id.values() if float(trade.get("realized_pnl", 0)) > 0),
+        "losses": sum(1 for trade in trades_by_id.values() if float(trade.get("realized_pnl", 0)) < 0),
+        "fees": round(session_fees, 4),
+        "strategies": {
+            strategy.strategy_id: {
+                "trades_count": strategy.trades_count,
+                "realized_pnl": strategy.daily_pnl,
+            }
+            for strategy in strategies
+        },
+        "source": source,
+        "aggregate_only": source == "LEGACY_SUMMARY_IMPORT",
+    }
+
+
 def _record_completed_bracket(bracket_id: str) -> None:
     if bracket_id in completed_brackets_recorded:
         return
@@ -303,9 +574,13 @@ def _record_completed_bracket(bracket_id: str) -> None:
     if not bracket:
         return
     completed_brackets_recorded.add(bracket_id)
+    realized_pnl = bracket_realized_pnl.get(bracket_id, 0.0)
     strategy = strategy_map.get(bracket.strategy_id)
     if strategy:
-        strategy.record_trade(bracket_realized_pnl.get(bracket_id, 0.0))
+        strategy.record_trade(realized_pnl)
+    trade = _completed_trade_record(bracket_id, realized_pnl)
+    if trade:
+        pending_trade_records[trade["trade_id"]] = trade
     bracket_realized_pnl.pop(bracket_id, None)
 
 
@@ -423,14 +698,22 @@ def _check_session_boundary(now_dt: datetime) -> None:
     if last_session_date == session_date:
         return
     is_first_observation = last_session_date is None
-    last_session_date = session_date
+    previous_session_date = last_session_date
     if is_first_observation:
+        last_session_date = session_date
         return
+    boundary_event_key: Optional[str] = None
+    if not inflight_event_keys:
+        should_process, boundary_event_key = _begin_durable_event(
+            "SESSION_BOUNDARY", {"timestamp": now_dt}
+        )
+        if not should_process:
+            return
     log.info("New ET session %s detected; resetting daily session state", session_date)
     if engine.working_orders:
         log.warning("Session boundary detected with %d open working orders; cancelling all", len(engine.working_orders))
         engine.cancel_all_orders("SESSION_BOUNDARY_PURGE")
-        engine.working_orders.clear()
+        _release_dead_entry_brackets()
     # A position still on the book at a session boundary means the prior day's
     # 15:55 flatten did not complete. Liquidate it. Clearing positions blind
     # would leave the broker holding shares this process no longer tracks, and
@@ -443,9 +726,10 @@ def _check_session_boundary(now_dt: datetime) -> None:
         )
         for sym, pos in list(account.positions.items()):
             side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
+            bracket_id = bracket_manager.symbol_to_bracket.get(sym)
             liq_order = engine.create_order(
                 symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
-                strategy_id="SESSION_BOUNDARY_LIQUIDATION",
+                strategy_id="SESSION_BOUNDARY_LIQUIDATION", parent_order_id=bracket_id,
             )
             engine.submit_order(liq_order.id)
             _reconcile_fills(_flatten_symbol(sym, pos.market_price, now_dt))
@@ -455,6 +739,17 @@ def _check_session_boundary(now_dt: datetime) -> None:
                 "next flatten sweep retries.",
                 ", ".join(sorted(account.positions)),
             )
+            _checkpoint_runtime(
+                "SESSION_BOUNDARY_LIQUIDATION_INCOMPLETE",
+                (boundary_event_key, "SESSION_BOUNDARY") if boundary_event_key else None,
+            )
+            return
+    # Forced exits now belong to the prior day before its immutable summary is
+    # calculated. Only a verified-flat book may advance and clear linkage.
+    if previous_session_date is not None:
+        summary = _session_summary(previous_session_date)
+        pending_session_summaries[summary["session_date"]] = summary
+    last_session_date = session_date
     risk_engine.reset_daily_metrics(account.equity)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
@@ -468,6 +763,10 @@ def _check_session_boundary(now_dt: datetime) -> None:
     completed_brackets_recorded.clear()
     for strategy in strategies:
         strategy.reset_daily_stats()
+    _checkpoint_runtime(
+        "SESSION_BOUNDARY",
+        (boundary_event_key, "SESSION_BOUNDARY") if boundary_event_key else None,
+    )
 
 
 async def broadcast_ui_state() -> None:
@@ -505,6 +804,14 @@ async def broadcast_ui_state() -> None:
         "all_positions": [_serialize_position(symbol) for symbol in account.positions],
         "positions_count": len(account.positions),
         "working_orders_count": len(engine.working_orders),
+        "ledger_revision": ledger_revision,
+        "persistence": {
+            "status": "durable" if persistence_healthy and state_store else (
+                "disabled" if state_store is None else "recovery_halt"
+            ),
+            "last_checkpoint_at": state_store.last_checkpoint_at if state_store else None,
+            "restored_at": state_store.restored_at if state_store else None,
+        },
         "ingestion": relay_statuses,
         "recent_news": recent_news[-10:],
         "recent_activity": [
@@ -660,6 +967,14 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 # Event Bus Handlers
 async def handle_bar_event(bar: BarEvent) -> None:
     """Ingest bar, update clocks, match orders, process strategies, check risk, update trailing stops."""
+    should_process, event_key = _begin_durable_event("BAR", bar)
+    if not should_process:
+        return
+    if simulation_mode:
+        flattening_engine.clock.set_simulated_time(bar.timestamp)
+    else:
+        flattening_engine.clock.clear_simulated_time()
+    _check_session_boundary(bar.timestamp)
     latest_market_prices[bar.symbol.upper()] = bar.close
     _mark_feed_event("bar")
     history = market_history.setdefault(bar.symbol.upper(), [])
@@ -672,11 +987,6 @@ async def handle_bar_event(bar: BarEvent) -> None:
         "volume": bar.volume,
     })
     del history[:-120]
-    if simulation_mode:
-        flattening_engine.clock.set_simulated_time(bar.timestamp)
-    else:
-        flattening_engine.clock.clear_simulated_time()
-    _check_session_boundary(bar.timestamp)
     adaptation_engine.update_clock(bar.timestamp)
     for strat in strategies:
         try:
@@ -740,11 +1050,51 @@ async def handle_bar_event(bar: BarEvent) -> None:
             if oid in engine.working_orders:
                 engine.working_orders[oid].stop_price = mod["new_stop_price"]
 
+    _checkpoint_runtime("BAR_EVENT", (event_key, "BAR") if event_key else None)
     await broadcast_ui_state()
+
+
+def _quote_requires_write_ahead(quote: QuoteEvent) -> bool:
+    """Return true only when this quote can fill or trip a liquidation."""
+    symbol = quote.symbol.upper()
+    for order in engine.working_orders.values():
+        if order.symbol != symbol:
+            continue
+        if order.order_type == OrderType.MARKET:
+            return True
+        if order.order_type == OrderType.LIMIT and (
+            (order.side == OrderSide.BUY and quote.ask_price <= (order.limit_price or 0.0))
+            or (order.side == OrderSide.SELL and quote.bid_price >= (order.limit_price or 0.0))
+        ):
+            return True
+        if order.order_type == OrderType.STOP and (
+            (order.side == OrderSide.BUY and quote.ask_price >= (order.stop_price or 0.0))
+            or (order.side == OrderSide.SELL and quote.bid_price <= (order.stop_price or 0.0))
+        ):
+            return True
+    position = account.positions.get(symbol)
+    if position is None:
+        return False
+    if risk_engine.status == BreakerStatus.HALTED_DAILY_LOSS:
+        return True
+    mid = (quote.bid_price + quote.ask_price) / 2.0
+    if position.side == PositionSide.LONG:
+        projected_unrealized = position.shares * (mid - position.avg_entry_price)
+    else:
+        projected_unrealized = position.shares * (position.avg_entry_price - mid)
+    projected_equity = account.equity + projected_unrealized - position.unrealized_pnl
+    projected_drawdown = max(0.0, risk_engine.config.starting_equity - projected_equity)
+    return projected_drawdown >= risk_engine.config.hard_max_daily_loss_dollars
 
 
 async def handle_quote_event(quote: QuoteEvent) -> None:
     """Ingest quote and match working orders."""
+    can_fill = _quote_requires_write_ahead(quote)
+    event_key: Optional[str] = None
+    if can_fill:
+        should_process, event_key = _begin_durable_event("QUOTE", quote)
+        if not should_process:
+            return
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
     _mark_feed_event("quote")
     for strat in strategies:
@@ -753,6 +1103,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         except Exception as e:
             log.error(f"Strategy {strat.strategy_id} error on quote: {e}")
 
+    prior_risk_status = risk_engine.status
     fills = engine.process_quote(
         symbol=quote.symbol,
         bid=quote.bid_price,
@@ -772,11 +1123,18 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
     if status == BreakerStatus.HALTED_DAILY_LOSS:
         _trip_circuit_breaker(quote.timestamp)
 
+    if event_key:
+        _checkpoint_runtime("QUOTE_MUTATION", (event_key, "QUOTE"))
+    elif fills or risk_engine.status != prior_risk_status:
+        _checkpoint_runtime("QUOTE_MUTATION")
     await broadcast_ui_state()
 
 
 async def handle_news_event(news: NewsEvent) -> None:
     """Record news, trigger catalyst events and contradiction checks."""
+    should_process, event_key = _begin_durable_event("NEWS", news)
+    if not should_process:
+        return
     _mark_feed_event("news")
     recent_news.append({
         "headline": news.headline,
@@ -799,12 +1157,19 @@ async def handle_news_event(news: NewsEvent) -> None:
     exit_signals = news_strategy.on_news(news)
     for sig in exit_signals:
         await execute_strategy_signal(sig)
+    _checkpoint_runtime("NEWS_EVENT", (event_key, "NEWS") if event_key else None)
     await broadcast_ui_state()
 
 
 async def handle_vix_print(vprint: VixPrint) -> None:
     """Update VIX print and scale risk and adaptation parameters."""
     global last_vix_print
+    previous_vix_state = (
+        adaptation_engine.current_vix,
+        adaptation_engine.current_vix_regime,
+        adaptation_engine.current_sizing_multiplier,
+        adaptation_engine.current_stop_multiplier,
+    )
     last_vix_print = vprint
     _mark_feed_event("vix")
     if vprint.is_stale or vprint.is_fallback:
@@ -826,11 +1191,24 @@ async def handle_vix_print(vprint: VixPrint) -> None:
             strat.on_vix(vprint)
         except Exception as e:
             log.error(f"Strategy {strat.strategy_id} error on vix: {e}")
+    current_vix_state = (
+        adaptation_engine.current_vix,
+        adaptation_engine.current_vix_regime,
+        adaptation_engine.current_sizing_multiplier,
+        adaptation_engine.current_stop_multiplier,
+    )
+    if current_vix_state != previous_vix_state:
+        _checkpoint_runtime("VIX_STATE")
     await broadcast_ui_state()
 
 
 async def handle_flattening_directive(directive: FlatteningDirective) -> None:
     """Apply auto-flattening directives."""
+    event_key: Optional[str] = None
+    if not inflight_event_keys:
+        should_process, event_key = _begin_durable_event("FLATTENING", directive)
+        if not should_process:
+            return
     if directive.cancel_all_orders:
         engine.cancel_all_orders("FLATTENING_DIRECTIVE")
         _release_dead_entry_brackets()
@@ -876,12 +1254,18 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
 
         if audit_res.audit_passed:
             account.status = account.status.__class__.EOD_FLAT
+    _checkpoint_runtime(
+        f"FLATTENING_{directive.phase.value}",
+        (event_key, "FLATTENING") if event_key else None,
+    )
 
 
 async def _runtime_clock_loop() -> None:
     """Keep EOD controls alive even when a market-data bar is delayed or absent."""
     while True:
         try:
+            if pending_processed_events:
+                _checkpoint_runtime("PERSISTENCE_RETRY")
             if simulation_mode:
                 # Replay bars advance the simulated clock synchronously.  Do
                 # not let the wall-clock task observe the host's unrelated
@@ -942,6 +1326,10 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     entry_order_to_bracket.clear()
     bracket_realized_pnl.clear()
     completed_brackets_recorded.clear()
+    pending_trade_records.clear()
+    pending_session_summaries.clear()
+    pending_processed_events.clear()
+    inflight_event_keys.clear()
     latest_market_prices.clear()
     for _feed in feed_last_event:
         feed_last_event[_feed] = None
@@ -966,6 +1354,13 @@ def set_simulation_mode(enabled: bool) -> None:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup and graceful teardown lifecycle."""
     log.info(f"Starting AutonomousDayTrader backend on port {settings.API_PORT}...")
+    if settings.ENV.lower() == "production" and (
+        not settings.PERSISTENCE_ENABLED or not settings.PERSISTENCE_REQUIRED
+    ):
+        raise PersistenceError(
+            "Production requires PERSISTENCE_ENABLED=true and PERSISTENCE_REQUIRED=true"
+        )
+    _restore_checkpoint()
     # Register bus event handlers
     event_bus.subscribe(BarEvent, handle_bar_event)
     event_bus.subscribe(QuoteEvent, handle_quote_event)
@@ -973,6 +1368,35 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     event_bus.subscribe(NewsEvent, handle_news_event)
     event_bus.subscribe(VixPrint, handle_vix_print)
     event_bus.subscribe(RelayStatusEvent, _handle_relay_status)
+
+    if state_store is not None:
+        for event_key, event_type, event in state_store.list_pending_events():
+            log.warning("Replaying pending durable %s event %s", event_type, event_key)
+            if event_type == "BAR" and isinstance(event, BarEvent):
+                await handle_bar_event(event)
+            elif event_type == "QUOTE" and isinstance(event, QuoteEvent):
+                await handle_quote_event(event)
+            elif event_type == "NEWS" and isinstance(event, NewsEvent):
+                await handle_news_event(event)
+            elif event_type == "FLATTENING" and isinstance(event, FlatteningDirective):
+                await handle_flattening_directive(event)
+            elif event_type == "SESSION_BOUNDARY" and isinstance(event, dict):
+                _check_session_boundary(event["timestamp"])
+            elif event_type == "MANUAL_FLATTEN" and isinstance(event, dict):
+                should_process, replay_key = _begin_durable_event("MANUAL_FLATTEN", event)
+                if should_process:
+                    await _execute_manual_flatten(
+                        [str(symbol).upper() for symbol in event["target_symbols"]],
+                        event["timestamp"],
+                        replay_key,
+                    )
+            else:
+                raise PersistenceError(
+                    f"Unsupported pending event {event_key} ({event_type}/{type(event).__name__})"
+                )
+            if event_key in pending_processed_events:
+                if not _checkpoint_runtime("PENDING_EVENT_REPLAY_RETRY"):
+                    raise PersistenceError(f"Could not commit replayed event {event_key}")
 
     global stock_ws_client, news_ws_client, vix_client
     configured = bool(settings.RELAY_TOKEN)
@@ -1005,9 +1429,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except asyncio.CancelledError:
             pass
         runtime_tasks.discard(task)
+    # Producers are fully stopped before the final durable checkpoint. Nothing
+    # can fill or mutate the account after this point.
+    checkpoint_saved = False
+    for attempt in range(5):
+        if _checkpoint_runtime("GRACEFUL_SHUTDOWN"):
+            checkpoint_saved = True
+            break
+        await asyncio.sleep(0.5 * (attempt + 1))
+    if state_store is not None and not checkpoint_saved:
+        log.critical("Final durable checkpoint failed after all shutdown retries")
     stock_ws_client = None
     news_ws_client = None
     vix_client = None
+    if state_store is not None:
+        state_store.close()
     log.info("Shutdown complete.")
 
 
@@ -1043,6 +1479,8 @@ async def get_health() -> Dict[str, Any]:
     operational_status = "healthy" if configured and all(
         relay_statuses.get(feed) == "connected" for feed in ("stock", "news", "vix")
     ) else "degraded" if configured else "unconfigured"
+    if settings.PERSISTENCE_REQUIRED and not persistence_healthy:
+        operational_status = "recovery_halt"
     return {
         "status": operational_status,
         "mode": settings.ENV,
@@ -1071,6 +1509,18 @@ async def get_health() -> Dict[str, Any]:
             "mock": settings.MOCK_PORT,
         },
         "relay": relay_statuses,
+        "persistence": {
+            "status": "durable" if persistence_healthy and state_store else (
+                "disabled" if state_store is None else "recovery_halt"
+            ),
+            "required": settings.PERSISTENCE_REQUIRED,
+            "schema_version": SCHEMA_VERSION if state_store else None,
+            "checkpoint_revision": persistence_revision,
+            "ledger_revision": ledger_revision,
+            "last_checkpoint_at": state_store.last_checkpoint_at if state_store else None,
+            "restored_at": state_store.restored_at if state_store else None,
+            "error": persistence_error,
+        },
         # Read live off the wired engine, not from config constants, so the deployed
         # build's actual limits are verifiable from outside without placing an order.
         "limits": {
@@ -1165,7 +1615,88 @@ async def get_market_context() -> Dict[str, Any]:
 @app.get("/api/audit")
 async def get_audit_log(limit: int = 50) -> List[Dict[str, Any]]:
     """Recent execution and order audit trail."""
-    return [r.__dict__ for r in engine.audit_log[-limit:]]
+    return [r.__dict__ for r in reversed(engine.audit_log[-limit:])]
+
+
+@app.get("/api/trades")
+async def get_trade_history(
+    range: str = "7d",
+    limit: int = 25,
+    cursor: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Paginated durable completed-trade history and aggregate-only recoveries."""
+    if state_store is None:
+        raise HTTPException(status_code=503, detail="Durable trade history is not enabled")
+    if range not in {"today", "7d", "all"}:
+        raise HTTPException(status_code=400, detail="range must be today, 7d, or all")
+    limit = max(1, min(limit, 100))
+    today_et = datetime.now(ET_TZ).date()
+    start_date = None
+    if range == "today":
+        start_date = today_et.isoformat()
+    elif range == "7d":
+        start_date = (today_et - timedelta(days=6)).isoformat()
+
+    try:
+        items, next_cursor = state_store.list_trades(start_date, limit=limit, cursor=cursor)
+    except PersistenceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    trade_stats = state_store.aggregate_trade_stats(start_date)
+    all_summaries = state_store.list_session_summaries(start_date)
+    recovered_sessions = [
+        summary
+        for summary in all_summaries
+        if summary.get("aggregate_only")
+    ]
+    trades_count = int(trade_stats["trades_count"]) + sum(int(s.get("trades_count", 0)) for s in recovered_sessions)
+    wins = int(trade_stats["wins"])
+    losses = int(trade_stats["losses"])
+    # Aggregate-only recoveries intentionally do not invent win/loss details.
+    realized_pnl = round(
+        float(trade_stats["realized_pnl"])
+        + sum(float(s.get("realized_pnl", 0.0)) for s in recovered_sessions),
+        2,
+    )
+    fees = round(
+        float(trade_stats["fees"])
+        + sum(float(s.get("fees", 0.0)) for s in recovered_sessions),
+        2,
+    )
+    opening_equity = account.daily_starting_equity
+    if all_summaries:
+        earliest = min(all_summaries, key=lambda summary: summary["session_date"])
+        opening_equity = float(earliest.get("opening_equity", opening_equity))
+    return {
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "timezone": "America/New_York",
+        "persistence": {
+            "status": "durable" if persistence_healthy else "recovery_halt",
+            "last_checkpoint_at": state_store.last_checkpoint_at,
+            "restored_at": state_store.restored_at,
+            "schema_version": SCHEMA_VERSION,
+        },
+        "summary": {
+            "opening_equity": round(opening_equity, 2),
+            "current_equity": round(account.equity, 2),
+            "realized_pnl": realized_pnl,
+            "fees": fees,
+            "fees_known": all(summary.get("fees_known", True) for summary in recovered_sessions),
+            "trades_count": trades_count,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": round(wins / max(1, wins + losses), 4),
+        },
+        "items": items,
+        "recovered_sessions": recovered_sessions,
+        "next_cursor": next_cursor,
+    }
+
+
+@app.get("/api/history/sessions")
+async def get_session_history() -> List[Dict[str, Any]]:
+    if state_store is None:
+        raise HTTPException(status_code=503, detail="Durable session history is not enabled")
+    return state_store.list_session_summaries(None)
 
 
 class OrderCreateRequest(BaseModel):
@@ -1189,17 +1720,59 @@ async def submit_order(req: OrderCreateRequest) -> Dict[str, Any]:
     if otype == OrderType.STOP_LIMIT:
         raise HTTPException(status_code=400, detail="STOP_LIMIT orders are not supported by the execution engine")
 
+    symbol = req.symbol.upper()
+    existing_pos = account.positions.get(symbol)
+    is_reducing = bool(
+        existing_pos
+        and (
+            (existing_pos.side == PositionSide.LONG and side == OrderSide.SELL)
+            or (existing_pos.side == PositionSide.SHORT and side == OrderSide.BUY)
+        )
+        and req.qty <= existing_pos.shares
+    )
+    bracket_id = bracket_manager.symbol_to_bracket.get(symbol) if is_reducing else None
+    if existing_pos is not None and not is_reducing:
+        raise HTTPException(
+            status_code=409,
+            detail="Manual position increases are disabled; flatten the tracked bracket first",
+        )
+    if is_reducing and bracket_id is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Position has no durable trade linkage; use the recovery flatten workflow",
+        )
+    estimated_entry = req.limit_price or latest_market_prices.get(symbol)
+    if not is_reducing and (req.stop_price is None or not estimated_entry):
+        raise HTTPException(
+            status_code=400,
+            detail="Opening orders require stop_price and a known limit/latest market price",
+        )
+
     order = engine.create_order(
-        symbol=req.symbol,
+        symbol=symbol,
         side=side,
         order_type=otype,
         qty=req.qty,
         limit_price=req.limit_price,
         stop_price=req.stop_price,
-        estimated_price=latest_market_prices.get(req.symbol.upper()),
+        estimated_price=estimated_entry,
         strategy_id=req.strategy_id,
+        parent_order_id=bracket_id,
     )
     submitted = engine.submit_order(order.id)
+    if submitted.status.value == "ACCEPTED" and not is_reducing:
+        bracket = bracket_manager.create_bracket(
+            bracket_id=f"brk_{submitted.id}",
+            symbol=symbol,
+            side="LONG" if side == OrderSide.BUY else "SHORT",
+            total_qty=req.qty,
+            entry_price=float(estimated_entry),
+            stop_price=float(req.stop_price),
+            strategy_id=req.strategy_id,
+            timestamp=datetime.now(timezone.utc),
+        )
+        entry_order_to_bracket[submitted.id] = bracket.bracket_id
+    _checkpoint_runtime("API_ORDER_SUBMIT")
     return {
         "order_id": submitted.id,
         "status": submitted.status.value,
@@ -1213,6 +1786,7 @@ async def cancel_order(order_id: str) -> Dict[str, Any]:
     try:
         cancelled = engine.cancel_order(order_id, reason="API_REQUEST")
         _release_dead_entry_brackets()
+        _checkpoint_runtime("API_ORDER_CANCEL")
         return {"order_id": cancelled.id, "status": cancelled.status.value}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1222,11 +1796,9 @@ class FlattenRequest(BaseModel):
     symbol: Optional[str] = None
 
 
-@app.post("/api/flatten")
-async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]:
-    """Manually flatten a position or all open positions."""
-    now_dt = datetime.now(timezone.utc)
-    target_symbols = [req.symbol.upper()] if (req and req.symbol) else list(account.positions.keys())
+async def _execute_manual_flatten(
+    target_symbols: List[str], now_dt: datetime, event_key: Optional[str]
+) -> Dict[str, Any]:
     flattened = []
 
     for sym in target_symbols:
@@ -1248,8 +1820,24 @@ async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]
             _reconcile_fills(fills)
             flattened.append(sym)
 
+    _checkpoint_runtime(
+        "MANUAL_FLATTEN",
+        (event_key, "MANUAL_FLATTEN") if event_key else None,
+    )
     await broadcast_ui_state()
     return {"flattened": flattened, "remaining_positions": len(account.positions)}
+
+
+@app.post("/api/flatten")
+async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]:
+    """Manually flatten a position or all open positions."""
+    now_dt = datetime.now(timezone.utc)
+    target_symbols = [req.symbol.upper()] if (req and req.symbol) else list(account.positions.keys())
+    payload = {"target_symbols": target_symbols, "timestamp": now_dt}
+    should_process, event_key = _begin_durable_event("MANUAL_FLATTEN", payload)
+    if not should_process:
+        return {"flattened": [], "remaining_positions": len(account.positions), "duplicate": True}
+    return await _execute_manual_flatten(target_symbols, now_dt, event_key)
 
 
 # Real-Time UI WebSocket Endpoint (Port 8005)
@@ -1285,6 +1873,7 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                             oid = mod.get("order_id")
                             if oid and oid in engine.working_orders:
                                 engine.working_orders[oid].stop_price = mod.get("new_stop_price", new_stop)
+                    _checkpoint_runtime("MANUAL_TIGHTEN_STOP")
                     await broadcast_ui_state()
             except Exception as e:
                 log.error(f"Error handling UI action: {e}")

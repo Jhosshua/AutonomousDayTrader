@@ -35,6 +35,26 @@ class Settings(BaseSettings):
         description="Start AlpacaRelay stock, news, and VIX clients during application lifespan"
     )
 
+    # Durable singleton state. Production enables this against a Railway volume;
+    # tests and local development remain opt-in so replays cannot contaminate the
+    # live paper ledger.
+    PERSISTENCE_ENABLED: bool = Field(
+        default=False,
+        description="Persist account, orders, brackets, strategies, and history"
+    )
+    PERSISTENCE_REQUIRED: bool = Field(
+        default=False,
+        description="Fail startup instead of silently creating a fresh account when no checkpoint exists"
+    )
+    STATE_DB_PATH: str = Field(
+        default=".data/trading_state.sqlite3",
+        description="SQLite ledger path; production must point this at a durable mounted volume"
+    )
+    STATE_BACKUP_PATH: str = Field(
+        default="",
+        description="Optional same-volume hot backup created at session boundaries and shutdown"
+    )
+
     # Active Ticker Universes & Subscriptions
     WATCHLIST_SYMBOLS: List[str] = Field(
         default=["SPY", "QQQ", "AAPL", "NVDA", "TSLA"],
