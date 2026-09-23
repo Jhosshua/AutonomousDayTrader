@@ -29,20 +29,22 @@ Execute Round 6 Release: update MEMORY.md, ERRORS.md, and PROJECT.md; verify tes
 - **Code layout**: PROJECT.md § Code Layout
 
 ## Key Decisions Made
-- [TBD]
+- Fully documented all Round 6 adversarial findings, attack angles, and remediations in MEMORY.md, ERRORS.md, and PROJECT.md (Milestone M8).
+- Atomic git commit 97d461c created and pushed to origin/main.
+- Live Railway production deployment verified healthy with HTTP 200 OK.
 
 ## Change Tracker
-- **Files modified**: None yet
-- **Build status**: Pending test verification
+- **Files modified**: MEMORY.md, ERRORS.md, PROJECT.md
+- **Build status**: 355/355 pytest passed, 31/31 challenger mutations passed, 320/320 E2E passed, Monday dry run passed, frontend build clean
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: In progress
+- **Build/test result**: PASS (100% across all suites)
 - **Lint status**: 0 violations
-- **Tests added/modified**: test_challenger_r6_remediation.py, test_challenger_r6_signal_collision_and_budget.py
+- **Tests added/modified**: test_challenger_r6_remediation.py (15 tests), test_challenger_r6_signal_collision_and_budget.py (16 tests)
 
 ## Loaded Skills
 - None
 
 ## Artifact Index
-- handoff.md — Final release and deployment report
+- handoff.md — Final release and deployment report (commit 97d461c, Railway deployment a80e144c-3ff0-44fb-9009-e065d92ec056)
