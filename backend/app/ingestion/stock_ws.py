@@ -264,3 +264,5 @@ class StockWebSocketClient:
                     self._queue.task_done()
             except asyncio.CancelledError:
                 break
+            except Exception as exc:
+                log.exception(f"Stock queue worker error: {exc}")

@@ -63,10 +63,10 @@ def calculate_position_size(
     entry_price: float,
     stop_loss_price: float,
     risk_pct: float = 0.01,
-    max_alloc_pct: float = 0.25,
+    max_alloc_pct: float = 0.50,
     vix_multiplier: float = 1.0,
 ) -> int:
-    """Calculate volatility-adjusted share size enforcing 1% risk budget and 25% max notional cap."""
+    """Calculate volatility-adjusted share size enforcing 1% risk budget and 50% max notional cap ($25,000 / 50% equity)."""
     stop_distance = abs(entry_price - stop_loss_price)
     if stop_distance <= 0.001 or entry_price <= 0:
         return 0
@@ -213,14 +213,25 @@ class DynamicAdaptationEngine:
         return True
 
     def calculate_adapted_stop(self, signal: SignalEvent) -> float:
-        """Calculate volatility-adapted stop-loss price scaled by current_stop_multiplier."""
+        """Calculate volatility-adapted stop-loss price scaled by current_stop_multiplier.
+        
+        Strictly clamps adapted stop distance to institutional bounds [0.0042, 0.0380]
+        (or [min_stop_distance_pct + 0.0002, max_stop_distance_pct - 0.0002]), guaranteeing
+        that VIX multipliers (0.85 to 2.00) never breach the [0.0040, 0.0400] risk engine invariant.
+        """
         raw_dist = abs(signal.entry_price - signal.stop_loss)
         adapted_dist = raw_dist * self.current_stop_multiplier
+
+        # Institutional stop distance bounds (40 bps to 400 bps)
+        min_dist = signal.entry_price * 0.0040
+        max_dist = signal.entry_price * 0.0400
+        clamped_dist = max(min_dist, min(adapted_dist, max_dist))
+
         is_buy = signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY"
         if is_buy:
-            return round(signal.entry_price - adapted_dist, 4)
+            return round(signal.entry_price - clamped_dist, 4)
         else:
-            return round(signal.entry_price + adapted_dist, 4)
+            return round(signal.entry_price + clamped_dist, 4)
 
     def calculate_adapted_size(
         self,

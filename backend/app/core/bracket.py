@@ -511,8 +511,9 @@ class DynamicBracketManager:
         self,
         symbol: str,
         new_stop_price: float,
+        current_market_price: Optional[float] = None,
     ) -> BracketUpdateDirective:
-        """Handle manual UI override to tighten stop."""
+        """Handle manual UI override to tighten stop with market price bounds clamping."""
         symbol_upper = symbol.upper()
         bracket_id = self.symbol_to_bracket.get(symbol_upper)
         if not bracket_id:
@@ -524,6 +525,15 @@ class DynamicBracketManager:
 
         if bracket.status not in (BracketStatus.ACTIVE, BracketStatus.TARGET_1_HIT):
             return BracketUpdateDirective(action="NO_ACTION", bracket_status=bracket.status)
+
+        # Clamp stop price to market price bounds:
+        # A BUY (LONG) stop cannot be tightened above current market price.
+        # A SELL (SHORT) stop cannot be tightened below current market price.
+        if current_market_price is not None:
+            if bracket.side == "LONG" and new_stop_price > current_market_price:
+                new_stop_price = current_market_price
+            elif bracket.side != "LONG" and new_stop_price < current_market_price:
+                new_stop_price = current_market_price
 
         tightened = False
         if bracket.side == "LONG":

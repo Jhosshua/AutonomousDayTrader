@@ -6,6 +6,11 @@ import { Sparkles, X, Shield, Activity, BarChart2 } from "lucide-react";
 import { StrategyState } from "@/types/trading";
 import StrategyCard from "./StrategyCard";
 
+function safeFixed(val: number | null | undefined, digits = 2): string {
+  if (val === null || val === undefined || isNaN(val)) return "0.00";
+  return val.toFixed(digits);
+}
+
 interface StrategyCarouselProps {
   strategies: StrategyState[];
 }
@@ -84,16 +89,16 @@ export default function StrategyCarousel({ strategies }: StrategyCarouselProps) 
                   <span className="text-neutral-400 text-[11px] block">Session Realized PnL</span>
                   <span
                     className={`text-base font-bold num-tabular ${
-                      selectedStrategy.daily_pnl >= 0 ? "text-apple-green" : "text-apple-red"
+                      (selectedStrategy.daily_pnl ?? 0) >= 0 ? "text-apple-green" : "text-apple-red"
                     }`}
                   >
-                    {selectedStrategy.daily_pnl >= 0 ? "+" : ""}${selectedStrategy.daily_pnl.toFixed(2)}
+                    {(selectedStrategy.daily_pnl ?? 0) >= 0 ? "+" : ""}${safeFixed(selectedStrategy.daily_pnl)}
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                   <span className="text-neutral-400 text-[11px] block">Win Rate</span>
                   <span className="text-base font-bold text-neutral-200 num-tabular">
-                    {(selectedStrategy.win_rate * 100).toFixed(1)}%
+                    {safeFixed((selectedStrategy.win_rate ?? 0) * 100, 1)}%
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
@@ -105,7 +110,7 @@ export default function StrategyCarousel({ strategies }: StrategyCarouselProps) 
                 <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                   <span className="text-neutral-400 text-[11px] block">Sharpe Ratio</span>
                   <span className="text-base font-bold text-neutral-200 num-tabular">
-                    {selectedStrategy.sharpe == null ? "—" : selectedStrategy.sharpe.toFixed(2)}
+                    {selectedStrategy.sharpe == null ? "—" : safeFixed(selectedStrategy.sharpe)}
                   </span>
                 </div>
               </div>
@@ -121,7 +126,7 @@ export default function StrategyCarousel({ strategies }: StrategyCarouselProps) 
                   <span className="flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5 text-apple-blue" /> Exit Protocols
                   </span>
-                  <span className="text-neutral-200 font-medium">1.5R Scale / 2.5R Trail</span>
+                  <span className="text-neutral-200 font-medium">0.80R Scale / 1.80R Trail</span>
                 </div>
                 <div className="flex items-center justify-between text-neutral-400">
                   <span className="flex items-center gap-1.5">

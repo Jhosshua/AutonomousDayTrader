@@ -14,7 +14,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.app.config import settings
 from backend.app.core.account import PaperTradingAccount, PositionSide
@@ -767,16 +767,32 @@ def _check_session_boundary(now_dt: datetime) -> None:
     completed_brackets_recorded.clear()
     for strategy in strategies:
         strategy.reset_daily_stats()
+    engine.prune_session_state()
     _checkpoint_runtime(
         "SESSION_BOUNDARY",
         (boundary_event_key, "SESSION_BOUNDARY") if boundary_event_key else None,
     )
 
 
-async def broadcast_ui_state() -> None:
-    """Broadcast current system state to connected mobile trading UI clients."""
+_last_broadcast_time: float = 0.0
+_UI_BROADCAST_THROTTLE_SEC: float = 0.25  # 4 Hz maximum rate
+
+
+async def broadcast_ui_state(force: bool = False) -> None:
+    """Broadcast current system state to connected mobile trading UI clients with throttling and timeout protection."""
+    global _last_broadcast_time
     if not ui_clients:
         return
+
+    try:
+        loop = asyncio.get_running_loop()
+        now_mono = loop.time()
+    except RuntimeError:
+        now_mono = 0.0
+
+    if not force and (now_mono - _last_broadcast_time) < _UI_BROADCAST_THROTTLE_SEC:
+        return
+    _last_broadcast_time = now_mono
 
     snapshot = account.get_snapshot()
     primary_pos = _serialize_position(next(iter(account.positions))) if account.positions else None
@@ -837,7 +853,7 @@ async def broadcast_ui_state() -> None:
     raw = json.dumps(payload, default=str)
     for ws in list(ui_clients):
         try:
-            await ws.send_text(raw)
+            await asyncio.wait_for(ws.send_text(raw), timeout=0.35)
         except Exception:
             ui_clients.discard(ws)
 
@@ -902,6 +918,8 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         is_symbol_active=is_active,
     )
     if not approved or qty <= 0:
+        if signal.strategy_id == "orb":
+            orb_strategy.notify_signal_rejected(sym)
         return
 
     # The adaptation layer sizes from the strategy's raw stop for its public
@@ -930,9 +948,13 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         is_exit=False,
     )
     if not risk_preview.approved:
+        if signal.strategy_id == "orb":
+            orb_strategy.notify_signal_rejected(sym)
         return
     qty = min(qty, risk_preview.authorized_qty)
     if qty <= 0:
+        if signal.strategy_id == "orb":
+            orb_strategy.notify_signal_rejected(sym)
         return
 
     side = OrderSide.BUY if (signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY") else OrderSide.SELL
@@ -1133,7 +1155,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         _checkpoint_runtime("QUOTE_MUTATION", (event_key, "QUOTE"))
     elif fills or risk_engine.status != prior_risk_status:
         _checkpoint_runtime("QUOTE_MUTATION")
-    await broadcast_ui_state()
+    await broadcast_ui_state(force=bool(fills))
 
 
 async def handle_news_event(news: NewsEvent) -> None:
@@ -1436,6 +1458,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except asyncio.CancelledError:
             pass
         runtime_tasks.discard(task)
+    for ws in list(ui_clients):
+        try:
+            await ws.close(code=1001, reason="Server shutdown")
+        except Exception:
+            pass
+        ui_clients.discard(ws)
     # Producers are fully stopped before the final durable checkpoint. Nothing
     # can fill or mutate the account after this point.
     checkpoint_saved = False
@@ -1710,7 +1738,7 @@ class OrderCreateRequest(BaseModel):
     symbol: str
     side: str
     order_type: str
-    qty: int
+    qty: int = Field(gt=0, description="Order quantity must be strictly positive")
     limit_price: Optional[float] = None
     stop_price: Optional[float] = None
     strategy_id: str = "MANUAL"
@@ -1755,17 +1783,20 @@ async def submit_order(req: OrderCreateRequest) -> Dict[str, Any]:
             detail="Opening orders require stop_price and a known limit/latest market price",
         )
 
-    order = engine.create_order(
-        symbol=symbol,
-        side=side,
-        order_type=otype,
-        qty=req.qty,
-        limit_price=req.limit_price,
-        stop_price=req.stop_price,
-        estimated_price=estimated_entry,
-        strategy_id=req.strategy_id,
-        parent_order_id=bracket_id,
-    )
+    try:
+        order = engine.create_order(
+            symbol=symbol,
+            side=side,
+            order_type=otype,
+            qty=req.qty,
+            limit_price=req.limit_price,
+            stop_price=req.stop_price,
+            estimated_price=estimated_entry,
+            strategy_id=req.strategy_id,
+            parent_order_id=bracket_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     submitted = engine.submit_order(order.id)
     if submitted.status.value == "ACCEPTED" and not is_reducing:
         bracket = bracket_manager.create_bracket(
@@ -1809,14 +1840,22 @@ async def _execute_manual_flatten(
     flattened = []
 
     for sym in target_symbols:
-        pos = account.positions.get(sym)
-        if pos:
-            bracket_id = bracket_manager.symbol_to_bracket.get(sym)
+        # Cancel all working orders in engine.working_orders for this symbol
+        working_for_sym = [oid for oid, o in list(engine.working_orders.items()) if o.symbol == sym]
+        for oid in working_for_sym:
+            engine.cancel_order(oid, reason="MANUAL_FLATTEN")
+
+        bracket_id = bracket_manager.symbol_to_bracket.get(sym)
+        if bracket_id:
             cancel_dir = bracket_manager.cancel_bracket_for_flattening(sym, reason="MANUAL_FLATTEN")
             if cancel_dir and cancel_dir.orders_to_cancel:
                 for oid in cancel_dir.orders_to_cancel:
                     if oid in engine.working_orders:
                         engine.cancel_order(oid, reason="MANUAL_FLATTEN")
+            bracket_manager.cancel_pending_entry_bracket(sym)
+
+        pos = account.positions.get(sym)
+        if pos:
             side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
             order = engine.create_order(
                 symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
@@ -1831,7 +1870,7 @@ async def _execute_manual_flatten(
         "MANUAL_FLATTEN",
         (event_key, "MANUAL_FLATTEN") if event_key else None,
     )
-    await broadcast_ui_state()
+    await broadcast_ui_state(force=True)
     return {"flattened": flattened, "remaining_positions": len(account.positions)}
 
 
@@ -1839,7 +1878,16 @@ async def _execute_manual_flatten(
 async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]:
     """Manually flatten a position or all open positions."""
     now_dt = datetime.now(timezone.utc)
-    target_symbols = [req.symbol.upper()] if (req and req.symbol) else list(account.positions.keys())
+    if req and req.symbol:
+        target_symbols = [req.symbol.upper()]
+    else:
+        target_symbols = sorted(
+            list(
+                set(account.positions.keys())
+                | {o.symbol.upper() for o in engine.working_orders.values()}
+                | {s.upper() for s in bracket_manager.symbol_to_bracket.keys()}
+            )
+        )
     payload = {"target_symbols": target_symbols, "timestamp": now_dt}
     should_process, event_key = _begin_durable_event("MANUAL_FLATTEN", payload)
     if not should_process:
@@ -1854,7 +1902,7 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
     ui_clients.add(websocket)
     try:
-        await broadcast_ui_state()
+        await broadcast_ui_state(force=True)
         while True:
             data = await websocket.receive_text()
             try:
@@ -1874,14 +1922,16 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                     if new_stop <= 0:
                         log.warning("Rejected TIGHTEN_STOP for %s: invalid new_stop %s", sym, msg.get("new_stop"))
                         continue
-                    bracket_dir = bracket_manager.manual_tighten_stop(sym, new_stop)
+                    pos = account.positions.get(sym)
+                    mkt_price = pos.market_price if pos else None
+                    bracket_dir = bracket_manager.manual_tighten_stop(sym, new_stop, current_market_price=mkt_price)
                     if bracket_dir and getattr(bracket_dir, "orders_to_modify", None):
                         for mod in bracket_dir.orders_to_modify:
                             oid = mod.get("order_id")
                             if oid and oid in engine.working_orders:
                                 engine.working_orders[oid].stop_price = mod.get("new_stop_price", new_stop)
                     _checkpoint_runtime("MANUAL_TIGHTEN_STOP")
-                    await broadcast_ui_state()
+                    await broadcast_ui_state(force=True)
             except Exception as e:
                 log.error(f"Error handling UI action: {e}")
     except WebSocketDisconnect:

@@ -102,6 +102,7 @@ class NewsWebSocketClient:
                 log.info(f"Connecting to News WebSocket at {self.relay_url}...")
                 async with websockets.connect(
                     self.relay_url,
+                    max_size=settings.WS_MAX_MESSAGE_SIZE_BYTES,
                     ping_interval=settings.WS_PING_INTERVAL_SEC,
                     ping_timeout=settings.WS_PING_TIMEOUT_SEC,
                 ) as ws:
@@ -189,52 +190,59 @@ class NewsWebSocketClient:
             msgs = [msgs]
 
         for m in msgs:
-            t = m.get("T")
-            if t == "n":
-                headline = m.get("headline", "")
-                summary = m.get("summary", "")
-                content = m.get("content", "")
-                symbols = [s.upper() for s in m.get("symbols", [])]
+            try:
+                if not isinstance(m, dict):
+                    continue
+                t = m.get("T")
+                if t == "n":
+                    headline = m.get("headline", "")
+                    summary = m.get("summary", "")
+                    content = m.get("content", "")
+                    symbols = [s.upper() for s in m.get("symbols", [])]
 
-                # Run algorithmic sentiment & catalyst classification
-                score, confidence, category = self.scorer.score(headline=headline, summary=summary)
-                is_high_impact = abs(score) >= 0.6
-                if is_high_impact:
-                    log.info(f"High-impact news catalyst: [{category.value}] Score={score:.2f} ({symbols}) '{headline}'")
+                    # Run algorithmic sentiment & catalyst classification
+                    score, confidence, category = self.scorer.score(headline=headline, summary=summary)
+                    is_high_impact = abs(score) >= 0.6
+                    if is_high_impact:
+                        log.info(f"High-impact news catalyst: [{category.value}] Score={score:.2f} ({symbols}) '{headline}'")
 
-                created_raw = m.get("created_at") or datetime.now(timezone.utc).isoformat()
-                created_str = str(created_raw).replace("Z", "+00:00")
-                created_dt = datetime.fromisoformat(created_str)
-                if created_dt.tzinfo is None:
-                    created_dt = created_dt.replace(tzinfo=timezone.utc)
+                    created_raw = m.get("created_at") or datetime.now(timezone.utc).isoformat()
+                    created_str = str(created_raw).replace("Z", "+00:00")
+                    created_dt = datetime.fromisoformat(created_str)
+                    if created_dt.tzinfo is None:
+                        created_dt = created_dt.replace(tzinfo=timezone.utc)
 
-                updated_dt = None
-                if m.get("updated_at"):
-                    upd_str = str(m["updated_at"]).replace("Z", "+00:00")
-                    updated_dt = datetime.fromisoformat(upd_str)
-                    if updated_dt.tzinfo is None:
-                        updated_dt = updated_dt.replace(tzinfo=timezone.utc)
+                    updated_dt = None
+                    if m.get("updated_at"):
+                        upd_str = str(m["updated_at"]).replace("Z", "+00:00")
+                        updated_dt = datetime.fromisoformat(upd_str)
+                        if updated_dt.tzinfo is None:
+                            updated_dt = updated_dt.replace(tzinfo=timezone.utc)
 
-                event = NewsEvent(
-                    article_id=int(m.get("id", 0)),
-                    headline=headline,
-                    summary=summary,
-                    symbols=symbols,
-                    source=m.get("source", "benzinga"),
-                    created_at=created_dt,
-                    updated_at=updated_dt,
-                    url=m.get("url"),
-                    content=content,
-                    sentiment_score=score,
-                    sentiment_confidence=confidence,
-                    catalyst_category=category,
-                )
-                await self.bus.publish(event)
-                self.articles_received += 1
-                if is_high_impact:
-                    self.catalysts_detected += 1
+                    event = NewsEvent(
+                        article_id=int(m.get("id", 0)),
+                        headline=headline,
+                        summary=summary,
+                        symbols=symbols,
+                        source=m.get("source", "benzinga"),
+                        created_at=created_dt,
+                        updated_at=updated_dt,
+                        url=m.get("url"),
+                        content=content,
+                        sentiment_score=score,
+                        sentiment_confidence=confidence,
+                        catalyst_category=category,
+                    )
+                    await self.bus.publish(event)
+                    self.articles_received += 1
+                    if is_high_impact:
+                        self.catalysts_detected += 1
 
-            elif t == "relay":
-                msg_text = m.get("msg", "")
-                status = "connected" if "connected" in msg_text else "disconnected"
-                await self.bus.publish(RelayStatusEvent(feed_type="news", status=status, message=msg_text))
+                elif t == "relay":
+                    msg_text = m.get("msg", "")
+                    status = "connected" if "connected" in msg_text else "disconnected"
+                    await self.bus.publish(RelayStatusEvent(feed_type="news", status=status, message=msg_text))
+            except asyncio.CancelledError:
+                raise
+            except Exception as item_err:
+                log.exception(f"Error processing individual news item: {item_err}")

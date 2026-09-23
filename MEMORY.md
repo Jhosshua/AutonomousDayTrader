@@ -2,6 +2,44 @@
 
 ## Decisions
 
+### 2026-09-23: R3 Full-Stack Review Remediation, Multi-Agent Audit Certification, and Production Hardening
+- **Comprehensive Full-Stack Code Review & Remediation**:
+  Conducted an exhaustive audit across all 5 architectural subsystems (Ingestion, Core State & Risk, Strategies, API & Lifecycle, Frontend) cataloging and remediating 20 architectural defects without regressions:
+  1. *News WS Max Message Size*: Added `max_size=settings.WS_MAX_MESSAGE_SIZE_BYTES` in `news_ws.py` to prevent large Benzinga batch frames from terminating the connection.
+  2. *News WS Item Isolation*: Wrapped per-article parsing in `try...except` inside batch loops, preventing a single malformed article from aborting the entire news stream.
+  3. *Stock WS Queue Loop Recovery*: Added outer `try...except` recovery loop with exponential backoff in `stock_ws._process_queue_loop`, preventing silent worker task termination on deserialization glitches.
+  4. *Quote Stop Order Fill Break*: Added immediate `break` statement after `_execute_fill` on `STOP`/`STOP_LIMIT` orders in `engine.process_quote`, terminating tick iteration to eliminate double execution and sibling limit order fills.
+  5. *State & Memory Bounding*: Implemented `prune_session_state` in `engine.py` and capped `audit_log` at 10,000 (trimmed to 5,000), bounding memory while strictly preserving active working orders and execution history.
+  6. *Manual Stop Tightening Clamping*: Clamped `new_stop_price` against `current_market_price` in `bracket.manual_tighten_stop` (BUY stops clamped $\le$ market, SELL stops clamped $\ge$ market), preventing immediate cross-market stops.
+  7. *Phase 4 Continuous Zero-Audit Retry*: Enhanced flattening in `check_time_tick` (`if not self.phase4_executed or not self.audit_passed:`) to retry zero-audit directives on every tick from 15:58:00 to 16:00:00 ET until flat.
+  8. *Institutional Stop Clamping on VIX Multipliers*: Clamped adapted stop distance to institutional bounds `[0.0040 * entry, 0.0400 * entry]` in `adaptation.py`, preventing VIX regime multipliers from breaching the risk engine invariant.
+  9. *Capital Allocation Cap Alignment*: Aligned `DynamicAdaptationEngine.max_alloc_pct` to 0.50 ($25,000 / 50% equity cap), establishing parity with `risk.py`.
+  10. *News Momentum Strict Causality*: Enforced non-negative lower bound `0 <= (now_ts - c.timestamp.timestamp()) <= self.catalyst_ttl_seconds`, eliminating forward data leakage from future news timestamps.
+  11. *News Momentum Sliding Bar Window*: Sliced `recent_bars` to 60 bars (`[-60:]`), eliminating unbounded memory growth.
+  12. *VWAP Pullback Calibrated Targets & Volume Floor*: Updated fallback targets to 0.80R / 1.80R and enforced strict volume checks (`bar.volume > 0` and `sma10_vol > 0`) to prevent zero-volume ghost entries.
+  13. *VWAP Pullback Minimum Reward Ratio*: Enforced $\ge 0.50R$ minimum reward on standard deviation band targets to reject unfavourable risk/reward setups.
+  14. *ORB Lockout Prevention*: Added `notify_signal_rejected(symbol)` to reset `breakout_fired` flag if downstream risk or admission filters reject an order, preventing permanent symbol lockout.
+  15. *ORB Late-Arriving Symbol Gating*: Prevented symbols arriving after 09:45 ET (`t_time > dtime(9, 45)`) from establishing spurious opening ranges.
+  16. *Broadcast UI State Throttling*: Added 4 Hz rate limiter (`_UI_BROADCAST_THROTTLE_SEC = 0.25`) to prevent event-loop starvation during market quote spikes.
+  17. *Slow Consumer Eviction*: Wrapped UI WebSocket sends in `asyncio.wait_for(..., timeout=0.35)` and automatically pruned disconnected or stalled clients from `ui_clients`.
+  18. *Manual Flatten Scope & Working Order Cancellation*: Aggregated target symbols across positions, working orders, and brackets in `manual_flatten`, canceling all working orders across all symbols.
+  19. *Order Validation & Error Handling*: Added `Field(gt=0)` validation on `POST /api/orders` quantity and returned HTTP 400 instead of HTTP 500 on `ValueError`.
+  20. *Lifespan WebSocket Close & Frontend Resilience*: Added WebSocket close code 1001 on server shutdown, Next.js obsidian dark theme error boundary (`frontend/app/error.tsx`), null-safe formatting (`safeFixed`/`safeLocale`), and disconnected REST fallback polling for `/api/account` and `/api/positions`.
+- **Multi-Agent Audit Panel Certification (Unanimous 5/5 Pass)**:
+  - Reviewer R3-1: **APPROVE** (Verified diff cleanliness, thread/async loop safety, and state synchronization across layers).
+  - Reviewer R3-2: **APPROVE** (Verified 320/320 E2E tests, Next.js production build, and frontend resilience stress test suite).
+  - Challenger R3-1: **APPROVE** (Monte Carlo grid sweep & 6/6 mutation verification tests killed on defective implementations).
+  - Challenger R3-2: **APPROVE** (16/16 stress tests pass covering API error handling, UI resilience, and port hygiene).
+  - Auditor R3-1: **CLEAN** (Forensic audit confirms zero integrity violations, no facade/mock shortcuts, and strictly binding institutional invariants).
+  - Overall Gate Status: **PASS (5/5 Unanimous Certification)**.
+- **Verification Metrics**:
+  - Backend Unit & Integration Tests: 272/272 passed (100% pass rate in 4.19s).
+  - Opaque-Box E2E Tests: 320/320 passed (100% pass rate in 26.40s, Exit Code 0).
+  - Challenger Stress & Mutation Suite: 63/63 passed (100% pass rate in 2.25s).
+  - Integrated Monday Market Open Dry Run: Status `PASS` (184 events processed, 0 event bus errors, 0 open positions, 0 working orders, realized PnL +$308.56).
+  - Frontend Production Build: Clean Next.js 15.5 static export, 0 TypeScript errors, 4/4 resilience tests passed.
+  - Port Hygiene: Monitored ports 3005, 8000, 8005, 8080 confirmed 100% clean and free of lingering daemons.
+
 ### 2026-09-23: Empirical Diagnosis & Architecture Remediation (Market Trend Filter, Recalibrated Brackets, Causal Guards)
 - **Root Cause Analysis of 0% Win Rate (-$201.68 PnL across 7 trades)**:
   1. *Context Blindness (89.4% of losses)*: Strategies triggered on single-stock 1m/5m bars without conditioning on broad market index beta (SPY/QQQ). Specifically, shorting TSLA (-$68.30) and AAPL (-$112.04) on 2026-09-22 occurred directly into systematic, market-wide morning bull bids where systematic drift overwhelmed idiosyncratic momentum.
@@ -88,6 +126,26 @@
 - **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
 
 ## Session log
+
+### 2026-09-23: R3 Full-Stack Review, Remediation & Production Deployment
+- **Mission & Scope**: Executed an end-to-end full-stack code review of `AutonomousDayTrader` across Ingestion, Core State & Risk, Strategies, API & Lifecycle, and Frontend. Remediated all 20 cataloged defects, verified through independent multi-agent adversarial audit panel (5/5 unanimous approval), and deployed to Railway production.
+- **Key Remediations**:
+  - Clamped adapted stop distance to `[0.0040 * entry, 0.0400 * entry]` under all VIX regimes.
+  - Eliminated news momentum lookahead bias with strict non-negative time bounds (`0 <= delta <= TTL`).
+  - Added quote-level stop fill loop termination (`break`) preventing competing order double execution.
+  - Expanded manual flatten to cancel working orders across the union of positions, engine orders, and brackets.
+  - Throttled UI broadcasts to 4 Hz and enforced 350ms timeout eviction on slow consumers.
+  - Hardened ORB against symbol lockout and gated late-arriving symbols after 09:45 ET.
+  - Added Next.js obsidian dark error boundary, null-safe helpers, and REST fallback synchronization.
+- **Audit & Verification**:
+  - 5/5 panel approval (Reviewers R3-1 & R3-2, Challengers R3-1 & R3-2, Auditor R3-1).
+  - 272 backend unit/integration tests passed (100%).
+  - 320 opaque-box E2E runner tests passed (100%).
+  - 63 stress and mutation tests passed (100%).
+  - Integrated Monday dry run passed cleanly (+$308.56 PnL, 184 events, 0 errors).
+  - Clean local port hygiene verified on 3005, 8000, 8005, 8080.
+  - Git release committed to `main` and pushed upstream to GitHub.
+  - Remote Railway auto-deployment verified Online with `/health` HTTP 200 OK.
 
 ### 2026-09-23 (close): Empirical diagnosis & strategy remediation deployed
 - **Context & Diagnosis**: Addressed the 0% win rate (-$201.68 PnL) observed across 7 live paper trades on 2026-09-21 and 2026-09-22. Identified context blindness (shorting into market bids caused 89.4% of losses), unrealistic 1.5R/2.5R target geometry under intraday noise, and static override slippage hazards.

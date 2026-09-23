@@ -45,11 +45,15 @@ class VWAPPullbackStrategy(Strategy):
         ema_fast_period: int = 20,
         ema_slow_period: int = 50,
         cooldown_bars: int = 15,
+        target_1_r: float = 0.80,
+        target_2_r: float = 1.80,
     ):
         super().__init__(strategy_id=strategy_id, name=name)
         self.ema_fast_period: int = ema_fast_period
         self.ema_slow_period: int = ema_slow_period
         self.cooldown_bars: int = cooldown_bars
+        self.target_1_r: float = target_1_r
+        self.target_2_r: float = target_2_r
         self.symbol_states: Dict[str, SymbolVWAPState] = {}
 
     def _get_state(self, symbol: str) -> SymbolVWAPState:
@@ -141,13 +145,17 @@ class VWAPPullbackStrategy(Strategy):
 
         signals: List[SignalEvent] = []
 
+        # Enforce volume floor to prevent false bounces on zero volume
+        if bar.volume <= 0 or sma10_vol <= 0:
+            return []
+
         # 1. Bullish Pullback & Bounce
         if is_bullish_trend:
             # Check if current bar tested the zone or prior bar did
             tested_zone = (long_zone_low <= bar.low <= long_zone_high) or (long_zone_low <= bar.close <= long_zone_high)
             is_green_bounce = bar.close > bar.open and bar.close >= vwap
             has_hammer_wick = lower_wick >= 0.30 * candle_range
-            volume_confirmed = bar.volume >= 1.20 * sma10_vol
+            volume_confirmed = bar.volume > 0 and sma10_vol > 0 and bar.volume >= 1.20 * sma10_vol
 
             if (tested_zone or state.in_pullback_zone) and is_green_bounce and (has_hammer_wick or volume_confirmed):
                 entry_price = bar.close
@@ -156,11 +164,12 @@ class VWAPPullbackStrategy(Strategy):
                 raw_risk = max(min_distance, std * 0.8) if entry_price - stop_loss < min_distance else (entry_price - stop_loss)
                 stop_loss, risk = resolve_stop(entry_price, raw_risk, True)
                 tp1 = round(vwap + (1.0 * std), 4)
-                if tp1 <= entry_price:
-                    tp1 = round(entry_price + 1.5 * risk, 4)
+                min_tp1 = round(entry_price + 0.50 * risk, 4)
+                if tp1 < min_tp1:
+                    tp1 = round(entry_price + self.target_1_r * risk, 4)
                 tp2 = round(vwap + (2.0 * std), 4)
                 if tp2 <= tp1:
-                    tp2 = round(entry_price + 2.5 * risk, 4)
+                    tp2 = round(entry_price + self.target_2_r * risk, 4)
 
                 signals.append(
                     SignalEvent(
@@ -189,7 +198,7 @@ class VWAPPullbackStrategy(Strategy):
             tested_zone = (short_zone_low <= bar.high <= short_zone_high) or (short_zone_low <= bar.close <= short_zone_high)
             is_red_rejection = bar.close < bar.open and bar.close <= vwap
             has_inv_hammer_wick = upper_wick >= 0.30 * candle_range
-            volume_confirmed = bar.volume >= 1.20 * sma10_vol
+            volume_confirmed = bar.volume > 0 and sma10_vol > 0 and bar.volume >= 1.20 * sma10_vol
 
             if (tested_zone or state.in_pullback_zone) and is_red_rejection and (has_inv_hammer_wick or volume_confirmed):
                 entry_price = bar.close
@@ -198,11 +207,12 @@ class VWAPPullbackStrategy(Strategy):
                 raw_risk = max(min_distance, std * 0.8) if stop_loss - entry_price < min_distance else (stop_loss - entry_price)
                 stop_loss, risk = resolve_stop(entry_price, raw_risk, False)
                 tp1 = round(vwap - (1.0 * std), 4)
-                if tp1 >= entry_price:
-                    tp1 = round(entry_price - 1.5 * risk, 4)
+                max_tp1 = round(entry_price - 0.50 * risk, 4)
+                if tp1 > max_tp1:
+                    tp1 = round(entry_price - self.target_1_r * risk, 4)
                 tp2 = round(vwap - (2.0 * std), 4)
                 if tp2 >= tp1:
-                    tp2 = round(entry_price - 2.5 * risk, 4)
+                    tp2 = round(entry_price - self.target_2_r * risk, 4)
 
                 signals.append(
                     SignalEvent(

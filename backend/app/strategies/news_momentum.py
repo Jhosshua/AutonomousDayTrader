@@ -204,16 +204,17 @@ class NewsMomentumStrategy(Strategy):
         if sym not in self.recent_bars:
             self.recent_bars[sym] = []
         self.recent_bars[sym].append(bar)
+        self.recent_bars[sym] = self.recent_bars[sym][-60:]
 
         pending_list = self.pending_catalysts.get(sym, [])
         if not pending_list:
             return []
 
-        # Filter active catalysts within TTL
+        # Filter active catalysts within TTL enforcing strict causality (no forward data leakage)
         now_ts = bar.timestamp.timestamp()
         valid_catalysts = [
             c for c in pending_list
-            if (now_ts - c.timestamp.timestamp() <= self.catalyst_ttl_seconds) and not c.processed
+            if (0 <= (now_ts - c.timestamp.timestamp()) <= self.catalyst_ttl_seconds) and not c.processed
         ]
         self.pending_catalysts[sym] = valid_catalysts
 

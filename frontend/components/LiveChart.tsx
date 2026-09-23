@@ -17,6 +17,11 @@ interface CandleData {
   volume: number;
 }
 
+function safeFixed(val: number | null | undefined, digits: number = 2): string {
+  if (val == null || isNaN(val)) return "—";
+  return Number(val).toFixed(digits);
+}
+
 export default function LiveChart({ position, height = 240 }: LiveChartProps) {
   const [hoveredCandle, setHoveredCandle] = useState<CandleData | null>(null);
 
@@ -89,7 +94,7 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
               {hoveredCandle.close}
             </span>
           ) : (
-            <span>Live Price: <strong className="text-white">${position.market_price.toFixed(2)}</strong></span>
+            <span>Live Price: <strong className="text-white">${safeFixed(position?.market_price)}</strong></span>
           )}
         </div>
       </div>
@@ -140,7 +145,7 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
                 fontWeight="bold"
                 className="num-tabular"
               >
-                TP2 ${position.take_profit_2.toFixed(2)}
+                TP2 ${safeFixed(position.take_profit_2)}
               </text>
             </g>
           )}
@@ -166,7 +171,7 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
                 fontWeight="bold"
                 className="num-tabular"
               >
-                TP1 ${position.take_profit_1.toFixed(2)}
+                TP1 ${safeFixed(position.take_profit_1)}
               </text>
             </g>
           )}
@@ -191,7 +196,7 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
                 fontWeight="bold"
                 className="num-tabular"
               >
-                ENT ${position.entry_price.toFixed(2)}
+                ENT ${safeFixed(position.entry_price)}
               </text>
             </g>
           )}
@@ -217,7 +222,7 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
                 fontWeight="bold"
                 className="num-tabular"
               >
-                STP ${position.stop_loss.toFixed(2)}
+                STP ${safeFixed(position.stop_loss)}
               </text>
             </g>
           )}
@@ -299,10 +304,10 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
           <span className="w-2 h-0.5 bg-apple-teal rounded-full inline-block" /> Entry
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-0.5 bg-apple-green rounded-full inline-block" /> Target 1 (1.5R)
+          <span className="w-2 h-0.5 bg-apple-green rounded-full inline-block" /> Target 1 (0.80R)
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-0.5 bg-emerald-400 rounded-full inline-block" /> Target 2 (2.5R)
+          <span className="w-2 h-0.5 bg-emerald-400 rounded-full inline-block" /> Target 2 (1.80R)
         </span>
       </div>
     </div>

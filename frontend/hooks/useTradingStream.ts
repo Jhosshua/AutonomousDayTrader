@@ -172,7 +172,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 primary = {
                   symbol: first.symbol,
                   side: first.side,
-                  shares: first.shares || first.qty || 100,
+                  shares: first.shares ?? first.qty ?? 0,
                   entry_price: first.avg_entry_price || first.entry_price || 0,
                   market_price: first.market_price || 0,
                   market_value: first.market_value || 0,
@@ -238,6 +238,13 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
       };
     } catch (err: any) {
       setLastError(err?.message || "Failed to initialize WebSocket");
+      if (mountedRef.current) {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
+        reconnectAttemptRef.current += 1;
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, delay);
+      }
     }
   }, [getResolvedEndpoints]);
 
@@ -245,11 +252,70 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     mountedRef.current = true;
     connect();
 
-    // Fallback: poll backend health & audit if available
+    // Fallback: poll backend account, positions, and audit if disconnected
     const pollInterval = setInterval(async () => {
       if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
         try {
           const { httpBase } = getResolvedEndpoints();
+
+          // Poll account state
+          try {
+            const accRes = await fetch(`${httpBase}/api/account`);
+            if (accRes.ok) {
+              const accData = await accRes.json();
+              setState((prev) => ({
+                ...prev,
+                account: {
+                  ...prev.account,
+                  equity: accData.equity ?? prev.account.equity,
+                  cash: accData.cash ?? prev.account.cash,
+                  buying_power: accData.buying_power ?? prev.account.buying_power,
+                  daily_pnl: (accData.realized_pnl ?? 0) + (accData.unrealized_pnl ?? 0),
+                  daily_pnl_pct: accData.equity > 0 ? ((accData.realized_pnl ?? 0) + (accData.unrealized_pnl ?? 0)) / accData.equity : 0,
+                  daily_drawdown: accData.daily_drawdown_dollars ?? prev.account.daily_drawdown,
+                  daily_drawdown_pct: accData.daily_drawdown_pct ?? prev.account.daily_drawdown_pct,
+                  is_circuit_broken: accData.is_circuit_broken ?? prev.account.is_circuit_broken,
+                  status: accData.status ?? prev.account.status,
+                },
+              }));
+            }
+          } catch {
+            // Ignore account poll error
+          }
+
+          // Poll positions
+          try {
+            const posRes = await fetch(`${httpBase}/api/positions`);
+            if (posRes.ok) {
+              const posData = await posRes.json();
+              const posList = Object.values(posData).map((p: any) => ({
+                symbol: p.symbol,
+                side: p.side,
+                shares: p.shares ?? p.qty ?? 0,
+                entry_price: p.avg_entry_price ?? p.entry_price ?? 0,
+                market_price: p.market_price ?? 0,
+                market_value: p.market_value ?? 0,
+                unrealized_pnl: p.unrealized_pnl ?? 0,
+                unrealized_pnl_pct: p.unrealized_pnl_pct ?? 0,
+                stop_loss: p.stop_loss,
+                take_profit_1: p.take_profit_1,
+                take_profit_2: p.take_profit_2,
+                strategy_id: p.strategy_id || "ORB",
+                chart_points: p.chart_points,
+                cost_basis: p.cost_basis,
+                realized_pnl: p.realized_pnl,
+              }));
+              setState((prev) => ({
+                ...prev,
+                all_positions: posList,
+                primary_position: posList.length > 0 ? posList[0] : null,
+                positions_count: posList.length,
+              }));
+            }
+          } catch {
+            // Ignore positions poll error
+          }
+
           const res = await fetch(`${httpBase}/api/audit?limit=10`);
           if (res.ok) {
             const logs = await res.json();

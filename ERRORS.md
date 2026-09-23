@@ -1,5 +1,69 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-09-23: VIX Stop Distance Clamping Violation
+
+**What did not work**: In `backend/app/strategies/adaptation.py`, `calculate_adapted_stop` multiplied the strategy base stop distance by VIX regime multipliers (e.g. 0.85 in Low VIX to 2.00 in Crisis VIX) without clamping the result to institutional risk bounds. When VIX reached Elevated (25–35) or Crisis (35+) levels, or on symbols with wider base stop spreads, the calculated stop distance expanded beyond 4.00% of entry price (e.g., 4.2%–5.0%). When downstream signals reached `InstitutionalRiskEngine.evaluate_order`, the risk engine strictly rejected the order with `STOP_TOO_WIDE`. In quiet regimes, it could also contract below 0.40% (`STOP_TOO_TIGHT`). This resulted in erratic strategy signal rejections during volatile market conditions when risk management is most critical.
+
+**What worked instead**: Enforced strict institutional clamping inside `calculate_adapted_stop`:
+`min_bound = 0.0040 * entry_price`
+`max_bound = 0.0400 * entry_price`
+`adapted_dist = max(min_bound, min(max_bound, adapted_dist))`
+This guarantees that regardless of VIX regime multiplier or raw stop width, the output stop distance strictly satisfies the `[0.0040, 0.0400]` risk engine invariant before order submission.
+
+**Note for next time**: Strategy adaptation multipliers must always be bounded by the outer risk engine's non-negotiable envelope. Never permit an internal multiplier to scale a parameter past the external validator's rejection threshold.
+
+## 2026-09-23: News Momentum Lookahead Bias via Unbounded Lower Timestamp
+
+**What did not work**: In `backend/app/strategies/news_momentum.py`, the `on_bar` method filtered news catalysts using `(now_ts - c.timestamp.timestamp()) <= self.catalyst_ttl_seconds`. Lacking a lower bound of zero (`0 <=`), if a news article arrived with a timestamp in the future of `now_ts` (from clock skew, asynchronous queue jitter, or forward-dated feed replay), `elapsed` was negative, trivially satisfying the inequality. This allowed future news catalysts to trigger entry signals before their chronological publication time, introducing forward lookahead bias and violating causality.
+
+**What worked instead**: Added an explicit non-negative lower bound:
+`if not (0 <= (now_ts - c.timestamp.timestamp()) <= self.catalyst_ttl_seconds): continue`
+Any news item with a future timestamp ($t_{\text{news}} > t_{\text{bar}}$) or expired timestamp ($t_{\text{bar}} - t_{\text{news}} > \text{TTL}$) is strictly rejected from triggering momentum entries.
+
+**Note for next time**: Any freshness window or TTL check of the form `delta <= TTL` must explicitly enforce `0 <= delta <= TTL`. A missing lower bound is a classic vector for lookahead bias in event-driven systems.
+
+## 2026-09-23: Quote Stop-Fill Double Execution via Missing Loop Break
+
+**What did not work**: In `backend/app/core/engine.py`, `process_quote` iterated over `self.working_orders.values()` to evaluate stop loss triggers. When a `STOP` or `STOP_LIMIT` order crossed the quote bid/ask and was filled via `_execute_fill(order, fill_price, bar_time, ...)` (which cancels sibling bracket exit orders asynchronously via `on_child_order_fill`), the loop did not execute a `break` statement (unlike `process_bar`). On wide or crossed quotes, or when order dictionary iteration order allowed, a sibling take-profit limit order or competing exit order could trigger and fill on the exact same price quote tick before cancellation took effect. This led to duplicate fills, over-execution, and flipped short/long exposure.
+
+**What worked instead**: Added an immediate `break` statement after filling a `STOP` or `STOP_LIMIT` order in `process_quote`:
+```python
+if is_stop:
+    self._execute_fill(order, fill_price, bar_time, liquidity="TAKER")
+    break
+```
+This guarantees that once a protective stop fills, no further orders for that tick are executed, mirroring the deterministic semantics of `process_bar`.
+
+**Note for next time**: Quote-level and bar-level order matching loops must maintain identical loop-control invariants. Stop executions are terminal state transitions for the position on that market tick.
+
+## 2026-09-23: Manual Flatten Omission of Working Orders on Flat Positions
+
+**What did not work**: In `backend/app/main.py`, `_execute_manual_flatten` and `manual_flatten` iterated solely over `account.positions.keys()`. If a trader or strategy had pending limit entry orders or unfulfilled bracket orders for a symbol where `account.positions[symbol]` was zero or not yet established, those working orders were completely bypassed by the flatten routine. If the market subsequently moved to touch those pending limit orders, they filled unprotected on the broker/paper book, creating new unauthorized positions after a manual flatten had been certified.
+
+**What worked instead**: Aggregated target symbols across all three core registries:
+```python
+target_symbols = set(account.positions.keys())
+target_symbols.update(engine.working_orders.keys())
+for order in list(engine.working_orders.values()):
+    if hasattr(order, "symbol"):
+        target_symbols.add(order.symbol)
+if bracket_manager:
+    target_symbols.update(bracket_manager.symbol_to_bracket.keys())
+```
+The routine then cancels all working orders in `engine.working_orders` for all target symbols, purges bracket state, and liquidates any existing inventory, guaranteeing complete flat-book enforcement.
+
+**Note for next time**: "Flatten" means zero exposure AND zero intent. Always purge the union of active inventory and working orders across the engine, bracket manager, and account.
+
+## 2026-09-23: UI Broadcast Slow-Consumer Event Loop Starvation
+
+**What did not work**: `broadcast_ui_state` in `backend/app/main.py` was invoked synchronously on every market quote arrival tick without rate limiting. In high-frequency quote streams (hundreds of quote updates per second across the 5-symbol watchlist), serializing and sending UI payloads to connected WebSockets consumed significant CPU and blocked the `asyncio` event loop. Furthermore, if a single browser client lagged or suffered network backpressure, `ws.send_text(raw)` stalled or blocked indefinitely, starving AlpacaRelay ingestion workers and delaying order execution fills.
+
+**What worked instead**: Implemented dual protection in `main.py`:
+1. **Rate Limiting**: Added a 4 Hz throttle (`_UI_BROADCAST_THROTTLE_SEC = 0.25`) so full UI payloads are pushed at most once every 250ms during high-frequency quote bursts.
+2. **Client Timeout & Eviction**: Wrapped client transmissions in `asyncio.wait_for(ws.send_text(raw), timeout=0.35)`. If a client fails to accept the payload within 350ms, it is immediately evicted from `ui_clients` and disconnected, completely isolating the core trading engine from slow frontends.
+
+**Note for next time**: Never link high-throughput market data processing directly to downstream consumer WebSockets. Always throttle UI broadcasts and aggressively evict slow consumers with strict timeouts.
+
 ## 2026-09-23: Inverted Mean Reversion Policy
 
 **What did not work**: In `backend/app/core/market_filter.py`, the initial mean reversion policy blocked buying oversold dips during `BULLISH` regimes and blocked fading overbought spikes during `BEARISH` regimes, while falling through to approve selling during `BULLISH` and buying during `BEARISH`. This allowed shorting directly into morning market-wide bull rallies (catching the full brunt of systematic trend drift) and catching falling knives during market liquidations, directly causing the 2026-09-22 TSLA and AAPL stop-outs.

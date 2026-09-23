@@ -116,7 +116,7 @@ class ZeroOvernightFlatteningEngine:
 
         # Phase 4 Audit: 15:58:00 - 15:59:59
         if t >= self.schedule.phase4_audit_time and t < self.schedule.market_close_time:
-            if not self.phase4_executed:
+            if not self.phase4_executed or not self.audit_passed:
                 self.phase4_executed = True
                 self.current_phase = FlatteningPhase.ZERO_AUDIT
                 return FlatteningDirective(

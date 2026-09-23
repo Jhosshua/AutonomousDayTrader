@@ -5,6 +5,11 @@ import { motion } from "framer-motion";
 import { Shield, Square, Check, RefreshCw, AlertCircle } from "lucide-react";
 import { Position } from "@/types/trading";
 
+function safeFixed(val: number | null | undefined, digits = 2): string {
+  if (val === null || val === undefined || isNaN(val)) return "0.00";
+  return val.toFixed(digits);
+}
+
 interface ManualControlsProps {
   position: Position | null;
   isConnected: boolean;
@@ -42,18 +47,26 @@ export default function ManualControls({
   };
 
   const handleTightenBreakeven = () => {
-    if (!position) return;
+    if (!position || position.entry_price == null || isNaN(position.entry_price)) return;
     const breakeven = position.entry_price;
     const ok = onTightenStop(position.symbol, breakeven);
     if (ok) {
-      showFeedback(`Stop tightened to breakeven ($${breakeven.toFixed(2)})`);
+      showFeedback(`Stop tightened to breakeven ($${safeFixed(breakeven)})`);
     } else {
       showFeedback("Tighten failed: stream disconnected and no REST fallback for stop changes", true);
     }
   };
 
   const handleTightenHalfProfit = () => {
-    if (!position) return;
+    if (
+      !position ||
+      position.entry_price == null ||
+      position.market_price == null ||
+      isNaN(position.entry_price) ||
+      isNaN(position.market_price)
+    ) {
+      return;
+    }
     const entry = position.entry_price;
     const current = position.market_price;
     const targetStop =
@@ -63,7 +76,7 @@ export default function ManualControls({
     const newStop = Number(targetStop.toFixed(2));
     const ok = onTightenStop(position.symbol, newStop);
     if (ok) {
-      showFeedback(`Stop tightened to +50% profit lock ($${newStop.toFixed(2)})`);
+      showFeedback(`Stop tightened to +50% profit lock ($${safeFixed(newStop)})`);
     } else {
       showFeedback("Tighten failed: stream disconnected and no REST fallback for stop changes", true);
     }
@@ -92,16 +105,60 @@ export default function ManualControls({
 
   if (!position) {
     return (
-      <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center">
-        <span className="text-xs text-neutral-400">No active positions to control</span>
-        <div className="mt-2">
-          <button
-            onClick={() => setConfirmFlattenAll(true)}
-            disabled={!isConnected}
-            className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-apple-red/20 text-neutral-400 hover:text-apple-red border border-white/10 text-xs font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none"
+      <div className="space-y-3">
+        {actionFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 backdrop-blur-md ${
+              actionFeedback.isError
+                ? "bg-apple-red/20 border-apple-red/40 text-apple-red"
+                : "bg-apple-green/20 border-apple-green/40 text-apple-green"
+            }`}
           >
-            Flatten All Portfolios
-          </button>
+            {actionFeedback.isError ? (
+              <AlertCircle className="w-3.5 h-3.5" />
+            ) : (
+              <Check className="w-3.5 h-3.5" />
+            )}
+            <span>{actionFeedback.msg}</span>
+          </motion.div>
+        )}
+
+        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center">
+          <span className="text-xs text-neutral-400">No active positions to control</span>
+          <div className="mt-2">
+            {!confirmFlattenAll ? (
+              <button
+                onClick={() => setConfirmFlattenAll(true)}
+                disabled={!isConnected}
+                className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-apple-red/20 text-neutral-400 hover:text-apple-red border border-white/10 text-xs font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              >
+                Flatten All Portfolios
+              </button>
+            ) : (
+              <div className="p-3 rounded-2xl bg-neutral-900 border border-apple-red/40 space-y-2 mt-2">
+                <div className="text-[11px] text-neutral-300 text-center">
+                  Purge working brackets and market-liquidate all open positions?
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExecuteFlattenAll}
+                    className="flex-1 py-1.5 rounded-xl bg-apple-red text-white text-[11px] font-bold"
+                  >
+                    Purge All
+                  </button>
+                  <button
+                    onClick={() => setConfirmFlattenAll(false)}
+                    className="flex-1 py-1.5 rounded-xl bg-white/10 text-neutral-400 text-[11px]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -164,7 +221,7 @@ export default function ManualControls({
           className="w-full py-3 px-4 rounded-2xl bg-apple-red/15 hover:bg-apple-red/25 border border-apple-red/30 text-apple-red text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:pointer-events-none"
         >
           <Square className="w-4 h-4 fill-current" />
-          <span>Flatten {position.symbol} ({position.shares} shares @ ${position.market_price.toFixed(2)})</span>
+          <span>Flatten {position.symbol} ({position.shares} shares @ ${safeFixed(position.market_price)})</span>
         </motion.button>
       ) : (
         <div className="p-3 rounded-2xl bg-apple-red/25 border border-apple-red/50 space-y-2">

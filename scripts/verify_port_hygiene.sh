@@ -3,7 +3,7 @@
 # This script is intentionally read-only: it must not kill an unrelated process.
 set -euo pipefail
 
-PORTS=(3005 8005 8080)
+PORTS=(3005 8000 8005 8080)
 VIOLATIONS=0
 
 echo "🔍 Auditing port hygiene across project ports: ${PORTS[*]}..."

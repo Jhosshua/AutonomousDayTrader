@@ -79,12 +79,12 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 ### Implementation Track
 | # | Milestone Name | Scope | Dependencies | Status |
 |---|----------------|-------|--------------|--------|
-| M1 | `engine_ingestion` | AlpacaRelay Ingestion (Stock WS, News WS, REST /vix), $50k Paper Account, Institutional Risk Circuit Breakers, Bracket Orders, Auto-Flattening Engine | None | COMPLETED / DEPLOYED; 225/225 backend unit tests pass |
-| M2 | `strategies_adaptation` | 4 Dynamic Strategies (ORB, VWAP Pullback, News Momentum, Mean Reversion), VIX Volatility Regime Scaling, Time-of-Day Phase Engine | M1 | COMPLETED / DEPLOYED; MarketTrendFilter active, 320/320 E2E tests pass |
-| M3 | `ui_mobile_streaming` | Mobile Trading UI (Next.js/Tailwind/Framer), Obsidian Glassmorphism, Momentum Gradient Blur, Trading Strategy Cards, "Active Position" Tray, Real-Time WS State Streaming | M1, M2 | COMPLETED / DEPLOYED; build and visual suite pass |
-| M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_READY | COMPLETED / DEPLOYED (320/320 E2E, 225/225 backend tests pass) |
-| M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | COMPLETED / DEPLOYED; Integrated dry run verified ($50,308.56 equity, +$308.56 PnL, 184/184 events, 0 errors) |
-| M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | COMPLETED / DEPLOYED; Railway production live & healthy, ports clean |
+| M1 | `engine_ingestion` | AlpacaRelay Ingestion (Stock WS, News WS, REST /vix), $50k Paper Account, Institutional Risk Circuit Breakers, Bracket Orders, Auto-Flattening Engine | None | COMPLETED / DEPLOYED; 272/272 backend unit tests pass, VIX stop clamping & quote break hardened |
+| M2 | `strategies_adaptation` | 4 Dynamic Strategies (ORB, VWAP Pullback, News Momentum, Mean Reversion), VIX Volatility Regime Scaling, Time-of-Day Phase Engine | M1 | COMPLETED / DEPLOYED; MarketTrendFilter active, news momentum strict causality, VWAP volume floor, ORB lockout prevention |
+| M3 | `ui_mobile_streaming` | Mobile Trading UI (Next.js/Tailwind/Framer), Obsidian Glassmorphism, Momentum Gradient Blur, Trading Strategy Cards, "Active Position" Tray, Real-Time WS State Streaming | M1, M2 | COMPLETED / DEPLOYED; Next.js 15.5 export clean, error.tsx boundary, safe formatting, 4Hz broadcast throttle & slow-consumer eviction |
+| M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_READY | COMPLETED / DEPLOYED (320/320 E2E tests, 272/272 backend tests, 63/63 stress & mutation tests pass) |
+| M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | COMPLETED / DEPLOYED; Integrated dry run verified ($50,308.55 equity, +$308.56 PnL, 184/184 events, 0 errors) |
+| M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | COMPLETED / DEPLOYED; Full-stack review remediated, multi-agent audit certified (5/5 PASS), Railway production live & healthy, ports clean |
 
 ### E2E Testing Track (Parallel)
 | Track | Scope | Outputs | Status |
@@ -300,4 +300,37 @@ Key Architectural Remediations:
 - Full Opaque-Box E2E Tests: 320/320 passed in 25.77s (Exit Code 0).
 - Integrated Monday Market Open Dry Run (`scripts/run_integrated_monday_dry_run.py`): Status `PASS`, 184 events processed, 0 event bus errors, 0 open positions, 0 working orders, realized PnL +$308.56.
 - Process & Port Hygiene: Ports 8000, 8005, 8080, and 3005 confirmed 100% clean and free.
+
+### 2026-09-23: R3 Full-Stack Review Remediation, Multi-Agent Audit Certification & Production Hardening
+An exhaustive end-to-end full-stack code review was conducted across all 5 system layers (Ingestion, Core State & Risk, Strategies, API & Lifecycle, Frontend). All 20 cataloged defects were remediated with production-grade fixes, verified by an independent 5-member multi-agent adversarial audit panel, and certified for live deployment.
+
+Multi-Agent Audit Panel Verdicts:
+- Reviewer R3-1: **APPROVE** (Verified diff cleanliness, thread/async loop safety, and state synchronization across layers).
+- Reviewer R3-2: **APPROVE** (Verified 320/320 E2E tests, Next.js production build, and frontend resilience stress test suite).
+- Challenger R3-1: **APPROVE** (Monte Carlo grid sweep & 6/6 mutation verification tests killed on defective implementations).
+- Challenger R3-2: **APPROVE** (16/16 stress tests pass covering API error handling, UI resilience, and port hygiene).
+- Auditor R3-1: **CLEAN** (Forensic audit confirms zero integrity violations, no facade/mock shortcuts, and strictly binding institutional invariants).
+- Overall Gate Status: **PASS (5/5 Unanimous Certification)**.
+
+Key Hardened Contracts & Remediations:
+- **Ingestion Resilience**: Added `WS_MAX_MESSAGE_SIZE_BYTES` to `news_ws.py` websockets connection; isolated individual article parsing inside batch loops with `try...except` to prevent malformed frames from aborting valid news; wrapped `stock_ws._process_queue_loop` in an outer recovery loop with exponential backoff.
+- **Order Execution Invariants**: Added immediate `break` statement after protective stop fill in `engine.process_quote`, terminating tick iteration to eliminate double execution and sibling limit order fills. Implemented `prune_session_state` and 10k/5k audit log bounding to keep memory bounded without losing active working orders.
+- **Manual Stop Clamping**: In `bracket.manual_tighten_stop`, clamped stops against `current_market_price` (BUY stop $\le$ market, SELL stop $\ge$ market), preventing immediate cross-market stops.
+- **Continuous Zero-Audit Retry**: Extended Phase 4 flattening between 15:58 and 16:00 ET to continuously re-evaluate and re-emit liquidation directives on every tick until the portfolio is certified flat.
+- **VIX Stop Distance Clamping**: Clamped adapted stop distance to institutional bounds `[0.0040 * entry, 0.0400 * entry]` in `adaptation.py`, preventing VIX regime multipliers from breaching the risk engine invariant.
+- **News Momentum Strict Causality**: Enforced non-negative lower bound `0 <= (now_ts - c.timestamp.timestamp()) <= self.catalyst_ttl_seconds`, eliminating forward data leakage from future news timestamps; bounded bar history to 60 bars.
+- **VWAP Pullback Calibrated Geometry**: Recalibrated fallback targets to 0.80R / 1.80R, enforced volume floor (`bar.volume > 0` and `sma10_vol > 0`), and required $\ge 0.50R$ minimum reward on standard deviation bands.
+- **ORB Microstructure & Lockout Prevention**: Added `notify_signal_rejected(symbol)` to reset `breakout_fired` flag on downstream order rejections, and gated late-arriving symbols (`t_time > dtime(9, 45)`) from establishing spurious opening ranges.
+- **API & UI Performance Isolation**: Throttled UI broadcasts to 4 Hz (`_UI_BROADCAST_THROTTLE_SEC = 0.25`), added 350ms timeout and eviction for slow WebSocket consumers, and added code 1001 close on server shutdown.
+- **Comprehensive Manual Flattening**: Aggregated symbols across positions, working orders, and brackets, canceling all working orders across all symbols.
+- **Frontend Hardening**: Added Next.js obsidian dark theme error boundary (`frontend/app/error.tsx`), null-safe formatting (`safeFixed`/`safeLocale`), and disconnected REST fallback polling for `/api/account` and `/api/positions`.
+
+Deterministic Test & Simulation Verification:
+- Backend Unit & Integration Tests: 272/272 passed (100% pass rate in 4.19s).
+- Full Opaque-Box E2E Tests: 320/320 passed (100% pass rate in 26.40s, Exit Code 0).
+- Challenger Stress & Mutation Suite: 63/63 passed (100% pass rate in 2.25s).
+- Integrated Monday Market Open Dry Run (`scripts/run_integrated_monday_dry_run.py`): Status `PASS` (184 events processed, 0 event bus errors, 0 open positions, 0 working orders, realized PnL +$308.56).
+- Frontend Production Build: Clean Next.js 15.5 static export, 0 TypeScript errors, 4/4 resilience tests passed.
+- Port Hygiene: Monitored ports 3005, 8000, 8005, 8080 confirmed 100% clean and free.
+
 

@@ -321,6 +321,10 @@ class ExecutionEngine:
             if fill_price is not None:
                 fill = self._execute_fill(order, order.remaining_qty, fill_price, slippage, timestamp)
                 fills.append(fill)
+                if order.order_type in (OrderType.STOP, OrderType.STOP_LIMIT):
+                    # A stop fill is an OCO terminal event. The caller will
+                    # cancel sibling targets during fill reconciliation.
+                    break
 
         return fills
 
@@ -477,3 +481,16 @@ class ExecutionEngine:
         )
         order.audit_trail.append(record)
         self.audit_log.append(record)
+        if len(self.audit_log) > 10000:
+            self.audit_log = self.audit_log[-5000:]
+
+    def prune_session_state(self, max_audit_records: int = 5000, max_orders: int = 1000) -> None:
+        """Prune older orders and bound audit log to prevent unbounded memory growth."""
+        if len(self.audit_log) > max_audit_records:
+            self.audit_log = self.audit_log[-max_audit_records:]
+        if len(self.orders) > max_orders:
+            working_orders = {oid: order for oid, order in self.orders.items() if oid in self.working_orders}
+            non_working = [order for oid, order in self.orders.items() if oid not in self.working_orders]
+            keep_count = max(0, max_orders - len(working_orders))
+            kept_non_working = {order.id: order for order in non_working[-keep_count:]}
+            self.orders = {**kept_non_working, **working_orders}

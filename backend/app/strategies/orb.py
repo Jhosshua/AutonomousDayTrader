@@ -115,6 +115,12 @@ class OpeningRangeBreakoutStrategy(Strategy):
         state = self._get_state(symbol)
         state.baseline_volume = max(1000.0, volume)
 
+    def notify_signal_rejected(self, symbol: str) -> None:
+        """Reset breakout_fired if downstream signal admission or risk engine rejects the order."""
+        sym = symbol.upper()
+        if sym in self.symbol_states:
+            self.symbol_states[sym].breakout_fired = False
+
     def on_bar(self, bar: BarEvent) -> List[SignalEvent]:
         if self.status != StrategyStatus.ACTIVE:
             return []
@@ -153,7 +159,12 @@ class OpeningRangeBreakoutStrategy(Strategy):
         # At or after range end: establish range if not already done
         if not state.range_established:
             if not state.opening_bars:
-                # Missed the open: seed the range from this bar but skip signal
+                # Late arriving symbol: opening range cannot be spuriously seeded outside 09:30-09:45 ET
+                if t_time > dtime(9, 45):
+                    state.range_established = True
+                    state.breakout_fired = True
+                    return []
+                # Missed the open (within 09:30-09:45): seed the range from this bar but skip signal
                 # evaluation, since a range containing the current bar can never
                 # be broken out of on that same bar.
                 state.opening_bars.append(bar)

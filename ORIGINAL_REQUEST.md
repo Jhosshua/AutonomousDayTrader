@@ -211,3 +211,87 @@ Integrity mode: development
 - [ ] `MEMORY.md`, `ERRORS.md`, and `PROJECT.md` updated with exact session details and rationale.
 - [ ] Git commit pushed to `origin main`.
 - [ ] Remote Railway deployment live and `GET /health` returning `200 OK` (`status: healthy`).
+
+## 2026-09-23T15:01:42Z
+
+Execute an exhaustive, end-to-end code review of `AutonomousDayTrader`, remediate all identified defects, stress-test and verify via independent adversarial review sub-agents, and deliver a clean production deployment to Railway.
+
+Working directory: /Users/mo/AutonomousDayTrader
+Integrity mode: development
+
+---
+
+## Background & Scope
+`AutonomousDayTrader` is an institutional-grade intraday trading bot operating on a ,000 virtual account on Railway, connected downstream to AlpacaRelay.
+Previous audits resolved market trend filters, bracket geometries, and trailing stops. This mission conducts a comprehensive, full-stack code review across all system layers:
+- **Ingestion**: `backend/app/ingestion/` (Stock WS, News WS, VIX client, backpressure, reconnection, queue limits)
+- **Core State & Risk**: `backend/app/core/` (Risk engine, bracket manager, market filter, paper account, durable persistence/ledger, EOD flattening)
+- **Execution & Strategies**: `backend/app/strategies/` (`orb.py`, `vwap_pullback.py`, `news_momentum.py`, `mean_reversion.py`, `adaptation.py`, `base.py`)
+- **API & Lifecycle**: `backend/app/main.py` (FastAPI routes, WebSocket streaming, session boundaries, graceful shutdown)
+- **Frontend & UI**: `frontend/` (Next.js components, WebSocket subscriptions, trading drawer, error boundaries)
+
+---
+
+## Requirements
+
+### R1. Comprehensive Full-Stack Code Review
+- Perform static analysis, control-flow inspection, and adversarial edge-case review across all backend and frontend modules.
+- Identify and catalog:
+  - Latent concurrency race conditions or unhandled exceptions in asynchronous loops (`asyncio` tasks, WebSockets).
+  - Floating-point knife-edge rounding errors or precision leaks in risk/bracket calculations.
+  - Data leakage, lookahead bias, or unclosed bar dependencies in indicators.
+  - State desynchronization between in-memory structures, SQLite durable ledger, and UI streaming.
+  - Ingestion bottlenecks, backpressure drops, or memory leaks in long-running buffers.
+
+### R2. Systematic Remediation & Hardening
+- Implement clean, minimal, production-grade fixes for every valid defect identified during the review.
+- Strict non-negotiable invariants:
+  - Hard daily loss limit (,500 circuit breaker) and single-position notional cap (,000 / 50% equity) must remain strictly binding.
+  - Stop loss distances must remain strictly within `[0.0040, 0.0400]`.
+  - Zero overnight holding: 4-phase flattening protocol must reliably liquidate all positions before 16:00 ET.
+  - Process hygiene: Zero orphaned background daemons or open listening ports.
+
+### R3. Unbiased Adversarial Multi-Agent Audit
+- Deploy independent review and challenger sub-agents that did not write the remediation code.
+- Reviewers must:
+  - Audit every git diff line by line.
+  - Execute mutation checks against new and modified tests to verify they fail on defective code.
+  - Challenge concurrency invariants, bracket fill lifecycles, and risk enforcement boundaries.
+  - Formally issue approval or blocking change requests.
+
+### R4. Deterministic Verification & Integrated Dry Run
+- 100% pass rate across the full backend unit test suite (`pytest backend/tests`).
+- 100% pass rate across the comprehensive E2E test runner (`python3 tests/e2e/runner.py`).
+- Deterministic integrated Monday dry run (`python scripts/run_integrated_monday_dry_run.py`) must pass on real production wiring with zero unhandled exceptions.
+- Verify clean local port hygiene (confirm ports 8000, 8005, 8080, 3005 are clean and liberated).
+
+### R5. Documentation, Git Commit, and Remote Railway Deployment
+- Update `MEMORY.md`, `ERRORS.md`, and `PROJECT.md` detailing all findings, remediation mechanics, and audit certifications.
+- Commit all changes cleanly and push to `origin main`.
+- Monitor remote Railway auto-deploy until status is Online.
+- Verify the live production health endpoint (`https://autonomousdaytrader-production.up.railway.app/health`) returns HTTP 200 OK (`status: healthy`).
+
+---
+
+## Acceptance Criteria
+
+### Code Review & Fixes
+- [ ] Complete codebase audit executed with all findings classified by severity (CRITICAL, MAJOR, MINOR).
+- [ ] All confirmed defects remediated with zero architectural regression.
+- [ ] No lookahead bias, repainting, or unclosed bar access in any strategy module.
+- [ ] Risk guardrails (,500 daily breaker, ,000 position cap, 0.4%–4.0% stops, EOD flat book) strictly preserved.
+
+### Independent Review
+- [ ] Unbiased multi-agent review panel unanimously approves all diffs (zero unresolved CRITICAL or MAJOR findings).
+- [ ] Mutation checks verified on key test assertions.
+
+### Verification & Testing
+- [ ] 100% backend pytest suite passes (`pytest backend/tests`).
+- [ ] 100% E2E test runner passes (`tests/e2e/runner.py`).
+- [ ] Integrated simulation dry run passes cleanly with zero event bus errors.
+- [ ] Zero lingering local daemons or listening ports on 8000, 8005, 8080, 3005.
+
+### Deployment & Delivery
+- [ ] `MEMORY.md`, `ERRORS.md`, and `PROJECT.md` updated with full audit trail.
+- [ ] Git commit pushed to GitHub upstream `origin main`.
+- [ ] Remote Railway deployment live and `GET /health` returning `200 OK` (`status: healthy`).

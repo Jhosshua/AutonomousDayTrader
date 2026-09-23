@@ -17,6 +17,16 @@ export interface ActivePositionTrayProps {
   onTightenStop: (symbol: string, newStop: number) => boolean;
 }
 
+function safeFixed(val: number | null | undefined, digits: number = 2): string {
+  if (val == null || isNaN(val)) return "—";
+  return Number(val).toFixed(digits);
+}
+
+function safeLocale(val: number | null | undefined, minDigits: number = 2, maxDigits: number = 2): string {
+  if (val == null || isNaN(val)) return "—";
+  return Number(val).toLocaleString("en-US", { minimumFractionDigits: minDigits, maximumFractionDigits: maxDigits });
+}
+
 export default function ActivePositionTray({
   position,
   recentActivity,
@@ -92,7 +102,7 @@ export default function ActivePositionTray({
               <div className="text-xs text-neutral-400 truncate">
                 {position ? (
                   <span>
-                    Entry: ${position.entry_price.toFixed(2)} • Live: ${position.market_price.toFixed(2)}
+                    Entry: ${safeFixed(position.entry_price)} • Live: ${safeFixed(position.market_price)}
                   </span>
                 ) : (
                   <span>Ready for signals • Cash preservation</span>
@@ -112,10 +122,10 @@ export default function ActivePositionTray({
                 }`}
               >
                 <div>
-                  {pnlSign}${Math.abs(position.unrealized_pnl).toFixed(2)}
+                  {pnlSign}${position.unrealized_pnl != null ? safeFixed(Math.abs(position.unrealized_pnl)) : "—"}
                 </div>
                 <div className="text-[10px] opacity-80">
-                  {pnlSign}{(position.unrealized_pnl_pct * 100).toFixed(2)}%
+                  {pnlSign}{position.unrealized_pnl_pct != null ? safeFixed(position.unrealized_pnl_pct * 100) : "—"}%
                 </div>
               </div>
             )}
@@ -213,28 +223,28 @@ export default function ActivePositionTray({
                         isPositive ? "text-apple-green" : "text-apple-red"
                       }`}
                     >
-                      {pnlSign}${Math.abs(position.unrealized_pnl).toFixed(2)}
+                      {pnlSign}${position.unrealized_pnl != null ? safeFixed(Math.abs(position.unrealized_pnl)) : "—"}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-[11px] text-neutral-400 block">Entry Price</span>
                     <span className="text-lg font-bold text-white num-tabular">
-                      ${position.entry_price.toFixed(2)}
+                      ${safeFixed(position.entry_price)}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-[11px] text-neutral-400 block">Current Price</span>
                     <span className="text-lg font-bold text-white num-tabular">
-                      ${position.market_price.toFixed(2)}
+                      ${safeFixed(position.market_price)}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-[11px] text-neutral-400 block">Market Value</span>
                     <span className="text-lg font-bold text-neutral-200 num-tabular">
-                      ${position.market_value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${safeLocale(position.market_value)}
                     </span>
                   </div>
                 </div>
