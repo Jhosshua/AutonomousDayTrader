@@ -61,8 +61,21 @@ def run_watchdog_audit(base_url: str = DEFAULT_URL) -> dict:
         "telemetry": {},
     }
 
-    # 1. Inspect /health
+    # 1. Inspect /health (with a 6-second persistence retry to filter self-healing transient socket reconnects)
     health_data = fetch_json(f"{base_url}/health")
+    if health_data and health_data.get("status") == "degraded":
+        import time
+        time.sleep(6.0)
+        recheck_data = fetch_json(f"{base_url}/health")
+        if recheck_data and recheck_data.get("status") == "healthy":
+            audit["warnings"].append({
+                "component": "production_health",
+                "message": f"Deployment briefly reported degraded status ({health_data.get('relay')}) but self-healed within 6s",
+            })
+            health_data = recheck_data
+        else:
+            health_data = recheck_data or health_data
+
     if not health_data or health_data.get("status") != "healthy":
         audit["overall_status"] = "CRITICAL"
         audit["incidents"].append({

@@ -31,13 +31,13 @@ Comprehensive architectural audit, bug remediation, de-themification of music/pl
 4. **Succession**: At 16 spawns, write handoff.md, spawn successor.
 - **Work items**:
   1. Audit & Terminology Discovery [done]
-  2. Remediation & De-themification Implementation [in-progress]
-  3. Adversarial Diff Review & Integrity Verification [pending]
-  4. Full QA & Dry-Run Simulation [pending]
-  5. Visual UI Inspection & Build [pending]
-  6. Documentation, Git Push, Railway Deployment & Hygiene [pending]
-- **Current phase**: 2
-- **Current focus**: Phase 2: Worker Remediation & De-themification Implementation
+  2. Remediation & De-themification Implementation [done]
+  3. Adversarial Diff Review & Integrity Verification [done]
+  4. Full QA & Dry-Run Simulation [done]
+  5. Visual UI Inspection & Build [done]
+  6. Documentation, Git Push, Railway Deployment & Hygiene [done]
+- **Current phase**: Complete
+- **Current focus**: Complete
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -74,17 +74,17 @@ Comprehensive architectural audit, bug remediation, de-themification of music/pl
 | reviewer_iter2_1 | teamwork_preview_reviewer | Backend Re-Review (Iteration 2) | completed | 3b8c54d9-8065-4db7-a466-860f1cc23961 |
 | auditor_iter2_2 | teamwork_preview_auditor | Forensic Integrity Audit (Iteration 2) | completed | 2f8f731e-1d59-483e-a4ec-275a37e36333 |
 | qa_sim_visual_1 | teamwork_preview_worker | QA, Monday Dry Run & Visual UI | completed | 79df1f3d-ed0b-4874-9e88-5aa446b129cb |
-| release_worker_1 | teamwork_preview_worker | Release, Git Push & Railway Deploy | in-progress | 9d3deed7-60ed-4701-ae43-91748de7011a |
+| release_worker_1 | teamwork_preview_worker | Release, Git Push & Railway Deploy | completed | 9d3deed7-60ed-4701-ae43-91748de7011a |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 17
-- Pending subagents: 9d3deed7-60ed-4701-ae43-91748de7011a
+- Spawn count: 17 / 17
+- Pending subagents: none
 - Predecessor: none
-- Successor: not yet spawned
+- Successor: none (mission complete)
 
 ## Active Timers
-- Heartbeat cron: 5a5296a1-3dc5-443b-ab0c-8599c9af5cef/task-246
+- Heartbeat cron: none (all tasks killed)
 - Safety timer: none
 
 ## Artifact Index

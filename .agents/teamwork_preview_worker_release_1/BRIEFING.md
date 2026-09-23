@@ -31,12 +31,12 @@ Release Engineer: Update MEMORY.md & PROJECT.md, commit & push to GitHub origin 
 - **Code layout**: PROJECT.md
 
 ## Change Tracker
-- **Files modified**: None yet
-- **Build status**: Ready to document and commit
-- **Pending issues**: None
+- **Files modified**: MEMORY.md, PROJECT.md (and whole project staged & committed in 32d0d6a)
+- **Build status**: PASS (Railway deployment 46bbb9cd-39f1-4f8c-af07-ee254b781d1e status SUCCESS)
+- **Pending issues**: None (Production healthy, /health returns HTTP 200)
 
 ## Quality Status
-- **Build/test result**: Backend 163/163, E2E 318/318 passing in test suite
+- **Build/test result**: Backend 163/163 pass, E2E 318/318 pass, Monday simulation dry-run certified ($50,398.30 equity, +$398.30 PnL), 17/17 visual UI tests pass on mobile/desktop
 - **Lint status**: Clean
 - **Tests added/modified**: backend/tests/stress/test_challenger_stress_invariants.py, tests/e2e/test_challenger_bracket_2.py
 
@@ -45,6 +45,9 @@ Release Engineer: Update MEMORY.md & PROJECT.md, commit & push to GitHub origin 
 - Bracket lifecycle: manual_tighten_stop strictly guarded for ACTIVE / TARGET_1_HIT brackets, with activate_bracket_on_fill in tests.
 - Post-publish telemetry counting in stock_ws.py and news_ws.py.
 - Flat-book session boundary reset: clearing account.positions and cancelling lingering working orders.
+- De-themification: Complete replacement of music/playlist terms with institutional trading terms ("Trading Strategies", "Active Position").
+- Railway deployment 46bbb9cd-39f1-4f8c-af07-ee254b781d1e auto-triggered on push to main; active status SUCCESS; remote production health endpoint returns HTTP 200 {"status":"healthy"}.
+- Process hygiene: ports 3005, 8005, 8080 100% liberated with zero lingering processes.
 
 ## Artifact Index
 - /Users/mo/AutonomousDayTrader/.agents/teamwork_preview_worker_release_1/DISPATCH.md
