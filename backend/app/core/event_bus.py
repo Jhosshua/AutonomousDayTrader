@@ -51,6 +51,9 @@ class EventBus:
             if isinstance(event, reg_type):
                 handlers.extend(reg_handlers)
 
+        # Deduplicate handlers while preserving dispatch order
+        handlers = list(dict.fromkeys(handlers))
+
         if not handlers:
             return
 

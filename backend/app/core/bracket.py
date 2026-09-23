@@ -512,6 +512,7 @@ class DynamicBracketManager:
         symbol: str,
         new_stop_price: float,
         current_market_price: Optional[float] = None,
+        enforce_distance_bounds: bool = False,
     ) -> BracketUpdateDirective:
         """Handle manual UI override to tighten stop with market price bounds clamping."""
         symbol_upper = symbol.upper()
@@ -526,14 +527,28 @@ class DynamicBracketManager:
         if bracket.status not in (BracketStatus.ACTIVE, BracketStatus.TARGET_1_HIT):
             return BracketUpdateDirective(action="NO_ACTION", bracket_status=bracket.status)
 
-        # Clamp stop price to market price bounds:
-        # A BUY (LONG) stop cannot be tightened above current market price.
-        # A SELL (SHORT) stop cannot be tightened below current market price.
-        if current_market_price is not None:
-            if bracket.side == "LONG" and new_stop_price > current_market_price:
-                new_stop_price = current_market_price
-            elif bracket.side != "LONG" and new_stop_price < current_market_price:
-                new_stop_price = current_market_price
+        # Clamp stop price to market price bounds and institutional stop distance limits [0.0040, 0.0400]:
+        if current_market_price is not None and current_market_price > 0:
+            if enforce_distance_bounds:
+                if bracket.side == "LONG":
+                    max_allowed_stop = round(current_market_price * (1.0 - 0.0040), 4)
+                    min_allowed_stop = round(current_market_price * (1.0 - 0.0400), 4)
+                    if new_stop_price > max_allowed_stop:
+                        new_stop_price = max_allowed_stop
+                    elif new_stop_price < min_allowed_stop:
+                        new_stop_price = min_allowed_stop
+                else:
+                    min_allowed_stop = round(current_market_price * (1.0 + 0.0040), 4)
+                    max_allowed_stop = round(current_market_price * (1.0 + 0.0400), 4)
+                    if new_stop_price < min_allowed_stop:
+                        new_stop_price = min_allowed_stop
+                    elif new_stop_price > max_allowed_stop:
+                        new_stop_price = max_allowed_stop
+            else:
+                if bracket.side == "LONG" and new_stop_price > current_market_price:
+                    new_stop_price = current_market_price
+                elif bracket.side != "LONG" and new_stop_price < current_market_price:
+                    new_stop_price = current_market_price
 
         tightened = False
         if bracket.side == "LONG":

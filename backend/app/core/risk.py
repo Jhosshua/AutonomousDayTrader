@@ -134,6 +134,7 @@ class InstitutionalRiskEngine:
         vix_multiplier: float = 1.0,
         is_entry_lockout_active: bool = False,
         is_exit: bool = False,
+        existing_position_notional: float = 0.0,
     ) -> RiskCheckResult:
         """
         Pre-Trade Approval Gate.
@@ -153,15 +154,29 @@ class InstitutionalRiskEngine:
             )
 
         # 1. Circuit Breaker Check
-        if self.status != BreakerStatus.ARMED:
+        dd_dollars = max(0.0, round(self.config.starting_equity - account_equity, 2))
+        if self.status != BreakerStatus.ARMED or dd_dollars >= self.config.hard_max_daily_loss_dollars:
             return RiskCheckResult(
                 approved=False,
                 reason=f"CIRCUIT_BREAKER_HALTED: Trading halted due to maximum daily loss ({self.status.value})",
                 requested_qty=requested_qty,
                 authorized_qty=0,
                 estimated_risk_dollars=0.0,
-                risk_level=self.risk_level,
+                risk_level=RiskLevel.HALTED,
                 rejection_code="CIRCUIT_BREAKER_HALTED",
+            )
+
+        # 1b. Remaining Daily Loss Budget Check
+        remaining_loss_budget = max(0.0, round(self.config.hard_max_daily_loss_dollars - dd_dollars, 2))
+        if remaining_loss_budget <= 0.0:
+            return RiskCheckResult(
+                approved=False,
+                reason="EXHAUSTED_DAILY_LOSS_BUDGET: No remaining risk budget available",
+                requested_qty=requested_qty,
+                authorized_qty=0,
+                estimated_risk_dollars=0.0,
+                risk_level=self.risk_level,
+                rejection_code="EXHAUSTED_DAILY_LOSS_BUDGET",
             )
 
         # 2. Session Time Lockout Check
@@ -261,13 +276,15 @@ class InstitutionalRiskEngine:
         )
         target_risk_dollars = min(
             self.config.max_trade_risk_dollars,
-            round(account_equity * risk_pct, 2)
+            round(account_equity * risk_pct, 2),
+            remaining_loss_budget,
         )
 
         q_risk = int(math.floor(target_risk_dollars / stop_dist))
-        # Max single-position notional (max_position_equity_pct of equity)
+        # Max single-position notional (max_position_equity_pct of equity) net of existing exposure
         max_notional = account_equity * self.config.max_position_equity_pct
-        q_alloc = int(math.floor(max_notional / entry_price))
+        available_notional = max(0.0, max_notional - existing_position_notional)
+        q_alloc = int(math.floor(available_notional / entry_price))
         # Buying power capacity
         q_bp = int(math.floor(buying_power / entry_price))
 

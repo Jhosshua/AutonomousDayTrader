@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import logging
+import math
 import os
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
@@ -104,15 +105,60 @@ last_session_date: Optional[Any] = None
 completed_brackets_recorded: Set[str] = set()
 
 
+def _get_effective_committed_portfolio(
+    acct: PaperTradingAccount,
+    execution_engine: Optional[Any] = None,
+    risk_eng: Optional[Any] = None,
+    bracket_mgr: Optional[Any] = None,
+) -> tuple[set[str], list[str], int, dict[str, float]]:
+    """Compute active symbols, active sectors, committed position count, and exposure notional map.
+    Includes filled positions and in-flight entry commitments (working orders / pending brackets).
+    """
+    committed_symbols = set(acct.positions.keys())
+    existing_notional: dict[str, float] = {}
+
+    for sym, pos in acct.positions.items():
+        existing_notional[sym.upper()] = pos.shares * (pos.market_price if pos.market_price > 0 else pos.avg_entry_price)
+
+    eng = execution_engine or globals().get("engine")
+    if eng is not None and hasattr(eng, "working_orders"):
+        for order in list(eng.working_orders.values()):
+            if order.status.value in ("ACCEPTED", "PARTIALLY_FILLED"):
+                sym = order.symbol.upper()
+                pos = acct.positions.get(sym)
+                is_reducing = bool(
+                    pos and (
+                        (pos.side == PositionSide.LONG and order.side == OrderSide.SELL) or
+                        (pos.side == PositionSide.SHORT and order.side == OrderSide.BUY)
+                    )
+                )
+                if not is_reducing:
+                    committed_symbols.add(sym)
+                    order_price = order.limit_price or order.estimated_price or 0.0
+                    existing_notional[sym] = existing_notional.get(sym, 0.0) + (order.remaining_qty * order_price)
+
+    bm = bracket_mgr or globals().get("bracket_manager")
+    if bm is not None and hasattr(bm, "brackets"):
+        for b in list(bm.brackets.values()):
+            if b.status == BracketStatus.PENDING_ENTRY:
+                sym = b.symbol.upper()
+                committed_symbols.add(sym)
+                if sym not in existing_notional:
+                    existing_notional[sym] = b.total_qty * b.entry_price
+
+    re = risk_eng or globals().get("risk_engine")
+    committed_sectors = [
+        re.symbol_sectors.get(s, "Other")
+        for s in committed_symbols
+        if re and hasattr(re, "symbol_sectors") and s in re.symbol_sectors
+    ]
+    return committed_symbols, committed_sectors, len(committed_symbols), existing_notional
+
+
 def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[bool, str]:
     """Validate order against Institutional Risk Engine and active flattening lockout."""
     is_lockout = flattening_engine.current_phase != FlatteningPhase.NORMAL_TRADING
-    active_symbols = set(acct.positions.keys())
-    active_sectors = [
-        risk_engine.symbol_sectors.get(s, "Other")
-        for s in active_symbols
-        if s in risk_engine.symbol_sectors
-    ]
+    active_symbols, active_sectors, committed_count, notional_map = _get_effective_committed_portfolio(acct)
 
     # Differentiate position-reducing / liquidation orders from position-opening orders
     existing_pos = acct.positions.get(order.symbol.upper())
@@ -162,12 +208,13 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
         stop_price=s_price,
         account_equity=acct.equity,
         buying_power=acct.buying_power,
-        active_positions_count=len(acct.positions),
+        active_positions_count=len(acct.positions) if getattr(order, "strategy_id", None) == "MANUAL" else committed_count,
         active_symbols=active_symbols,
         active_sectors=active_sectors,
         vix_multiplier=adaptation_engine.current_sizing_multiplier,
         is_entry_lockout_active=is_lockout,
         is_exit=is_exit,
+        existing_position_notional=notional_map.get(sym, 0.0),
     )
     if res.approved and not is_exit and order.qty > res.authorized_qty:
         return False, f"RISK_SIZE_REJECTED: requested {order.qty} exceeds authorized {res.authorized_qty} shares"
@@ -388,12 +435,12 @@ def _atr_estimate(symbol: str, bar: BarEvent, period: int = 14) -> float:
     return max(0.01, sum(true_ranges) / len(true_ranges))
 
 
-def _serialize_position(symbol: str) -> Dict[str, Any]:
+def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, Any]:
     """Serialize one position with the bracket and chart data that actually backs the UI."""
     pos = account.positions[symbol]
     bracket_id = bracket_manager.symbol_to_bracket.get(symbol)
     bracket = bracket_manager.brackets.get(bracket_id) if bracket_id else None
-    return {
+    pos_data = {
         "symbol": pos.symbol,
         "side": pos.side.value,
         "shares": pos.shares,
@@ -412,8 +459,11 @@ def _serialize_position(symbol: str) -> Dict[str, Any]:
         "take_profit_1": bracket.target_1_price if bracket else None,
         "take_profit_2": bracket.target_2_price if bracket else None,
         "strategy_id": bracket.strategy_id if bracket else "manual",
-        "chart_points": market_history.get(symbol, [])[-120:],
     }
+    if include_chart:
+        history = market_history.get(symbol, [])
+        pos_data["chart_points"] = list(history)[-120:]
+    return pos_data
 
 
 def _apply_bracket_directive(bracket_id: str, directive: Any) -> None:
@@ -705,6 +755,9 @@ def _check_session_boundary(now_dt: datetime) -> None:
     if is_first_observation:
         last_session_date = session_date
         return
+    if session_date < last_session_date:
+        log.warning("Ignoring out-of-order historical event from %s (current session: %s)", session_date, last_session_date)
+        return
     boundary_event_key: Optional[str] = None
     if not inflight_event_keys:
         should_process, boundary_event_key = _begin_durable_event(
@@ -768,6 +821,10 @@ def _check_session_boundary(now_dt: datetime) -> None:
     for strategy in strategies:
         strategy.reset_daily_stats()
     engine.prune_session_state()
+    market_history.clear()
+    recent_news.clear()
+    if state_store is not None:
+        state_store.wal_checkpoint("PASSIVE")
     _checkpoint_runtime(
         "SESSION_BOUNDARY",
         (boundary_event_key, "SESSION_BOUNDARY") if boundary_event_key else None,
@@ -776,6 +833,19 @@ def _check_session_boundary(now_dt: datetime) -> None:
 
 _last_broadcast_time: float = 0.0
 _UI_BROADCAST_THROTTLE_SEC: float = 0.25  # 4 Hz maximum rate
+
+
+def _sanitize_for_json(val: Any) -> Any:
+    """Recursively replace non-finite numbers (NaN, Infinity, -Infinity) with 0.0."""
+    if isinstance(val, float):
+        if math.isnan(val) or math.isinf(val):
+            return 0.0
+        return val
+    elif isinstance(val, dict):
+        return {k: _sanitize_for_json(v) for k, v in val.items()}
+    elif isinstance(val, (list, tuple)):
+        return [_sanitize_for_json(v) for v in val]
+    return val
 
 
 async def broadcast_ui_state(force: bool = False) -> None:
@@ -795,7 +865,8 @@ async def broadcast_ui_state(force: bool = False) -> None:
     _last_broadcast_time = now_mono
 
     snapshot = account.get_snapshot()
-    primary_pos = _serialize_position(next(iter(account.positions))) if account.positions else None
+    active_position_symbols = list(account.positions.keys())
+    primary_pos = _serialize_position(active_position_symbols[0], include_chart=True) if active_position_symbols else None
 
     daily_pnl = round(snapshot.equity - account.daily_starting_equity, 2)
     daily_pnl_pct = round(
@@ -821,7 +892,7 @@ async def broadcast_ui_state(force: bool = False) -> None:
         "market_context": adaptation_engine.get_market_context(),
         "strategies": [s.to_dict() for s in strategies],
         "primary_position": primary_pos,
-        "all_positions": [_serialize_position(symbol) for symbol in account.positions],
+        "all_positions": [_serialize_position(symbol, include_chart=False) for symbol in active_position_symbols],
         "positions_count": len(account.positions),
         "working_orders_count": len(engine.working_orders),
         "ledger_revision": ledger_revision,
@@ -850,7 +921,7 @@ async def broadcast_ui_state(force: bool = False) -> None:
         ],
     }
 
-    raw = json.dumps(payload, default=str)
+    raw = json.dumps(_sanitize_for_json(payload), default=str, allow_nan=False)
     for ws in list(ui_clients):
         try:
             await asyncio.wait_for(ws.send_text(raw), timeout=0.35)
@@ -910,11 +981,12 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 
     latest_market_prices[sym] = signal.entry_price if bar is None else bar.close
     adapted_stop = adaptation_engine.calculate_adapted_stop(signal)
-    is_active = sym in account.positions
+    committed_symbols, committed_sectors, committed_count, notional_map = _get_effective_committed_portfolio(account)
+    is_active = sym in committed_symbols
     approved, reason, qty = adaptation_engine.evaluate_signal_admission(
         signal=signal,
         equity=account.equity,
-        current_positions_count=len(account.positions),
+        current_positions_count=committed_count,
         is_symbol_active=is_active,
     )
     if not approved or qty <= 0:
@@ -926,12 +998,6 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     # sizing contract.  Execution submits the volatility-adjusted stop, so cap
     # that quantity against the exact risk geometry that will reach the order
     # engine before creating the order.
-    active_symbols = set(account.positions.keys())
-    active_sectors = [
-        risk_engine.symbol_sectors.get(s, "Other")
-        for s in active_symbols
-        if s in risk_engine.symbol_sectors
-    ]
     risk_preview = risk_engine.evaluate_order_request(
         symbol=sym,
         side="BUY" if signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY" else "SELL",
@@ -940,12 +1006,13 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         stop_price=adapted_stop,
         account_equity=account.equity,
         buying_power=account.buying_power,
-        active_positions_count=len(account.positions),
-        active_symbols=active_symbols,
-        active_sectors=active_sectors,
+        active_positions_count=committed_count,
+        active_symbols=committed_symbols,
+        active_sectors=committed_sectors,
         vix_multiplier=adaptation_engine.current_sizing_multiplier,
         is_entry_lockout_active=flattening_engine.current_phase != FlatteningPhase.NORMAL_TRADING,
         is_exit=False,
+        existing_position_notional=notional_map.get(sym, 0.0),
     )
     if not risk_preview.approved:
         if signal.strategy_id == "orb":
@@ -988,6 +1055,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         if bar:
             fills = engine.process_bar(bar.symbol, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.timestamp)
             _reconcile_fills(fills)
+    else:
+        if signal.strategy_id == "orb":
+            orb_strategy.notify_signal_rejected(sym)
+        log.warning("Entry order %s rejected by execution engine: %s", submitted.id, submitted.reject_reason)
 
 
 # Event Bus Handlers
@@ -1237,7 +1308,20 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         should_process, event_key = _begin_durable_event("FLATTENING", directive)
         if not should_process:
             return
-    if directive.cancel_all_orders:
+    if directive.phase == FlatteningPhase.ORDER_PURGE:
+        # Phase 2 (15:50 ET): Purge unfilled entry orders; preserve protective stops for open positions
+        for order_id, order in list(engine.working_orders.items()):
+            pos = account.positions.get(order.symbol.upper())
+            is_protective = bool(
+                pos and (
+                    (pos.side == PositionSide.LONG and order.side == OrderSide.SELL) or
+                    (pos.side == PositionSide.SHORT and order.side == OrderSide.BUY)
+                )
+            )
+            if not is_protective:
+                engine.cancel_order(order_id, reason="EOD_PURGE_UNFILLED_ENTRIES")
+        _release_dead_entry_brackets()
+    elif directive.cancel_all_orders:
         engine.cancel_all_orders("FLATTENING_DIRECTIVE")
         _release_dead_entry_brackets()
 
@@ -1479,6 +1563,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     vix_client = None
     if state_store is not None:
         state_store.close()
+    event_bus.clear()
     log.info("Shutdown complete.")
 
 

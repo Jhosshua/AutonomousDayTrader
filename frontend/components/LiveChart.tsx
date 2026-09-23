@@ -55,23 +55,26 @@ export default function LiveChart({ position, height = 240 }: LiveChartProps) {
     if (position.take_profit_1) allPrices.push(position.take_profit_1);
     if (position.take_profit_2) allPrices.push(position.take_profit_2);
 
-    if (allPrices.length === 0) {
+    const validPrices = allPrices.filter((p) => typeof p === "number" && Number.isFinite(p));
+    if (validPrices.length === 0) {
       return { minPrice: 0, maxPrice: 1, priceRange: 1 };
     }
 
-    const min = Math.min(...allPrices);
-    const max = Math.max(...allPrices);
+    const min = Math.min(...validPrices);
+    const max = Math.max(...validPrices);
     const padding = (max - min) * 0.15 || 1.0;
+    const range = max - min + padding * 2;
     return {
       minPrice: min - padding,
       maxPrice: max + padding,
-      priceRange: max - min + padding * 2,
+      priceRange: Number.isFinite(range) && range > 0 ? range : 1.0,
     };
   }, [candles, position]);
 
   const getY = (price: number) => {
-    if (priceRange === 0) return height / 2;
-    return height - ((price - minPrice) / priceRange) * height;
+    if (!Number.isFinite(price) || priceRange === 0 || !Number.isFinite(priceRange)) return height / 2;
+    const y = height - ((price - minPrice) / priceRange) * height;
+    return Number.isFinite(y) ? y : height / 2;
   };
 
   const chartWidth = 500;

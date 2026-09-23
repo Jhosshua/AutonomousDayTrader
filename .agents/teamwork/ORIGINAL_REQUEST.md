@@ -373,3 +373,80 @@ Integrity mode: development
 - [ ] Frontend build succeeds with zero TypeScript or styling regressions.
 - [ ] Visual UI verified for expanded ticker carousel and active position tray.
 - [ ] Git commit pushed to `origin main` and Railway remote health endpoint verified HTTP 200 OK.
+
+## 2026-09-23T20:07:47Z
+
+Execute an exhaustive, adversarial code review and audit of `AutonomousDayTrader` across every system angle following the universe expansion to 12 symbols, multi-sector risk engine, and regime-separated execution. Identify latent concurrency races, indicator leakage, numerical precision errors, memory leaks, and edge-case boundary failures; implement production-grade fixes; verify via comprehensive regression and mutation testing; and deliver a verified production deployment to Railway.
+
+Working directory: /Users/mo/AutonomousDayTrader
+Integrity mode: development
+
+---
+
+## Background & Scope
+`AutonomousDayTrader` just received a major release expanding the watchlist from 3 to 12 high-beta symbols (`SPY`, `QQQ`, `AAPL`, `NVDA`, `TSLA`, `AMD`, `MSFT`, `AMZN`, `META`, `GOOGL`, `PLTR`, `COIN`), dynamic sector allocation across 6 sectors, regime-separated execution (`NEUTRAL` mean-reversion activation), and microstructure calibrations. 
+
+A 4x increase in ticker subscriptions introduces 4x higher quote/trade throughput (~3.5M quotes/session), higher concurrency in order book processing, potential buffer accumulation, and complex cross-sector risk transitions. This audit must attack every layer without mercy.
+
+---
+
+## Attack Angles & Audit Requirements
+
+### R1. Adversarial Multi-Angle Code Review & Vulnerability Attack
+Attack the system across these specific dimensions:
+1. **Concurrency & Event Bus Race Conditions**:
+   - Asynchronous queue locks, task cancellation, and WebSocket reconnect backpressure across 12 simultaneous ticker feeds.
+   - Race conditions between rapid quote updates, bracket modifications, and order fill callbacks.
+2. **Indicator Causality & Synchronization**:
+   - Multi-symbol rolling buffers (`all_bars`, `session_bars`, `recent_bars`): check for off-by-one errors, lookahead bias, unclosed bar leakage, and memory growth.
+   - Anchor VWAP session reset synchronization across multiple symbols arriving at different microsecond timestamps.
+3. **Risk Engine & Bracket Knife-Edge Boundaries**:
+   - Floating-point precision leaks in bracket sizing and stop price calculations.
+   - Strict enforcement of institutional stop-loss distance bounds: $[0.0040, 0.0400]$ ($40$ to $400$ bps).
+   - Hard daily circuit breaker ($1,500 drawdown) and single-position notional cap ($25,000 / 50% equity).
+   - Multi-sector concentration cap (max 2 positions per sector, max 3 total positions) under simultaneous signal collisions.
+4. **Ingestion & Buffer Memory Hygiene**:
+   - Long-running memory leaks in `market_history` (deque capping), news deduplication caches, and SQLite ledger checkpoints.
+5. **API & UI State Synchronization**:
+   - WebSocket payload serialization safety with 12 active tickers.
+   - Frontend error boundary stability and drawer responsiveness.
+
+### R2. Systematic Remediation & Mutation Testing
+- Implement clean, minimal, production-grade fixes for every confirmed defect.
+- For every fix, implement a mutation test verifying that the test deterministically fails if the bug is reintroduced.
+- Non-negotiable risk invariants ($1,500 daily breaker, $25,000 position cap, 4-phase EOD zero-overnight auto-flattening) must remain strictly binding.
+
+### R3. Deterministic Verification & Integrated Dry Run
+- 100% pass rate across the full backend unit test suite (`pytest backend/tests`).
+- 100% pass rate across the comprehensive E2E test runner (`python3 tests/e2e/runner.py`).
+- Deterministic integrated Monday dry run (`python scripts/run_integrated_monday_dry_run.py`) must pass cleanly across the 12-symbol universe with zero unhandled exceptions and flat book at EOD.
+- Verify clean local port hygiene (confirm ports 8000, 8005, 8080, 3005 are clean and liberated with zero lingering processes).
+
+### R4. Documentation, Git Commit, and Remote Railway Deployment
+- Update `MEMORY.md`, `ERRORS.md`, and `PROJECT.md` detailing all audit findings, attack vectors, and applied remediations.
+- Clean git commit pushed to `origin main`.
+- Remote Railway auto-deployment verified live (`GET https://autonomousdaytrader-production.up.railway.app/health` returns HTTP 200 `status: healthy`).
+
+---
+
+## Acceptance Criteria
+
+### Audit & Code Quality
+- [ ] Multi-angle vulnerability report cataloging all findings by severity (CRITICAL, MAJOR, MINOR).
+- [ ] All confirmed defects remediated with zero regressions.
+- [ ] Zero lookahead bias, memory leaks, or concurrency race conditions.
+
+### Risk & Boundary Invariants
+- [ ] $1,500 daily breaker, $25,000 position cap, $[0.0040, 0.0400]$ stop ranges, and EOD flat book strictly certified.
+- [ ] Multi-sector allocation (max 2/sector, max 3 concurrent) tested against simultaneous signal collisions.
+
+### Verification & Testing
+- [ ] 100% backend pytest suite passes (`pytest backend/tests -q`).
+- [ ] 100% E2E test runner passes (`tests/e2e/runner.py`).
+- [ ] Integrated simulation dry run passes on 12 symbols with zero event bus errors.
+- [ ] Zero lingering daemons or open listening ports on 8000, 8005, 8080, 3005.
+
+### Deployment & Live Verification
+- [ ] Next.js frontend build succeeds with zero TypeScript or styling errors.
+- [ ] Commit pushed to `origin main`.
+- [ ] Remote Railway deployment live and `GET /health` returns HTTP 200 OK (`status: healthy`).

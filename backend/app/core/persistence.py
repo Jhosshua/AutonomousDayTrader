@@ -15,11 +15,14 @@ import hashlib
 import importlib
 import json
 from pathlib import Path
+import logging
 import sqlite3
 import threading
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from pydantic import BaseModel
+
+log = logging.getLogger(__name__)
 
 
 SCHEMA_VERSION = 2
@@ -374,6 +377,8 @@ class TradingStateStore:
                     connection.execute("ROLLBACK")
                 raise
         self.last_checkpoint_at = now
+        if revision % 100 == 0:
+            self.wal_checkpoint("PASSIVE")
         return revision, inserted_trades
 
     def begin_event(self, event_key: str, event_type: str, payload: Any) -> bool:
@@ -533,10 +538,26 @@ class TradingStateStore:
                 target.close()
         return destination_path
 
+    def wal_checkpoint(self, mode: str = "PASSIVE") -> None:
+        """Execute SQLite WAL checkpoint to flush write-ahead log pages."""
+        mode_upper = mode.upper()
+        if mode_upper not in ("PASSIVE", "FULL", "RESTART", "TRUNCATE"):
+            mode_upper = "PASSIVE"
+        with self._lock:
+            if not self._closed and self._connection:
+                try:
+                    self._connection.execute(f"PRAGMA wal_checkpoint({mode_upper})")
+                except Exception as exc:
+                    log.warning("WAL checkpoint (%s) failed: %s", mode_upper, exc)
+
     def close(self) -> None:
         with self._lock:
             if self._closed:
                 return
+            try:
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except Exception as exc:
+                log.warning("Final WAL truncate checkpoint failed: %s", exc)
             self._connection.close()
             fcntl.flock(self._lease_handle.fileno(), fcntl.LOCK_UN)
             self._lease_handle.close()

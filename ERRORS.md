@@ -1,5 +1,69 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-09-23: Ingestion Queue Saturation Dropping Critical Candle Bars and Fills (R6-1)
+
+**What did not work**: Under extreme quote floods across 12 tickers (~3.5M quotes/session), incoming wire messages filled the FIFO queue beyond `QUEUE_MAX_SIZE` (10,000 items). An unprioritized queue dropped all subsequent messages via `asyncio.QueueFull`, discarding critical candle bars (`b`) and trade execution prints (`t`).
+
+**What worked instead**: Implemented prioritized frame detection in `stock_ws._read_loop`. If the queue is saturated, high-priority frames (`"T":"b"`, `"T":"t"`, `"T":"relay"`) discard older quote frames (`q`) via `self._queue.get_nowait()` before inserting, guaranteeing zero dropped bars or execution reconciliation prints.
+
+**Note for next time**: Real-time market data queues must implement QoS priority tiers. High-frequency telemetry (quotes) must yield to lower-frequency, state-critical frames (bars, trades) during saturation.
+
+## 2026-09-23: Mid-Minute News Catalyst Dropping on Start-of-Minute Evaluation (R6-1)
+
+**What did not work**: In `news_momentum.py`, news catalysts arriving at e.g. 09:35:45 were compared against bar timestamp 09:35:00. The check `(now_ts - c.timestamp.timestamp()) <= TTL` treated `elapsed` as negative (-45s) and dropped the catalyst when purging expired news, missing the breakout on the 09:36 reaction bar. Additionally, non-watchlist symbols accumulated without bound in `pending_catalysts`.
+
+**What worked instead**: Filtered catalysts to `settings.WATCHLIST_SYMBOLS`, open positions, and active bars; capped queue depth to 10; and preserved mid-minute catalysts (`0 < c.timestamp - now_ts <= 60.0`) across the bar duration so subsequent reaction bars can trigger breakouts.
+
+**Note for next time**: When aligning asynchronous event timestamps (news) with discretely bucketed candle bars, ensure the sliding retention window accounts for the candle's duration ($t_{bar} \le t_{event} < t_{bar} + \Delta t$).
+
+## 2026-09-23: Indicator Baseline Self-Contamination Diluting Breakout RVOL and ATR (R6-2)
+
+**What did not work**: In `vwap_pullback.py` and `orb.py`, rolling volume SMA and ATR calculations included the current candidate breakout bar itself (`state.recent_bars` or `state.all_bars`). On large expansion candles, the candidate bar's own elevated volume and range inflated the baseline denominator, artificially compressing calculated RVOL and ATR multiples and failing entry filters.
+
+**What worked instead**: Sliced baselines strictly to prior closed bars: `state.recent_bars[:-1][-10:]` for VWAP pullback volume and `state.all_bars[:-1]` for ORB ATR, strictly maintaining indicator causality.
+
+**Note for next time**: Never include the current candidate/decision bar in its own baseline reference window. The baseline must represent strictly prior, fully finalized state.
+
+## 2026-09-23: Sub-Second NTP Jitter Triggering False Future Index Rejections (R6-2)
+
+**What did not work**: In `MarketTrendFilter`, a strict zero-tolerance guard `if elapsed < 0: return FUTURE_INDEX_DATA` caused quotes arriving with microsecond clock skew (e.g. -0.002s) to be rejected as lookahead leaks, marking market trend as `UNKNOWN` and intermittently freezing strategy execution.
+
+**What worked instead**: Relaxed the forward tolerance bound to `elapsed < -1.0s`, accommodating realistic sub-second NTP network jitter while strictly rejecting genuine lookahead bias and forward-dated feeds.
+
+**Note for next time**: Causal time checks must distinguish between microsecond clock jitter/network skew and actual forward-data anomalies by including a tight, realistic tolerance epsilon ($\approx 1.0\text{s}$).
+
+## 2026-09-23: Pre-Trade Drawdown Check Bypass and Uncapped Loss Budgeting (R6-3)
+
+**What did not work**: In `InstitutionalRiskEngine.evaluate_order_request`, the circuit breaker check checked `self.status != BreakerStatus.ARMED`. Because breaker transitions occurred periodically or after fills, intraday equity drawdown could cross the $1,500 threshold between evaluations, allowing new orders to execute during an active hard-loss state. Furthermore, orders were sized without verifying that risk dollars fit within the remaining daily loss budget ($1,500 - \text{drawdown}$).
+
+**What worked instead**: Added an immediate, real-time drawdown check `dd_dollars >= self.config.hard_max_daily_loss_dollars` that halts new orders with `CIRCUIT_BREAKER_HALTED`. Capped order risk via `min(target_risk_dollars, remaining_loss_budget)`.
+
+**Note for next time**: Real-time pre-trade risk checks must independently evaluate raw current equity and hard boundaries on every single order request, rather than relying solely on cached state machine flags.
+
+## 2026-09-23: Multi-Ticker Signal Collisions Racing Past Portfolio Concentration Caps (R6-3)
+
+**What did not work**: With 12 active tickers, multiple breakout strategies fired signals on the same millisecond tick. Because order fills occur asynchronously on subsequent quotes, `len(account.positions)` remained 0 while all 12 orders were evaluated, accepting up to 12 orders and drastically breaching the 3-position total cap and 2-position sector cap once filled.
+
+**What worked instead**: Implemented `_get_effective_committed_portfolio` in `backend/app/main.py`. This routine constructs the union of filled positions, accepted entry orders, and pending brackets, evaluating both total portfolio commitments and per-sector reservations atomically during pre-trade filtering.
+
+**Note for next time**: In asynchronous trading systems, portfolio capacity must track committed orders in-flight, not just completed fills.
+
+## 2026-09-23: Phase 2 EOD Flattening Order Purge Stripping Protective Stops (R6-3)
+
+**What did not work**: At 15:50 ET (Phase 2 `ORDER_PURGE`), the flattening routine cancelled all working orders across all symbols. This stripped protective stop-loss orders from open positions, leaving active holdings completely unhedged and exposed for 5 minutes until market liquidation at 15:55 ET (Phase 3).
+
+**What worked instead**: Refactored Phase 2 purge to cancel ONLY unfilled entry orders, explicitly preserving active protective stop brackets until Phase 3 executes market liquidations.
+
+**Note for next time**: Flattening phases must preserve defensive exit orders while active exposure remains on the book. Never strip protective stops before the underlying position is closed.
+
+## 2026-09-23: Non-Finite Floats (NaN/Infinity) Crashing WebSocket Frontend Deserialization (R6-3)
+
+**What did not work**: Division-by-zero or zero-range ATR/volatility conditions generated `NaN` or `Infinity` float values in backend state dictionaries. Standard Python `json.dumps()` serialized these as bare tokens (`NaN`, `Infinity`), violating RFC 8259 and crashing browser `JSON.parse` with `SyntaxError: Unexpected token N in JSON`.
+
+**What worked instead**: Implemented recursive `_sanitize_for_json` replacing all `NaN` and `Infinity` floats with `0.0`, and passed `allow_nan=False` to `json.dumps` to ensure strict RFC 8259 compliance. Added coordinate guards in `LiveChart.tsx`.
+
+**Note for next time**: Never trust IEEE 754 floating point numbers to be finite when serializing over JSON APIs. Always enforce RFC 8259 compliance at the serialization boundary.
+
 ## 2026-09-23: Filter-Stacking Bottleneck Causing Total Strategy Starvation
 
 **What did not work**: The combination of a narrow 3-single-stock watchlist, binary sector lockout, extreme volume surge hurdles ($3.5\times$ on 1-minute bars), and locking out all directional strategies during `NEUTRAL` market regimes without an active mean reversion counterpart caused a filter-stacking bottleneck. Trade frequency collapsed to ~0 trades/day despite normal market liquidity and hours.

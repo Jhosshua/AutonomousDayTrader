@@ -128,9 +128,9 @@ class VWAPPullbackStrategy(Strategy):
             is_bullish_trend = bar.close > vwap
             is_bearish_trend = bar.close < vwap
 
-        # Volume SMAs
-        volumes = [float(b.volume) for b in state.recent_bars]
-        sma10_vol = calculate_sma(volumes, 10)
+        # Volume SMAs (baseline excludes current candidate bar to prevent self-dilution)
+        prior_volumes = [float(b.volume) for b in state.recent_bars[:-1][-10:]]
+        sma10_vol = calculate_sma(prior_volumes, 10) if prior_volumes else float(bar.volume)
 
         # Test of VWAP pullback zone
         # Long zone: [VWAP - 0.2*std, VWAP + 0.3*std]

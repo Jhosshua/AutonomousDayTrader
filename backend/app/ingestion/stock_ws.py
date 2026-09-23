@@ -204,12 +204,31 @@ class StockWebSocketClient:
         log.info(f"Subscribed channels: bars={len(cmd.get('bars', []))}, quotes={len(cmd.get('quotes', []))}, trades={len(cmd.get('trades', []))}")
 
     async def _read_loop(self, ws: Any) -> None:
-        """Read wire frames and buffer onto internal queue with backpressure protection."""
+        """Read wire frames and buffer onto internal queue with backpressure protection and selective quote shedding."""
         async for raw_msg in ws:
             self.messages_received += 1
             qsize = self._queue.qsize()
             if qsize >= settings.QUEUE_MAX_SIZE * settings.QUEUE_HIGH_WATERMARK_PCT:
                 log.warning(f"Queue high watermark reached: {qsize}/{settings.QUEUE_MAX_SIZE} items")
+
+            is_priority = bool(
+                '"T":"b"' in raw_msg
+                or '"T": "b"' in raw_msg
+                or '"T":"t"' in raw_msg
+                or '"T": "t"' in raw_msg
+                or '"T":"relay"' in raw_msg
+                or '"T": "relay"' in raw_msg
+            )
+
+            if is_priority and self._queue.full():
+                # Priority frame (bar, trade, or relay): evict older frame (quote) to guarantee delivery
+                try:
+                    self._queue.get_nowait()
+                    self._queue.task_done()
+                    self.dropped_messages += 1
+                    log.warning("Ingestion queue full! Evicted older frame to prioritize bar/trade event")
+                except (asyncio.QueueEmpty, ValueError):
+                    pass
 
             try:
                 self._queue.put_nowait(raw_msg)

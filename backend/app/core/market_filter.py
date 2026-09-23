@@ -187,7 +187,7 @@ class MarketTrendFilter:
         if self.spy_state.last_timestamp:
             spy_ts = _to_utc(self.spy_state.last_timestamp)
             elapsed = (now - spy_ts).total_seconds()
-            if elapsed < 0:
+            if elapsed < -1.0:
                 return MarketTrend.UNKNOWN, f"FUTURE_INDEX_DATA: Index timestamp is in the future ({elapsed:.1f}s)"
             if elapsed > self.stale_threshold_sec:
                 return MarketTrend.UNKNOWN, f"STALE_INDEX_DATA: SPY data age ({elapsed:.1f}s) > {self.stale_threshold_sec}s"
@@ -195,7 +195,7 @@ class MarketTrendFilter:
         if self.qqq_state.last_timestamp:
             qqq_ts = _to_utc(self.qqq_state.last_timestamp)
             elapsed = (now - qqq_ts).total_seconds()
-            if elapsed < 0:
+            if elapsed < -1.0:
                 return MarketTrend.UNKNOWN, f"FUTURE_INDEX_DATA: Index timestamp is in the future ({elapsed:.1f}s)"
             if elapsed > self.stale_threshold_sec:
                 return MarketTrend.UNKNOWN, f"STALE_INDEX_DATA: QQQ data age ({elapsed:.1f}s) > {self.stale_threshold_sec}s"

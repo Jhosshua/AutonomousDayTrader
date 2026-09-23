@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-23T19:55:00Z
+# BRIEFING — 2026-09-23T20:09:00Z
 
 ## Mission
-Implement universe expansion, regime-separated strategy execution, and realistic microstructure calibrations to scale trading frequency and maintain institutional profitability for AutonomousDayTrader, verified by adversarial sub-agents, deterministic E2E dry runs, UI visual audit, and Railway deployment.
+Execute an exhaustive, adversarial code review and audit of `AutonomousDayTrader` across every system angle following universe expansion to 12 symbols, multi-sector risk engine, and regime-separated execution; identify latent races, indicator leakage, numerical precision errors, memory leaks, and boundary failures; implement production-grade fixes with deterministic mutation tests; verify via 100% tests, dry run, port hygiene; and deploy to Railway.
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -14,6 +14,10 @@ Implement universe expansion, regime-separated strategy execution, and realistic
 - Active Victory Auditor: d306538a-1360-45b0-a0e5-4682c4c66068 (victory_auditor_sentinel_5 - VICTORY CONFIRMED)
 - Cron 1 Task ID: e5d4f817-fe63-421e-8e42-a9f9643bc9fa/task-32 (Cancelled upon completion)
 - Cron 2 Task ID: e5d4f817-fe63-421e-8e42-a9f9643bc9fa/task-34 (Cancelled upon completion)
+- Active Orchestrator: 919291d6-b0dc-48c9-ab39-d3b8659498d2 (orchestrator_6 - In Progress)
+- Active Victory Auditor: [To be spawned upon victory claim]
+- Cron 1 Task ID: f05ee9d9-c207-4268-b1d7-b92b51a39c99/task-28 (Active: */8 * * * *)
+- Cron 2 Task ID: f05ee9d9-c207-4268-b1d7-b92b51a39c99/task-30 (Active: */10 * * * *)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -23,31 +27,23 @@ Implement universe expansion, regime-separated strategy execution, and realistic
 - Remote deployment mandate: git push origin main, verify Railway remote build and deployment success, check remote live health endpoint (https://autonomousdaytrader-production.up.railway.app/health)
 
 ## User Context
-- **Last user request**: Implement universe expansion (12 symbols), regime-separated strategy execution (trending vs neutral/chop), realistic microstructure calibrations (news_momentum 2.0x, mean_reversion Z 1.65 / volume 1.30x / wick 0.30), adversarial anti-hallucination & anti-bias audit, deterministic E2E dry run, UI audit, documentation, and Railway deployment.
+- **Last user request**: Execute an exhaustive, adversarial code review and audit of `AutonomousDayTrader` across every system angle following universe expansion to 12 symbols, multi-sector risk engine, and regime-separated execution. Identify latent concurrency races, indicator leakage, numerical precision errors, memory leaks, and edge-case boundary failures; implement production-grade fixes; verify via comprehensive regression and mutation testing; and deliver a verified production deployment to Railway.
 - **Pending clarifications**: none
 - **Delivered results**:
-  - Universe expanded to 12 symbols across 6 sectors (Semiconductors, Software, Discretionary, Communication Services, Fintech/Crypto, Index/ETFs).
-  - Multi-sector risk limits enforced: max 2 positions/sector, max 3 concurrent positions total, strictly preserving $1,500 daily breaker and $25,000 position cap.
-  - Regime-separated strategy execution: Trending (BULLISH/BEARISH) enables ORB & VWAP along beta; Range-bound (NEUTRAL) activates Statistical Mean Reversion (+-1.6 sigma to 20-SMA) and high-RVOL (>=2.20x) idiosyncratic breakouts.
-  - Calibrations: news_momentum volume surge 2.0x with \b regex boundaries; mean_reversion Z=1.65, volume climax 1.30x, wick rejection 0.30.
-  - Independent Adversarial Audit: Unanimously approved by Reviewer 1, Reviewer 2, Challenger 1, Challenger 2, and Forensic Auditor. 5/5 mutation tests killed.
-  - Deterministic Verification: 324/324 backend tests passed (100%), 320/320 E2E tests passed (100%), Monday dry run passed with zero errors and flat book.
-  - Port & Process Hygiene: Ports 3005, 8000, 8005, 8080 clean and liberated.
-  - Production Deployment: Commit c0a18c4 pushed to origin main; Railway deployment verified live and healthy (HTTP 200 OK).
-  - Post-Victory Audit: VICTORY CONFIRMED by independent auditor.
+  - [orchestrator_6 working in progress]
 
 ## Project Status
-- **Phase**: complete
-- **Crons Active**: none (killed per protocol)
-- **Active Subagents**: none (killed per protocol)
+- **Phase**: in progress
+- **Crons Active**: task-28 (progress reporting */8), task-30 (liveness */10)
+- **Active Subagents**: orchestrator_6 (919291d6-b0dc-48c9-ab39-d3b8659498d2)
 
 ## Routing Decision
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Rationale**: Full-stack trading system engineering, market microstructure calibration, adversarial audit, simulation, and deployment.
+- **Rationale**: Full-stack trading system engineering, concurrency audit, indicator causality analysis, risk invariants, mutation testing, dry run simulation, and deployment.
 
 ## Victory Audit Status
-- **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Triggered**: no
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index
@@ -55,9 +51,7 @@ Implement universe expansion, regime-separated strategy execution, and realistic
 - /Users/mo/AutonomousDayTrader/.agents/teamwork/ORIGINAL_REQUEST.md — Mirror of authoritative user requests
 - /Users/mo/AutonomousDayTrader/.agents/teamwork/sentinel/BRIEFING.md — Sentinel persistent working memory
 - /Users/mo/AutonomousDayTrader/.agents/teamwork/sentinel/handoff.md — Sentinel final handoff report
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_5/handoff.md — Orchestrator completion handoff
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/victory_auditor_sentinel_5/audit_report.md — Independent post-victory audit report
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/victory_auditor_sentinel_5/handoff.md — Independent victory auditor handoff
+- /Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_6/progress.md — Active orchestrator progress log
 - /Users/mo/AutonomousDayTrader/PROJECT.md — Global architecture, specifications & audit history
 - /Users/mo/AutonomousDayTrader/MEMORY.md — Engineering decisions and logs
 - /Users/mo/AutonomousDayTrader/ERRORS.md — Defect postmortems and anti-patterns

@@ -32,7 +32,8 @@ const getRelayDotClass = (status: string | undefined) => {
 };
 
 export default function Header({ account, marketContext, ingestion, isConnected }: HeaderProps) {
-  const isPositive = account.daily_pnl >= 0;
+  const dailyPnl = account?.daily_pnl ?? 0;
+  const isPositive = dailyPnl >= 0;
   const pnlSign = isPositive ? "+" : "";
 
   // Regime color mapping
@@ -163,7 +164,7 @@ export default function Header({ account, marketContext, ingestion, isConnected 
             animate={{ opacity: 1, scale: 1 }}
             className="text-4xl font-bold tracking-tight text-white num-tabular"
           >
-            ${account.equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${(account?.equity ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </motion.div>
 
           {/* Daily PnL Badge */}
@@ -176,8 +177,8 @@ export default function Header({ account, marketContext, ingestion, isConnected 
           >
             {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
             <span>
-              {pnlSign}${Math.abs(account.daily_pnl).toFixed(2)} ({pnlSign}
-              {account.daily_pnl_pct.toFixed(2)}%) Today
+              {pnlSign}${Math.abs(account?.daily_pnl ?? 0).toFixed(2)} ({pnlSign}
+              {(account?.daily_pnl_pct ?? 0).toFixed(2)}%) Today
             </span>
           </div>
         </div>
@@ -187,13 +188,13 @@ export default function Header({ account, marketContext, ingestion, isConnected 
           <div>
             <span className="text-neutral-400 text-[11px] block">Cash Balance</span>
             <span className="font-semibold text-neutral-200 num-tabular">
-              ${account.cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${(account?.cash ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div>
             <span className="text-neutral-400 text-[11px] block">Day Trading Buying Power</span>
             <span className="font-semibold text-neutral-200 num-tabular">
-              ${account.buying_power.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${(account?.buying_power ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div className="hidden sm:block">

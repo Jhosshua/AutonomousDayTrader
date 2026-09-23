@@ -125,12 +125,6 @@ class OpeningRangeBreakoutStrategy(Strategy):
         if self.status != StrategyStatus.ACTIVE:
             return []
 
-        state = self._get_state(bar.symbol)
-        state.all_bars.append(bar)
-        # Cap buffer: RVOL baseline uses the last 20 bars, ATR fallback 14
-        if len(state.all_bars) > 60:
-            del state.all_bars[:-60]
-
         # Convert timestamp to ET
         ts = bar.timestamp
         if ts.tzinfo is None:
@@ -138,19 +132,25 @@ class OpeningRangeBreakoutStrategy(Strategy):
         ts_et = ts.astimezone(ET_TZ)
         t_time = ts_et.time()
 
+        open_bell = dtime(9, 30)
+        cutoff_time = dtime(11, 30)
+
+        if t_time < open_bell:
+            # Pre-market bar, do not include in opening range or regular-session baselines
+            return []
+
+        state = self._get_state(bar.symbol)
+        state.all_bars.append(bar)
+        # Cap buffer: RVOL baseline uses the last 20 bars, ATR fallback 14
+        if len(state.all_bars) > 60:
+            del state.all_bars[:-60]
+
         # Ingest bars during opening range (09:30 to 09:30 + range_minutes)
         # 5m range: 09:30:00 to 09:34:59 (bars timestamped 09:30 to 09:34)
         end_minute = 30 + self.range_minutes
         end_hour = 9 + (end_minute // 60)
         end_minute = end_minute % 60
         range_end_time = dtime(end_hour, end_minute)
-
-        open_bell = dtime(9, 30)
-        cutoff_time = dtime(11, 30)
-
-        if t_time < open_bell:
-            # Pre-market bar, do not include in opening range
-            return []
 
         if open_bell <= t_time < range_end_time:
             state.opening_bars.append(bar)
@@ -203,8 +203,9 @@ class OpeningRangeBreakoutStrategy(Strategy):
         if not sig_type:
             return []
 
-        # Bar Range Cap & Extension Cap
-        atr = calculate_atr(state.all_bars, period=14)
+        # Bar Range Cap & Extension Cap (baseline on prior bars to prevent range leakage)
+        atr_bars = state.all_bars[:-1] if len(state.all_bars) > 1 else state.all_bars
+        atr = calculate_atr(atr_bars, period=14)
         if atr > 0.001:
             candle_range = bar.high - bar.low
             if candle_range > (self.max_bar_range_atr * atr):

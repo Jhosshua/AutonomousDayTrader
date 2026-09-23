@@ -2,6 +2,39 @@
 
 ## Decisions
 
+### 2026-09-23: Round 6 Adversarial Audit, Systemic Vulnerability Remediation & Production Hardening
+- **Adversarial Audit Scope & Objectives**:
+  Following the universe expansion to 12 symbols and multi-sector risk engine, an exhaustive adversarial audit probed the system across 5 core attack vectors:
+  1. *Concurrency & Ingestion Backpressure*: Wire quote saturation (3.5M quotes/session) causing queue overflows and dropping candle bars and fill executions.
+  2. *Indicator Causality & Baseline Lookahead*: Candidate bar contamination in volume and ATR baselines, pre-market bar pollution, and clock skew sensitivities.
+  3. *Risk Engine Invariants & Boundary Precision*: Unevaluated real-time equity drawdown bypass, stop loss distance boundary clamping, loss budgeting caps, and simultaneous multi-ticker signal collisions.
+  4. *Session State, Memory & Persistence*: Unbounded catalyst buffers, SQLite WAL file explosion, and event bus listener deduplication.
+  5. *API & Frontend Resilience*: Non-finite float serialization (`NaN`/`Infinity`) crashing JSON clients, mobile viewport drag gesture scrolling lockout, and payload bloat.
+
+- **Defects Cataloged and Remediated**:
+  1. *Prioritized Ingestion Queue (`backend/app/ingestion/stock_ws.py`)*: Under quote bursts exceeding `QUEUE_MAX_SIZE` (10,000 items), FIFO queue overflow dropped candle bars (`b`) and trade events (`t`). Remediated by implementing prioritized frame detection (`'"T":"b"'`, `'"T":"t"'`, `'"T":"relay"'`) that evicts stale quote frames via `get_nowait()` when saturated, guaranteeing zero dropped bars or execution prints.
+  2. *News Momentum Catalyst Bounding & Horizon (`backend/app/strategies/news_momentum.py`)*: Unbounded `pending_catalysts` dictionary leaked memory for non-watchlist symbols; mid-minute news items were prematurely discarded if evaluated against start-of-minute bars. Remediated by filtering incoming catalysts against `settings.WATCHLIST_SYMBOLS`, open positions, and active bars; capping queue depth to 10; and preserving mid-minute catalysts (`0 < c.timestamp - now_ts <= 60.0`) for subsequent reaction bar evaluation.
+  3. *SQLite WAL Checkpoint Cadence & Truncation (`backend/app/core/persistence.py`, `backend/app/main.py`)*: High-frequency checkpointing accumulated WAL frames without truncation. Remediated by adding periodic `wal_checkpoint("PASSIVE")` every 100 revisions in `TradingStateStore.save_checkpoint`, and executing `PRAGMA wal_checkpoint(TRUNCATE)` on application shutdown.
+  4. *Event Bus Handler Deduplication & Teardown (`backend/app/core/event_bus.py`)*: Event subscribers registered across base and child classes received duplicate invocations. Remediated with `list(dict.fromkeys(handlers))` deduplication and lifecycle `clear()` method invoked on lifespan shutdown.
+  5. *VWAP Pullback Candidate Bar Baseline Exclusion (`backend/app/strategies/vwap_pullback.py`)*: Volume SMA calculation included the candidate bar itself, diluting breakout RVOL denominators. Remediated by slicing `state.recent_bars[:-1][-10:]`.
+  6. *ORB Pre-Market Guard & Rejection Unlock (`backend/app/strategies/orb.py`)*: Bars prior to 09:30 ET contaminated regular-session ATR/RVOL baselines, ATR included candidate breakout bar, and rejected orders permanently locked `state.breakout_fired = True`. Remediated by filtering `t_time < open_bell`, baseline ATR slicing `state.all_bars[:-1]`, and adding `notify_signal_rejected(symbol)` to reset breakout lockout.
+  7. *Market Trend Filter Clock Jitter Tolerance (`backend/app/core/market_filter.py`)*: Zero-tolerance clock check `elapsed < 0` rejected valid quotes with sub-second NTP skew as `FUTURE_INDEX_DATA`. Remediated with `elapsed < -1.0s` forward threshold, absorbing physical network jitter while barring actual lookahead bias.
+  8. *Session Boundary Monotonicity Guard (`backend/app/main.py`)*: Non-monotonic date ticks could trigger spurious session resets. Remediated by requiring `session_date >= last_session_date`, clearing intraday market history and news cache, and forcing passive WAL checkpoint on rollover.
+  9. *Pre-Trade Real-Time Drawdown & Loss Budgeting (`backend/app/core/risk.py`)*: `evaluate_order_request` relied exclusively on `BreakerStatus.ARMED` without checking real-time equity drawdown against the $1,500 hard daily loss limit, allowing orders to slip through before scheduled breaker transitions; single position cap ($25,000) failed to subtract existing exposure. Remediated with real-time drawdown check `dd_dollars >= hard_max_daily_loss_dollars` halting orders with `CIRCUIT_BREAKER_HALTED`, capping order risk to `min(target_risk_dollars, remaining_loss_budget)`, and netting existing notional.
+  10. *12-Ticker Signal Concurrency & Sector Reservation (`backend/app/main.py`)*: Simultaneous breakout bursts across 12 tickers raced past `len(account.positions)` before fills settled, exceeding the 3-position total and 2-position sector caps. Remediated via `_get_effective_committed_portfolio` combining active filled positions, working entry orders, and pending brackets.
+  11. *Phase 2 EOD Auto-Flattening Protective Stop Preservation (`backend/app/main.py`)*: Phase 2 order purge at 15:50 ET indiscriminately cancelled protective stops, leaving active positions naked for 5 minutes until Phase 3 liquidation at 15:55 ET. Remediated by purging only unfilled entry orders, preserving protective stop brackets until Phase 3 market liquidation.
+  12. *Dynamic Bracket Manual Tighten Stop Bounds (`backend/app/core/bracket.py`)*: `manual_tighten_stop` lacked institutional distance validation. Remediated with `enforce_distance_bounds: bool = False` parameter clamping new stop prices into $[0.0040, 0.0400]$ of market price.
+  13. *WebSocket Float RFC 8259 Sanitization & Payload Bounding (`backend/app/main.py`)*: Emitted `NaN` and `Infinity` tokens crashed browser `JSON.parse`, and 120-point charts per background position bloated frames. Remediated with recursive `_sanitize_for_json` replacing non-finite floats with `0.0`, `allow_nan=False` serialization, and chart point omission on background positions.
+  14. *Mobile Frontend Stability (`frontend/`)*: Nullish coalescing in `Header.tsx` and `page.tsx` eliminated `undefined` renders; `LiveChart.tsx` guarded coordinate projections; `ActivePositionTray.tsx` isolated drag gestures to handle bar (`dragListener={false}` on modal container) to prevent mobile scroll lock.
+
+- **Deterministic Verification & Certification**:
+  - Full backend pytest suite: 355/355 passed (100% pass rate in 4.37s).
+  - Challenger R6 stress & mutation suite: 31/31 passed in 0.21s (15 remediation mutations, 16 adversarial concurrency & loss budget tests).
+  - Opaque-box E2E test runner (`tests/e2e/runner.py`): 320/320 passed (100% pass rate in 26.34s, Exit Code 0).
+  - Integrated Monday market open dry run (`scripts/run_integrated_monday_dry_run.py`): Status `PASS`, 184 events processed, 0 event bus errors, 0 open positions, 0 working orders, flat EOD book ($50,308.55 equity).
+  - Next.js frontend production build: Clean compile, 0 errors, 4/4 WebSocket resilience tests passed.
+  - Port hygiene verification: Ports 8000, 8005, 8080, and 3005 clean and liberated.
+
 ### 2026-09-23: Universe Expansion, Multi-Sector Risk Modeling, Regime-Separated Execution & Microstructure Calibrations (R4-R6)
 - **Quantitative Diagnosis of Filter-Stacking Bottleneck & Trade Starvation**:
   - *Symptom*: Trade count dropped to ~0 trades/day despite active market hours ($49,798.32 equity, $0.00 drawdown today).

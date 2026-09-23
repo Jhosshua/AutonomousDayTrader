@@ -68,7 +68,7 @@ export default function Home() {
               <div className="flex items-center gap-1.5 mt-0.5">
                 <Activity className="w-3.5 h-3.5 text-apple-teal" />
                 <span className="font-bold text-white text-xs num-tabular">
-                  ${state.account.daily_drawdown.toFixed(2)} / $1,500
+                  ${(state.account?.daily_drawdown ?? 0).toFixed(2)} / $1,500
                 </span>
               </div>
             </div>

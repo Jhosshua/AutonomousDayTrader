@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence, PanInfo } from "framer-motion";
+import { motion, AnimatePresence, PanInfo, useDragControls } from "framer-motion";
 import { ChevronDown, Shield, Square, Layers, Activity } from "lucide-react";
 import { Position, AuditRecord } from "@/types/trading";
 import LiveChart from "./LiveChart";
@@ -36,6 +36,7 @@ export default function ActivePositionTray({
   onTightenStop,
 }: ActivePositionTrayProps) {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const dragControls = useDragControls();
 
   const isPositive = (position?.unrealized_pnl ?? 0) >= 0;
   const pnlSign = isPositive ? "+" : "";
@@ -171,6 +172,8 @@ export default function ActivePositionTray({
             {/* Modal Sheet Content */}
             <motion.div
               drag="y"
+              dragListener={false}
+              dragControls={dragControls}
               dragConstraints={{ top: 0 }}
               dragElastic={{ top: 0, bottom: 0.5 }}
               onDragEnd={handleDragEnd}
@@ -181,7 +184,10 @@ export default function ActivePositionTray({
               className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto no-scrollbar rounded-t-[32px] sm:rounded-[32px] bg-[#0c0c12] border border-white/10 shadow-2xl p-5 sm:p-6 space-y-5"
             >
               {/* Drag Handle Bar */}
-              <div className="w-12 h-1.5 bg-white/25 rounded-full mx-auto cursor-grab active:cursor-grabbing mb-2" />
+              <div
+                onPointerDown={(e) => dragControls.start(e)}
+                className="w-12 h-1.5 bg-white/25 rounded-full mx-auto cursor-grab active:cursor-grabbing mb-2 touch-none"
+              />
 
               {/* Modal Header */}
               <div className="flex items-start justify-between">

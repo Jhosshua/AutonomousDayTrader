@@ -10,6 +10,7 @@ import math
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from backend.app.config import settings
 from backend.app.models.events import BarEvent, NewsEvent, OrderSide, OrderType
 from backend.app.strategies.base import (
     Strategy,
@@ -135,9 +136,12 @@ class NewsMomentumStrategy(Strategy):
 
         signals: List[SignalEvent] = []
         now_dt = news.created_at or datetime.now(timezone.utc)
+        active_watchlist = set(settings.WATCHLIST_SYMBOLS) if hasattr(settings, "WATCHLIST_SYMBOLS") else set()
 
         for sym in news.symbols:
             s = sym.upper()
+            if active_watchlist and s not in active_watchlist and s not in self.monitored_positions and s not in self.recent_bars:
+                continue
 
             # 1. Contradiction Circuit Breaker Check
             current_side = self.monitored_positions.get(s)
@@ -181,7 +185,7 @@ class NewsMomentumStrategy(Strategy):
                 self.monitored_positions.pop(s, None)
                 continue
 
-            # 2. Record pending catalyst if sentiment meets threshold
+            # 2. Record pending catalyst if sentiment meets threshold (capped to 10 items)
             if abs(sentiment) >= self.sentiment_threshold:
                 if s not in self.pending_catalysts:
                     self.pending_catalysts[s] = []
@@ -193,6 +197,7 @@ class NewsMomentumStrategy(Strategy):
                         timestamp=now_dt,
                     )
                 )
+                self.pending_catalysts[s] = self.pending_catalysts[s][-10:]
 
         return signals
 
@@ -210,13 +215,27 @@ class NewsMomentumStrategy(Strategy):
         if not pending_list:
             return []
 
-        # Filter active catalysts within TTL enforcing strict causality (no forward data leakage)
+        # Filter active catalysts within TTL enforcing strict causality.
+        # A 1-minute bar covers [bar.timestamp, bar.timestamp + 60s]. News arriving mid-minute
+        # or prior is eligible if within catalyst_ttl_seconds. News timestamped after bar close
+        # is preserved for subsequent bars.
         now_ts = bar.timestamp.timestamp()
+
+        # 1. Select valid catalysts for this bar: strictly causal (c.ts <= now_ts) and within TTL
         valid_catalysts = [
             c for c in pending_list
             if (0 <= (now_ts - c.timestamp.timestamp()) <= self.catalyst_ttl_seconds) and not c.processed
         ]
-        self.pending_catalysts[sym] = valid_catalysts
+
+        # 2. Retain catalysts: keep valid catalysts, plus mid-minute catalysts (arriving within the 60s bar window: 0 < c.ts - now_ts <= 60.0)
+        # Purge catalysts that are processed, older than TTL, or anomalously far in the future (>60s)
+        self.pending_catalysts[sym] = [
+            c for c in pending_list
+            if not c.processed and (
+                (0 <= (now_ts - c.timestamp.timestamp()) <= self.catalyst_ttl_seconds)
+                or (0 < (c.timestamp.timestamp() - now_ts) <= 60.0)
+            )
+        ]
 
         if not valid_catalysts:
             return []

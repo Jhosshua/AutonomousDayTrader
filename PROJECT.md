@@ -87,6 +87,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | COMPLETED / DEPLOYED; Integrated dry run verified ($50,308.55 equity, +$308.56 PnL, 184/184 events, 0 errors) |
 | M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | COMPLETED / DEPLOYED; Full-stack review remediated, multi-agent audit certified (5/5 PASS), Railway production live & healthy, ports clean |
 | M7 | `universe_regime_calibration` | 12-symbol watchlist expansion, multi-sector risk engine (max 2/sector, max 3 total), regime-separated execution (NEUTRAL vs trending), microstructure calibrations (news 2.0x, MR Z=1.65, wick 0.30, vol 1.30x) | M1-M6 | COMPLETED / DEPLOYED; 324/324 backend pytest pass, 320/320 E2E runner pass, integrated dry run pass, Railway deployed healthy |
+| M8 | `round6_adversarial_hardening` | Round 6 adversarial audit, QoS frame priority, causal indicator baselines, pre-trade drawdown & loss budgeting, committed portfolio concurrency, EOD stop preservation, JSON float sanitization | M1-M7 | COMPLETED / DEPLOYED; 355/355 backend pytest pass, 31/31 stress mutations pass, 320/320 E2E pass, dry run pass, Railway deployed healthy |
 
 ### E2E Testing Track (Parallel)
 | Track | Scope | Outputs | Status |
@@ -362,6 +363,44 @@ Key Architectural Enhancements:
 - Frontend Production Build: Clean Next.js 15.5 build (0 TypeScript/lint errors).
 - UI Architecture Verification: `node frontend/scripts/verify_ui.mjs` PASSED (all design tokens, spring physics, glassmorphism, and responsive components verified).
 - Port Hygiene: Monitored ports 8000, 8005, 8080, 3005 confirmed 100% clean and free.
+
+### 2026-09-23: Round 6 Adversarial Audit, Systemic Hardening & Milestone 8 Certification
+An exhaustive adversarial audit and multi-agent peer review probed the expanded 12-symbol, multi-sector trading engine across concurrency backpressure, indicator causality, pre-trade risk invariants, and UI deserialization. All cataloged vulnerabilities were remediated with production-grade fixes, verified by 31 targeted stress/mutation tests, and certified across the full test suite.
+
+Key Hardened Subsystems & Remediations:
+- **Prioritized Ingestion Queue (`backend/app/ingestion/stock_ws.py`)**:
+  - Implemented prioritized frame detection (`"T":"b"`, `"T":"t"`, `"T":"relay"`). Under quote bursts exceeding `QUEUE_MAX_SIZE` (10,000 items), older quote frames (`q`) are evicted via `get_nowait()` to guarantee delivery of critical candle bars and execution prints without dropping connections.
+- **News Catalyst Horizon & Deduplication (`backend/app/strategies/news_momentum.py`)**:
+  - Bounded memory by filtering incoming catalysts against `settings.WATCHLIST_SYMBOLS`, open positions, and active bars; capped catalyst queue to 10 items; preserved mid-minute news items (`0 < c.timestamp - now_ts <= 60.0`) so that subsequent reaction bars can trigger breakouts.
+- **SQLite WAL Checkpointing & Resource Teardown (`backend/app/core/persistence.py`, `backend/app/core/event_bus.py`)**:
+  - Added periodic `wal_checkpoint("PASSIVE")` every 100 revisions in `TradingStateStore.save_checkpoint`, and executed `PRAGMA wal_checkpoint(TRUNCATE)` on application shutdown via `store.close()`.
+  - Added event bus listener deduplication (`list(dict.fromkeys(handlers))`) and implemented clean event bus `clear()` lifecycle teardown on server shutdown.
+- **Strict Indicator Causality & Clock Skew Tolerance (`orb.py`, `vwap_pullback.py`, `market_filter.py`)**:
+  - Candidate bar excluded from rolling volume and ATR baselines (`state.recent_bars[:-1][-10:]` in VWAP pullback and `state.all_bars[:-1]` in ORB).
+  - Pre-market bars prior to 09:30 ET filtered in ORB, and downstream order rejections reset `state.breakout_fired = False` via `notify_signal_rejected(symbol)`.
+  - Relaxed forward timestamp tolerance in `MarketTrendFilter` to `elapsed < -1.0s`, absorbing sub-second NTP clock jitter while strictly barring physical future data leakage.
+- **Pre-Trade Risk Invariants & Committed Portfolio Tracking (`risk.py`, `main.py`)**:
+  - Added real-time equity drawdown check `dd_dollars >= hard_max_daily_loss_dollars` halting new orders with `CIRCUIT_BREAKER_HALTED` immediately, independent of scheduled breaker transitions.
+  - Capped order target risk to remaining daily loss budget (`min(target_risk_dollars, remaining_loss_budget)`).
+  - Net existing position notional against the $25,000 (50% equity) single-position cap.
+  - Implemented `_get_effective_committed_portfolio` combining active filled positions, working entry orders, and pending brackets to eliminate race conditions during simultaneous 12-ticker signal bursts.
+- **EOD Auto-Flattening Protective Stop Preservation (`backend/app/main.py`)**:
+  - Phase 2 order purge at 15:50 ET cancels only unfilled entry orders, strictly preserving protective stop-loss orders on active positions until Phase 3 market liquidation at 15:55 ET.
+- **Dynamic Bracket Manual Tighten Stop Bounds (`backend/app/core/bracket.py`)**:
+  - Added `enforce_distance_bounds: bool = False` parameter clamping new stop prices into $[0.0040, 0.0400]$ of market price.
+- **WebSocket RFC 8259 Compliance & Mobile UI Safety (`backend/app/main.py`, `frontend/`)**:
+  - Serialized WebSockets with recursive `_sanitize_for_json` replacing non-finite floats with `0.0` and `allow_nan=False`.
+  - Omitted chart points from background positions to eliminate payload bloat.
+  - Added nullish coalescing defaults across `Header.tsx` and `page.tsx`; bound `useDragControls()` exclusively to the handle bar with `dragListener={false}` on modal container in `ActivePositionTray.tsx` to prevent mobile scroll lock.
+
+100% Verification Test Records:
+- Backend Pytest Suite: 355/355 passed (100% pass rate in 4.37s).
+- Challenger R6 Stress & Mutation Suite: 31/31 passed in 0.21s (15 remediation mutations, 16 adversarial concurrency & loss budget tests).
+- Full Opaque-Box E2E Runner: 320/320 passed (100% pass rate in 26.34s, Exit Code 0).
+- Integrated Monday Market Open Dry Run: Status `PASS` (184 events processed, 0 event bus errors, 0 open positions, 0 working orders, flat EOD book, realized PnL +$308.56).
+- Frontend Production Build: Clean Next.js 15.5 build (0 TypeScript/lint errors, 4/4 resilience tests passed).
+- Port Hygiene: Monitored ports 8000, 8005, 8080, 3005 confirmed 100% clean and free.
+
 
 
 
