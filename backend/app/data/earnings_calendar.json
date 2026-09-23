@@ -1,0 +1,117 @@
+{
+  "LRCX": [
+    {
+      "symbol": "LRCX",
+      "report_date": "2026-04-22",
+      "report_time": "amc",
+      "fiscal_quarter": "Q3 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "LRCX",
+      "report_date": "2026-07-29",
+      "report_time": "amc",
+      "fiscal_quarter": "Q4 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "LRCX",
+      "report_date": "2026-10-21",
+      "report_time": "amc",
+      "fiscal_quarter": "Q1 2027",
+      "confirmed": true
+    }
+  ],
+  "KLAC": [
+    {
+      "symbol": "KLAC",
+      "report_date": "2026-04-29",
+      "report_time": "amc",
+      "fiscal_quarter": "Q3 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "KLAC",
+      "report_date": "2026-07-30",
+      "report_time": "amc",
+      "fiscal_quarter": "Q4 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "KLAC",
+      "report_date": "2026-10-29",
+      "report_time": "amc",
+      "fiscal_quarter": "Q1 2027",
+      "confirmed": true
+    }
+  ],
+  "MU": [
+    {
+      "symbol": "MU",
+      "report_date": "2026-03-20",
+      "report_time": "amc",
+      "fiscal_quarter": "Q2 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "MU",
+      "report_date": "2026-06-25",
+      "report_time": "amc",
+      "fiscal_quarter": "Q3 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "MU",
+      "report_date": "2026-09-25",
+      "report_time": "amc",
+      "fiscal_quarter": "Q4 2026",
+      "confirmed": true
+    }
+  ],
+  "AMD": [
+    {
+      "symbol": "AMD",
+      "report_date": "2026-04-30",
+      "report_time": "amc",
+      "fiscal_quarter": "Q1 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "AMD",
+      "report_date": "2026-07-30",
+      "report_time": "amc",
+      "fiscal_quarter": "Q2 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "AMD",
+      "report_date": "2026-10-27",
+      "report_time": "amc",
+      "fiscal_quarter": "Q3 2026",
+      "confirmed": true
+    }
+  ],
+  "GS": [
+    {
+      "symbol": "GS",
+      "report_date": "2026-04-15",
+      "report_time": "bmo",
+      "fiscal_quarter": "Q1 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "GS",
+      "report_date": "2026-07-15",
+      "report_time": "bmo",
+      "fiscal_quarter": "Q2 2026",
+      "confirmed": true
+    },
+    {
+      "symbol": "GS",
+      "report_date": "2026-10-15",
+      "report_time": "bmo",
+      "fiscal_quarter": "Q3 2026",
+      "confirmed": true
+    }
+  ]
+}

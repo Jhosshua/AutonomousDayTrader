@@ -85,6 +85,19 @@ const INITIAL_STATE: TradingState = {
     last_checkpoint_at: null,
     restored_at: null,
   },
+  swing: {
+    status: "STANDBY",
+    strategy_name: "2-Day Panic Dip (Connors RSI-2)",
+    allocated_capital: 50000,
+    slot_notional: 25000,
+    max_slots: 2,
+    active_slots_used: 0,
+    available_slots: 2,
+    flattening_exempt: true,
+    candidates: [],
+    positions: [],
+    last_scan_time: null,
+  },
   isConnected: false,
   lastUpdated: new Date(),
 };
@@ -209,6 +222,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 recent_news: payload.recent_news || prev.recent_news,
                 ledger_revision: payload.ledger_revision ?? prev.ledger_revision,
                 persistence: payload.persistence || prev.persistence,
+                swing: payload.swing !== undefined ? payload.swing : prev.swing,
                 isConnected: true,
                 lastUpdated: new Date(),
               };
@@ -334,6 +348,20 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
               }));
             }
           }
+
+          // Poll swing state
+          try {
+            const swingRes = await fetch(`${httpBase}/api/swing/state`);
+            if (swingRes.ok) {
+              const swingData = await swingRes.json();
+              setState((prev) => ({
+                ...prev,
+                swing: swingData,
+              }));
+            }
+          } catch {
+            // Ignore swing poll error
+          }
         } catch {
           // Backend might be starting or offline, gracefully ignore
         }
@@ -367,6 +395,23 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
       }).catch(console.error);
       return true;
     }
+    if (
+      payload.action === "SWING_EXIT_NEXT_OPEN" ||
+      payload.action === "SWING_EXIT_IMMEDIATE" ||
+      payload.action === "SWING_TIGHTEN_STOP"
+    ) {
+      const { httpBase } = getResolvedEndpoints();
+      fetch(`${httpBase}/api/swing/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: payload.action,
+          symbol: payload.symbol,
+          new_stop: payload.new_stop,
+        }),
+      }).catch(console.error);
+      return true;
+    }
     return false;
   }, [getResolvedEndpoints]);
 
@@ -382,6 +427,18 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     return sendAction({ action: "TIGHTEN_STOP", symbol, new_stop: newStop });
   }, [sendAction]);
 
+  const swingExitNextOpen = useCallback((symbol: string): boolean => {
+    return sendAction({ action: "SWING_EXIT_NEXT_OPEN", symbol });
+  }, [sendAction]);
+
+  const swingExitImmediate = useCallback((symbol: string): boolean => {
+    return sendAction({ action: "SWING_EXIT_IMMEDIATE", symbol });
+  }, [sendAction]);
+
+  const swingTightenStop = useCallback((symbol: string, newStop: number): boolean => {
+    return sendAction({ action: "SWING_TIGHTEN_STOP", symbol, new_stop: newStop });
+  }, [sendAction]);
+
   return {
     state,
     isConnected,
@@ -389,6 +446,9 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     flattenPosition,
     flattenAll,
     tightenStop,
+    swingExitNextOpen,
+    swingExitImmediate,
+    swingTightenStop,
     sendAction,
   };
 }

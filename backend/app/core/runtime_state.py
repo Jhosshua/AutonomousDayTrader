@@ -34,9 +34,13 @@ def capture_runtime_state(
     market_history: Dict[str, Any],
     recent_news: list[Dict[str, Any]],
     last_session_date: Optional[date],
+
     last_vix_print: Any,
     ledger_revision: int,
+    swing_staged_orders: Optional[List[Any]] = None,
+    swing_reserved_symbols: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
+
     """Return a complete JSON-safe recovery checkpoint."""
     account_state = {
         name: getattr(account, name)
@@ -122,7 +126,10 @@ def capture_runtime_state(
         },
         "last_session_date": last_session_date,
         "ledger_revision": ledger_revision,
+        "swing_staged_orders": [o.to_dict() if hasattr(o, "to_dict") else o for o in (swing_staged_orders or [])],
+        "swing_reserved_symbols": list(swing_reserved_symbols or []),
     }
+
     encoded = encode_runtime_value(state)
     if not isinstance(encoded, dict):
         raise PersistenceError("Encoded runtime checkpoint is not an object")
@@ -145,7 +152,10 @@ def restore_runtime_state(
     latest_market_prices: Dict[str, float],
     market_history: Dict[str, Any],
     recent_news: list[Dict[str, Any]],
+    swing_staged_order_manager: Optional[Any] = None,
+    swing_reserved_symbols: Optional[Set[str]] = None,
 ) -> Dict[str, Any]:
+
     """Restore a checkpoint into already-wired singleton components."""
     decoded = decode_runtime_value(payload)
     if decoded.get("runtime_state_version") != RUNTIME_STATE_VERSION:
@@ -208,7 +218,17 @@ def restore_runtime_state(
     recent_news.clear()
     recent_news.extend(decoded["market"]["recent_news"])
 
+    if swing_staged_order_manager is not None:
+        raw_staged = decoded.get("swing_staged_orders", [])
+        from backend.app.strategies.swing_panic_dip import StagedSwingOrder
+        restored_orders = [StagedSwingOrder.from_dict(o) if isinstance(o, dict) else o for o in raw_staged]
+        swing_staged_order_manager.load_staged_orders(restored_orders)
+    if swing_reserved_symbols is not None:
+        swing_reserved_symbols.clear()
+        swing_reserved_symbols.update(decoded.get("swing_reserved_symbols", []))
+
     validate_runtime_state(account, engine, bracket_manager)
+
     return {
         "last_session_date": decoded.get("last_session_date"),
         "last_vix_print": decoded["market"].get("last_vix_print"),

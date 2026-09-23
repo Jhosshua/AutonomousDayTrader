@@ -251,6 +251,7 @@ class OrderEvent:
     avg_fill_price: float = 0.0
     reject_reason: Optional[str] = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    arm: str = "INTRADAY"
 
 
 @dataclass(frozen=True)
@@ -284,6 +285,10 @@ class PositionState:
     fees_paid: float
     opened_at: datetime
     updated_at: datetime
+    arm: str = "INTRADAY"
+    strategy_id: str = "MANUAL"
+    holding_days: int = 0
+    stop_loss_price: Optional[float] = None
 
 
 @dataclass(frozen=True)

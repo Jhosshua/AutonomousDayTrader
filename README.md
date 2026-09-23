@@ -72,9 +72,28 @@
 4. **Statistical Mean Reversion / Exhaustion Fades**: 1-minute $Z$-score ($\ge 2.5\sigma$) and RSI-14 extreme overbought/oversold fades back to the 20-period moving average.
 - **Dynamic Self-Adaptation**: Adapts position sizing, entry criteria, and stop widths dynamically across 4 VIX Volatility Regimes (Low, Normal, Elevated, Crisis) and 5 Time-of-Day Execution Phases (Pre-market scan, Open flush, Trend continuation, Midday chop defense, Power hour).
 
-### 3. Mobile-First Trading UI
+### 3. Autonomous Multi-Day Swing Trading Engine ("2-Day Panic Dip")
+An autonomous multi-day swing engine operating across 5 certified liquid high-beta US equities (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`) and benchmark `QQQ`:
+- **7 Quantitative Rules**:
+  1. *Macro Floor*: Daily Close > 200-day Simple Moving Average (SMA).
+  2. *Market Leadership / Relative Strength*: Trailing 60-day return $\ge$ QQQ return ($\Delta_{\text{stock},60d} \ge \Delta_{\text{QQQ},60d}$).
+  3. *Panic Trigger*: 2-day Connors RSI (Wilder's RSI(2) on daily closes) < 10.0.
+  4. *Mandatory Earnings Veto*: 48-hour entry blackout window; holding position sold at 09:30 open if earnings report tomorrow.
+  5. *Entry Execution & Sizing*: 16:00 ET close qualification $\to$ overnight staging in `SwingStagedOrderManager` $\to$ executed at next 09:30 ET open. Fixed $25,000 notional per slot (`floor(25000 / open)` shares) with hard cap of maximum 2 concurrent swing positions.
+  6. *Emergency Stop-Loss*: Hard stop established immediately upon fill at $P_{\text{fill}} - 2.5 \times \text{Daily ATR(14)}$; intraday price breach triggers immediate market liquidation.
+  7. *Take-Profit & Time Exit*: Sold at next 09:30 open if prior close > 5-day SMA, prior RSI(2) > 70.0, or held for 5 trading days.
+- **Strict Architectural Separation & EOD Flattening Exemption**:
+  - Swing positions are explicitly tagged `arm=TradingArm.SWING` and strictly exempt from the 15:45–15:58 ET intraday auto-flattening engine and session sweeps.
+  - Shares the $50,000 virtual paper trading account pool with intraday day trading without margin collision or double-spending.
+  - Symbol-level mutual exclusion prevents concurrent intraday and swing trades on the same symbol (e.g. `AMD`).
+- **Unified Obsidian Dark Operator Interface**:
+  - Fluid segmented toggle between "Intraday Day Trader" and "Swing Mean-Reversion".
+  - Real-time `SwingTelemetryBar`, `SwingCandidateWatchlist`, and `ActiveSwingPositionsTable` with ATR stop loss meters, holding day counters, and manual operator overrides.
+
+### 4. Mobile-First Trading UI
 - **Design System**: Obsidian dark palette (`#000000`), backdrop glassmorphism (`backdrop-blur-xl`), animated background gradient mesh dynamically tinted by portfolio momentum (green for profit, red for drawdown, violet for neutral).
-- **Trading Strategies Carousel**: Horizontal carousel showcasing the 4 strategies with strategy banners, live daily PnL, win rate badges, and active state indicators.
+- **Segmented Mode Navigation**: Framer Motion sliding pill toggle between Intraday Day Trading and Swing Trading views with position count badges.
+- **Trading Strategies Carousel**: Horizontal carousel showcasing the 4 intraday strategies with strategy banners, live daily PnL, win rate badges, and active state indicators.
 - **"Active Position" Expandable Drawer**: Docked mini-tray displaying the primary active position; spring-physics gesture expansion (`stiffness: 350, damping: 32`) reveals live ticker candlestick charts, bracket orders, and manual intervention controls (Quick Flatten, Tighten Stop).
 - **Sub-Second Streaming**: Bi-directional WebSocket synchronization over Port 8005 with zero page reloads.
 
@@ -161,23 +180,28 @@ count, and -$21.34 session result are preserved without inventing lost fills.
 
 ### Running Test Suites
 ```bash
-# Run the complete opaque-box E2E test suite (293 tests with port audit)
+# Run the complete opaque-box E2E test suite (325 tests with port audit)
 python3 tests/e2e/runner.py
 
-# Run all E2E tests using pytest (293 tests covering Tier 1-5 + visual checks)
+# Run all E2E tests using pytest (covering Tier 1-5, swing multi-day replay, and visual checks)
 pytest tests/e2e
 
-# Run backend unit test suite (140 tests)
+# Run backend unit & integration test suite (432 tests)
 pytest backend/tests
 
 # Run frontend architecture and streaming stress tests
 cd frontend && npm test
+
+# Run Playwright desktop (1440x900) & mobile (390x844) visual QA audit
+python3 scripts/verify_visual_qa.py
 ```
 
-### Monday Market Open Deterministic Simulation
+### Deterministic Simulation Replays & Dry Runs
 ```bash
-# Execute the mock Monday 09:25 - 10:30 ET replay through the production path.
-# This is simulation evidence only; it does not certify live-market fills.
+# Execute Integrated Multi-Day Swing Dry Run (6-day deterministic replay verifying all 7 rules)
+python3 scripts/run_integrated_swing_dry_run.py
+
+# Execute the mock Monday 09:25 - 10:30 ET intraday replay through the production path
 ./scripts/run_monday_dry_run.sh
 ```
 
@@ -197,11 +221,12 @@ AutonomousDayTrader/
 │   ├── app/
 │   │   ├── main.py               # FastAPI server (Port 8005) & WS streaming
 │   │   ├── config.py             # Config & env vars (ports, tokens, risk limits)
+│   │   ├── data/                 # Seed historical daily bars & earnings calendar
 │   │   ├── core/
-│   │   │   ├── account.py        # $50,000 Paper Account state machine
+│   │   │   ├── account.py        # $50,000 Paper Account state machine & TradingArm
 │   │   │   ├── risk.py           # Institutional Risk Engine & circuit breakers
 │   │   │   ├── bracket.py        # Stop-loss & dynamic take-profit brackets
-│   │   │   ├── flattening.py     # 4-phase zero-overnight auto-liquidation
+│   │   │   ├── flattening.py     # 4-phase zero-overnight auto-liquidation state machine
 │   │   │   └── engine.py         # Main execution engine coordinator
 │   │   ├── ingestion/
 │   │   │   ├── stock_ws.py       # Stock WebSocket client (bars, quotes, trades)
@@ -213,27 +238,31 @@ AutonomousDayTrader/
 │   │   │   ├── vwap_pullback.py  # VWAP Trend Pullback & Continuation
 │   │   │   ├── news_momentum.py  # Catalyst News Momentum Breakout
 │   │   │   ├── mean_reversion.py # Statistical Mean Reversion / Exhaustion
-│   │   │   └── adaptation.py     # VIX regime scaling & time-of-day dynamics
+│   │   │   ├── adaptation.py     # VIX regime scaling & time-of-day dynamics
+│   │   │   ├── swing_panic_dip.py# 2-Day Panic Dip Connors RSI(2) swing engine
+│   │   │   ├── swing_indicators.py# Causal rolling daily indicators & daily bar store
+│   │   │   └── earnings_calendar.py# 48-hour earnings blackout & veto engine
 │   │   └── replay/
 │   │       ├── mock_relay.py     # Protocol-accurate AlpacaRelay mock server
 │   │       └── feed_player.py    # Historical & synthetic feed replay player
-│   └── tests/                    # Unit and stress test suites (140 tests)
+│   └── tests/                    # Unit, stress, and mutation test suites (432 tests)
 ├── frontend/                     # Mobile Trading UI (Next.js 15 / React 19)
 │   ├── app/                      # App router layout, page, and globals
-│   ├── components/               # Header, Strategy Cards, ActivePositionTray, LiveChart
+│   ├── components/               # Header, Strategy Cards, SegmentedModeToggle, Swing components
 │   ├── hooks/                    # useTradingStream WebSocket client hook
 │   └── scripts/                  # UI verification & streaming stress test scripts
 ├── tests/
-│   └── e2e/                      # Opaque-box E2E test suite (293 current tests)
+│   └── e2e/                      # Opaque-box E2E test suite (325 tests)
 ├── scripts/
 │   ├── run_dev.sh                # Local development launcher
+│   ├── run_integrated_swing_dry_run.py # Production-path multi-day swing replay
+│   ├── verify_visual_qa.py       # Desktop & mobile Playwright visual QA
 │   ├── run_monday_dry_run.sh     # Monday market open live simulation script
 │   ├── run_integrated_monday_dry_run.py # Production-path integration replay
-│   ├── run_monday_dry_run.py     # Legacy standalone simulator (not certification source)
-│   ├── run_production_stack.sh   # Requires RELAY_TOKEN; local production-like launcher
 │   ├── verify_port_hygiene.sh    # Process hygiene & port liberation auditor
 │   └── deploy_and_push.sh        # Git commit and push upstream deployment script
-├── MONDAY_SIMULATION_REPORT.md   # Latest production-path deterministic replay report
+├── SWING_SIMULATION_REPORT.md    # Multi-day swing dry run verification report
+├── MONDAY_SIMULATION_REPORT.md   # Intraday Monday dry run replay report
 ├── TEST_INFRA.md                 # E2E test methodology & coverage matrix
 ├── TEST_READY.md                 # Test harness readiness certificate
 └── PROJECT.md                    # Project architectural blueprint & contract specs

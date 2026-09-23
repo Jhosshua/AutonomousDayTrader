@@ -3,11 +3,16 @@ Paper Trading Account State Machine ($50,000 initial balance, FINRA 4:1 Day Trad
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from backend.app.models.events import AccountState, PositionState
+
+
+class TradingArm(str, Enum):
+    INTRADAY = "INTRADAY"
+    SWING = "SWING"
 
 
 class PositionSide(str, Enum):
@@ -39,8 +44,16 @@ class Position:
     fees_paid: float = 0.0
     opened_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    arm: TradingArm = TradingArm.INTRADAY
+    strategy_id: str = "MANUAL"
+    holding_days: int = 0
+    stop_loss_price: Optional[float] = None
+    entry_atr: Optional[float] = None
+    entry_date: Optional[date] = None
 
     def __post_init__(self) -> None:
+        if isinstance(self.arm, str) and not isinstance(self.arm, TradingArm):
+            self.arm = TradingArm(self.arm)
         self.recalculate()
 
     def recalculate(self) -> None:
@@ -70,7 +83,7 @@ class Position:
     def to_state(self) -> PositionState:
         return PositionState(
             symbol=self.symbol,
-            side=self.side.value,
+            side=self.side.value if hasattr(self.side, "value") else str(self.side),
             shares=self.shares,
             avg_entry_price=self.avg_entry_price,
             market_price=self.market_price,
@@ -82,6 +95,10 @@ class Position:
             fees_paid=self.fees_paid,
             opened_at=self.opened_at,
             updated_at=self.updated_at,
+            arm=self.arm.value if hasattr(self.arm, "value") else str(self.arm),
+            strategy_id=self.strategy_id,
+            holding_days=self.holding_days,
+            stop_loss_price=self.stop_loss_price,
         )
 
 
@@ -235,6 +252,9 @@ class PaperTradingAccount:
         price: float,
         fee: float,
         timestamp: datetime,
+        arm: TradingArm = TradingArm.INTRADAY,
+        strategy_id: str = "MANUAL",
+        stop_loss_price: Optional[float] = None,
     ) -> Tuple[float, Optional[Position]]:
         """
         Atomically process execution fill:
@@ -267,6 +287,9 @@ class PaperTradingAccount:
                 market_price=round(price, 4),
                 fees_paid=fee,
                 opened_at=timestamp,
+                arm=arm,
+                strategy_id=strategy_id,
+                stop_loss_price=stop_loss_price,
             )
             self.positions[symbol] = new_pos
             self._recompute_account_state()

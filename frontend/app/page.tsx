@@ -1,8 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useTradingStream } from "@/hooks/useTradingStream";
 import AmbientBackground from "@/components/AmbientBackground";
 import Header from "@/components/Header";
+import SegmentedModeToggle, { TradingMode } from "@/components/SegmentedModeToggle";
+import SwingTelemetryBar from "@/components/SwingTelemetryBar";
+import SwingCandidateWatchlist from "@/components/SwingCandidateWatchlist";
+import ActiveSwingPositionsTable from "@/components/ActiveSwingPositionsTable";
 import StrategyCarousel from "@/components/StrategyCarousel";
 import ActivePositionTray from "@/components/ActivePositionTray";
 import ExecutionLog from "@/components/ExecutionLog";
@@ -17,7 +22,15 @@ export default function Home() {
     flattenPosition,
     flattenAll,
     tightenStop,
+    swingExitNextOpen,
+    swingExitImmediate,
+    swingTightenStop,
   } = useTradingStream();
+
+  const [mode, setMode] = useState<TradingMode>("intraday");
+
+  const swingPositionsCount = state.swing?.positions?.length ?? 0;
+  const intradayPositionsCount = state.positions_count ?? 0;
 
   return (
     <main className="relative min-h-screen bg-black text-white pb-32 overflow-x-hidden selection:bg-apple-purple/30">
@@ -36,6 +49,14 @@ export default function Home() {
           isConnected={isConnected}
         />
 
+        {/* Segmented Mode Navigation Toggle */}
+        <SegmentedModeToggle
+          mode={mode}
+          onModeChange={setMode}
+          intradayPositionsCount={intradayPositionsCount}
+          swingPositionsCount={swingPositionsCount}
+        />
+
         {/* Status / Alert Banner if any connection issue */}
         {!isConnected && lastError && (
           <div className="mx-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2 backdrop-blur-md">
@@ -46,61 +67,85 @@ export default function Home() {
           </div>
         )}
 
-        {/* Risk & Regime Telemetry Bar */}
-        <section className="px-4">
-          <div data-testid="risk-telemetry" className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
-              <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
-                Risk Engine
-              </span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-apple-green" />
-                <span className="font-bold text-white text-xs">
-                  {state.account.risk_level || "NORMAL"} (1.0% Base / 2.0% Hard)
-                </span>
-              </div>
-            </div>
+        {/* INTRADAY MODE VIEW */}
+        {mode === "intraday" && (
+          <>
+            {/* Risk & Regime Telemetry Bar */}
+            <section className="px-4">
+              <div data-testid="risk-telemetry" className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
+                  <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
+                    Risk Engine
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-apple-green" />
+                    <span className="font-bold text-white text-xs">
+                      {state.account.risk_level || "NORMAL"} (1.0% Base / 2.0% Hard)
+                    </span>
+                  </div>
+                </div>
 
-            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
-              <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
-                Drawdown Limit
-              </span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <Activity className="w-3.5 h-3.5 text-apple-teal" />
-                <span className="font-bold text-white text-xs num-tabular">
-                  ${(state.account?.daily_drawdown ?? 0).toFixed(2)} / $1,500
-                </span>
-              </div>
-            </div>
+                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
+                  <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
+                    Drawdown Limit
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Activity className="w-3.5 h-3.5 text-apple-teal" />
+                    <span className="font-bold text-white text-xs num-tabular">
+                      ${(state.account?.daily_drawdown ?? 0).toFixed(2)} / $1,500
+                    </span>
+                  </div>
+                </div>
 
-            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
-              <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
-                Overnight Policy
-              </span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-apple-green inline-block" />
-                <span className="font-bold text-white text-xs">
-                  Zero Overnight (15:55 MOC)
-                </span>
-              </div>
-            </div>
+                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
+                  <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
+                    Overnight Policy
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-apple-green inline-block" />
+                    <span className="font-bold text-white text-xs">
+                      Zero Overnight (15:55 MOC)
+                    </span>
+                  </div>
+                </div>
 
-            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
-              <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
-                Active Positions
-              </span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <Terminal className="w-3.5 h-3.5 text-apple-purple" />
-                <span className="font-bold text-white text-xs num-tabular">
-                  {state.positions_count} Open • {state.working_orders_count} Working
-                </span>
+                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
+                  <span className="text-neutral-400 text-[10px] uppercase tracking-wider block">
+                    Active Positions
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Terminal className="w-3.5 h-3.5 text-apple-purple" />
+                    <span className="font-bold text-white text-xs num-tabular">
+                      {state.positions_count} Open • {state.working_orders_count} Working
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </section>
+            </section>
 
-        {/* Trading Strategies Carousel */}
-        <StrategyCarousel strategies={state.strategies} />
+            {/* Trading Strategies Carousel */}
+            <StrategyCarousel strategies={state.strategies} />
+          </>
+        )}
+
+        {/* SWING MODE VIEW */}
+        {mode === "swing" && (
+          <>
+            {/* Swing Telemetry Bar */}
+            <SwingTelemetryBar swingState={state.swing} />
+
+            {/* Active Swing Positions Table with ATR Stops and Day Counters */}
+            <ActiveSwingPositionsTable
+              positions={state.swing?.positions ?? []}
+              onExitNextOpen={swingExitNextOpen}
+              onExitImmediate={swingExitImmediate}
+              onTightenStop={swingTightenStop}
+            />
+
+            {/* Candidate Watchlist with Rules 1-4 Checks */}
+            <SwingCandidateWatchlist candidates={state.swing?.candidates ?? []} />
+          </>
+        )}
 
         {/* Durable Account Ledger & Completed Trade History */}
         <TradeHistory
@@ -114,7 +159,7 @@ export default function Home() {
         </section>
       </div>
 
-      {/* Docked Active Position Tray & Expandable Modal Sheet */}
+      {/* Docked Active Position Tray & Expandable Modal Sheet for Intraday */}
       <ActivePositionTray
         position={state.primary_position}
         recentActivity={state.recent_activity}

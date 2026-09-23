@@ -38,7 +38,8 @@ class StockWebSocketClient:
             self.relay_url = self.relay_url.rstrip("/") + "/v2/stocks"
 
         self.relay_token = relay_token or settings.RELAY_TOKEN
-        self.symbols: Set[str] = set(symbols or settings.WATCHLIST_SYMBOLS)
+        default_symbols = list(set(settings.WATCHLIST_SYMBOLS) | set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK})
+        self.symbols: Set[str] = set(symbols or default_symbols)
         self.bus: EventBus = bus or event_bus
 
         self._running: bool = False

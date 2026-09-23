@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.app.config import settings
-from backend.app.core.account import PaperTradingAccount, PositionSide
+from backend.app.core.account import PaperTradingAccount, PositionSide, TradingArm
 from backend.app.core.bracket import BracketChildType, BracketStatus, DynamicBracketManager
 from backend.app.core.market_filter import MarketTrendFilter
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
@@ -42,6 +42,12 @@ from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
+from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
+from backend.app.strategies.earnings_calendar import EarningsCalendar
+from backend.app.strategies.swing_panic_dip import (
+    SwingStrategyEngine,
+    SwingStagedOrderManager,
+)
 
 logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 log = logging.getLogger("AutonomousDayTrader")
@@ -105,24 +111,87 @@ last_session_date: Optional[Any] = None
 completed_brackets_recorded: Set[str] = set()
 
 
+# Swing Trading Arm Symbol Reservation State
+swing_reserved_symbols: Set[str] = set()
+
+
+def reserve_symbol_for_swing(symbol: str) -> None:
+    """Reserve a symbol for the swing trading engine, locking out intraday entries."""
+    swing_reserved_symbols.add(symbol.upper())
+
+
+def release_symbol_for_swing(symbol: str) -> None:
+    """Release a symbol from swing reservation."""
+    swing_reserved_symbols.discard(symbol.upper())
+
+
+def is_symbol_reserved_for_swing(
+    symbol: str,
+    acct: Optional[PaperTradingAccount] = None,
+    eng: Optional[Any] = None,
+) -> bool:
+    """Check if a symbol is currently reserved, actively held, or has working orders in the swing arm."""
+    sym = symbol.upper()
+    if sym in swing_reserved_symbols:
+        return True
+    target_acct = acct or globals().get("account")
+    if target_acct and hasattr(target_acct, "positions"):
+        pos = target_acct.positions.get(sym)
+        if pos is not None and (
+            getattr(pos, "arm", None) == TradingArm.SWING
+            or getattr(pos, "strategy_id", "") == "swing_panic_dip"
+        ):
+            return True
+    target_engine = eng or globals().get("engine")
+    if target_engine and hasattr(target_engine, "working_orders"):
+        for w_order in target_engine.working_orders.values():
+            if w_order.symbol.upper() == sym and (
+                getattr(w_order, "arm", None) == TradingArm.SWING
+                or getattr(w_order, "strategy_id", "") == "swing_panic_dip"
+            ):
+                return True
+    return False
+
+
+
 def _get_effective_committed_portfolio(
     acct: PaperTradingAccount,
     execution_engine: Optional[Any] = None,
     risk_eng: Optional[Any] = None,
     bracket_mgr: Optional[Any] = None,
+    arm: Optional[TradingArm] = None,
 ) -> tuple[set[str], list[str], int, dict[str, float]]:
     """Compute active symbols, active sectors, committed position count, and exposure notional map.
     Includes filled positions and in-flight entry commitments (working orders / pending brackets).
+    Optionally filters by TradingArm (INTRADAY or SWING).
     """
-    committed_symbols = set(acct.positions.keys())
+    if arm == TradingArm.INTRADAY:
+        committed_symbols = {
+            sym for sym, pos in acct.positions.items()
+            if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+        }
+    elif arm == TradingArm.SWING:
+        committed_symbols = {
+            sym for sym, pos in acct.positions.items()
+            if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip"
+        }
+    else:
+        committed_symbols = set(acct.positions.keys())
+
     existing_notional: dict[str, float] = {}
 
-    for sym, pos in acct.positions.items():
-        existing_notional[sym.upper()] = pos.shares * (pos.market_price if pos.market_price > 0 else pos.avg_entry_price)
+    for sym in committed_symbols:
+        pos = acct.positions.get(sym)
+        if pos:
+            existing_notional[sym.upper()] = pos.shares * (pos.market_price if pos.market_price > 0 else pos.avg_entry_price)
 
     eng = execution_engine or globals().get("engine")
     if eng is not None and hasattr(eng, "working_orders"):
         for order in list(eng.working_orders.values()):
+            if arm == TradingArm.INTRADAY and (getattr(order, "arm", None) == TradingArm.SWING or getattr(order, "strategy_id", "") == "swing_panic_dip"):
+                continue
+            if arm == TradingArm.SWING and (getattr(order, "arm", None) != TradingArm.SWING and getattr(order, "strategy_id", "") != "swing_panic_dip"):
+                continue
             if order.status.value in ("ACCEPTED", "PARTIALLY_FILLED"):
                 sym = order.symbol.upper()
                 pos = acct.positions.get(sym)
@@ -140,6 +209,10 @@ def _get_effective_committed_portfolio(
     bm = bracket_mgr or globals().get("bracket_manager")
     if bm is not None and hasattr(bm, "brackets"):
         for b in list(bm.brackets.values()):
+            if arm == TradingArm.INTRADAY and (getattr(b, "arm", None) == TradingArm.SWING or getattr(b, "strategy_id", "") == "swing_panic_dip"):
+                continue
+            if arm == TradingArm.SWING and (getattr(b, "arm", None) != TradingArm.SWING and getattr(b, "strategy_id", "") != "swing_panic_dip"):
+                continue
             if b.status == BracketStatus.PENDING_ENTRY:
                 sym = b.symbol.upper()
                 committed_symbols.add(sym)
@@ -156,12 +229,14 @@ def _get_effective_committed_portfolio(
 
 
 def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[bool, str]:
-    """Validate order against Institutional Risk Engine and active flattening lockout."""
-    is_lockout = flattening_engine.current_phase != FlatteningPhase.NORMAL_TRADING
-    active_symbols, active_sectors, committed_count, notional_map = _get_effective_committed_portfolio(acct)
+    """Validate order against Institutional Risk Engine, active flattening lockout, and arm separation."""
+    order_arm = getattr(order, "arm", TradingArm.INTRADAY)
+    order_strat = getattr(order, "strategy_id", None)
+    is_swing = (order_arm == TradingArm.SWING or order_strat == "swing_panic_dip")
+    sym = order.symbol.upper()
 
     # Differentiate position-reducing / liquidation orders from position-opening orders
-    existing_pos = acct.positions.get(order.symbol.upper())
+    existing_pos = acct.positions.get(sym)
     is_exit = False
     if getattr(order, "strategy_id", None) in (
         "CIRCUIT_BREAKER",
@@ -170,6 +245,7 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
         "MANUAL_FLATTEN",
         "NEWS_CONTRADICTION",
         "NEWS_CONTRADICTION_CIRCUIT_BREAKER",
+        "SESSION_BOUNDARY_LIQUIDATION",
     ):
         is_exit = True
     elif existing_pos is not None:
@@ -183,8 +259,43 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     if state_store is not None and not persistence_healthy and not is_exit:
         return False, "PERSISTENCE_RECOVERY_HALT: durable ledger is unavailable"
 
+    # Symbol reservation / mutual exclusion check:
+    if not is_exit:
+        target_engine = globals().get("engine")
+        if is_swing:
+            # Swing cannot enter if an INTRADAY position is currently open for this symbol
+            if existing_pos is not None and (
+                getattr(existing_pos, "arm", None) != TradingArm.SWING
+                and getattr(existing_pos, "strategy_id", "") != "swing_panic_dip"
+            ):
+                return False, f"SWING_REJECTED: Symbol {sym} is currently held by Intraday strategy"
+            # Swing cannot enter if an INTRADAY order is currently working for this symbol
+            if target_engine and hasattr(target_engine, "working_orders"):
+                for w_order in target_engine.working_orders.values():
+                    if w_order.symbol.upper() == sym and (
+                        getattr(w_order, "arm", None) != TradingArm.SWING
+                        and getattr(w_order, "strategy_id", "") != "swing_panic_dip"
+                    ):
+                        return False, f"SWING_REJECTED: Symbol {sym} has active working order in Intraday strategy"
+        else:
+            # Intraday cannot enter if symbol is reserved for Swing or currently held by Swing
+            if is_symbol_reserved_for_swing(sym, acct, target_engine):
+                return False, f"SYMBOL_RESERVED_FOR_SWING: Intraday entry for {sym} rejected because symbol is reserved/held by Swing Engine"
+
+
+    # Route portfolio commitment and lockout by arm
+    if is_swing:
+        active_symbols, active_sectors, committed_count, notional_map = _get_effective_committed_portfolio(
+            acct, arm=TradingArm.SWING
+        )
+        is_lockout = False  # Swing orders are exempt from intraday EOD flattening lockout
+    else:
+        active_symbols, active_sectors, committed_count, notional_map = _get_effective_committed_portfolio(
+            acct, arm=TradingArm.INTRADAY
+        )
+        is_lockout = flattening_engine.current_phase != FlatteningPhase.NORMAL_TRADING
+
     # Estimate entry price (do NOT set est_price = order.stop_price!)
-    sym = order.symbol.upper()
     est_price = order.limit_price
     if not est_price:
         if getattr(order, "estimated_price", None):
@@ -200,6 +311,12 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
     s_price = order.stop_price or (est_price * 0.98 if order.side == OrderSide.BUY else est_price * 1.02)
 
+    active_cnt = (
+        sum(1 for p in acct.positions.values() if getattr(p, "arm", None) != TradingArm.SWING and getattr(p, "strategy_id", "") != "swing_panic_dip")
+        if (getattr(order, "strategy_id", None) == "MANUAL" and not is_swing)
+        else committed_count
+    )
+
     res = risk_engine.evaluate_order_request(
         symbol=order.symbol,
         side=order.side.value,
@@ -208,13 +325,16 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
         stop_price=s_price,
         account_equity=acct.equity,
         buying_power=acct.buying_power,
-        active_positions_count=len(acct.positions) if getattr(order, "strategy_id", None) == "MANUAL" else committed_count,
+        active_positions_count=active_cnt,
         active_symbols=active_symbols,
         active_sectors=active_sectors,
         vix_multiplier=adaptation_engine.current_sizing_multiplier,
         is_entry_lockout_active=is_lockout,
         is_exit=is_exit,
         existing_position_notional=notional_map.get(sym, 0.0),
+        strategy_id=order_strat,
+        arm=order_arm,
+        active_swing_positions_count=committed_count if is_swing else 0,
     )
     if res.approved and not is_exit and order.qty > res.authorized_qty:
         return False, f"RISK_SIZE_REJECTED: requested {order.qty} exceeds authorized {res.authorized_qty} shares"
@@ -222,6 +342,27 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
 
 engine = ExecutionEngine(account=account, risk_validator=pre_trade_risk_validator)
+
+# Swing Trading Infrastructure & Engine
+daily_bar_store = DailyBarStore(seed_path=settings.DAILY_BARS_SEED_PATH)
+daily_bar_aggregator = DailyBarAggregator(store=daily_bar_store)
+earnings_calendar = EarningsCalendar(seed_path=settings.EARNINGS_CALENDAR_SEED_PATH)
+swing_staged_order_manager = SwingStagedOrderManager()
+swing_strategy_engine = SwingStrategyEngine(
+    account=account,
+    execution_engine=engine,
+    risk_engine=risk_engine,
+    bar_store=daily_bar_store,
+    calendar=earnings_calendar,
+    staged_manager=swing_staged_order_manager,
+    symbols=settings.SWING_SYMBOLS,
+    benchmark=settings.SWING_BENCHMARK,
+    slot_notional=settings.SWING_SLOT_NOTIONAL,
+    max_concurrent_positions=settings.SWING_MAX_CONCURRENT_POSITIONS,
+    reserve_symbol_cb=reserve_symbol_for_swing,
+    release_symbol_cb=release_symbol_for_swing,
+    is_reserved_cb=is_symbol_reserved_for_swing,
+)
 
 # Feed Ingestion Clients
 stock_ws_client: Optional[StockWebSocketClient] = None
@@ -267,7 +408,10 @@ def _capture_checkpoint() -> Dict[str, Any]:
         last_session_date=last_session_date,
         last_vix_print=last_vix_print,
         ledger_revision=ledger_revision,
+        swing_staged_orders=swing_staged_order_manager.get_staged_orders(),
+        swing_reserved_symbols=swing_reserved_symbols,
     )
+
 
 
 def _checkpoint_runtime(
@@ -389,7 +533,10 @@ def _restore_checkpoint() -> bool:
         latest_market_prices=latest_market_prices,
         market_history=market_history,
         recent_news=recent_news,
+        swing_staged_order_manager=swing_staged_order_manager,
+        swing_reserved_symbols=swing_reserved_symbols,
     )
+
     last_session_date = restored["last_session_date"]
     last_vix_print = restored["last_vix_print"]
     persistence_revision = revision
@@ -766,40 +913,63 @@ def _check_session_boundary(now_dt: datetime) -> None:
         if not should_process:
             return
     log.info("New ET session %s detected; resetting daily session state", session_date)
-    if engine.working_orders:
-        log.warning("Session boundary detected with %d open working orders; cancelling all", len(engine.working_orders))
-        engine.cancel_all_orders("SESSION_BOUNDARY_PURGE")
+    intraday_working = [
+        o for o in engine.working_orders.values()
+        if getattr(o, "arm", None) != TradingArm.SWING and getattr(o, "strategy_id", "") != "swing_panic_dip"
+    ]
+    if intraday_working:
+        log.warning("Session boundary detected with %d open intraday working orders; cancelling", len(intraday_working))
+        for order in intraday_working:
+            engine.cancel_order(order.id, reason="SESSION_BOUNDARY_PURGE")
         _release_dead_entry_brackets()
     # A position still on the book at a session boundary means the prior day's
-    # 15:55 flatten did not complete. Liquidate it. Clearing positions blind
-    # would leave the broker holding shares this process no longer tracks, and
-    # nothing would ever close them.
-    if account.positions:
+    # 15:55 flatten did not complete. Liquidate unclosed INTRADAY positions.
+    # Swing positions are strictly exempt and held overnight!
+    intraday_positions = {
+        sym: pos for sym, pos in account.positions.items()
+        if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+    }
+    if intraday_positions:
         log.error(
-            "Session boundary with %d open position(s); prior-day flatten failed. Liquidating: %s",
-            len(account.positions),
-            ", ".join(sorted(account.positions)),
+            "Session boundary with %d open intraday position(s); prior-day flatten failed. Liquidating: %s",
+            len(intraday_positions),
+            ", ".join(sorted(intraday_positions)),
         )
-        for sym, pos in list(account.positions.items()):
+        for sym, pos in list(intraday_positions.items()):
             side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
             bracket_id = bracket_manager.symbol_to_bracket.get(sym)
             liq_order = engine.create_order(
                 symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
                 strategy_id="SESSION_BOUNDARY_LIQUIDATION", parent_order_id=bracket_id,
+                arm=TradingArm.INTRADAY,
             )
             engine.submit_order(liq_order.id)
             _reconcile_fills(_flatten_symbol(sym, pos.market_price, now_dt))
-        if account.positions:
+        remaining_intraday = {
+            sym: pos for sym, pos in account.positions.items()
+            if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+        }
+        if remaining_intraday:
             log.error(
                 "Session boundary liquidation incomplete; still open: %s. Book kept so the "
                 "next flatten sweep retries.",
-                ", ".join(sorted(account.positions)),
+                ", ".join(sorted(remaining_intraday)),
             )
             _checkpoint_runtime(
                 "SESSION_BOUNDARY_LIQUIDATION_INCOMPLETE",
                 (boundary_event_key, "SESSION_BOUNDARY") if boundary_event_key else None,
             )
             return
+
+    # Advance holding_days counter for active swing positions across session boundary
+    # Strictly on trading days (Monday=0 through Friday=4). Non-trading weekend days (Saturday=5, Sunday=6) never increment.
+    if session_date.weekday() < 5:
+        for sym, pos in account.positions.items():
+            if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
+                pos.holding_days += 1
+                log.info("Advanced swing position %s holding_days to %d", sym, pos.holding_days)
+
+
     # Forced exits now belong to the prior day before its immutable summary is
     # calculated. Only a verified-flat book may advance and clear linkage.
     if previous_session_date is not None:
@@ -807,17 +977,36 @@ def _check_session_boundary(now_dt: datetime) -> None:
         pending_session_summaries[summary["session_date"]] = summary
     last_session_date = session_date
     market_filter.reset_session(session_date)
+    daily_bar_aggregator.reset_for_new_session()
     risk_engine.reset_daily_metrics(account.equity)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
-    # Bracket/linkage state is per-session: clear it so no stale PENDING_ENTRY
-    # bracket blocks a symbol on the new day.
-    bracket_manager.brackets.clear()
-    bracket_manager.symbol_to_bracket.clear()
-    bracket_manager.order_to_bracket.clear()
-    entry_order_to_bracket.clear()
-    bracket_realized_pnl.clear()
-    completed_brackets_recorded.clear()
+    # Bracket/linkage state: clear INTRADAY brackets so no stale PENDING_ENTRY
+    # bracket blocks an intraday symbol on the new day. Preserve SWING brackets!
+    intraday_brackets = [
+        bid for bid, b in list(bracket_manager.brackets.items())
+        if getattr(b, "arm", None) != TradingArm.SWING and getattr(b, "strategy_id", "") != "swing_panic_dip"
+    ]
+    for bid in intraday_brackets:
+        b = bracket_manager.brackets.pop(bid, None)
+        if b:
+            bracket_manager.symbol_to_bracket.pop(b.symbol, None)
+            if b.stop_order_id:
+                bracket_manager.order_to_bracket.pop(b.stop_order_id, None)
+            if b.target_1_order_id:
+                bracket_manager.order_to_bracket.pop(b.target_1_order_id, None)
+            if b.target_2_order_id:
+                bracket_manager.order_to_bracket.pop(b.target_2_order_id, None)
+            bracket_realized_pnl.pop(bid, None)
+            completed_brackets_recorded.discard(bid)
+
+    for order_id in list(entry_order_to_bracket.keys()):
+        order = engine.orders.get(order_id)
+        if order is None or (
+            getattr(order, "arm", None) != TradingArm.SWING
+            and getattr(order, "strategy_id", "") != "swing_panic_dip"
+        ):
+            entry_order_to_bracket.pop(order_id, None)
     for strategy in strategies:
         strategy.reset_daily_stats()
     engine.prune_session_state()
@@ -919,6 +1108,7 @@ async def broadcast_ui_state(force: bool = False) -> None:
             }
             for r in engine.audit_log[-20:]
         ],
+        "swing": swing_strategy_engine.to_ui_dict(),
     }
 
     raw = json.dumps(_sanitize_for_json(payload), default=str, allow_nan=False)
@@ -981,7 +1171,9 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 
     latest_market_prices[sym] = signal.entry_price if bar is None else bar.close
     adapted_stop = adaptation_engine.calculate_adapted_stop(signal)
-    committed_symbols, committed_sectors, committed_count, notional_map = _get_effective_committed_portfolio(account)
+    committed_symbols, committed_sectors, committed_count, notional_map = _get_effective_committed_portfolio(
+        account, arm=TradingArm.INTRADAY
+    )
     is_active = sym in committed_symbols
     approved, reason, qty = adaptation_engine.evaluate_signal_admission(
         signal=signal,
@@ -1013,7 +1205,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         is_entry_lockout_active=flattening_engine.current_phase != FlatteningPhase.NORMAL_TRADING,
         is_exit=False,
         existing_position_notional=notional_map.get(sym, 0.0),
+        arm=TradingArm.INTRADAY,
+        strategy_id=signal.strategy_id,
     )
+
     if not risk_preview.approved:
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
@@ -1093,19 +1288,37 @@ async def handle_bar_event(bar: BarEvent) -> None:
         except Exception as e:
             log.error(f"Strategy {strat.strategy_id} error on time tick: {e}")
 
+    bar_sym = bar.symbol.upper()
+    bar_et = bar.timestamp.astimezone(ET_TZ) if bar.timestamp.tzinfo else bar.timestamp
+
+    # 09:30 ET Market Open Execution for Staged Swing Orders
+    # Execute open orders strictly for this symbol when THAT symbol's 09:30 open bar arrives
+    if bar_et.time().hour == 9 and bar_et.time().minute == 30:
+        if swing_staged_order_manager.is_staged_for_entry(bar_sym) or swing_staged_order_manager.is_staged_for_exit(bar_sym):
+            swing_strategy_engine.execute_market_open({bar_sym: bar.open}, bar.timestamp)
+
+    # Swing Data Aggregation & Real-Time Emergency Stop Check
+    # Evaluated after execute_market_open so new positions are monitored on their opening candle
+    swing_set = set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK}
+    if bar_sym in swing_set:
+        daily_bar_aggregator.on_minute_bar(bar)
+    swing_strategy_engine.on_bar(bar)
+
+
     directive = flattening_engine.check_time_tick()
     if directive:
         await handle_flattening_directive(directive)
 
-    # Evaluate strategies on new bar
+    # Evaluate intraday strategies on new bar (restricted strictly to WATCHLIST_SYMBOLS)
     collected_signals: List[SignalEvent] = []
-    for strat in strategies:
-        try:
-            sigs = strat.on_bar(bar)
-            if sigs:
-                collected_signals.extend(sigs)
-        except Exception as e:
-            log.error(f"Strategy {strat.strategy_id} error on bar: {e}")
+    if bar.symbol.upper() in settings.WATCHLIST_SYMBOLS:
+        for strat in strategies:
+            try:
+                sigs = strat.on_bar(bar)
+                if sigs:
+                    collected_signals.extend(sigs)
+            except Exception as e:
+                log.error(f"Strategy {strat.strategy_id} error on bar: {e}")
 
     if collected_signals:
         arbitrated = adaptation_engine.arbitrate_signals(collected_signals)
@@ -1310,7 +1523,10 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
             return
     if directive.phase == FlatteningPhase.ORDER_PURGE:
         # Phase 2 (15:50 ET): Purge unfilled entry orders; preserve protective stops for open positions
+        # Preserve swing orders (both protective stops and staged/entry orders)
         for order_id, order in list(engine.working_orders.items()):
+            if getattr(order, "arm", None) == TradingArm.SWING or getattr(order, "strategy_id", "") == "swing_panic_dip":
+                continue
             pos = account.positions.get(order.symbol.upper())
             is_protective = bool(
                 pos and (
@@ -1322,17 +1538,20 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
                 engine.cancel_order(order_id, reason="EOD_PURGE_UNFILLED_ENTRIES")
         _release_dead_entry_brackets()
     elif directive.cancel_all_orders:
-        engine.cancel_all_orders("FLATTENING_DIRECTIVE")
+        engine.cancel_all_orders("FLATTENING_DIRECTIVE", arm=TradingArm.INTRADAY)
         _release_dead_entry_brackets()
 
     if directive.liquidate_all_positions:
         now_dt = directive.timestamp
         for sym, pos in list(account.positions.items()):
+            if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
+                continue
             side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
             bracket_id = bracket_manager.symbol_to_bracket.get(sym)
             liq_order = engine.create_order(
                 symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
                 strategy_id="AUTO_FLATTEN", parent_order_id=bracket_id,
+                arm=TradingArm.INTRADAY,
             )
             engine.submit_order(liq_order.id)
             fills = _flatten_symbol(sym, pos.market_price, now_dt)
@@ -1344,16 +1563,19 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
             working_orders=list(engine.working_orders.values()),
         )
         if audit_res.cancel_all_orders and engine.working_orders:
-            engine.cancel_all_orders("AUDIT_EMERGENCY_SWEEP")
+            engine.cancel_all_orders("AUDIT_EMERGENCY_SWEEP", arm=TradingArm.INTRADAY)
             _release_dead_entry_brackets()
         if audit_res.liquidate_all_positions and account.positions:
             now_dt = audit_res.timestamp
             for sym, pos in list(account.positions.items()):
+                if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
+                    continue
                 side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
                 bracket_id = bracket_manager.symbol_to_bracket.get(sym)
                 sweep_order = engine.create_order(
                     symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
                     strategy_id="EMERGENCY_SWEEP", parent_order_id=bracket_id,
+                    arm=TradingArm.INTRADAY,
                 )
                 engine.submit_order(sweep_order.id)
                 fills = _flatten_symbol(sym, pos.market_price, now_dt)
@@ -1365,7 +1587,18 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
             )
 
         if audit_res.audit_passed:
-            account.status = account.status.__class__.EOD_FLAT
+            has_swing_open = any(
+                getattr(p, "arm", None) == TradingArm.SWING or getattr(p, "strategy_id", "") == "swing_panic_dip"
+                for p in account.positions.values()
+            )
+            if not has_swing_open:
+                account.status = account.status.__class__.EOD_FLAT
+
+    if directive.phase == FlatteningPhase.MARKET_CLOSED:
+        eval_date = directive.timestamp.astimezone(ET_TZ).date() if directive.timestamp.tzinfo else directive.timestamp.date()
+        daily_bar_aggregator.finalize_all(eval_date)
+        swing_strategy_engine.evaluate_market_close(eval_date)
+
     _checkpoint_runtime(
         f"FLATTENING_{directive.phase.value}",
         (event_key, "FLATTENING") if event_key else None,
@@ -1453,6 +1686,9 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     market_filter.reset_session()
     for strategy in strategies:
         strategy.reset_daily_stats()
+    swing_strategy_engine.reset()
+    daily_bar_aggregator.reset_for_new_session()
+    swing_reserved_symbols.clear()
 
 
 def set_simulation_mode(enabled: bool) -> None:
@@ -2017,12 +2253,72 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                                 engine.working_orders[oid].stop_price = mod.get("new_stop_price", new_stop)
                     _checkpoint_runtime("MANUAL_TIGHTEN_STOP")
                     await broadcast_ui_state(force=True)
+                elif action == "SWING_EXIT_NEXT_OPEN":
+                    sym = msg.get("symbol", "").upper()
+                    staged = swing_strategy_engine.stage_manual_exit_next_open(sym)
+                    if staged:
+                        log.info("WebSocket processed SWING_EXIT_NEXT_OPEN for %s", sym)
+                    _checkpoint_runtime("SWING_MANUAL_EXIT_NEXT_OPEN")
+                    await broadcast_ui_state(force=True)
+                elif action == "SWING_EXIT_IMMEDIATE":
+                    sym = msg.get("symbol", "").upper()
+                    exit_res = swing_strategy_engine.execute_immediate_exit(sym)
+                    if exit_res:
+                        log.info("WebSocket processed SWING_EXIT_IMMEDIATE for %s", sym)
+                    _checkpoint_runtime("SWING_MANUAL_EXIT_IMMEDIATE")
+                    await broadcast_ui_state(force=True)
+                elif action == "SWING_TIGHTEN_STOP":
+                    sym = msg.get("symbol", "").upper()
+                    try:
+                        new_stop = float(msg.get("new_stop", 0.0))
+                    except (TypeError, ValueError):
+                        new_stop = 0.0
+                    success = swing_strategy_engine.tighten_stop(sym, new_stop)
+                    if success:
+                        log.info("WebSocket processed SWING_TIGHTEN_STOP for %s to %s", sym, new_stop)
+                    _checkpoint_runtime("SWING_MANUAL_TIGHTEN_STOP")
+                    await broadcast_ui_state(force=True)
             except Exception as e:
                 log.error(f"Error handling UI action: {e}")
     except WebSocketDisconnect:
         pass
     finally:
         ui_clients.discard(websocket)
+
+
+@app.get("/api/swing/state")
+async def get_swing_state() -> Dict[str, Any]:
+    """Return latest swing trading engine state."""
+    return swing_strategy_engine.to_ui_dict()
+
+
+class SwingActionRequest(BaseModel):
+    action: str  # "EXIT_NEXT_OPEN", "EXIT_IMMEDIATE", "TIGHTEN_STOP"
+    symbol: str
+    new_stop: Optional[float] = None
+
+
+@app.post("/api/swing/action")
+async def post_swing_action(req: SwingActionRequest) -> Dict[str, Any]:
+    """Execute operator action for the swing trading engine."""
+    sym = req.symbol.upper()
+    act = req.action.upper()
+    if act in ("EXIT_NEXT_OPEN", "SWING_EXIT_NEXT_OPEN"):
+        staged = swing_strategy_engine.stage_manual_exit_next_open(sym)
+        await broadcast_ui_state(force=True)
+        return {"status": "ok", "action": "SWING_EXIT_NEXT_OPEN", "symbol": sym, "staged": staged is not None}
+    elif act in ("EXIT_IMMEDIATE", "SWING_EXIT_IMMEDIATE"):
+        exit_res = swing_strategy_engine.execute_immediate_exit(sym)
+        await broadcast_ui_state(force=True)
+        return {"status": "ok", "action": "SWING_EXIT_IMMEDIATE", "symbol": sym, "result": exit_res}
+    elif act in ("TIGHTEN_STOP", "SWING_TIGHTEN_STOP"):
+        new_stop = req.new_stop or 0.0
+        success = swing_strategy_engine.tighten_stop(sym, new_stop)
+        await broadcast_ui_state(force=True)
+        return {"status": "ok", "action": "SWING_TIGHTEN_STOP", "symbol": sym, "success": success}
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown swing action {req.action}")
+
 
 
 # Railway serves the backend and the exported mobile dashboard from one process.

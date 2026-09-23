@@ -2,11 +2,14 @@
 Institutional Risk Engine, Circuit Breakers ($1,500 hard daily loss limit), and Position Sizing.
 """
 from __future__ import annotations
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 import math
-from typing import Any, Dict, Optional, Set, Tuple
-from pydantic import BaseModel, Field
+from typing import Any, Dict, Optional, Set
+from pydantic import BaseModel
+
+
+from backend.app.core.account import TradingArm
 
 
 class RiskLevel(str, Enum):
@@ -45,6 +48,8 @@ class RiskEngineConfig(BaseModel):
     max_positions_per_sector: int = 2
     min_stop_distance_pct: float = 0.004     # 0.4%
     max_stop_distance_pct: float = 0.040     # 4.0%
+    max_concurrent_swing_positions: int = 2
+    swing_slot_notional: float = 25000.0
 
 
 class InstitutionalRiskEngine:
@@ -75,6 +80,10 @@ class InstitutionalRiskEngine:
             "GOOGL": "Communication Services",
             "META": "Communication Services",
             "COIN": "Fintech/Crypto",
+            "LRCX": "Semiconductors",
+            "KLAC": "Semiconductors",
+            "MU": "Semiconductors",
+            "GS": "Financials",
         }
 
     def register_symbol_sector(self, symbol: str, sector: str) -> None:
@@ -135,12 +144,21 @@ class InstitutionalRiskEngine:
         is_entry_lockout_active: bool = False,
         is_exit: bool = False,
         existing_position_notional: float = 0.0,
+        strategy_id: Optional[str] = None,
+        arm: Optional[TradingArm] = None,
+        active_swing_positions_count: int = 0,
     ) -> RiskCheckResult:
         """
         Pre-Trade Approval Gate.
         Evaluates an order request against institutional guardrails and calculates risk-adjusted sizing.
+        Supports arm-aware routing for INTRADAY and SWING trading arms.
         """
         symbol = symbol.upper()
+        is_swing = bool(
+            strategy_id == "swing_panic_dip"
+            or arm == TradingArm.SWING
+            or (isinstance(arm, str) and arm.upper() == "SWING")
+        )
 
         # Position reducing or liquidation orders bypass entry lockouts, circuit halts, and sizing constraints
         if is_exit:
@@ -179,6 +197,80 @@ class InstitutionalRiskEngine:
                 rejection_code="EXHAUSTED_DAILY_LOSS_BUDGET",
             )
 
+        # -------------------------------------------------------------
+        # SWING TRADING ARM GATE
+        # -------------------------------------------------------------
+        if is_swing:
+            # 1. Swing Concurrency Check (max 2 active swing positions)
+            swing_count = active_swing_positions_count if active_swing_positions_count > 0 else (active_positions_count if is_swing else 0)
+            if symbol not in active_symbols and swing_count >= self.config.max_concurrent_swing_positions:
+                return RiskCheckResult(
+                    approved=False,
+                    reason=f"MAX_CONCURRENT_SWING_POSITIONS_REACHED: Limit of {self.config.max_concurrent_swing_positions} swing positions reached",
+                    requested_qty=requested_qty,
+                    authorized_qty=0,
+                    estimated_risk_dollars=0.0,
+                    risk_level=self.risk_level,
+                    rejection_code="MAX_CONCURRENT_SWING_POSITIONS_REACHED",
+                )
+
+            # 2. Stop Geometry Check (require stop < entry for BUY, stop > entry for SELL; bypass 4.0% ceiling)
+            stop_dist = abs(entry_price - stop_price)
+            direction_is_valid = (
+                (side.upper() == "BUY" and stop_price < entry_price)
+                or (side.upper() == "SELL" and stop_price > entry_price)
+            )
+            if entry_price <= 0 or stop_dist <= 0 or not direction_is_valid:
+                return RiskCheckResult(
+                    approved=False,
+                    reason="INVALID_PRICE_GEOMETRY: Entry/stop direction or distance is invalid",
+                    requested_qty=requested_qty,
+                    authorized_qty=0,
+                    estimated_risk_dollars=0.0,
+                    risk_level=self.risk_level,
+                    rejection_code="INVALID_PRICE_GEOMETRY",
+                )
+
+            # 3. Swing Notional Cap Check ($25,000 per slot)
+            max_notional = self.config.swing_slot_notional
+            order_notional = requested_qty * entry_price
+            if order_notional > max_notional + 50.00:
+                return RiskCheckResult(
+                    approved=False,
+                    reason=f"SWING_NOTIONAL_CAP_EXCEEDED: Requested notional ${order_notional:,.2f} exceeds ${max_notional:,.2f} slot limit",
+                    requested_qty=requested_qty,
+                    authorized_qty=0,
+                    estimated_risk_dollars=round(requested_qty * stop_dist, 2),
+                    risk_level=self.risk_level,
+                    rejection_code="SWING_NOTIONAL_CAP_EXCEEDED",
+                )
+
+            q_slot = int(math.floor((max_notional + 50.00) / entry_price))
+            q_bp = int(math.floor(buying_power / entry_price))
+            authorized_qty = min(requested_qty, q_slot, q_bp)
+            if authorized_qty < 1:
+                return RiskCheckResult(
+                    approved=False,
+                    reason=f"INSUFFICIENT_BUYING_POWER: Authorized quantity {authorized_qty} < 1 share",
+                    requested_qty=requested_qty,
+                    authorized_qty=0,
+                    estimated_risk_dollars=0.0,
+                    risk_level=self.risk_level,
+                    rejection_code="INSUFFICIENT_BUYING_POWER",
+                )
+
+            return RiskCheckResult(
+                approved=True,
+                reason=f"SWING_ORDER_APPROVED: Sized at {authorized_qty} shares (notional ${authorized_qty * entry_price:,.2f})",
+                requested_qty=requested_qty,
+                authorized_qty=authorized_qty,
+                estimated_risk_dollars=round(authorized_qty * stop_dist, 2),
+                risk_level=self.risk_level,
+            )
+
+        # -------------------------------------------------------------
+        # INTRADAY TRADING ARM GATE
+        # -------------------------------------------------------------
         # 2. Session Time Lockout Check
         if is_entry_lockout_active:
             return RiskCheckResult(

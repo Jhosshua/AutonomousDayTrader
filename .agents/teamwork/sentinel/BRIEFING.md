@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-23T21:03:00Z
+# BRIEFING — 2026-09-23T21:25:00Z
 
 ## Mission
-Execute an exhaustive, adversarial code review and audit of `AutonomousDayTrader` across every system angle following universe expansion to 12 symbols, multi-sector risk engine, and regime-separated execution; identify latent races, indicator leakage, numerical precision errors, memory leaks, and boundary failures; implement production-grade fixes with deterministic mutation tests; verify via 100% tests, dry run, port hygiene; and deploy to Railway.
+Integrate an autonomous, multi-day swing trading engine ("2-Day Panic Dip" Connors RSI-2 strategy) into `AutonomousDayTrader` across 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`), with 3x independent adversarial review against lookahead/future bias, state machine flattening audit, execution timing audit, end-to-end replay verification, visual QA, and remote Railway deployment.
 
 ## 🔒 My Identity
 - Archetype: sentinel
@@ -18,6 +18,10 @@ Execute an exhaustive, adversarial code review and audit of `AutonomousDayTrader
 - Active Victory Auditor: 9468ce5b-9f5b-4880-9bea-bdf615086eb5 (victory_auditor_sentinel_6 - VICTORY CONFIRMED)
 - Cron 1 Task ID: f05ee9d9-c207-4268-b1d7-b92b51a39c99/task-28 (Cancelled upon completion)
 - Cron 2 Task ID: f05ee9d9-c207-4268-b1d7-b92b51a39c99/task-30 (Cancelled upon completion)
+- Active Orchestrator: 8f602370-8fd6-478f-9f31-f33f00dc4661 (orchestrator_7 - In Progress)
+- Active Victory Auditor: to be spawned on victory claim
+- Cron 1 Task ID: 9d5a39f7-9368-4d83-9f21-cbaf5fd7a56d/task-30 (Progress Reporting)
+- Cron 2 Task ID: 9d5a39f7-9368-4d83-9f21-cbaf5fd7a56d/task-32 (Liveness Check)
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
@@ -27,42 +31,32 @@ Execute an exhaustive, adversarial code review and audit of `AutonomousDayTrader
 - Remote deployment mandate: git push origin main, verify Railway remote build and deployment success, check remote live health endpoint (https://autonomousdaytrader-production.up.railway.app/health)
 
 ## User Context
-- **Last user request**: Execute an exhaustive, adversarial code review and audit of `AutonomousDayTrader` across every system angle following universe expansion to 12 symbols, multi-sector risk engine, and regime-separated execution. Identify latent concurrency races, indicator leakage, numerical precision errors, memory leaks, and edge-case boundary failures; implement production-grade fixes; verify via comprehensive regression and mutation testing; and deliver a verified production deployment to Railway.
+- **Last user request**: Integrate an autonomous, multi-day swing trading engine ("2-Day Panic Dip" Connors RSI-2 strategy) into `AutonomousDayTrader` across 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`). The swing engine shares the $50,000 account pool ($25,000 allocated per slot, maximum 2 concurrent swing positions), runs fully independently from intraday trading (strictly exempt from 15:58 ET auto-flattening), provides a unified Obsidian dark operator dashboard, undergoes 3x independent adversarial review against lookahead/future bias, and completes end-to-end replay verification and remote Railway deployment.
 - **Pending clarifications**: none
 - **Delivered results**:
-  - Full-stack adversarial audit completed across 5 attack angles (concurrency & QoS, indicator causality, risk boundaries, memory hygiene, UI & WebSocket state).
-  - 14 production defects remediated with zero regressions.
-  - 31 deterministic adversarial mutation & stress tests added and verified.
-  - 355/355 unit tests passed (100%), 320/320 E2E runner tests passed (100%).
-  - Integrated Monday dry run passed with 184 events, 0 errors, flat book at EOD.
-  - Ports 8000, 8005, 8080, 3005 verified clean and liberated.
-  - Production commits pushed to origin/main (97d461c, 12ebf45).
-  - Live Railway deployment verified healthy (HTTP 200 OK, status: healthy).
-  - Post-victory audit independently verified: VICTORY CONFIRMED.
+  - Request logged to ORIGINAL_REQUEST.md.
+  - Project Orchestrator (orchestrator_7) dispatched (`8f602370-8fd6-478f-9f31-f33f00dc4661`).
+  - Monitoring crons established (Cron 1: task-30, Cron 2: task-32).
 
 ## Project Status
-- **Phase**: complete
-- **Crons Active**: none (killed per protocol)
-- **Active Subagents**: none (killed per protocol)
+- **Phase**: in progress
+- **Crons Active**: Cron 1 (task-30, `*/8 * * * *`), Cron 2 (task-32, `*/10 * * * *`)
+- **Active Subagents**: orchestrator_7 (`8f602370-8fd6-478f-9f31-f33f00dc4661`)
 
 ## Routing Decision
 - **Route**: General (`teamwork_preview_orchestrator`)
-- **Rationale**: Full-stack trading system engineering, concurrency audit, indicator causality analysis, risk invariants, mutation testing, dry run simulation, and deployment.
+- **Rationale**: Multi-day swing trading engine implementation, quantitative indicators, risk pool coordination, 3x adversarial reviews, replay tests, Next.js UI, process hygiene, and remote Railway deployment.
 
 ## Victory Audit Status
-- **Triggered**: yes
-- **Verdict**: VICTORY CONFIRMED
+- **Triggered**: no
+- **Verdict**: pending
 - **Retry count**: 0
 
 ## Artifact Index
 - /Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md — Authoritative record of user requests
 - /Users/mo/AutonomousDayTrader/.agents/teamwork/ORIGINAL_REQUEST.md — Mirror of authoritative user requests
 - /Users/mo/AutonomousDayTrader/.agents/teamwork/sentinel/BRIEFING.md — Sentinel persistent working memory
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/sentinel/handoff.md — Sentinel final handoff report
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_6/handoff.md — Orchestrator victory handoff
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/victory_auditor_sentinel_6/audit_report.md — Independent post-victory audit report
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/victory_auditor_sentinel_6/handoff.md — Independent victory auditor handoff
+- /Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_7/DISPATCH.md — Orchestrator 7 dispatch briefing
 - /Users/mo/AutonomousDayTrader/PROJECT.md — Global architecture, specifications & audit history
 - /Users/mo/AutonomousDayTrader/MEMORY.md — Engineering decisions and logs
 - /Users/mo/AutonomousDayTrader/ERRORS.md — Defect postmortems and anti-patterns
-- /Users/mo/AutonomousDayTrader/MONDAY_SIMULATION_REPORT.md — Operational readiness certificate

@@ -292,3 +292,34 @@
   - Local process hygiene verified: zero lingering daemons, ports 8005, 3005, and 8080 clean and liberated.
 - **In progress**: None (Release certified and deployed).
 - **Next session priorities**: Monitor live market open Monday session performance and telemetry feeds.
+
+### 2026-09-23 (Milestone 9): Autonomous Multi-Day Swing Trading Engine ("2-Day Panic Dip") Integration
+- **Worked on**: Full architectural implementation, 3x adversarial review, deterministic replay verification, desktop & mobile visual QA, and production release of the autonomous "2-Day Panic Dip" swing trading engine across 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`) and benchmark `QQQ`.
+- **Implemented Quantitative Rules & Core Systems**:
+  - *Rule 1 (Macro Floor)*: Today's Daily Close > 200-day Simple Moving Average (SMA).
+  - *Rule 2 (Market Leadership / Relative Strength)*: Trailing 60-day return $\ge$ QQQ return ($\Delta_{\text{stock},60d} \ge \Delta_{\text{QQQ},60d}$).
+  - *Rule 3 (Panic Trigger)*: 2-day Connors RSI (Wilder's RSI(2) on daily closes) < 10.0.
+  - *Rule 4 (Mandatory Earnings Veto)*: 48-hour entry blackout window; holding position sold at 09:30 open if earnings report tomorrow.
+  - *Rule 5 (Entry Execution & Sizing)*: 16:00 ET close qualification $\to$ staged in `SwingStagedOrderManager` $\to$ executed at next 09:30 ET open. Fixed $25,000 notional per slot (`floor(25000 / open)` shares) with hard cap of maximum 2 concurrent swing positions.
+  - *Rule 6 (Emergency Stop-Loss)*: Hard stop established immediately upon fill at $P_{\text{fill}} - 2.5 \times \text{Daily ATR(14)}$; intraday price breach triggers immediate market liquidation.
+  - *Rule 7 (Take-Profit & Time Exit)*: Sold at next 09:30 open if prior close > 5-day SMA, prior RSI(2) > 70.0, or held for 5 trading days.
+- **Architectural Isolation & EOD Flattening Exemption**:
+  - Positions, orders, and brackets tagged with `TradingArm.SWING` vs `TradingArm.INTRADAY`.
+  - 4-phase auto-flattening engine (15:45 lockout, 15:50 cancel, 15:55 liquidation, 15:58 flat audit) applies exclusively to intraday positions; swing positions and stops survive uninterrupted.
+  - Session boundary sweeps preserve swing positions and increment `pos.holding_days` strictly on trading days.
+  - Shared $50,000 account pool tracks cash, buying power, and PnL without double-spending or margin collisions.
+  - Symbol mutual exclusion for `AMD` locks out intraday entries when reserved or held by the swing engine.
+- **Unified Obsidian Dark Operator Interface**:
+  - `SegmentedModeToggle` with fluid Framer Motion sliding pill toggle between Intraday and Swing modes.
+  - `SwingTelemetryBar` displaying strategy status, $50k allocation, slot utilization (e.g. 1/2 slots), and "OVERNIGHT EXEMPT" badge.
+  - `SwingCandidateWatchlist` displaying 5 certified stocks with live metrics, 200 SMA, 60d RS, RSI(2), and earnings checks.
+  - `ActiveSwingPositionsTable` with ATR stop loss meter, holding day counter ("Day 2 of 5"), exit triggers checklist, and manual overrides.
+- **3x Adversarial Review & 10-Point Remediation**:
+  - All 10 defects cataloged by adversarial reviewers were genuinely remediated, mutation-tested, and certified clean by Forensic Auditor.
+- **Verification & Deployment Certification**:
+  - Deterministic 6-day multi-day replay dry run (`python3 scripts/run_integrated_swing_dry_run.py`): Status `PASS` (+$2,953.81 realized PnL, ending equity $52,953.81, 100% of 7 quantitative rules certified, 0 unhandled exceptions). Published in `SWING_SIMULATION_REPORT.md`.
+  - Full backend pytest suite: 432/432 passed (100%).
+  - Full opaque-box E2E test runner: 325/325 passed (100% in 27.48s).
+  - Visual QA (`python3 scripts/verify_visual_qa.py`): Desktop (1440x900) and mobile (390x844) viewports verified with 0px horizontal overflow, full interactive fidelity, and clean port release.
+  - Frontend production build: Next.js 15.5 clean build (0 TypeScript/lint errors).
+  - Port hygiene: Ports 3005, 8000, 8005, 8080 confirmed 100% clean and liberated.

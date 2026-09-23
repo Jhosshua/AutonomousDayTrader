@@ -172,6 +172,7 @@ class HookSimulationInstance {
           positions_count: payload.positions_count ?? (primary ? 1 : 0),
           working_orders_count: payload.working_orders_count ?? prev.working_orders_count,
           recent_activity: payload.recent_activity || prev.recent_activity,
+          swing: payload.swing !== undefined ? payload.swing : prev.swing,
           isConnected: true,
           lastUpdated: new Date(),
         };
@@ -197,6 +198,18 @@ class HookSimulationInstance {
 
   tightenStop(symbol, newStop) {
     this.sendAction({ action: "TIGHTEN_STOP", symbol, new_stop: newStop });
+  }
+
+  swingExitNextOpen(symbol) {
+    this.sendAction({ action: "SWING_EXIT_NEXT_OPEN", symbol });
+  }
+
+  swingExitImmediate(symbol) {
+    this.sendAction({ action: "SWING_EXIT_IMMEDIATE", symbol });
+  }
+
+  swingTightenStop(symbol, newStop) {
+    this.sendAction({ action: "SWING_TIGHTEN_STOP", symbol, new_stop: newStop });
   }
 }
 
@@ -427,10 +440,35 @@ console.log("\n[TEST 3] Testing Manual Action Serialization Parity...");
   assert.strictEqual(msg4.action, "CUSTOM_OVERRIDE");
   assert.strictEqual(msg4.param, 42);
 
+  // Action 5: SWING_EXIT_NEXT_OPEN
+  client.swingExitNextOpen("LRCX");
+  assert.strictEqual(client.sentMessages.length, 5, "Five messages should be sent");
+  const msg5 = JSON.parse(client.sentMessages[4]);
+  assert.strictEqual(msg5.action, "SWING_EXIT_NEXT_OPEN");
+  assert.strictEqual(msg5.symbol, "LRCX");
+
+  // Action 6: SWING_EXIT_IMMEDIATE
+  client.swingExitImmediate("MU");
+  assert.strictEqual(client.sentMessages.length, 6, "Six messages should be sent");
+  const msg6 = JSON.parse(client.sentMessages[5]);
+  assert.strictEqual(msg6.action, "SWING_EXIT_IMMEDIATE");
+  assert.strictEqual(msg6.symbol, "MU");
+
+  // Action 7: SWING_TIGHTEN_STOP
+  client.swingTightenStop("AMD", 145.50);
+  assert.strictEqual(client.sentMessages.length, 7, "Seven messages should be sent");
+  const msg7 = JSON.parse(client.sentMessages[6]);
+  assert.strictEqual(msg7.action, "SWING_TIGHTEN_STOP");
+  assert.strictEqual(msg7.symbol, "AMD");
+  assert.strictEqual(msg7.new_stop, 145.50);
+
   console.log("  Dispatched payloads verified:");
   console.log("    1. FLATTEN_POSITION:", JSON.stringify(msg1));
   console.log("    2. FLATTEN_ALL:", JSON.stringify(msg2));
   console.log("    3. TIGHTEN_STOP:", JSON.stringify(msg3));
+  console.log("    4. SWING_EXIT_NEXT_OPEN:", JSON.stringify(msg5));
+  console.log("    5. SWING_EXIT_IMMEDIATE:", JSON.stringify(msg6));
+  console.log("    6. SWING_TIGHTEN_STOP:", JSON.stringify(msg7));
   console.log("  ✅ Action serialization parity PASSED.");
 }
 

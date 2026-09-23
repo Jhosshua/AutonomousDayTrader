@@ -9,6 +9,8 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
+from backend.app.core.account import TradingArm
+
 
 class BracketStatus(str, Enum):
     PENDING_ENTRY = "PENDING_ENTRY"          # Entry order submitted, awaiting fill
@@ -54,6 +56,7 @@ class BracketOrder(BaseModel):
     target_2_order_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    arm: TradingArm = TradingArm.INTRADAY
 
     @property
     def target_1_remaining_qty(self) -> int:
@@ -115,6 +118,7 @@ class DynamicBracketManager:
         target_1_override: Optional[float] = None,
         target_2_override: Optional[float] = None,
         timestamp: Optional[datetime] = None,
+        arm: TradingArm = TradingArm.INTRADAY,
     ) -> BracketOrder:
         """
         Create and compute price levels for a dynamic multi-tier bracket.
@@ -169,6 +173,7 @@ class DynamicBracketManager:
             target_2_order_id=f"t2_{bracket_id}" if q2 > 0 else None,
             created_at=now,
             updated_at=now,
+            arm=arm,
         )
 
         self.brackets[bracket_id] = bracket

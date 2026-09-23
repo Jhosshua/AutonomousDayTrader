@@ -1,7 +1,7 @@
 """backend/app/config.py
 System configuration, network endpoints, credentials, and institutional risk parameters.
 """
-from typing import List, Optional
+from typing import List
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -59,6 +59,30 @@ class Settings(BaseSettings):
     WATCHLIST_SYMBOLS: List[str] = Field(
         default=["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "PLTR", "COIN"],
         description="Default symbol roster for stock market data subscriptions"
+    )
+    SWING_SYMBOLS: List[str] = Field(
+        default=["LRCX", "KLAC", "MU", "AMD", "GS"],
+        description="Certified 5 stocks for 2-Day Panic Dip swing strategy"
+    )
+    SWING_BENCHMARK: str = Field(
+        default="QQQ",
+        description="Benchmark index for 60-day relative strength filter"
+    )
+    SWING_SLOT_NOTIONAL: float = Field(
+        default=25000.0,
+        description="Target notional allocation per swing trade slot"
+    )
+    SWING_MAX_CONCURRENT_POSITIONS: int = Field(
+        default=2,
+        description="Maximum concurrent open swing positions"
+    )
+    DAILY_BARS_SEED_PATH: str = Field(
+        default="backend/app/data/daily_bars_seed.json",
+        description="Path to historical daily bars seed data"
+    )
+    EARNINGS_CALENDAR_SEED_PATH: str = Field(
+        default="backend/app/data/earnings_calendar.json",
+        description="Path to earnings calendar seed data"
     )
     SUBSCRIBE_BARS: bool = Field(default=True, description="Subscribe to 1-minute OHLCV bars")
     SUBSCRIBE_QUOTES: bool = Field(default=True, description="Subscribe to NBBO top-of-book quotes")

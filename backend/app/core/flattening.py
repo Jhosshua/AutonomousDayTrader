@@ -4,9 +4,12 @@ Automated 4-Phase Zero-Overnight Flattening State Machine and Market Clock Abstr
 from __future__ import annotations
 from datetime import datetime, time
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
+
+from backend.app.core.account import TradingArm
 
 ET_TZ = ZoneInfo("America/New_York")
 
@@ -216,23 +219,36 @@ class ZeroOvernightFlatteningEngine:
     ) -> FlatteningDirective:
         """
         Phase 4 (15:58 ET): Zero-Overnight Position Audit.
-        Verifies open positions count == 0 and working orders count == 0.
-        If positions exist, issues emergency IOC market liquidation directive.
+        Verifies open INTRADAY positions count == 0 and INTRADAY working orders count == 0.
+        Swing positions and swing working orders are strictly exempt.
+        If intraday positions exist, issues emergency IOC market liquidation directive.
         If flat, certifies audit passed for session close.
         """
         self.phase4_executed = True
         self.current_phase = FlatteningPhase.ZERO_AUDIT
-        unclosed = list(open_positions.keys())
         now_dt = self.clock.now()
 
-        if len(unclosed) == 0 and len(working_orders) == 0:
+        # Filter out exempt swing positions and orders
+        intraday_positions = {
+            sym: pos for sym, pos in open_positions.items()
+            if getattr(pos, "arm", None) not in ("SWING", TradingArm.SWING)
+            and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+        }
+        intraday_working_orders = [
+            order for order in working_orders
+            if getattr(order, "arm", None) not in ("SWING", TradingArm.SWING)
+            and getattr(order, "strategy_id", "") != "swing_panic_dip"
+        ]
+        unclosed = list(intraday_positions.keys())
+
+        if len(unclosed) == 0 and len(intraday_working_orders) == 0:
             self.audit_passed = True
             return FlatteningDirective(
                 phase=FlatteningPhase.ZERO_AUDIT,
                 timestamp=now_dt,
                 action_required="AUDIT_PASSED_CLEAN_BOOK",
                 lock_new_entries=True,
-                cancel_all_orders=True,
+                cancel_all_orders=False,
                 run_audit=True,
                 audit_passed=True,
                 unclosed_symbols=[],

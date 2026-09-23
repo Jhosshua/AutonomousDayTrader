@@ -9,7 +9,7 @@ import math
 from typing import Callable, Dict, List, Optional, Tuple
 import uuid
 
-from backend.app.core.account import PaperTradingAccount
+from backend.app.core.account import PaperTradingAccount, TradingArm
 from backend.app.models.events import OrderSide, OrderType, OrderState
 
 
@@ -90,9 +90,12 @@ class Order:
     reject_reason: Optional[str] = None
     fills: List[Fill] = field(default_factory=list)
     audit_trail: List[OrderAuditRecord] = field(default_factory=list)
+    arm: TradingArm = TradingArm.INTRADAY
 
     def __post_init__(self) -> None:
         self.remaining_qty = self.qty
+        if isinstance(self.arm, str) and not isinstance(self.arm, TradingArm):
+            self.arm = TradingArm(self.arm)
 
 
 class ExecutionEngine:
@@ -131,6 +134,7 @@ class ExecutionEngine:
         client_order_id: Optional[str] = None,
         bracket_role: Optional[BracketRole] = None,
         parent_order_id: Optional[str] = None,
+        arm: TradingArm = TradingArm.INTRADAY,
     ) -> Order:
         """Create a new order in CREATED state."""
         if qty <= 0:
@@ -157,6 +161,7 @@ class ExecutionEngine:
             strategy_id=strategy_id,
             bracket_role=bracket_role,
             parent_order_id=parent_order_id,
+            arm=arm,
         )
         self.orders[order_id] = order
         self._record_audit(order, OrderState.CREATED, "ORDER_CREATED", "Order initialized")
@@ -229,10 +234,13 @@ class ExecutionEngine:
         self._record_audit(order, OrderState.CANCELLED, "CANCEL_REQUEST", reason)
         return order
 
-    def cancel_all_orders(self, reason: str = "CIRCUIT_BREAKER") -> List[Order]:
-        """Cancel all active working orders."""
+    def cancel_all_orders(self, reason: str = "CIRCUIT_BREAKER", arm: Optional[TradingArm] = None) -> List[Order]:
+        """Cancel all active working orders, optionally filtered by trading arm."""
         cancelled = []
         for order_id in list(self.working_orders.keys()):
+            order = self.working_orders.get(order_id)
+            if order and arm is not None and getattr(order, "arm", None) != arm:
+                continue
             cancelled.append(self.cancel_order(order_id, reason))
         return cancelled
 
@@ -429,6 +437,9 @@ class ExecutionEngine:
             price=price,
             fee=fee,
             timestamp=timestamp,
+            arm=getattr(order, "arm", TradingArm.INTRADAY),
+            strategy_id=getattr(order, "strategy_id", "MANUAL"),
+            stop_loss_price=getattr(order, "stop_price", None),
         )
         fill.realized_pnl = realized_delta
 

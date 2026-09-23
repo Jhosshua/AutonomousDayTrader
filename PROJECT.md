@@ -401,6 +401,47 @@ Key Hardened Subsystems & Remediations:
 - Frontend Production Build: Clean Next.js 15.5 build (0 TypeScript/lint errors, 4/4 resilience tests passed).
 - Port Hygiene: Monitored ports 8000, 8005, 8080, 3005 confirmed 100% clean and free.
 
+### 2026-09-23: Milestone 9 — Autonomous Multi-Day Swing Trading Engine ("2-Day Panic Dip") Integration
+AutonomousDayTrader integrated an autonomous multi-day swing trading engine running the quantitative "2-Day Panic Dip" Connors RSI-2 strategy across 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`) and benchmark `QQQ`. The swing engine operates independently from intraday trading, sharing the $50,000 paper trading pool ($25,000 per slot, maximum 2 concurrent swing positions), and is strictly exempt from the 15:45–15:58 ET intraday auto-flattening engine.
+
+#### Feature Inventory (F24–F29):
+- **F24: Swing Execution Engine ("2-Day Panic Dip") (`backend/app/strategies/swing_panic_dip.py`)**:
+  - Implements the 7 quantitative rules:
+    1. *Rule 1 (Macro Floor)*: Today's Daily Close > 200-day Simple Moving Average (SMA).
+    2. *Rule 2 (Market Leadership / Relative Strength)*: Trailing 60-day return $\ge$ QQQ return ($\Delta_{\text{stock},60d} \ge \Delta_{\text{QQQ},60d}$).
+    3. *Rule 3 (Panic Trigger)*: 2-day Connors RSI (Wilder's RSI(2) on daily closes) < 10.0.
+    4. *Rule 4 (Mandatory Earnings Veto)*: 48-hour entry blackout window; holding position sold at 09:30 open if earnings report tomorrow.
+    5. *Rule 5 (Entry Execution & Sizing)*: 16:00 ET close qualification $\to$ staged in `SwingStagedOrderManager` $\to$ executed at next 09:30 ET open. Fixed $25,000 notional per slot (`floor(25000 / open)` shares) with hard cap of maximum 2 concurrent swing positions.
+    6. *Rule 6 (Emergency Stop-Loss)*: Hard stop established immediately upon fill at $P_{\text{fill}} - 2.5 \times \text{Daily ATR(14)}$; intraday price breach triggers immediate market liquidation.
+    7. *Rule 7 (Take-Profit & Time Exit)*: Sold at next 09:30 open if prior close > 5-day SMA, prior RSI(2) > 70.0, or held for 5 trading days.
+- **F25: Architectural Separation & Flattening Exemption (`backend/app/core/account.py`, `flattening.py`, `risk.py`, `main.py`)**:
+  - `TradingArm` enum (`INTRADAY`, `SWING`) tags all positions, orders, and brackets.
+  - 4-phase auto-flattening engine (15:45 lockout, 15:50 cancel, 15:55 liquidation, 15:58 flat audit) applies exclusively to intraday positions; swing positions and stops survive uninterrupted.
+  - Session boundary sweeps preserve swing positions and increment `pos.holding_days` strictly on trading days.
+  - Shared $50,000 account pool tracks cash, buying power, and PnL without double-spending or margin collisions.
+  - Symbol mutual exclusion for `AMD` locks out intraday entries when reserved or held by the swing engine.
+- **F26: Market Leadership, Calendar & Signal Pipeline (`backend/app/strategies/swing_indicators.py`, `earnings_calendar.py`)**:
+  - Lookahead-free rolling daily calculations for 200 SMA, 5 SMA, 14-day ATR, 60-day RS vs QQQ, and 2-day Connors RSI using strictly closed sessions (`date <= today`).
+  - Seed daily bars fixture (`backend/app/data/daily_bars_seed.json`) with 265 historical bars per symbol.
+  - Automated earnings calendar lookup (`backend/app/data/earnings_calendar.json`) with graceful cached fallback.
+  - `SwingStagedOrderManager` holds overnight staged entry and exit orders outside `engine.working_orders`.
+- **F27: Unified Obsidian Dark Operator Interface (`frontend/`)**:
+  - `SegmentedModeToggle`: Fluid Framer Motion sliding pill toggle between "Intraday Day Trader" and "Swing Mean-Reversion".
+  - `SwingTelemetryBar`: Real-time display of strategy status, $50k allocation, slot utilization (e.g. 1/2 slots), and "OVERNIGHT EXEMPT" institutional badge.
+  - `SwingCandidateWatchlist`: Cards for the 5 certified stocks displaying live price, 200 SMA check, 60d RS check, RSI(2) value, earnings status, and qualification badges.
+  - `ActiveSwingPositionsTable`: Position details, ATR stop loss meter, holding day counter ("Day 2 of 5"), exit triggers checklist, and manual intervention controls.
+- **F28: 3x Independent Adversarial Reviews & Forensic Audit (`GATE_STATUS.md`)**:
+  - Pass 1: Mathematical & Lookahead Audit certified zero future bias in indicator math.
+  - Pass 2: State Machine & Flattening Exemption Audit certified zero risk of swing liquidation during 15:58 EOD sweeps.
+  - Pass 3: Execution Timing Audit certified 16:00 close vs 09:30 open lifecycle, holiday handling, and concurrency cap.
+  - Forensic Auditor Gate: 100% of all 10 identified defects genuinely remediated and verified clean.
+- **F29: Deterministic E2E Replay, Visual QA & Remote Deployment (`scripts/run_integrated_swing_dry_run.py`, `tests/e2e/test_swing_multiday_replay.py`)**:
+  - Deterministic 6-day multi-day replay dry run verified end-to-end: +$2,953.81 realized PnL, 100% of 7 quantitative rules certified, 0 event errors.
+  - Desktop (1440x900) and mobile (390x844) visual QA verified with 0px horizontal overflow and full interactive fidelity.
+  - Full backend pytest suite: 432/432 passed (100%).
+  - Full E2E test runner: 325/325 passed (100%).
+  - Local process hygiene verified: ports 3005, 8000, 8005, 8080 clean and liberated.
+
 
 
 

@@ -147,6 +147,77 @@ export interface NewsItem {
   created_at: string;
 }
 
+export interface SwingCandidate {
+  symbol: string;
+  price: number;
+  close: number;
+  sma_200: number;
+  sma_200_pass: boolean;
+  above_200_sma: boolean;
+  rs_stock_60d: number;
+  rs_qqq_60d: number;
+  rs_60d_stock: number;
+  rs_60d_qqq: number;
+  relative_strength_ok: boolean;
+  rs_pass: boolean;
+  rsi_2: number;
+  rsi_pass: boolean;
+  panic_trigger: boolean;
+  earnings_blackout: boolean;
+  earnings_date: string | null;
+  next_earnings_date: string | null;
+  daily_atr_14: number;
+  atr_14: number;
+  qualified: boolean;
+  is_held: boolean;
+  is_staged: boolean;
+  status: "QUALIFIED" | "STAGED" | "ACTIVE" | "WATCHING" | "INELIGIBLE" | "BLOCKED" | string;
+  rejection_reasons?: string[];
+}
+
+export interface SwingPosition {
+  symbol: string;
+  side: "LONG" | string;
+  shares: number;
+  entry_price: number;
+  market_price: number;
+  market_value: number;
+  unrealized_pnl: number;
+  unrealized_pnl_pct: number;
+  stop_loss: number;
+  stop_loss_price: number;
+  atr_14: number;
+  atr_stop_distance: number;
+  atr_stop_pct: number;
+  entry_date: string;
+  holding_days: number;
+  max_holding_days: number;
+  holding_progress: string;
+  sma_5: number;
+  rsi_2: number;
+  exit_triggers: {
+    sma_5_cross: boolean;
+    rsi_70_cross: boolean;
+    time_stop_day_5: boolean;
+    earnings_tomorrow: boolean;
+  };
+  staged_exit_at_open: boolean;
+}
+
+export interface SwingEngineState {
+  status: "ACTIVE" | "SCANNING" | "STANDBY" | "IDLE" | string;
+  strategy_name?: string;
+  allocated_capital: number;
+  slot_notional: number;
+  max_slots: number;
+  active_slots_used: number;
+  available_slots: number;
+  flattening_exempt: boolean;
+  candidates: SwingCandidate[];
+  positions: SwingPosition[];
+  last_scan_time: string | null;
+}
+
 export interface TradingState {
   type?: string;
   timestamp: string;
@@ -162,6 +233,8 @@ export interface TradingState {
   recent_news: NewsItem[];
   ledger_revision: number;
   persistence: PersistenceStatus;
+  swing?: SwingEngineState;
   isConnected: boolean;
   lastUpdated: Date;
 }
+

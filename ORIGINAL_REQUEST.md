@@ -450,3 +450,95 @@ Attack the system across these specific dimensions:
 - [ ] Next.js frontend build succeeds with zero TypeScript or styling errors.
 - [ ] Commit pushed to `origin main`.
 - [ ] Remote Railway deployment live and `GET /health` returns HTTP 200 OK (`status: healthy`).
+
+---
+
+## 2026-09-23T21:24:25Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+> Requested team: Full team with dedicated adversarial reviewers (as requested: "have it attacked 3xs by multiple sub agents tht are not biased for hallcuinations, lying, future bias, etc. Then deploy a team of agents to fully implement this have a team review each phase until fully done.")
+
+Integrate an autonomous, multi-day swing trading engine ("2-Day Panic Dip" Connors RSI-2 strategy) into `AutonomousDayTrader` across 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`). The swing engine shares the $50,000 account pool ($25,000 allocated per slot, maximum 2 concurrent swing positions), runs fully independently from intraday trading (strictly exempt from 15:58 ET auto-flattening), provides a unified Obsidian dark operator dashboard, undergoes 3x independent adversarial review against lookahead/future bias, and completes end-to-end replay verification and remote Railway deployment.
+
+Working directory: `/Users/mo/AutonomousDayTrader`
+Integrity mode: development
+
+## Requirements
+
+### R1. Independent Swing Trading Execution Engine (The "2-Day Panic Dip")
+Implement the 7 exact quantitative rules across the 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`):
+1. **Rule 1 (Macro Floor)**: Today's Daily Close must be strictly above the 200-day Simple Moving Average (SMA).
+2. **Rule 2 (Market Leadership / Relative Strength)**: The stock must perform equal to or better than the Nasdaq 100 (`QQQ`) over trailing 60 trading days ($\Delta_{\text{stock}, 60d} \ge \Delta_{\text{QQQ}, 60d}$).
+3. **Rule 3 (Panic Trigger)**: The stock's 2-day Connors RSI (`RSI(2)`) must close below 10.0.
+4. **Rule 4 (Mandatory Earnings Veto)**: 48-hour blackout window:
+   - If the company reports earnings within the next 48 hours, do not enter.
+   - If holding an active position and earnings report tomorrow, sell at Market Open (09:30 ET).
+5. **Rule 5 (Entry Execution & Sizing)**:
+   - When Rules 1–4 are satisfied at 16:00 ET close, stage a buy order executed at next Market Open (09:30 ET).
+   - Position sizing: $25,000 notional per trade slot from the shared $50,000 account pool, with a hard cap of maximum 2 concurrent swing positions at any time.
+6. **Rule 6 (Emergency Stop-Loss)**:
+   - Immediately establish a hard stop-loss at $2.5 \times \text{Daily ATR(14)}$ below the fill price.
+7. **Rule 7 (Take-Profit & Time Exit)**:
+   - Sell at next Market Open (09:30 ET) as soon as ANY of the following occur:
+     a) Prior daily close crosses back above its 5-day SMA.
+     b) Prior daily RSI(2) crosses above 70.0.
+     c) The position has been held for 5 trading days (time stop).
+
+### R2. Strict Architectural Separation & Flattening Exemption
+Ensure the swing engine operates independently from the intraday day-trading bot:
+- The existing 4-phase auto-flattening engine (15:45 lockout, 15:50 cancel, 15:55 liquidation, 15:58 flat audit) applies exclusively to intraday day-trading positions.
+- Swing positions, bracket stops, and orders must be explicitly tagged and exempt from EOD liquidation so multi-day overnight holds operate uninterrupted.
+- Risk management must coordinate buying power across the shared $50,000 account pool without allowing swing and intraday positions to exceed account margin or collide.
+
+### R3. Market Leadership, Calendar, and Signal Pipeline
+Build a lookahead-free indicator and calendar data pipeline:
+- Rolling daily calculations for 200 SMA, 5 SMA, 14-day ATR, 60-day relative strength vs `QQQ`, and 2-day Connors RSI using strictly causal, closed-session data.
+- Automated earnings calendar lookup with graceful cached fallback to prevent execution halts if an external API is transiently unavailable.
+
+### R4. Unified Obsidian Dark Operator Interface
+Extend the existing Next.js / Tailwind Obsidian dark design system:
+- Clear operator navigation or segmented toggle between "Intraday Day Trader" and "Swing Mean-Reversion".
+- Real-time display of swing candidate watchlist status (200 SMA check, 60d RS check, RSI(2) value, earnings blackout check, signal trigger state).
+- Active swing positions table showing entry price, current price, unrealized PnL, 2.5x ATR stop line, holding day counter (e.g. Day 2 of 5), and exit trigger conditions.
+- Operator override controls (manual position exit at next open or emergency market exit) consistent with existing UX patterns.
+
+### R5. 3x Adversarial Review & Zero-Lookahead Audit
+Subject the plan and implementation to 3 separate adversarial review passes conducted by independent reviewer subagents:
+- **Pass 1 (Mathematical & Lookahead Audit)**: Verify zero lookahead bias in RSI(2), ATR(14), 200 SMA, 60d RS vs QQQ, and earnings calendar calculations.
+- **Pass 2 (State Machine & Flattening Audit)**: Verify that the 15:58 ET intraday auto-flattening engine cannot liquidate or desynchronize swing positions under any edge case or race condition.
+- **Pass 3 (Execution Timing & Order Lifecycle Audit)**: Verify 16:00 ET qualification vs 09:30 ET execution timing, weekend/holiday boundary handling, partial fills, stop triggers, and position cap enforcement.
+
+### R6. Deterministic End-to-End Replay, Visual QA, and Remote Deployment
+- Implement a deterministic multi-day historical replay test covering qualifying signals, 09:30 ET entries, stop-loss protection, 5-SMA exits, RSI(2)>70 exits, and 5-day time exits across `LRCX`, `KLAC`, `MU`, `AMD`, and `GS`.
+- Perform visual QA of the desktop and mobile views of the updated operator dashboard.
+- Comply with all Global Agent Rules: terminate all temporary/test local background processes, push commits to `origin main`, verify live Railway cloud build and deployment, and confirm healthy remote endpoints.
+- Update project documentation (`PROJECT.md`, `MEMORY.md`, `README.md`).
+
+## Acceptance Criteria
+
+### Quantitative Rule Fidelity
+- [ ] Daily Close > 200 SMA, 60-day RS $\ge$ QQQ, and RSI(2) < 10.0 conditions trigger only upon market close (16:00 ET) using finalized daily bars.
+- [ ] Market open execution (09:30 ET) places orders for exactly $25,000 notional per slot.
+- [ ] Hard maximum of 2 concurrent swing positions is enforced at all times.
+- [ ] 48-hour earnings blackout prevents entry when earnings fall within 48 hours, and triggers sell at open if earnings are next day.
+- [ ] Hard stop-loss at $2.5 \times \text{Daily ATR(14)}$ is active immediately upon fill.
+- [ ] Exits trigger deterministically at next market open upon 5-day SMA cross, RSI(2) > 70, or 5th day holding limit.
+
+### Architecture & Isolation
+- [ ] Swing positions are strictly preserved through the 15:45–15:58 ET intraday flattening routine and held overnight.
+- [ ] Shared $50,000 account pool correctly tracks cash, buying power, and realized/unrealized PnL across both trading arms without double-spending or desync.
+
+### Adversarial & Verification Quality
+- [ ] 3x adversarial review passes completed with documented findings and all critical vulnerabilities remediated.
+- [ ] Automated replay test suite passes 100% deterministically.
+- [ ] Existing intraday test suite remains 100% passing (zero regressions).
+
+### Interface & Delivery
+- [ ] UI provides intuitive operator visibility into both arms matching the Obsidian dark glassmorphism design system.
+- [ ] No local test processes or servers left running on ports after completion.
+- [ ] Upstream repository pushed to `origin main` and remote Railway deployment verified live and healthy (`200 OK`).
+- [ ] `PROJECT.md`, `MEMORY.md`, and `README.md` fully updated.
+
