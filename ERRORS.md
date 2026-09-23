@@ -1,5 +1,37 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-09-23: Inverted Mean Reversion Policy
+
+**What did not work**: In `backend/app/core/market_filter.py`, the initial mean reversion policy blocked buying oversold dips during `BULLISH` regimes and blocked fading overbought spikes during `BEARISH` regimes, while falling through to approve selling during `BULLISH` and buying during `BEARISH`. This allowed shorting directly into morning market-wide bull rallies (catching the full brunt of systematic trend drift) and catching falling knives during market liquidations, directly causing the 2026-09-22 TSLA and AAPL stop-outs.
+
+**What worked instead**: Inverting the policy to be macro-trend aligned (`INDEX_BETA_CONTRADICTION`). In a `BULLISH` trend, buying oversold dips ($Z \le -2.0$) is permitted because systematic upward drift works with mean reversion, while shorting overbought rallies is strictly forbidden. In a `BEARISH` trend, fading relief rallies is permitted, while buying falling knives is strictly forbidden. In `NEUTRAL`, two-way reversion is permitted.
+
+**Note for next time**: In equity intraday microstructure, systematic market beta ($\beta \cdot \mu_{\text{mkt}}$) dominates idiosyncratic mean reversion on trend days. Never fade an idiosyncratic extreme against a confirmed market-wide trend regime.
+
+## 2026-09-23: Temporal Lookahead via abs() on Timestamps
+
+**What did not work**: In `MarketTrendFilter.get_current_trend`, index data freshness was evaluated with `abs((now - spy_ts).total_seconds()) > self.stale_threshold_sec`. Using `abs()` masked the sign of the time interval. When an index bar timestamp arrived from the future of `now` (`now < spy_ts`), `elapsed` was negative, but `abs(elapsed)` evaluated to a small positive number within the threshold. This allowed future index bars up to 120s ahead to be ingested as valid historical context, introducing forward data leakage and lookahead bias.
+
+**What worked instead**: Enforcing a strict signed causal time arrow: `elapsed = (now - spy_ts).total_seconds()`. If `elapsed < 0`, the filter immediately rejects the evaluation with `MarketTrend.UNKNOWN` and reason `"FUTURE_INDEX_DATA: Index timestamp is in the future"`. Only non-negative elapsed times $\le \text{stale\_threshold\_sec}$ are accepted. Defensive `None` guards were also added to prevent `AttributeError`.
+
+**Note for next time**: Never use `abs()` for time delta checks. Time has a physical causal direction; $t_{\text{event}} \le t_{\text{eval}}$ must always hold. Signed comparison is a fundamental causality invariant.
+
+## 2026-09-23: Target Override Slippage Hazard
+
+**What did not work**: In `backend/app/core/bracket.py`, when a trade signal specified explicit profit target overrides (`target_1_override`, `target_2_override`), `activate_bracket_on_fill` blindly assigned `bracket.target_1_price = round(bracket.target_1_override, 2)` without validating against the realized fill price. If adverse slippage filled a BUY order above `target_1_override`, the bracket placed a limit sell order below the entry price, becoming immediately marketable and locking in an instantaneous loss or scratching the trade.
+
+**What worked instead**: Adding directional slippage sanity validation: for BUY orders, `target_1_override > entry_price` must hold; for SELL orders, `target_1_override < entry_price` must hold. If adverse slippage violates this boundary condition, the invalid override is discarded and the target is dynamically re-anchored to `entry_price + direction * default_target_r * r_distance`.
+
+**Note for next time**: Pre-calculated prices from signal generation time are proposals. Once an order fills, every exit boundary must be validated against the realized execution price, never assumed to be geometrically sound.
+
+## 2026-09-23: Target 1 Partial Fill Orphan Vulnerability
+
+**What did not work**: In `BracketOrderManager.on_child_order_fill`, receiving ANY fill event for Target 1 unconditionally set `bracket.target_1_filled = True` without decrementing the open quantity. When a partial fill occurred (e.g., 20 of 50 shares filled), `target_1_filled` became `True`. If the price subsequently reversed and triggered the stop loss, the stop handler checked `if bracket.target_1_order_id and not bracket.target_1_filled:`, which evaluated to `False`. The remaining 30-share limit order was omitted from cancellation, remaining orphaned on the book. On market recovery, it filled unprotected, creating an unintended short position.
+
+**What worked instead**: Implementing explicit decremental remaining quantity tracking: `bracket.target_1_qty = max(0, bracket.target_1_qty - filled_qty)`, setting `target_1_filled = True` strictly when `target_1_qty == 0`, and updating stop execution cancellation logic to cancel open targets whenever `(not bracket.target_X_filled or bracket.target_X_qty > 0)`. Added `@property target_1_remaining_qty` and `target_2_remaining_qty`.
+
+**Note for next time**: Order state boolean flags (`is_filled`) must reflect complete order lifecycle termination. Any partial fill leaves working inventory that will orphan if cancellation logic checks only binary completion flags.
+
 ## 2026-09-20: A "float precision fix" that was really a behaviour change
 
 **What did not work**: Clamping strategy stop distances to `[0.0042, 0.0380]` in `orb.py`,

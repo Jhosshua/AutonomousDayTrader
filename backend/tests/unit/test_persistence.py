@@ -319,6 +319,8 @@ async def test_manual_api_round_trip_is_durably_listed(tmp_path, monkeypatch):
     main.reset_runtime_state()
     main.persistence_healthy = True
     main.latest_market_prices["AAPL"] = 100.0
+    monkeypatch.setattr(main.flattening_engine.clock, "clear_simulated_time", lambda: None)
+    main.flattening_engine.clock.set_simulated_time(datetime(2026, 9, 22, 14, 30, tzinfo=timezone.utc))
     try:
         response = await main.submit_order(
             main.OrderCreateRequest(
@@ -371,6 +373,8 @@ async def test_session_rollover_liquidates_then_summarizes_prior_session(tmp_pat
     main.reset_runtime_state()
     main.persistence_healthy = True
     main.latest_market_prices["AAPL"] = 100.0
+    monkeypatch.setattr(main.flattening_engine.clock, "clear_simulated_time", lambda: None)
+    main.flattening_engine.clock.set_simulated_time(datetime(2026, 9, 22, 14, 30, tzinfo=timezone.utc))
     prior_bar = BarEvent(
         "AAPL", 100.0, 100.5, 99.5, 100.0, 10_000,
         datetime(2026, 9, 22, 14, 30, tzinfo=timezone.utc),

@@ -123,3 +123,91 @@ Document all audit findings, fixes, and verification outcomes in `MEMORY.md` and
 - [ ] Remote health check `GET https://autonomousdaytrader-production.up.railway.app/health` returns `{"status":"ok"}` (or HTTP 200).
 - [ ] Local process hygiene verified: zero orphaned background processes or occupied ports (8005, 3005, 8080).
 
+## 2026-09-23T03:48:51Z
+
+Empirically diagnose and remediate underperformance in `AutonomousDayTrader` using live paper execution data, quantitative literature, and market microstructure analysis. Implement robust structural improvements across strategy triggers and bracket geometry, verify through independent multi-agent audit and integrated simulation, update documentation, and deploy to Railway.
+
+Working directory: /Users/mo/AutonomousDayTrader
+Integrity mode: development
+
+---
+
+## Background & Production Context
+`AutonomousDayTrader` is a live intraday paper-trading system for US equities connected downstream to AlpacaRelay, operating on a $50,000 virtual account.
+- **Starting Equity**: $50,000.00
+- **Current Production Equity**: $49,798.32 (-$201.68 realized loss)
+- **Production Win Rate**: 0.00% across 7 trades (0 wins, 7 losses/scratches).
+- **Target 1 (1.5R) Hit Rate**: 0.00% (0 of 7 trades hit Target 1).
+- **Key Failure Modes Observed**:
+  - 2026-09-21: 4 trades scratched within 3 minutes by trailing stop ratchets walking into entry noise; 1 trade clipped (TSLA long +$18.39, capturing only 23% of intended target) before reversing.
+  - 2026-09-22: 2 trades stopped out at full loss: TSLA SHORT (`news_momentum`) @ 09:31 ET (-$68.30) and AAPL SHORT (`orb`) @ 10:09 ET (-$112.04).
+  - Context Blindness: Strategies trigger on individual stock bars without checking broader index beta (SPY/QQQ trend), shorting stocks into market-wide morning bid.
+  - Unrealistic Profit Geometry: Target 1 at 1.5R and Target 2 at 2.5R are mathematically unachievable for intraday 1m/5m bars before noise stops out the trade.
+
+---
+
+## Requirements
+
+### R1. Quantitative Forensic Analysis & Research
+- Conduct deep quantitative and market-microstructure research into:
+  - Why Opening Range Breakouts (ORB) fail in mega-cap equities without market index (SPY/QQQ) trend confirmation.
+  - Optimal intraday profit target scaling (e.g., banking partial profits at 0.75R–1.0R instead of waiting for 1.5R).
+  - Preventing breakout exhaustion fills (chasing the tail of an extended candle).
+  - Hardening news sentiment scoring beyond crude regex token-matching.
+- Base all diagnoses on real trade logs and code mechanics, never synthetic replay fixtures (`MONDAY_SIMULATION_REPORT.md` is a 62-event plumbing test, not empirical edge).
+
+### R2. Strategy & Execution Architecture Remediation
+- Implement a causal market index / trend filter (e.g., SPY/QQQ VWAP or EMA directional alignment) to prevent counter-trend individual stock setups.
+- Restructure profit target and bracket management in `backend/app/core/bracket.py`:
+  - Enable realistic scaling (e.g., Target 1 at 0.8R–1.0R to de-risk trades quickly).
+  - Ensure trailing stops never walk into noise before trade reaches breakeven.
+- Refine entry conditions in `backend/app/strategies/orb.py` and `backend/app/strategies/news_momentum.py` to prevent entering at the exact climax of a bar.
+- Activate or calibrate `mean_reversion.py` so valid exhaustion setups are not starved by impossible thresholds under moderate VIX (14–16).
+
+### R3. Unbiased Adversarial Multi-Agent Review
+- At each phase (diagnosis, design, code diff), deploy independent, unbiased review sub-agents.
+- Reviewers must specifically audit for:
+  - Lookahead bias / forward data leakage (shifting, unclosed bars, global normalizers).
+  - Parameter curve-fitting (penalizing arbitrary constant tweaking without structural rationale).
+  - Floating point / boundary edge cases and risk engine invariant violations.
+
+### R4. Deterministic Verification & Integrated Dry Run
+- Run the full test suite (`pytest backend/tests`), ensuring 100% pass rate with zero regression.
+- Execute the integrated Monday dry run (`python scripts/run_integrated_monday_dry_run.py`) exercising the real production `main.py` wiring.
+- Confirm 0 lingering local server daemons or orphaned background processes on ports 8005, 3005, 8080.
+
+### R5. Documentation, Git Commit, and Remote Railway Deployment
+- Update `MEMORY.md`, `ERRORS.md`, and `PROJECT.md` documenting:
+  - The empirical root causes discovered.
+  - Structural changes made and their mathematical justification.
+  - The results of the verification and dry run.
+- Commit all changes cleanly to git and push to `origin main`.
+- Verify that the remote Railway deployment succeeds and the live production `/health` endpoint (`https://autonomousdaytrader-production.up.railway.app/health`) returns `healthy` with valid status and feeds.
+
+---
+
+## Acceptance Criteria
+
+### Diagnostics & Research
+- [ ] Root causes of the 7 failed paper trades documented with code citations and log timestamps.
+- [ ] Zero claims of edge derived from synthetic fixtures; all empirical assertions verified against live ledger data.
+
+### Code & Architecture
+- [ ] Market trend/beta filter active (preventing shorting into an uptrending SPY/QQQ).
+- [ ] Bracket profit target geometry recalibrated to achievable intraday R-multiples (Target 1 hit rate improved without compromising risk guardrails).
+- [ ] No lookahead bias, unclosed bar dependencies, or future leakage in any strategy.
+- [ ] All risk engine limits ($1,500 circuit breaker, $25,000 position cap, 0.4%–4.0% stop guardrails) strictly maintained.
+
+### Independent Review
+- [ ] Independent subagent audit completed with zero unresolved CRITICAL or MAJOR findings.
+- [ ] Mutation checks performed on key assertions to guarantee test integrity.
+
+### Testing & Verification
+- [ ] 100% of unit and integration tests passing (`backend/tests`).
+- [ ] `scripts/run_integrated_monday_dry_run.py` completes cleanly with 0 unhandled exceptions.
+- [ ] Zero orphaned processes or listening ports left running locally.
+
+### Deployment & Documentation
+- [ ] `MEMORY.md`, `ERRORS.md`, and `PROJECT.md` updated with exact session details and rationale.
+- [ ] Git commit pushed to `origin main`.
+- [ ] Remote Railway deployment live and `GET /health` returning `200 OK` (`status: healthy`).

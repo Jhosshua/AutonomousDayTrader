@@ -9,7 +9,7 @@ from backend.app.core.bracket import DynamicBracketManager, BracketStatus
 
 def test_bracket_creation_multi_tier():
     manager = DynamicBracketManager(breakeven_buffer=0.02)
-    # Entry 100.00, Stop 98.00 -> R = 2.00, Target 1 = 103.00, Target 2 = 105.00
+    # Entry 100.00, Stop 98.00 -> R = 2.00, Target 1 (0.8R) = 101.60, Target 2 (1.8R) = 103.60
     brk = manager.create_bracket(
         bracket_id="b1",
         symbol="TSLA",
@@ -19,11 +19,22 @@ def test_bracket_creation_multi_tier():
         stop_price=98.00,
         strategy_id="orb",
     )
-    assert brk.target_1_price == 103.00
-    assert brk.target_2_price == 105.00
+    assert brk.target_1_price == 101.60
+    assert brk.target_2_price == 103.60
     assert brk.target_1_qty == 50
     assert brk.target_2_qty == 50
     assert brk.status == BracketStatus.PENDING_ENTRY
+
+
+def test_bracket_price_scaled_breakeven_buffer():
+    # When no explicit buffer is passed, scales with price: max(0.04, round(entry * 0.0005, 2))
+    manager = DynamicBracketManager()
+    # $20 stock -> buffer = max(0.04, 0.01) = 0.04
+    assert manager.get_breakeven_buffer(20.0) == 0.04
+    # $100 stock -> buffer = max(0.04, 0.05) = 0.05
+    assert manager.get_breakeven_buffer(100.0) == 0.05
+    # $400 stock (TSLA) -> buffer = max(0.04, 0.20) = 0.20
+    assert manager.get_breakeven_buffer(400.0) == 0.20
 
 
 def test_bracket_target_1_fill_and_breakeven_ratchet():

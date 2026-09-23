@@ -181,7 +181,7 @@ def test_orb_bullish_breakout_and_brackets():
     bo_bar = _make_bar(
         high_p=125.40,
         low_p=124.70,
-        close_p=125.10,
+        close_p=125.25,
         vol=250000,
         ts_str="2026-09-21T09:35:00-04:00",
     )
@@ -190,7 +190,7 @@ def test_orb_bullish_breakout_and_brackets():
     sig = sigs[0]
     assert sig.side == OrderSide.BUY
     assert sig.strategy_id == "orb"
-    assert sig.entry_price == 125.10
+    assert sig.entry_price == 125.25
     assert sig.stop_loss == 124.20  # Midpoint of [124.80, 123.60]
     assert sig.take_profit_1 > sig.entry_price
     assert sig.take_profit_2 > sig.take_profit_1
@@ -522,3 +522,164 @@ def _risk_verdict(entry_price, stop_price, side="BUY"):
         active_symbols=set(),
         active_sectors=set(),
     )
+
+
+def test_orb_clv_rejection():
+    """Verify that a breakout bar with CLV < 0.65 (e.g. shooting star) is rejected."""
+    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
+    bars = [
+        _make_bar(high_p=124.50, low_p=123.60, close_p=124.20, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
+        _make_bar(high_p=124.80, low_p=123.80, close_p=124.40, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
+        _make_bar(high_p=124.60, low_p=123.90, close_p=124.30, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
+        _make_bar(high_p=124.70, low_p=124.00, close_p=124.50, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
+        _make_bar(high_p=124.60, low_p=124.10, close_p=124.40, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
+    ]
+    for b in bars:
+        strat.on_bar(b)
+
+    # Breakout candle touches 125.50 but closes at 124.85 on low of 124.70:
+    # Range = 0.80, CLV = (124.85 - 124.70) / 0.80 = 0.15 / 0.80 = 0.1875 < 0.65
+    bo_bar = _make_bar(
+        high_p=125.50,
+        low_p=124.70,
+        close_p=124.85,
+        vol=250000,
+        ts_str="2026-09-21T09:35:00-04:00",
+    )
+    sigs = strat.on_bar(bo_bar)
+    assert len(sigs) == 0, f"Expected CLV rejection, but got: {sigs}"
+
+
+def test_orb_bar_range_cap_rejection():
+    """Verify that an excessively wide breakout bar (> 2.2 * ATR) is rejected."""
+    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
+    # Range high 124.80, low 124.20. Normal candle range is ~0.30 -> ATR ~ 0.35
+    bars = [
+        _make_bar(high_p=124.50, low_p=124.20, close_p=124.30, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
+        _make_bar(high_p=124.80, low_p=124.30, close_p=124.40, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
+        _make_bar(high_p=124.60, low_p=124.30, close_p=124.50, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
+        _make_bar(high_p=124.70, low_p=124.30, close_p=124.50, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
+        _make_bar(high_p=124.60, low_p=124.20, close_p=124.40, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
+    ]
+    for b in bars:
+        strat.on_bar(b)
+
+    # Bar with huge range = 126.50 - 124.50 = 2.00 (>> 2.2 * 0.35 = 0.77)
+    bo_bar = _make_bar(
+        high_p=126.50,
+        low_p=124.50,
+        close_p=126.40,
+        vol=250000,
+        ts_str="2026-09-21T09:35:00-04:00",
+    )
+    sigs = strat.on_bar(bo_bar)
+    assert len(sigs) == 0, f"Expected Bar Range Cap rejection, but got: {sigs}"
+
+
+def test_orb_extension_cap_rejection():
+    """Verify that a breakout closing > 1.0 * ATR beyond the breakout level is rejected as overextended."""
+    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
+    bars = [
+        _make_bar(high_p=124.50, low_p=123.80, close_p=124.20, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
+        _make_bar(high_p=124.80, low_p=124.00, close_p=124.40, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
+        _make_bar(high_p=124.60, low_p=124.00, close_p=124.30, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
+        _make_bar(high_p=124.70, low_p=124.10, close_p=124.50, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
+        _make_bar(high_p=124.60, low_p=124.10, close_p=124.40, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
+    ]
+    for b in bars:
+        strat.on_bar(b)
+
+    # Range high is 124.80. Bar closes at 125.80 (> range_high + 1.0 * ATR)
+    bo_bar = _make_bar(
+        high_p=125.85,
+        low_p=124.60,
+        close_p=125.80,
+        vol=250000,
+        ts_str="2026-09-21T09:35:00-04:00",
+    )
+    sigs = strat.on_bar(bo_bar)
+    assert len(sigs) == 0, f"Expected Extension Cap rejection, but got: {sigs}"
+
+
+def test_news_word_boundary_substring_protection():
+    """Verify that substring matches like 'miss' in 'emission' or 'transmission' are ignored."""
+    neutral_headline = "Automaker Issues Report on Carbon Emission Standards"
+    assert score_news_sentiment(neutral_headline) == 0.0
+
+    bear_headline = "Automaker Misses Quarterly Delivery Targets by 15%"
+    assert score_news_sentiment(bear_headline) <= -0.40
+
+
+def test_news_candle_direction_confirmation():
+    """Verify that a bullish news catalyst is rejected if the surge bar closes red (bearish candle)."""
+    strat = NewsMomentumStrategy(sentiment_threshold=0.60, volume_surge_multiplier=3.0)
+    for i in range(20):
+        strat.on_bar(_make_bar(symbol="NVDA", vol=10000, ts_str=f"2026-09-21T10:{i:02d}:00-04:00"))
+
+    news_bull = NewsEvent(
+        article_id=10,
+        headline="NVIDIA Surges on Massive Blackwell Hyper-Scaler Cloud Partnership",
+        summary="...",
+        symbols=["NVDA"],
+        source="Benzinga",
+        created_at=datetime.fromisoformat("2026-09-21T10:20:00-04:00"),
+        sentiment_score=0.85,
+    )
+    strat.on_news(news_bull)
+
+    # Surge bar has huge volume, but open=126.0 and close=125.2 (RED candle, close < open)
+    red_surge_bar = _make_bar(
+        symbol="NVDA",
+        open_p=126.0,
+        high_p=126.5,
+        low_p=125.0,
+        close_p=125.2,
+        vol=50000,
+        ts_str="2026-09-21T10:21:00-04:00",
+    )
+    sigs = strat.on_bar(red_surge_bar)
+    assert len(sigs) == 0, "Bullish news momentum must NOT trigger on a red candle"
+
+
+def test_news_0931_volume_baseline_floor():
+    """Verify that during the opening minute when < 5 historical bars exist, 500k volume floor is enforced."""
+    strat = NewsMomentumStrategy(sentiment_threshold=0.60, volume_surge_multiplier=3.0)
+    # Only 1 prior bar with small volume 10,000
+    strat.on_bar(_make_bar(symbol="XYZ", vol=10000, ts_str="2026-09-21T09:30:00-04:00"))
+
+    news_bull = NewsEvent(
+        article_id=11,
+        headline="XYZ Upgraded to Outperform by Top Wall Street Analyst",
+        summary="...",
+        symbols=["XYZ"],
+        source="Benzinga",
+        created_at=datetime.fromisoformat("2026-09-21T09:31:00-04:00"),
+        sentiment_score=0.80,
+    )
+    strat.on_news(news_bull)
+
+    # Bar at 09:31 with volume 40,000. Against 10,000 this is 4x, but against 500k floor it is 0.08x.
+    surge_bar = _make_bar(
+        symbol="XYZ",
+        open_p=10.0,
+        high_p=10.5,
+        low_p=9.9,
+        close_p=10.4,
+        vol=40000,
+        ts_str="2026-09-21T09:31:00-04:00",
+    )
+    sigs = strat.on_bar(surge_bar)
+    assert len(sigs) == 0, "Opening minute volume must be compared against 500k floor when < 5 bars"
+
+
+def test_mean_reversion_moderate_vix_calibration():
+    """Verify MeanReversionStrategy default configuration is calibrated for moderate VIX (14-16)."""
+    strat = MeanReversionStrategy()
+    assert strat.z_threshold == 2.00
+    assert strat.rsi_overbought == 70.0
+    assert strat.rsi_oversold == 30.0
+    assert strat.volume_climax_multiplier == 1.75
+    assert strat.min_wick_ratio == 0.35
+    assert strat.atr_stop_multiplier == 0.15
+    assert strat.min_rr_ratio == 1.00
+

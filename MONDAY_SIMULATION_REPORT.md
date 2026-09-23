@@ -7,22 +7,22 @@ This report is a deterministic replay through the production ingestion, executio
   "status": "PASS",
   "simulation_only": true,
   "fixture": "tests/e2e/fixtures/monday_open_session.json",
-  "events_processed": 62,
+  "events_processed": 184,
   "event_bus_errors": 0,
-  "duration_seconds": 1.095,
+  "duration_seconds": 2.522,
   "account": {
-    "equity": 49961.26,
-    "cash": 49961.26,
-    "realized_pnl": -38.74,
+    "equity": 50308.55,
+    "cash": 50308.55,
+    "realized_pnl": 308.56,
     "unrealized_pnl": 0.0,
-    "fees_paid": 1.42,
+    "fees_paid": 1.12,
     "open_positions": 0,
     "working_orders": 0,
     "status": "ACTIVE"
   },
   "orders": {
-    "created": 17,
-    "filled": 9,
+    "created": 13,
+    "filled": 8,
     "rejected": 0,
     "details": [
       {
@@ -41,7 +41,7 @@ This report is a deterministic replay through the production ingestion, executio
         "qty": 50,
         "strategy_id": "orb",
         "estimated_price": null,
-        "stop_price": 125.0208,
+        "stop_price": 125.0608,
         "status": "CANCELLED",
         "reject_reason": null
       },
@@ -128,11 +128,11 @@ This report is a deterministic replay through the production ingestion, executio
       {
         "symbol": "AAPL",
         "side": "SELL",
-        "qty": 83,
+        "qty": 42,
         "strategy_id": "vwap_pullback",
         "estimated_price": null,
-        "stop_price": 149.8,
-        "status": "FILLED",
+        "stop_price": 150.341,
+        "status": "CANCELLED",
         "reject_reason": null
       },
       {
@@ -142,7 +142,7 @@ This report is a deterministic replay through the production ingestion, executio
         "strategy_id": "vwap_pullback",
         "estimated_price": null,
         "stop_price": null,
-        "status": "CANCELLED",
+        "status": "FILLED",
         "reject_reason": null
       },
       {
@@ -152,47 +152,7 @@ This report is a deterministic replay through the production ingestion, executio
         "strategy_id": "vwap_pullback",
         "estimated_price": null,
         "stop_price": null,
-        "status": "CANCELLED",
-        "reject_reason": null
-      },
-      {
-        "symbol": "AAPL",
-        "side": "BUY",
-        "qty": 72,
-        "strategy_id": "orb",
-        "estimated_price": 153.6,
-        "stop_price": 148.77,
         "status": "FILLED",
-        "reject_reason": null
-      },
-      {
-        "symbol": "AAPL",
-        "side": "SELL",
-        "qty": 72,
-        "strategy_id": "orb",
-        "estimated_price": null,
-        "stop_price": 151.7,
-        "status": "FILLED",
-        "reject_reason": null
-      },
-      {
-        "symbol": "AAPL",
-        "side": "SELL",
-        "qty": 36,
-        "strategy_id": "orb",
-        "estimated_price": null,
-        "stop_price": null,
-        "status": "CANCELLED",
-        "reject_reason": null
-      },
-      {
-        "symbol": "AAPL",
-        "side": "SELL",
-        "qty": 36,
-        "strategy_id": "orb",
-        "estimated_price": null,
-        "stop_price": null,
-        "status": "CANCELLED",
         "reject_reason": null
       }
     ]
@@ -208,17 +168,17 @@ This report is a deterministic replay through the production ingestion, executio
       "id": "orb",
       "name": "Opening Range Breakout",
       "status": "ACTIVE",
-      "daily_pnl": 14.21,
-      "win_rate": 0.5,
-      "trades_count": 2,
-      "sharpe": 0.05
+      "daily_pnl": 92.04,
+      "win_rate": 1.0,
+      "trades_count": 1,
+      "sharpe": 0.0
     },
     {
       "id": "vwap_pullback",
       "name": "VWAP Trend Pullback & Continuation",
       "status": "ACTIVE",
-      "daily_pnl": -42.51,
-      "win_rate": 0.0,
+      "daily_pnl": 226.96,
+      "win_rate": 1.0,
       "trades_count": 1,
       "sharpe": 0.0
     },
@@ -242,9 +202,9 @@ This report is a deterministic replay through the production ingestion, executio
     }
   ],
   "ui": {
-    "state_updates": 66,
+    "state_updates": 215,
     "last_has_all_positions": true,
-    "last_equity": 49961.26,
+    "last_equity": 50308.55,
     "last_positions_count": 0
   }
 }

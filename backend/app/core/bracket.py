@@ -55,6 +55,14 @@ class BracketOrder(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    @property
+    def target_1_remaining_qty(self) -> int:
+        return self.target_1_qty
+
+    @property
+    def target_2_remaining_qty(self) -> int:
+        return self.target_2_qty
+
 
 class BracketUpdateDirective(BaseModel):
     action: str  # "SUBMIT_ORDERS", "CANCEL_ORDER", "MODIFY_ORDER", "NO_ACTION"
@@ -71,11 +79,27 @@ class DynamicBracketManager:
     and OCO order size synchronization.
     """
 
-    def __init__(self, breakeven_buffer: float = 0.02) -> None:
-        self.breakeven_buffer: float = breakeven_buffer
+    def __init__(
+        self,
+        breakeven_buffer: Optional[float] = None,
+        default_target_1_r: float = 0.80,
+        default_target_2_r: float = 1.80,
+    ) -> None:
+        self.breakeven_buffer: Optional[float] = breakeven_buffer
+        self.default_target_1_r: float = default_target_1_r
+        self.default_target_2_r: float = default_target_2_r
         self.brackets: Dict[str, BracketOrder] = {}
         self.symbol_to_bracket: Dict[str, str] = {}
         self.order_to_bracket: Dict[str, Tuple[str, BracketChildType]] = {}
+
+    def get_breakeven_buffer(self, entry_price: float) -> float:
+        """Calculate price-scaled breakeven buffer: max(0.04, round(entry_price * 0.0005, 2)).
+        If an explicit custom buffer was configured, respect it.
+        """
+        scaled = max(0.04, round(entry_price * 0.0005, 2))
+        if self.breakeven_buffer is not None:
+            return self.breakeven_buffer
+        return scaled
 
     def create_bracket(
         self,
@@ -94,8 +118,8 @@ class DynamicBracketManager:
     ) -> BracketOrder:
         """
         Create and compute price levels for a dynamic multi-tier bracket.
-        Target 1: 1.5R (50% scale-out, rounded down)
-        Target 2: 2.5R (remaining 50%)
+        Target 1: 0.80R (50% scale-out, rounded down)
+        Target 2: 1.80R (remaining 50% or trailing ATR)
         """
         side_norm = side.upper()
         if side_norm not in ("LONG", "SHORT"):
@@ -112,8 +136,8 @@ class DynamicBracketManager:
         r_dist = abs(entry_price - stop_price)
         s = 1.0 if side_norm == "LONG" else -1.0
 
-        t1_price = round(target_1_override, 2) if target_1_override is not None else round(entry_price + (s * 1.5 * r_dist), 2)
-        t2_price = round(target_2_override, 2) if target_2_override is not None else round(entry_price + (s * 2.5 * r_dist), 2)
+        t1_price = round(target_1_override, 2) if target_1_override is not None else round(entry_price + (s * self.default_target_1_r * r_dist), 2)
+        t2_price = round(target_2_override, 2) if target_2_override is not None else round(entry_price + (s * self.default_target_2_r * r_dist), 2)
 
         q1 = max(1, total_qty // 2) if total_qty > 1 else 1
         q2 = total_qty - q1 if total_qty > 1 else 0
@@ -187,16 +211,39 @@ class DynamicBracketManager:
         bracket.r_distance = round(abs(fill_price - bracket.initial_stop_price), 4)
         bracket.entry_price = round(fill_price, 4)
         direction = 1.0 if bracket.side == "LONG" else -1.0
-        bracket.target_1_price = (
-            round(bracket.target_1_override, 2)
-            if bracket.target_1_override is not None
-            else round(bracket.entry_price + direction * 1.5 * bracket.r_distance, 2)
-        )
-        bracket.target_2_price = (
-            round(bracket.target_2_override, 2)
-            if bracket.target_2_override is not None
-            else round(bracket.entry_price + direction * 2.5 * bracket.r_distance, 2)
-        )
+        is_buy = bracket.side == "LONG"
+
+        # Sanity check Target 1 override against realized fill price:
+        # For BUY: target_1 must be strictly > fill_price
+        # For SHORT: target_1 must be strictly < fill_price
+        t1_override_valid = False
+        if bracket.target_1_override is not None:
+            if is_buy and bracket.target_1_override > bracket.entry_price:
+                t1_override_valid = True
+            elif not is_buy and bracket.target_1_override < bracket.entry_price:
+                t1_override_valid = True
+
+        if t1_override_valid:
+            bracket.target_1_price = round(bracket.target_1_override, 2)
+        else:
+            bracket.target_1_price = round(
+                bracket.entry_price + direction * self.default_target_1_r * bracket.r_distance, 2
+            )
+
+        # Sanity check Target 2 override: must be strictly beyond Target 1 in the profit direction
+        t2_override_valid = False
+        if bracket.target_2_override is not None:
+            if is_buy and bracket.target_2_override > bracket.target_1_price:
+                t2_override_valid = True
+            elif not is_buy and bracket.target_2_override < bracket.target_1_price:
+                t2_override_valid = True
+
+        if t2_override_valid:
+            bracket.target_2_price = round(bracket.target_2_override, 2)
+        else:
+            bracket.target_2_price = round(
+                bracket.entry_price + direction * self.default_target_2_r * bracket.r_distance, 2
+            )
         bracket.status = BracketStatus.ACTIVE
         bracket.peak_price_since_entry = fill_price
         bracket.updated_at = timestamp
@@ -272,8 +319,8 @@ class DynamicBracketManager:
                 # reconciliation, so their total must not exceed it.
                 orders_to_modify: List[Dict[str, Any]] = []
                 orders_to_cancel: List[str] = []
-                t1_open = bracket.target_1_qty if (bracket.target_1_order_id and not bracket.target_1_filled) else 0
-                t2_open = bracket.target_2_qty if (bracket.target_2_order_id and not bracket.target_2_filled) else 0
+                t1_open = bracket.target_1_qty if (bracket.target_1_order_id and (not bracket.target_1_filled or bracket.target_1_qty > 0)) else 0
+                t2_open = bracket.target_2_qty if (bracket.target_2_order_id and (not bracket.target_2_filled or bracket.target_2_qty > 0)) else 0
                 open_target_qty = t1_open + t2_open
                 if open_target_qty > bracket.remaining_qty:
                     t1_new = int(t1_open * bracket.remaining_qty / open_target_qty)
@@ -298,9 +345,9 @@ class DynamicBracketManager:
                 )
             bracket.status = BracketStatus.COMPLETED_STOP
             orders_to_cancel = []
-            if bracket.target_1_order_id and not bracket.target_1_filled:
+            if bracket.target_1_order_id and (not bracket.target_1_filled or bracket.target_1_qty > 0):
                 orders_to_cancel.append(bracket.target_1_order_id)
-            if bracket.target_2_order_id and not bracket.target_2_filled:
+            if bracket.target_2_order_id and (not bracket.target_2_filled or bracket.target_2_qty > 0):
                 orders_to_cancel.append(bracket.target_2_order_id)
 
             self.symbol_to_bracket.pop(bracket.symbol, None)
@@ -315,25 +362,31 @@ class DynamicBracketManager:
 
         # 2. Target 1 Filled
         elif child_type == BracketChildType.TAKE_PROFIT_1:
-            bracket.target_1_filled = True
-            bracket.remaining_qty -= filled_qty
+            bracket.remaining_qty = max(0, bracket.remaining_qty - filled_qty)
+            bracket.target_1_qty = max(0, bracket.target_1_qty - filled_qty)
+            bracket.target_1_filled = (bracket.target_1_qty == 0)
 
             if bracket.remaining_qty <= 0:
+                bracket.target_1_filled = True
                 bracket.status = BracketStatus.COMPLETED_PROFIT
                 self.symbol_to_bracket.pop(bracket.symbol, None)
                 for oid in (bracket.stop_order_id, bracket.target_1_order_id, bracket.target_2_order_id):
                     if oid:
                         self.order_to_bracket.pop(oid, None)
+                orders_to_cancel = [bracket.stop_order_id] if bracket.stop_order_id else []
+                if bracket.target_2_order_id and (not bracket.target_2_filled or bracket.target_2_qty > 0):
+                    orders_to_cancel.append(bracket.target_2_order_id)
                 return BracketUpdateDirective(
                     action="CANCEL_ORDER",
-                    orders_to_cancel=[bracket.stop_order_id] if bracket.stop_order_id else [],
+                    orders_to_cancel=orders_to_cancel,
                     bracket_status=BracketStatus.COMPLETED_PROFIT,
                 )
 
             bracket.status = BracketStatus.TARGET_1_HIT
             # Ratchet stop to breakeven + buffer
             s = 1.0 if bracket.side == "LONG" else -1.0
-            new_stop = round(bracket.entry_price + (s * self.breakeven_buffer), 4)
+            buffer = self.get_breakeven_buffer(bracket.entry_price)
+            new_stop = round(bracket.entry_price + (s * buffer), 4)
 
             # Invariant: breakeven stop must be strictly better than initial stop
             if bracket.side == "LONG":
@@ -355,6 +408,10 @@ class DynamicBracketManager:
         # 3. Target 2 Filled
         elif child_type == BracketChildType.TAKE_PROFIT_2:
             bracket.remaining_qty = max(0, bracket.remaining_qty - filled_qty)
+            bracket.target_2_qty = max(0, bracket.target_2_qty - filled_qty)
+            if bracket.target_2_qty == 0:
+                bracket.target_2_filled = True
+
             if bracket.remaining_qty <= 0:
                 bracket.target_2_filled = True
                 bracket.status = BracketStatus.COMPLETED_PROFIT
@@ -363,13 +420,16 @@ class DynamicBracketManager:
                     if oid:
                         self.order_to_bracket.pop(oid, None)
 
+                orders_to_cancel = [bracket.stop_order_id] if bracket.stop_order_id else []
+                if bracket.target_1_order_id and (not bracket.target_1_filled or bracket.target_1_qty > 0):
+                    orders_to_cancel.append(bracket.target_1_order_id)
+
                 return BracketUpdateDirective(
                     action="CANCEL_ORDER",
-                    orders_to_cancel=[bracket.stop_order_id] if bracket.stop_order_id else [],
+                    orders_to_cancel=orders_to_cancel,
                     bracket_status=BracketStatus.COMPLETED_PROFIT,
                 )
             else:
-                bracket.target_2_qty = max(0, bracket.target_2_qty - filled_qty)
                 return BracketUpdateDirective(
                     action="MODIFY_ORDER",
                     orders_to_modify=[{

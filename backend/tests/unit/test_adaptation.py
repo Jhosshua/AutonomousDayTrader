@@ -133,3 +133,62 @@ def test_market_context_telemetry():
     assert ctx["market_status"] == "OPEN"
     assert ctx["sizing_multiplier"] == 1.00
     assert ctx["stop_multiplier"] == 1.00
+
+
+def test_adaptation_market_filter_rejection():
+    from zoneinfo import ZoneInfo
+    from backend.app.core.market_filter import MarketTrendFilter
+    from backend.app.models.events import BarEvent
+
+    et_tz = ZoneInfo("America/New_York")
+    mf = MarketTrendFilter()
+    # Feed SPY and QQQ bullish bars in RTH (09:30 - 09:35 ET)
+    for m in range(30, 36):
+        dt = datetime(2026, 9, 22, 9, m, 0, tzinfo=et_tz)
+        mf.on_bar(BarEvent("SPY", 500.0, 502.0, 499.5, 501.5, 20000, dt))
+        mf.on_bar(BarEvent("QQQ", 450.0, 452.0, 449.5, 451.5, 20000, dt))
+
+    engine = DynamicAdaptationEngine(market_filter=mf)
+    engine.current_time_phase = "TREND_CONTINUATION"
+
+    # Counter-trend SHORT signal for ORB
+    sig_orb_short = SignalEvent(
+        symbol="AAPL",
+        side=OrderSide.SELL,
+        order_type=OrderType.MARKET,
+        entry_price=150.0,
+        stop_loss=152.0,
+        take_profit_1=148.0,
+        take_profit_2=146.0,
+        strategy_id="orb",
+        confidence=0.8,
+        reason="ORB breakdown",
+        timestamp=datetime(2026, 9, 22, 9, 36, 0, tzinfo=et_tz),
+    )
+    approved, reason, qty = engine.evaluate_signal_admission(
+        sig_orb_short, equity=50000.0, current_positions_count=0, is_symbol_active=False
+    )
+    assert approved is False
+    assert "ADAPTATION_MARKET_FILTER_DENIED" in reason
+    assert "INDEX_BETA_CONTRADICTION" in reason
+    assert qty == 0
+
+    # Trend-aligned BUY signal for ORB
+    sig_orb_long = SignalEvent(
+        symbol="AAPL",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        entry_price=150.0,
+        stop_loss=148.0,
+        take_profit_1=152.0,
+        take_profit_2=154.0,
+        strategy_id="orb",
+        confidence=0.8,
+        reason="ORB breakout",
+        timestamp=datetime(2026, 9, 22, 9, 36, 0, tzinfo=et_tz),
+    )
+    approved, reason, qty = engine.evaluate_signal_admission(
+        sig_orb_long, equity=50000.0, current_positions_count=0, is_symbol_active=False
+    )
+    assert approved is True
+    assert qty > 0

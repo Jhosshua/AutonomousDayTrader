@@ -49,14 +49,16 @@ def score_news_sentiment(headline: str) -> float:
     negation_patterns = [r"\bnot\s+", r"\bnever\s+", r"\bfails\s+to\s+", r"\bunable\s+to\s+"]
 
     for w in bullish_tokens:
-        if w in text:
+        token_pat = r"\b" + re.escape(w) + r"\b"
+        if re.search(token_pat, text):
             # Check if immediately preceded by negation
-            is_negated = any(re.search(neg + re.escape(w), text) for neg in negation_patterns)
+            is_negated = any(re.search(neg + re.escape(w) + r"\b", text) for neg in negation_patterns)
             score += -1.0 if is_negated else 1.0
 
     for w in bearish_tokens:
-        if w in text:
-            is_negated = any(re.search(neg + re.escape(w), text) for neg in negation_patterns)
+        token_pat = r"\b" + re.escape(w) + r"\b"
+        if re.search(token_pat, text):
+            is_negated = any(re.search(neg + re.escape(w) + r"\b", text) for neg in negation_patterns)
             score += 1.0 if is_negated else -1.0
 
     if score == 0.0:
@@ -85,11 +87,15 @@ class NewsMomentumStrategy(Strategy):
         sentiment_threshold: float = 0.60,
         volume_surge_multiplier: float = 3.50,
         catalyst_ttl_seconds: int = 180,
+        target_1_r: float = 0.80,
+        target_2_r: float = 1.80,
     ):
         super().__init__(strategy_id=strategy_id, name=name)
         self.sentiment_threshold: float = sentiment_threshold
         self.volume_surge_multiplier: float = volume_surge_multiplier
         self.catalyst_ttl_seconds: int = catalyst_ttl_seconds
+        self.target_1_r: float = target_1_r
+        self.target_2_r: float = target_2_r
 
         # Symbol state: symbol -> pending catalysts
         self.pending_catalysts: Dict[str, List[PendingCatalyst]] = {}
@@ -220,7 +226,10 @@ class NewsMomentumStrategy(Strategy):
         # the rule is meant to detect.
         recent_volumes = [float(b.volume) for b in self.recent_bars[sym][:-1][-20:]]
         sma20_vol = calculate_sma(recent_volumes, 20)
-        if sma20_vol <= 0:
+        # Fix 09:31 volume baseline: if < 5 bars, use 500k volume floor or open flush lockout
+        if len(recent_volumes) < 5:
+            sma20_vol = max(500000.0, sma20_vol)
+        elif sma20_vol <= 0:
             sma20_vol = 100000.0
 
         vol_ratio = bar.volume / sma20_vol
@@ -229,6 +238,17 @@ class NewsMomentumStrategy(Strategy):
 
         # Latest catalyst triggered
         cat = valid_catalysts[-1]
+
+        # Enforce candle direction confirmation (close > open for BUY, close < open for SELL)
+        if cat.sentiment >= self.sentiment_threshold:
+            if bar.close <= bar.open:
+                return []
+        elif cat.sentiment <= -self.sentiment_threshold:
+            if bar.close >= bar.open:
+                return []
+        else:
+            return []
+
         cat.processed = True
 
         entry_price = bar.close
@@ -239,24 +259,25 @@ class NewsMomentumStrategy(Strategy):
             # 0.4% floor. A wide stop is left for the risk engine to reject.
             raw_dist = max(0.10, entry_price - round(bar.low - 0.02, 4))
             stop_loss, risk = resolve_stop(entry_price, raw_dist, True)
-            tp1 = round(entry_price + 1.5 * risk, 4)
-            tp2 = round(entry_price + 2.5 * risk, 4)
+            tp1 = round(entry_price + self.target_1_r * risk, 4)
+            tp2 = round(entry_price + self.target_2_r * risk, 4)
 
-            signals.append(
-                SignalEvent(
-                    symbol=sym,
-                    side=OrderSide.BUY,
-                    order_type=OrderType.MARKET,
-                    entry_price=entry_price,
-                    stop_loss=stop_loss,
-                    take_profit_1=tp1,
-                    take_profit_2=tp2,
-                    strategy_id=self.strategy_id,
-                    confidence=min(1.0, 0.70 + 0.10 * vol_ratio),
-                    reason=f"NEWS_MOMENTUM_LONG: Sentiment {cat.sentiment:.2f}, Volume Surge {vol_ratio:.2f}x > {self.volume_surge_multiplier}x. Headline: '{cat.headline[:60]}...'",
-                    timestamp=bar.timestamp,
-                )
+            sig = SignalEvent(
+                symbol=sym,
+                side=OrderSide.BUY,
+                order_type=OrderType.MARKET,
+                entry_price=entry_price,
+                stop_loss=stop_loss,
+                take_profit_1=tp1,
+                take_profit_2=tp2,
+                strategy_id=self.strategy_id,
+                confidence=min(1.0, 0.70 + 0.10 * vol_ratio),
+                reason=f"NEWS_MOMENTUM_LONG: Sentiment {cat.sentiment:.2f}, Volume Surge {vol_ratio:.2f}x > {self.volume_surge_multiplier}x. Headline: '{cat.headline[:60]}...'",
+                timestamp=bar.timestamp,
             )
+            sig.catalyst_sentiment = cat.sentiment
+            sig.volume_surge = vol_ratio
+            signals.append(sig)
             self.monitored_positions[sym] = "LONG"
 
         elif cat.sentiment <= -self.sentiment_threshold:
@@ -264,24 +285,25 @@ class NewsMomentumStrategy(Strategy):
             # 0.4% floor. A wide stop is left for the risk engine to reject.
             raw_dist = max(0.10, round(bar.high + 0.02, 4) - entry_price)
             stop_loss, risk = resolve_stop(entry_price, raw_dist, False)
-            tp1 = round(entry_price - 1.5 * risk, 4)
-            tp2 = round(entry_price - 2.5 * risk, 4)
+            tp1 = round(entry_price - self.target_1_r * risk, 4)
+            tp2 = round(entry_price - self.target_2_r * risk, 4)
 
-            signals.append(
-                SignalEvent(
-                    symbol=sym,
-                    side=OrderSide.SELL,
-                    order_type=OrderType.MARKET,
-                    entry_price=entry_price,
-                    stop_loss=stop_loss,
-                    take_profit_1=tp1,
-                    take_profit_2=tp2,
-                    strategy_id=self.strategy_id,
-                    confidence=min(1.0, 0.70 + 0.10 * vol_ratio),
-                    reason=f"NEWS_MOMENTUM_SHORT: Sentiment {cat.sentiment:.2f}, Volume Surge {vol_ratio:.2f}x > {self.volume_surge_multiplier}x. Headline: '{cat.headline[:60]}...'",
-                    timestamp=bar.timestamp,
-                )
+            sig = SignalEvent(
+                symbol=sym,
+                side=OrderSide.SELL,
+                order_type=OrderType.MARKET,
+                entry_price=entry_price,
+                stop_loss=stop_loss,
+                take_profit_1=tp1,
+                take_profit_2=tp2,
+                strategy_id=self.strategy_id,
+                confidence=min(1.0, 0.70 + 0.10 * vol_ratio),
+                reason=f"NEWS_MOMENTUM_SHORT: Sentiment {cat.sentiment:.2f}, Volume Surge {vol_ratio:.2f}x > {self.volume_surge_multiplier}x. Headline: '{cat.headline[:60]}...'",
+                timestamp=bar.timestamp,
             )
+            sig.catalyst_sentiment = cat.sentiment
+            sig.volume_surge = vol_ratio
+            signals.append(sig)
             self.monitored_positions[sym] = "SHORT"
 
         return signals

@@ -2,6 +2,27 @@
 
 ## Decisions
 
+### 2026-09-23: Empirical Diagnosis & Architecture Remediation (Market Trend Filter, Recalibrated Brackets, Causal Guards)
+- **Root Cause Analysis of 0% Win Rate (-$201.68 PnL across 7 trades)**:
+  1. *Context Blindness (89.4% of losses)*: Strategies triggered on single-stock 1m/5m bars without conditioning on broad market index beta (SPY/QQQ). Specifically, shorting TSLA (-$68.30) and AAPL (-$112.04) on 2026-09-22 occurred directly into systematic, market-wide morning bull bids where systematic drift overwhelmed idiosyncratic momentum.
+  2. *Unrealistic Profit Geometry*: Initial Target 1 at 1.5R and Target 2 at 2.5R proved mathematically unachievable in noisy intraday 1m/5m regimes before trailing stops or noise walked into trades, resulting in 0 of 7 trades ever reaching Target 1.
+  3. *Target Override Slippage Erasure*: In `main.py` and `bracket.py`, adverse fill prices could land past static target overrides, generating inverted or marketable limit orders on entry.
+- **Architectural Solutions Implemented**:
+  1. *MarketTrendFilter (`backend/app/core/market_filter.py`)*: Anchored intraday VWAP ($PV / V$) and EMA 9/21 regime classification across SPY and QQQ. Evaluates consensus market regimes (`BULLISH`, `BEARISH`, `NEUTRAL`, `UNKNOWN`).
+  2. *Macro-Aligned Mean Reversion Policy*: Inverted the naive contrarian filter. Dip-buying oversold dips ($Z \le -2.0$) is permitted during `BULLISH` regimes (aligning systematic trend with mean reversion), while shorting overbought rallies is strictly denied (`INDEX_BETA_CONTRADICTION`). Conversely, fading relief bounces is permitted in `BEARISH`, while catching falling knives is denied. Both sides allowed in `NEUTRAL`.
+  3. *Signed Causal Staleness Guard*: Strict physical time arrow enforcement replacing `abs((now - ts).total_seconds())`. Any negative elapsed time ($elapsed < 0$) immediately flags `FUTURE_INDEX_DATA` and returns `MarketTrend.UNKNOWN`, strictly eliminating lookahead bias and future timestamp leakage.
+  4. *Recalibrated Dynamic Bracket Geometry*: Calibrated achievable intraday profit scaling: Target 1 at 0.80R (banking partial profits to de-risk trades quickly) and Target 2 at 1.80R (runner). Trailing stop remains strictly locked to `TARGET_1_HIT`.
+  5. *Slippage Boundary Sanity Checks*: In `activate_bracket_on_fill`, target overrides are dynamically validated against the actual realized fill price. If adverse slippage violates the profit direction ($TP_1 \le fill$ for BUY or $TP_1 \ge fill$ for SELL), the bracket dynamically re-anchors to $fill\_price \pm 0.80 \times R_{realized}$.
+  6. *Target 1 Decremental Partial Fill Tracking*: Decrements `target_1_qty` on partial fills and only marks `target_1_filled = True` when `target_1_qty == 0`. Stop-loss execution cancels all open target orders with remaining quantity ($qty > 0$), preventing orphaned limit orders from filling unprotected.
+  7. *ORB Microstructure Hardening*: Added Close Location Value (CLV $\ge 0.65$ for long, $\le 0.35$ for short with $10^{-5}$ IEEE 754 precision tolerance), Bar Range Cap ($High - Low \le 2.2 \times ATR$), and Breakout Extension Cap ($Close - RangeHigh \le 1.0 \times ATR$).
+  8. *News Momentum Regex Isolation*: Replaced crude substring matching with strict word-boundary regex patterns (`\b(?:beat|surpassed|exceeded)\b`) to prevent false positive catalyst triggers.
+- **Multi-Agent Verification & Certification**:
+  - Full panel review (Reviewers R2-1 & R2-2, Challengers R2-1 & R2-2, Auditor R2-1) passed 5/5 with **CLEAN** forensic integrity verdict.
+  - 225/225 backend unit tests passed (100%).
+  - 320/320 E2E tests passed (100%).
+  - Integrated Monday dry run (`scripts/run_integrated_monday_dry_run.py`) completed with status `PASS`, 0 event bus errors, 184 events processed, 0 open positions, 0 working orders, and +$308.56 realized PnL.
+
+
 ### 2026-09-21 (live session): the trailing stop was strangling its own trades. Two defects, fixed on a branch, NOT deployed mid-session
 - **Observed live.** First trade of the session: NVDA ORB long, 55 shares @ $223.9502, structural stop $222.7303 (0.545% of entry), T1 $225.78, T2 $227.00. Within three minutes the stop had walked to $223.4549 (0.221%) then $223.6655 (0.127%). Stopped out 09:43:57 at $223.7864 for **-$9.37**, five minutes 57 seconds after entry, T1 never reachable.
 - **Defect 1: "ATR" was one bar's range.** `main.py` passed `max(0.01, bar.high - bar.low)` as `current_atr`. On a quiet minute that is a couple of cents, so the trail distance collapsed with it. Now `_atr_estimate()` averages true range (`max(h-l, |h-prev_close|, |l-prev_close|)`) over 14 bars from `market_history`, falling back to the bar range only before there is history.
@@ -67,6 +88,17 @@
 - **Complete De-themification of Music & Playlist Terminology.** All playlist, album, track, and music metaphors were completely purged across frontend components, state models, docs, and test suites in favor of institutional day trading terminology: "Trading Strategies" (replacing "Curated Playlists") and "Active Position" (replacing "Now Playing" drawer).
 
 ## Session log
+
+### 2026-09-23 (close): Empirical diagnosis & strategy remediation deployed
+- **Context & Diagnosis**: Addressed the 0% win rate (-$201.68 PnL) observed across 7 live paper trades on 2026-09-21 and 2026-09-22. Identified context blindness (shorting into market bids caused 89.4% of losses), unrealistic 1.5R/2.5R target geometry under intraday noise, and static override slippage hazards.
+- **Completed**:
+  - Shipped `MarketTrendFilter` with causal time arrow, SPY/QQQ VWAP & EMA 9/21 consensus, and macro-aligned mean reversion policy.
+  - Recalibrated bracket geometry to 0.80R T1 and 1.80R T2 with slippage boundary validation and decremental partial fill tracking.
+  - Hardened ORB (CLV with IEEE 754 tolerance, range cap, extension cap) and News Momentum (word boundary regex).
+  - Multi-agent audit and stress testing completed: 225/225 unit tests pass, 320/320 E2E tests pass, integrated Monday dry run certified at +$308.56 PnL.
+  - Deployed to Railway, verified live production health endpoint HTTP 200, and verified complete local port hygiene.
+
+
 
 ### 2026-09-21 (close): first full live session. 5 trades, -$21.34, zero reached a target
 - **Result**: $50,000.00 -> $49,978.66, **-$21.34** (-0.043%). ORB 2 trades -$12.09, VWAP pullback 3 trades -$9.25. News momentum and mean reversion took nothing.

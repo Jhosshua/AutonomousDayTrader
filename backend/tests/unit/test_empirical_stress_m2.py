@@ -812,8 +812,8 @@ def test_reproduce_defect_create_bracket_argument_mismatch():
     assert bracket.symbol == "AAPL"
     assert bracket.status == BracketStatus.PENDING_ENTRY
     assert bracket.current_stop_price == 148.0
-    assert bracket.target_1_price == 153.0
-    assert bracket.target_2_price == 155.0
+    assert bracket.target_1_price == 151.6
+    assert bracket.target_2_price == 153.6
 
 
 def test_reproduce_defect_news_contradiction_bracket_cancellation_directive_discarded():
@@ -915,6 +915,8 @@ async def test_main_execute_strategy_signal_and_broadcast_integration():
         confidence=0.9,
         reason="News_Breakout",
     )
+    sig.catalyst_sentiment = 0.90
+    sig.volume_surge = 6.0
 
     # 1. Execute signal
     await execute_strategy_signal(sig, bar)

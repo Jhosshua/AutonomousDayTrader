@@ -19,6 +19,7 @@ from backend.app.strategies.base import (
     calculate_rsi,
     calculate_sma,
     calculate_zscore,
+    resolve_stop,
 )
 
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
@@ -59,12 +60,14 @@ class MeanReversionStrategy(Strategy):
         strategy_id: str = "mean_reversion",
         name: str = "Statistical Mean Reversion / Exhaustion Fades",
         period: int = 20,
-        z_threshold: float = 2.50,
+        z_threshold: float = 2.00,
         rsi_period: int = 14,
-        rsi_overbought: float = 75.0,
-        rsi_oversold: float = 25.0,
-        volume_climax_multiplier: float = 3.0,
-        min_wick_ratio: float = 0.50,
+        rsi_overbought: float = 70.0,
+        rsi_oversold: float = 30.0,
+        volume_climax_multiplier: float = 1.75,
+        min_wick_ratio: float = 0.35,
+        atr_stop_multiplier: float = 0.15,
+        min_rr_ratio: float = 1.00,
     ):
         super().__init__(strategy_id=strategy_id, name=name)
         self.period: int = period
@@ -74,6 +77,8 @@ class MeanReversionStrategy(Strategy):
         self.rsi_oversold: float = rsi_oversold
         self.volume_climax_multiplier: float = volume_climax_multiplier
         self.min_wick_ratio: float = min_wick_ratio
+        self.atr_stop_multiplier: float = atr_stop_multiplier
+        self.min_rr_ratio: float = min_rr_ratio
         self.symbol_states: Dict[str, SymbolMeanReversionState] = {}
 
     def _get_state(self, symbol: str) -> SymbolMeanReversionState:
@@ -153,7 +158,7 @@ class MeanReversionStrategy(Strategy):
         atr = calculate_atr(state.bars, 14)
         signals: List[SignalEvent] = []
 
-        # 1. Short Exhaustion Fade (Overbought extreme: Z >= 2.50, RSI >= 75, Upper Wick >= 50%)
+        # 1. Short Exhaustion Fade (Overbought extreme: Z >= 2.00, RSI >= 70, Upper Wick >= 35%)
         if z >= self.z_threshold:
             has_climax = vol_ratio >= self.volume_climax_multiplier
             has_wick_rejection = (upper_wick / candle_range) >= self.min_wick_ratio
@@ -162,12 +167,13 @@ class MeanReversionStrategy(Strategy):
             if has_wick_rejection and has_climax and is_rsi_overbought:
                 entry_price = bar.close
                 target_price = round(mean, 4)
-                stop_loss = round(bar.high + 0.50 * atr, 4)
+                raw_stop = round(bar.high + self.atr_stop_multiplier * atr, 4)
+                raw_dist = max(0.01, raw_stop - entry_price)
+                stop_loss, risk = resolve_stop(entry_price, raw_dist, False)
 
                 # Verify favorable reward-to-risk
                 reward = entry_price - target_price
-                risk = stop_loss - entry_price
-                if reward > 0 and risk > 0 and (reward / risk) >= 1.2:
+                if reward > 0 and risk > 0 and (reward / risk) >= self.min_rr_ratio:
                     signals.append(
                         SignalEvent(
                             symbol=bar.symbol,
@@ -185,7 +191,7 @@ class MeanReversionStrategy(Strategy):
                     )
                     state.last_signal_time = bar.timestamp
 
-        # 2. Long Exhaustion Fade (Oversold extreme: Z <= -2.50, RSI <= 25, Lower Wick >= 50%)
+        # 2. Long Exhaustion Fade (Oversold extreme: Z <= -2.00, RSI <= 30, Lower Wick >= 35%)
         elif z <= -self.z_threshold:
             has_climax = vol_ratio >= self.volume_climax_multiplier
             has_wick_rejection = (lower_wick / candle_range) >= self.min_wick_ratio
@@ -194,11 +200,12 @@ class MeanReversionStrategy(Strategy):
             if has_wick_rejection and has_climax and is_rsi_oversold:
                 entry_price = bar.close
                 target_price = round(mean, 4)
-                stop_loss = round(bar.low - 0.50 * atr, 4)
+                raw_stop = round(bar.low - self.atr_stop_multiplier * atr, 4)
+                raw_dist = max(0.01, entry_price - raw_stop)
+                stop_loss, risk = resolve_stop(entry_price, raw_dist, True)
 
                 reward = target_price - entry_price
-                risk = entry_price - stop_loss
-                if reward > 0 and risk > 0 and (reward / risk) >= 1.2:
+                if reward > 0 and risk > 0 and (reward / risk) >= self.min_rr_ratio:
                     signals.append(
                         SignalEvent(
                             symbol=bar.symbol,

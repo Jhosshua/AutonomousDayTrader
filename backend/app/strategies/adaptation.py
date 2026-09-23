@@ -110,6 +110,7 @@ class DynamicAdaptationEngine:
         max_concurrent_positions: int = 3,
         base_risk_pct: float = 0.01,
         max_alloc_pct: float = 0.25,
+        market_filter: Optional[Any] = None,
     ):
         self.current_vix: float = default_vix
         regime, sizing, stop_m = get_vix_regime(default_vix)
@@ -120,6 +121,7 @@ class DynamicAdaptationEngine:
         self.max_concurrent_positions: int = max_concurrent_positions
         self.base_risk_pct: float = base_risk_pct
         self.max_alloc_pct: float = max_alloc_pct
+        self.market_filter: Optional[Any] = market_filter
         self.last_update: datetime = datetime.now(timezone.utc)
 
     def on_vix_print(self, vprint: VixPrint) -> None:
@@ -267,6 +269,21 @@ class DynamicAdaptationEngine:
         Returns:
             (approved: bool, reason: str, authorized_qty: int)
         """
+        # 0. Market Index Trend Filter Check
+        if self.market_filter is not None:
+            catalyst_sentiment = getattr(signal, "catalyst_sentiment", None)
+            volume_surge = getattr(signal, "volume_surge", None)
+            permitted, reason = self.market_filter.is_signal_permitted(
+                strategy_id=signal.strategy_id,
+                side=signal.side,
+                symbol=signal.symbol,
+                asof=signal.timestamp,
+                catalyst_sentiment=catalyst_sentiment,
+                volume_surge=volume_surge,
+            )
+            if not permitted:
+                return False, f"ADAPTATION_MARKET_FILTER_DENIED: {reason}", 0
+
         # 1. Phase permission check
         if not self.is_strategy_permitted(signal.strategy_id, self.current_time_phase):
             return False, f"PHASE_GATE_DENIED: {signal.strategy_id} not permitted during {self.current_time_phase}", 0
@@ -289,7 +306,7 @@ class DynamicAdaptationEngine:
 
     def get_market_context(self) -> Dict[str, Any]:
         """Get market context dictionary for UI WebSocket streaming."""
-        return {
+        ctx = {
             "vix": self.current_vix,
             "vix_regime": self.current_vix_regime,
             "time_phase": self.current_time_phase,
@@ -297,6 +314,10 @@ class DynamicAdaptationEngine:
             "sizing_multiplier": self.current_sizing_multiplier,
             "stop_multiplier": self.current_stop_multiplier,
         }
+        if self.market_filter is not None:
+            trend, _ = self.market_filter.get_current_trend()
+            ctx["market_trend"] = trend.value
+        return ctx
 
     def get_snapshot(self) -> AdaptationState:
         """Return read-only state snapshot."""

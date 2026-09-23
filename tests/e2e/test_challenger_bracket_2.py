@@ -107,12 +107,13 @@ class TestOrbStopDistanceClamping:
                 ts_str=f"2026-09-21T09:{m:02d}:00-04:00",
             ))
 
-        # Breakout bar closing slightly above range high with RVOL 3.0x
+        # Breakout bar closing slightly above range high with RVOL 3.0x (proportional upper wick)
         entry = round(price * 1.002, 4)
+        wick = round((entry - price) * 0.1, 4)
         bo_bar = _make_bar(
             symbol=sym,
             open_p=price + delta,
-            high_p=entry + 0.01,
+            high_p=round(entry + wick, 4),
             low_p=price,
             close_p=entry,
             vol=50000,
@@ -151,12 +152,12 @@ class TestOrbStopDistanceClamping:
                 ts_str=f"2026-09-21T09:{m:02d}:00-04:00",
             ))
 
-        # Breakout bar closing above range high with RVOL 3.0x
+        # Breakout bar closing above range high with RVOL 3.0x (close near high)
         entry = round((price + delta) * 1.01, 2)
         bo_bar = _make_bar(
             symbol=sym,
             open_p=price + delta,
-            high_p=entry + 0.50,
+            high_p=round(entry + 0.01, 2),
             low_p=price,
             close_p=entry,
             vol=50000,
@@ -256,13 +257,15 @@ class TestNewsMomentumStopDistanceClamping:
         )
         strat.on_news(news)
 
-        # Breakout bar with tight low: low is just 0.001 below close
+        # Breakout bar with tight low: low is just 0.001 below close, directional close (close > open)
+        entry_price = price
+        close_p = round(entry_price + 0.10, 4)
         tight_bar = _make_bar(
             symbol=sym,
-            open_p=price,
-            high_p=price + 0.05,
-            low_p=round(price - 0.001, 4),
-            close_p=price,
+            open_p=entry_price,
+            high_p=round(close_p + 0.05, 4),
+            low_p=round(close_p - 0.001, 4),
+            close_p=close_p,
             vol=45000,  # 4.5x surge
             ts_str="2026-09-21T10:21:00-04:00",
         )
@@ -701,8 +704,9 @@ class TestExtremePricesClamping:
             ))
 
         entry = round((price + delta) * 1.005, 4)
+        wick = round((entry - price) * 0.1, 4)
         bo_bar = _make_bar(
-            symbol=sym, open_p=price+delta, high_p=entry+0.05, low_p=price, close_p=entry,
+            symbol=sym, open_p=price+delta, high_p=round(entry+wick, 4), low_p=price, close_p=entry,
             vol=50000, ts_str="2026-09-21T09:35:00-04:00"
         )
         sigs = strat.on_bar(bo_bar)

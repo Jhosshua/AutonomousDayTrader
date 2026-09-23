@@ -18,13 +18,17 @@ def evaluate_orb_signal(
     bars_5m: List[Union[BarEvent, Dict[str, Any]]],
     current_bar: Union[BarEvent, Dict[str, Any]],
     rvol: float,
+    min_clv: float = 0.65,
+    max_clv_sell: float = 0.35,
 ) -> Optional[str]:
-    """Opening Range Breakout signal evaluator.
+    """Opening Range Breakout signal evaluator with Close Location Value (CLV).
 
     Args:
         bars_5m: Sequence of bars forming the opening range.
         current_bar: Current breakout candidate bar.
         rvol: Relative volume on breakout.
+        min_clv: Minimum Close Location Value for BUY (default 0.65).
+        max_clv_sell: Maximum Close Location Value for SELL (default 0.35).
 
     Returns:
         "BUY", "SELL", or None.
@@ -42,11 +46,18 @@ def evaluate_orb_signal(
         return None
 
     close_p = current_bar.close if isinstance(current_bar, BarEvent) else float(current_bar.get("c", current_bar.get("close", 0.0)))
+    high_p = current_bar.high if isinstance(current_bar, BarEvent) else float(current_bar.get("h", current_bar.get("high", 0.0)))
+    low_p = current_bar.low if isinstance(current_bar, BarEvent) else float(current_bar.get("l", current_bar.get("low", 0.0)))
+
+    candle_range = max(0.0001, high_p - low_p)
+    clv = round((close_p - low_p) / candle_range, 4)
 
     if close_p > range_high:
-        return "BUY"
+        if clv >= (min_clv - 1e-5):
+            return "BUY"
     elif close_p < range_low:
-        return "SELL"
+        if clv <= (max_clv_sell + 1e-5):
+            return "SELL"
     return None
 
 
@@ -72,14 +83,22 @@ class OpeningRangeBreakoutStrategy(Strategy):
         name: str = "Opening Range Breakout",
         range_minutes: int = 5,
         min_rvol: float = 1.80,
-        target_1_r: float = 1.5,
-        target_2_r: float = 2.5,
+        target_1_r: float = 0.8,
+        target_2_r: float = 1.8,
+        max_bar_range_atr: float = 2.2,
+        max_extension_atr: float = 1.0,
+        min_clv: float = 0.65,
+        max_clv_sell: float = 0.35,
     ):
         super().__init__(strategy_id=strategy_id, name=name)
         self.range_minutes: int = range_minutes
         self.min_rvol: float = min_rvol
         self.target_1_r: float = target_1_r
         self.target_2_r: float = target_2_r
+        self.max_bar_range_atr: float = max_bar_range_atr
+        self.max_extension_atr: float = max_extension_atr
+        self.min_clv: float = min_clv
+        self.max_clv_sell: float = max_clv_sell
         self.symbol_states: Dict[str, SymbolORBState] = {}
 
     def _get_state(self, symbol: str) -> SymbolORBState:
@@ -163,16 +182,32 @@ class OpeningRangeBreakoutStrategy(Strategy):
         rvol = round(bar.volume / max(1.0, avg_vol), 2)
 
         # Evaluate breakout signal
-        sig_type = evaluate_orb_signal(state.opening_bars, bar, rvol=rvol)
+        sig_type = evaluate_orb_signal(
+            state.opening_bars,
+            bar,
+            rvol=rvol,
+            min_clv=self.min_clv,
+            max_clv_sell=self.max_clv_sell,
+        )
         if not sig_type:
             return []
+
+        # Bar Range Cap & Extension Cap
+        atr = calculate_atr(state.all_bars, period=14)
+        if atr > 0.001:
+            candle_range = bar.high - bar.low
+            if candle_range > (self.max_bar_range_atr * atr):
+                return []
+            if sig_type == "BUY" and (bar.close - state.range_high) > (self.max_extension_atr * atr):
+                return []
+            elif sig_type == "SELL" and (state.range_low - bar.close) > (self.max_extension_atr * atr):
+                return []
 
         entry_price = bar.close
         stop_loss = state.range_midpoint
         raw_dist = abs(entry_price - stop_loss)
         if raw_dist < 0.05:
             # Fallback to ATR-based risk if range is ultra-tight
-            atr = calculate_atr(state.all_bars, period=14)
             raw_dist = max(0.10, atr)
 
         # Widen a too-tight stop to the 0.4% floor. An oversized opening range is
@@ -192,18 +227,18 @@ class OpeningRangeBreakoutStrategy(Strategy):
             reason = f"ORB_BREAKDOWN_SHORT: Close {entry_price:.2f} < RangeLow {state.range_low:.2f}, RVOL={rvol}x"
 
         state.breakout_fired = True
-        return [
-            SignalEvent(
-                symbol=bar.symbol,
-                side=side,
-                order_type=OrderType.MARKET,
-                entry_price=entry_price,
-                stop_loss=stop_loss,
-                take_profit_1=tp1,
-                take_profit_2=tp2,
-                strategy_id=self.strategy_id,
-                confidence=min(1.0, 0.60 + 0.10 * rvol),
-                reason=reason,
-                timestamp=bar.timestamp,
-            )
-        ]
+        sig = SignalEvent(
+            symbol=bar.symbol,
+            side=side,
+            order_type=OrderType.MARKET,
+            entry_price=entry_price,
+            stop_loss=stop_loss,
+            take_profit_1=tp1,
+            take_profit_2=tp2,
+            strategy_id=self.strategy_id,
+            confidence=min(1.0, 0.60 + 0.10 * rvol),
+            reason=reason,
+            timestamp=bar.timestamp,
+        )
+        sig.rvol = rvol
+        return [sig]

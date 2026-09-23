@@ -322,16 +322,16 @@ def test_adv_bracket_volatility_flash_double_fill_race():
         strategy_id="orb",
         timestamp=now_dt,
     )
-    # TP1 = 100 + 1.5*2 = 103.00, TP2 = 100 + 2.5*2 = 105.00
-    assert bracket.target_1_price == 103.00
-    assert bracket.target_2_price == 105.00
+    # TP1 = 100 + 0.8*2 = 101.60, TP2 = 100 + 1.8*2 = 103.60
+    assert bracket.target_1_price == 101.60
+    assert bracket.target_2_price == 103.60
 
     # Entry fills
     bm.activate_bracket_on_fill(bracket.bracket_id, total_qty, entry_price, now_dt)
     assert bracket.status == BracketStatus.ACTIVE
 
     # Child TP1 fills first
-    dir_tp1 = bm.on_child_order_fill(bracket.target_1_order_id, 103.00, 50, now_dt)
+    dir_tp1 = bm.on_child_order_fill(bracket.target_1_order_id, 101.60, 50, now_dt)
     assert dir_tp1.action == "MODIFY_ORDER"
     assert bracket.status == BracketStatus.TARGET_1_HIT
     assert bracket.remaining_qty == 50

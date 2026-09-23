@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from backend.app.config import settings
 from backend.app.core.account import PaperTradingAccount, PositionSide
 from backend.app.core.bracket import BracketChildType, BracketStatus, DynamicBracketManager
+from backend.app.core.market_filter import MarketTrendFilter
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
 from backend.app.core.event_bus import event_bus
 from backend.app.core.flattening import ET_TZ, FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
@@ -59,6 +60,7 @@ risk_engine = InstitutionalRiskEngine(config=RiskEngineConfig(
 ))
 bracket_manager = DynamicBracketManager()
 flattening_engine = ZeroOvernightFlatteningEngine()
+market_filter = MarketTrendFilter()
 
 # Strategies & Dynamic Self-Adaptation Engine
 orb_strategy = OpeningRangeBreakoutStrategy()
@@ -68,6 +70,7 @@ mean_reversion_strategy = MeanReversionStrategy()
 adaptation_engine = DynamicAdaptationEngine(
     max_concurrent_positions=settings.MAX_CONCURRENT_POSITIONS,
     base_risk_pct=settings.PER_POSITION_RISK_PCT,
+    market_filter=market_filter,
 )
 
 strategies: List[Strategy] = [
@@ -750,6 +753,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
         summary = _session_summary(previous_session_date)
         pending_session_summaries[summary["session_date"]] = summary
     last_session_date = session_date
+    market_filter.reset_session(session_date)
     risk_engine.reset_daily_metrics(account.equity)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
@@ -955,8 +959,8 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             stop_price=adapted_stop,
             strategy_id=signal.strategy_id,
             timestamp=signal.timestamp,
-            target_1_override=signal.take_profit_1 if signal.strategy_id == "mean_reversion" else None,
-            target_2_override=signal.take_profit_2 if signal.strategy_id == "mean_reversion" else None,
+            target_1_override=signal.take_profit_1,
+            target_2_override=signal.take_profit_2,
         )
         entry_order_to_bracket[submitted.id] = bracket.bracket_id
         if bar:
@@ -977,6 +981,8 @@ async def handle_bar_event(bar: BarEvent) -> None:
     _check_session_boundary(bar.timestamp)
     latest_market_prices[bar.symbol.upper()] = bar.close
     _mark_feed_event("bar")
+    if bar.symbol.upper() in ("SPY", "QQQ"):
+        market_filter.on_bar(bar)
     history = market_history.setdefault(bar.symbol.upper(), [])
     history.append({
         "time": bar.timestamp.isoformat(),
@@ -1338,6 +1344,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     last_vix_print = None
     risk_engine.reset_daily_metrics(account.equity)
     flattening_engine.reset_for_new_session()
+    market_filter.reset_session()
     for strategy in strategies:
         strategy.reset_daily_stats()
 
