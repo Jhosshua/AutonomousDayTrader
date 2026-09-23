@@ -1,5 +1,61 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-09-23: Filter-Stacking Bottleneck Causing Total Strategy Starvation
+
+**What did not work**: The combination of a narrow 3-single-stock watchlist, binary sector lockout, extreme volume surge hurdles ($3.5\times$ on 1-minute bars), and locking out all directional strategies during `NEUTRAL` market regimes without an active mean reversion counterpart caused a filter-stacking bottleneck. Trade frequency collapsed to ~0 trades/day despite normal market liquidity and hours.
+
+**What worked instead**: Decoupled the filter stack:
+1. Expanded universe to 12 liquid, high-beta symbols across multiple sectors (`SPY`, `QQQ`, `AAPL`, `NVDA`, `TSLA`, `AMD`, `MSFT`, `AMZN`, `META`, `GOOGL`, `PLTR`, `COIN`).
+2. Permitted high-RVOL idiosyncratic breakouts ($\text{RVOL} \ge 2.20\times$) in `NEUTRAL` market regimes.
+3. Activated Statistical Mean Reversion during `NEUTRAL` regimes to monetize range-bound oscillations.
+4. Calibrated volume thresholds to realistic institutional participation levels.
+
+**Note for next time**: Never stack multiple restrictive filters across universe, regime, sector, and microstructure simultaneously without empirical frequency backtesting. Multiplied filter probabilities ($P_1 \times P_2 \times P_3 \times P_4$) quickly approach zero.
+
+## 2026-09-23: Single-Sector Starvation via Binary Sector Concentration Cap
+
+**What did not work**: In `backend/app/core/risk.py`, the sector concentration check enforced `sector in active_sectors`, permitting only a single active position per sector. Because both `AAPL` and `NVDA` were categorized under "Technology", holding AAPL completely locked out NVDA from any trade setup, regardless of signal quality or overall portfolio risk budget.
+
+**What worked instead**:
+1. Granularized sector mappings (e.g. `NVDA` and `AMD` as "Semiconductors", `MSFT` and `PLTR` as "Software", `GOOGL` and `META` as "Communication Services").
+2. Replaced the binary check with a multi-position limit: `max_positions_per_sector = 2`, while maintaining `max_concurrent_positions = 3` total.
+3. Exempted Index ETFs (`SPY`, `QQQ`) from sector concentration limits.
+
+**Note for next time**: Sector limits should accommodate multiple non-identical names up to a defined concentration ratio ($2 / 3$ max exposure) rather than a crude 1-name lockout that starves liquid setups.
+
+## 2026-09-23: Sentiment Substring NLP False Positive Leakage
+
+**What did not work**: In `backend/app/ingestion/sentiment.py`, `_classify_category` evaluated keywords using Python substring searches (`any(k in text for k in ...)`). Common financial words accidentally triggered unintended catalyst buckets: "sector" matched "sec" $\to$ `LEGAL_INVESTIGATION`; "approbed" matched "probe" $\to$ `LEGAL_INVESTIGATION`; "window" matched "win" $\to$ `PARTNERSHIP_CONTRACT`. This corrupted news sentiment classification and emitted erroneous signals or blocked trades.
+
+**What worked instead**: Refactored keyword matching to use strict word-boundary regular expressions:
+```python
+def _has_kw(keywords: Tuple[str, ...]) -> bool:
+    return any(re.search(r"\b" + re.escape(k) + r"\b", text) for k in keywords)
+```
+This ensures keywords only match complete words, completely eliminating substring leakage.
+
+**Note for next time**: Never use substring matching (`k in text`) for token-based NLP categorization. Always use regex word boundaries (`\b`) or tokenized vocabularies.
+
+## 2026-09-23: Mean Reversion Parameter Starvation Under Moderate VIX
+
+**What did not work**: `MeanReversionStrategy` used extreme entry hurdles: $Z$-score $\ge 2.00$, volume climax multiplier $\ge 1.75\times$, and minimum wick rejection ratio $\ge 0.35$. Under moderate VIX regimes (14–16), 1-minute bars rarely reach $2.0\sigma$ with $1.75\times$ volume and $35\%$ wick rejection simultaneously, resulting in 0 valid mean reversion triggers during normal chop sessions.
+
+**What worked instead**: Calibrated parameters to achievable intraday turning points:
+- $Z$-score threshold: lowered from 2.00 to 1.65.
+- Volume climax multiplier: lowered from $1.75\times$ to $1.30\times$.
+- Minimum wick rejection ratio: lowered from 0.35 to 0.30.
+These levels reliably capture range-bound exhaustion fades back to the 20-SMA while preserving stop-loss protection and minimum reward ratios.
+
+**Note for next time**: Reversion hurdles must match the empirical distribution of the underlying asset's volatility regime. $2.0\sigma$ on 1-minute bars is an extreme outlier threshold that starves intraday reversion strategies.
+
+## 2026-09-23: E2E Runner Port 8000 Audit Omission
+
+**What did not work**: In `tests/e2e/runner.py`, `run_tests` monitored ports `[8080, 8005, 3005]`, omitting port `8000` (the standard FastAPI default port and host collision vector). If any rogue process or unconfigured backend instance spawned on port 8000 during test execution, the runner would report clean port hygiene despite port 8000 remaining bound.
+
+**What worked instead**: Updated `ports_to_check` in `tests/e2e/runner.py` to `[8080, 8005, 8000, 3005]`, ensuring all four key ports are audited, confirmed clean, and liberated after test runs.
+
+**Note for next time**: All test runners and hygiene scripts must audit the complete set of system and default ports, including alternative or standard ports (8000 as well as 8005).
+
 ## 2026-09-23: VIX Stop Distance Clamping Violation
 
 **What did not work**: In `backend/app/strategies/adaptation.py`, `calculate_adapted_stop` multiplied the strategy base stop distance by VIX regime multipliers (e.g. 0.85 in Low VIX to 2.00 in Crisis VIX) without clamping the result to institutional risk bounds. When VIX reached Elevated (25–35) or Crisis (35+) levels, or on symbols with wider base stop spreads, the calculated stop distance expanded beyond 4.00% of entry price (e.g., 4.2%–5.0%). When downstream signals reached `InstitutionalRiskEngine.evaluate_order`, the risk engine strictly rejected the order with `STOP_TOO_WIDE`. In quiet regimes, it could also contract below 0.40% (`STOP_TOO_TIGHT`). This resulted in erratic strategy signal rejections during volatile market conditions when risk management is most critical.

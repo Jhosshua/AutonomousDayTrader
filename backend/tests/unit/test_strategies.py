@@ -675,11 +675,18 @@ def test_news_0931_volume_baseline_floor():
 def test_mean_reversion_moderate_vix_calibration():
     """Verify MeanReversionStrategy default configuration is calibrated for moderate VIX (14-16)."""
     strat = MeanReversionStrategy()
-    assert strat.z_threshold == 2.00
+    assert strat.z_threshold == 1.65
     assert strat.rsi_overbought == 70.0
     assert strat.rsi_oversold == 30.0
-    assert strat.volume_climax_multiplier == 1.75
-    assert strat.min_wick_ratio == 0.35
+    assert strat.volume_climax_multiplier == 1.30
+    assert strat.min_wick_ratio == 0.30
     assert strat.atr_stop_multiplier == 0.15
     assert strat.min_rr_ratio == 1.00
+
+
+def test_news_momentum_default_calibration():
+    """Verify NewsMomentumStrategy default configuration is calibrated to volume surge 2.00x."""
+    strat = NewsMomentumStrategy()
+    assert strat.volume_surge_multiplier == 2.00
+    assert strat.sentiment_threshold == 0.60
 

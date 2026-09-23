@@ -108,11 +108,11 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     """Validate order against Institutional Risk Engine and active flattening lockout."""
     is_lockout = flattening_engine.current_phase != FlatteningPhase.NORMAL_TRADING
     active_symbols = set(acct.positions.keys())
-    active_sectors = {
+    active_sectors = [
         risk_engine.symbol_sectors.get(s, "Other")
         for s in active_symbols
         if s in risk_engine.symbol_sectors
-    }
+    ]
 
     # Differentiate position-reducing / liquidation orders from position-opening orders
     existing_pos = acct.positions.get(order.symbol.upper())
@@ -927,11 +927,11 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     # that quantity against the exact risk geometry that will reach the order
     # engine before creating the order.
     active_symbols = set(account.positions.keys())
-    active_sectors = {
+    active_sectors = [
         risk_engine.symbol_sectors.get(s, "Other")
         for s in active_symbols
         if s in risk_engine.symbol_sectors
-    }
+    ]
     risk_preview = risk_engine.evaluate_order_request(
         symbol=sym,
         side="BUY" if signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY" else "SELL",

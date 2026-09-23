@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     # Active Ticker Universes & Subscriptions
     WATCHLIST_SYMBOLS: List[str] = Field(
-        default=["SPY", "QQQ", "AAPL", "NVDA", "TSLA"],
+        default=["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "PLTR", "COIN"],
         description="Default symbol roster for stock market data subscriptions"
     )
     SUBSCRIBE_BARS: bool = Field(default=True, description="Subscribe to 1-minute OHLCV bars")

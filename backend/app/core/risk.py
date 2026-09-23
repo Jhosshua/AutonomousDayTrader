@@ -42,6 +42,7 @@ class RiskEngineConfig(BaseModel):
     max_trade_risk_dollars: float = 1000.00
     max_position_equity_pct: float = 0.500   # $25,000 max single position (50% of equity / 12.5% of DTBP)
     max_concurrent_positions: int = 3
+    max_positions_per_sector: int = 2
     min_stop_distance_pct: float = 0.004     # 0.4%
     max_stop_distance_pct: float = 0.040     # 4.0%
 
@@ -65,12 +66,15 @@ class InstitutionalRiskEngine:
             "SPY": "Index",
             "QQQ": "Index",
             "AAPL": "Technology",
-            "NVDA": "Technology",
+            "NVDA": "Semiconductors",
+            "AMD": "Semiconductors",
+            "MSFT": "Software",
+            "PLTR": "Software",
             "TSLA": "Consumer Discretionary",
-            "MSFT": "Technology",
             "AMZN": "Consumer Discretionary",
             "GOOGL": "Communication Services",
             "META": "Communication Services",
+            "COIN": "Fintech/Crypto",
         }
 
     def register_symbol_sector(self, symbol: str, sector: str) -> None:
@@ -186,16 +190,28 @@ class InstitutionalRiskEngine:
 
         # 4. Sector Diversification Check
         sector = self.symbol_sectors.get(symbol)
-        if sector and sector != "Index" and symbol not in active_symbols and sector in active_sectors:
-            return RiskCheckResult(
-                approved=False,
-                reason=f"CORRELATED_SECTOR_EXPOSURE: Another active position already exists in sector '{sector}'",
-                requested_qty=requested_qty,
-                authorized_qty=0,
-                estimated_risk_dollars=0.0,
-                risk_level=self.risk_level,
-                rejection_code="CORRELATED_SECTOR_EXPOSURE",
+        if sector and sector not in ("Index", "Index/ETF") and symbol not in active_symbols:
+            sector_count_from_symbols = sum(
+                1 for s in active_symbols if self.symbol_sectors.get(s) == sector
             )
+            if isinstance(active_sectors, dict):
+                sector_count_from_arg = active_sectors.get(sector, 0)
+            elif isinstance(active_sectors, (list, tuple)):
+                sector_count_from_arg = active_sectors.count(sector)
+            else:
+                sector_count_from_arg = 1 if sector in active_sectors else 0
+
+            current_sector_count = max(sector_count_from_symbols, sector_count_from_arg)
+            if current_sector_count >= self.config.max_positions_per_sector:
+                return RiskCheckResult(
+                    approved=False,
+                    reason=f"CORRELATED_SECTOR_EXPOSURE: Maximum of {self.config.max_positions_per_sector} active positions reached for sector '{sector}'",
+                    requested_qty=requested_qty,
+                    authorized_qty=0,
+                    estimated_risk_dollars=0.0,
+                    risk_level=self.risk_level,
+                    rejection_code="CORRELATED_SECTOR_EXPOSURE",
+                )
 
         # 5. Stop Distance Safety Boundary Check
         stop_dist = abs(entry_price - stop_price)

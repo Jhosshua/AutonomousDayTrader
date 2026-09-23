@@ -85,7 +85,7 @@ class NewsMomentumStrategy(Strategy):
         strategy_id: str = "news_momentum",
         name: str = "Catalyst News Momentum Breakout",
         sentiment_threshold: float = 0.60,
-        volume_surge_multiplier: float = 3.50,
+        volume_surge_multiplier: float = 2.00,
         catalyst_ttl_seconds: int = 180,
         target_1_r: float = 0.80,
         target_2_r: float = 1.80,
@@ -275,9 +275,13 @@ class NewsMomentumStrategy(Strategy):
                 confidence=min(1.0, 0.70 + 0.10 * vol_ratio),
                 reason=f"NEWS_MOMENTUM_LONG: Sentiment {cat.sentiment:.2f}, Volume Surge {vol_ratio:.2f}x > {self.volume_surge_multiplier}x. Headline: '{cat.headline[:60]}...'",
                 timestamp=bar.timestamp,
+                rvol=vol_ratio,
+                volume_surge=vol_ratio,
+                catalyst_sentiment=cat.sentiment,
             )
             sig.catalyst_sentiment = cat.sentiment
             sig.volume_surge = vol_ratio
+            sig.rvol = vol_ratio
             signals.append(sig)
             self.monitored_positions[sym] = "LONG"
 
@@ -301,9 +305,13 @@ class NewsMomentumStrategy(Strategy):
                 confidence=min(1.0, 0.70 + 0.10 * vol_ratio),
                 reason=f"NEWS_MOMENTUM_SHORT: Sentiment {cat.sentiment:.2f}, Volume Surge {vol_ratio:.2f}x > {self.volume_surge_multiplier}x. Headline: '{cat.headline[:60]}...'",
                 timestamp=bar.timestamp,
+                rvol=vol_ratio,
+                volume_surge=vol_ratio,
+                catalyst_sentiment=cat.sentiment,
             )
             sig.catalyst_sentiment = cat.sentiment
             sig.volume_surge = vol_ratio
+            sig.rvol = vol_ratio
             signals.append(sig)
             self.monitored_positions[sym] = "SHORT"
 

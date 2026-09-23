@@ -247,22 +247,31 @@ class MarketTrendFilter:
 
     def is_signal_permitted(
         self,
-        strategy_id: str,
-        side: Union[OrderSide, str],
-        symbol: str,
+        strategy_id: str = "",
+        side: Union[OrderSide, str] = OrderSide.BUY,
+        symbol: str = "",
         asof: Optional[datetime] = None,
-        catalyst_sentiment: Optional[float] = None,
-        volume_surge: Optional[float] = None,
+        catalyst_sentiment: Optional[float] = 0.0,
+        volume_surge: Optional[float] = 0.0,
+        rvol: Optional[float] = None,
+        strategy_name: Optional[str] = None,
+        **kwargs: Any,
     ) -> Tuple[bool, str]:
         """Validate if a proposed trade signal is directionally aligned with market beta.
 
         Policy Matrix:
-        - ORB & VWAP Pullback: BUY requires BULLISH, SELL requires BEARISH. Reject in NEUTRAL/UNKNOWN.
-        - News Momentum: Require index alignment unless extreme catalyst (|S| >= 0.85, volume >= 5.0x).
-        - Mean Reversion: Permit counter-trend exhaustion fades, avoid trading into unconfirmed runaway trend.
+        - In MarketTrend.NEUTRAL:
+          - Permit mean_reversion (both BUY and SELL).
+          - Permit orb and news_momentum if rvol is not None and rvol >= 2.20 with reason containing
+            APPROVED_IDIOSYNCRATIC_BREAKOUT. If rvol < 2.20 or None, deny with INDEX_FILTER_DENIED.
+          - Deny vwap_pullback with INDEX_FILTER_DENIED.
+        - In MarketTrend.BULLISH / BEARISH:
+          - Permit orb and vwap_pullback along index beta (BUY in BULLISH, SELL in BEARISH).
+          - Permit news_momentum along index beta (or if extreme catalyst).
+          - Deny counter-trend mean_reversion with INDEX_FILTER_DENIED.
         """
         trend, reason = self.get_current_trend(asof)
-        strat = strategy_id.lower()
+        strat = (strategy_name or strategy_id).lower()
         is_buy = (side == OrderSide.BUY) if isinstance(side, OrderSide) else (str(side).upper() == "BUY")
 
         # 1. News Momentum Extreme Catalyst Override Check
@@ -281,29 +290,35 @@ class MarketTrendFilter:
         if trend == MarketTrend.UNKNOWN:
             return False, f"INDEX_FILTER_DENIED: Market trend UNKNOWN ({reason})"
 
-        # 2. ORB & VWAP Pullback (Pure directional trend strategies)
+        # 2. MarketTrend.NEUTRAL Execution Rules
+        if trend == MarketTrend.NEUTRAL:
+            if strat == "mean_reversion":
+                return True, f"APPROVED: Mean reversion permitted in NEUTRAL market on {symbol}"
+            if strat in ("orb", "news_momentum"):
+                if rvol is not None and rvol >= 2.20:
+                    return True, f"APPROVED_IDIOSYNCRATIC_BREAKOUT: {strat.upper()} permitted in NEUTRAL market on high RVOL ({rvol:.2f} >= 2.20x)"
+                return False, f"INDEX_FILTER_DENIED: {strat.upper()} requires directional market trend or high RVOL >= 2.20x in NEUTRAL (got RVOL={rvol})"
+            if strat == "vwap_pullback":
+                return False, f"INDEX_FILTER_DENIED: VWAP_PULLBACK requires directional market trend (currently NEUTRAL)"
+            return False, f"INDEX_FILTER_DENIED: {strat.upper()} not permitted in NEUTRAL market"
+
+        # 3. MarketTrend.BULLISH & MarketTrend.BEARISH Execution Rules
         if strat in ("orb", "vwap_pullback"):
             if trend == MarketTrend.BULLISH and not is_buy:
                 return False, f"INDEX_BETA_CONTRADICTION: Cannot open SHORT on {symbol} when market trend is BULLISH"
             if trend == MarketTrend.BEARISH and is_buy:
                 return False, f"INDEX_BETA_CONTRADICTION: Cannot open LONG on {symbol} when market trend is BEARISH"
-            if trend == MarketTrend.NEUTRAL:
-                return False, f"INDEX_FILTER_DENIED: {strat.upper()} requires directional market trend (currently NEUTRAL)"
 
-        # 3. News Momentum Standard Index Alignment Check
         elif strat == "news_momentum":
             if trend == MarketTrend.BULLISH and not is_buy:
                 return False, f"INDEX_BETA_CONTRADICTION: Shorting {symbol} on news denied during BULLISH market rally"
             if trend == MarketTrend.BEARISH and is_buy:
                 return False, f"INDEX_BETA_CONTRADICTION: Buying {symbol} on news denied during BEARISH market decline"
-            if trend == MarketTrend.NEUTRAL:
-                return False, f"INDEX_FILTER_DENIED: NEWS_MOMENTUM requires directional index alignment or extreme catalyst (currently NEUTRAL)"
 
-        # 4. Statistical Mean Reversion (Exhaustion fades)
         elif strat == "mean_reversion":
             if trend == MarketTrend.BULLISH and not is_buy:
-                return False, f"INDEX_BETA_CONTRADICTION: Shorting overbought {symbol} denied during strong BULLISH market rally"
+                return False, f"INDEX_FILTER_DENIED: INDEX_BETA_CONTRADICTION: Shorting overbought {symbol} denied during strong BULLISH market rally"
             if trend == MarketTrend.BEARISH and is_buy:
-                return False, f"INDEX_BETA_CONTRADICTION: Buying oversold {symbol} (catching falling knife) denied during strong BEARISH market decline"
+                return False, f"INDEX_FILTER_DENIED: INDEX_BETA_CONTRADICTION: Buying oversold {symbol} (catching falling knife) denied during strong BEARISH market decline"
 
         return True, f"APPROVED: Signal {side} on {symbol} aligned with MarketTrend.{trend.value}"

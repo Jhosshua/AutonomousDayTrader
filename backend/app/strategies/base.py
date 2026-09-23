@@ -34,6 +34,9 @@ class SignalEvent:
     reason: str
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     target_qty: Optional[int] = None
+    rvol: Optional[float] = None
+    volume_surge: Optional[float] = None
+    catalyst_sentiment: Optional[float] = None
 
     def __post_init__(self):
         if isinstance(self.side, str):

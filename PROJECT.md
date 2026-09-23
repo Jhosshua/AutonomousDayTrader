@@ -51,17 +51,17 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| F1 | Stock WebSocket Client | Ingest 1-min bars (`b`), quotes (`q`), trades (`t`) with `RELAY_TOKEN` auth, auto-reconnect, and backpressure handling | M1 | ORIGINAL_REQUEST §R1 |
+| F1 | Stock WebSocket Client | Ingest 1-min bars (`b`), quotes (`q`), trades (`t`) with `RELAY_TOKEN` auth, auto-reconnect, and backpressure handling across 12-symbol universe (`SPY`, `QQQ`, `AAPL`, `NVDA`, `TSLA`, `AMD`, `MSFT`, `AMZN`, `META`, `GOOGL`, `PLTR`, `COIN`) | M1 | ORIGINAL_REQUEST §R1 |
 | F2 | News WebSocket Client | Ingest Benzinga news (`T: "n"`), parse headlines, symbols, and compute real-time sentiment score $S \in [-1, 1]$ | M1 | ORIGINAL_REQUEST §R1 |
 | F3 | REST `/vix` Client | Query `GET /vix` with `X-Relay-Token`, parse dxFeed print, age validation, and fallback caching | M1 | ORIGINAL_REQUEST §R1 |
 | F4 | $50,000 Paper Account | State machine tracking Cash, Equity, 4:1 Day Trading Buying Power ($200k), Positions, Realized/Unrealized PnL, Order lifecycle | M1 | ORIGINAL_REQUEST §R1 |
-| F5 | Risk Guardrails & Circuit Breakers | Hard max daily loss limit ($1,500 / 3% drawdown) halting trading, 1–2% per-position risk limit, dynamic sizing | M1 | ORIGINAL_REQUEST §R1 |
+| F5 | Risk Guardrails & Circuit Breakers | Hard max daily loss limit ($1,500 / 3% drawdown) halting trading, 1–2% per-position risk limit, dynamic sizing, multi-sector limits (max 2/sector, max 3 concurrent total; Index exempt) | M1 | ORIGINAL_REQUEST §R1 |
 | F6 | Dynamic Bracket Orders | Multi-tier take-profit brackets with calibrated intraday geometry (Target 1 at 0.80R with 50% scale-out, Target 2 at 1.80R runner or trailing ATR stop locked to TARGET_1_HIT; slippage boundary validation and decremental partial fill tracking) | M1 | ORIGINAL_REQUEST §R1 |
 | F7 | Zero Overnight Flattening | 4-phase protocol: 15:45 entry lockout, 15:50 working order purge, 15:55 market liquidation, 15:58 flat audit before 16:00 ET | M1 | ORIGINAL_REQUEST §R1 |
 | F8 | Strategy 1: ORB | Opening Range Breakout on 5m/15m bars with RVOL $\ge 1.8\times$, midpoint stops, and target brackets | M2 | ORIGINAL_REQUEST §R2 |
 | F9 | Strategy 2: VWAP Pullback | Anchored VWAP from 09:30, standard deviation bands, EMA20 > EMA50 trend filter, bounce confirmation | M2 | ORIGINAL_REQUEST §R2 |
-| F10 | Strategy 3: News Momentum | Benzinga news catalyst sentiment trigger, volume surge $>3.5\times$ validation, news contradiction emergency exit | M2 | ORIGINAL_REQUEST §R2 |
-| F11 | Strategy 4: Mean Reversion | 1-min bar $Z$-score $\ge 2.5$, RSI-14 extremes with divergence, volume climax fade back to 20-SMA | M2 | ORIGINAL_REQUEST §R2 |
+| F10 | Strategy 3: News Momentum | Benzinga news catalyst sentiment trigger with strict regex word boundaries (`\b...`), volume surge $>2.0\times$ validation, news contradiction emergency exit | M2 | ORIGINAL_REQUEST §R2 |
+| F11 | Strategy 4: Mean Reversion | 1-min bar $Z$-score $\ge 1.65$, volume climax $>1.30\times$, upper/lower wick rejection $\ge 0.30$, 20-SMA mean reversion active in `NEUTRAL` regimes without fighting runaway trends | M2 | ORIGINAL_REQUEST §R2 |
 | F12 | Dynamic VIX Adaptation | Self-adaptation across 4 regimes (Low, Normal, Elevated, Crisis) with invariant dollar risk scaling and dynamic stop widths | M2 | ORIGINAL_REQUEST §R2 |
 | F13 | Time-of-Day Dynamics | 5 intraday execution regimes: Pre-market (08:00–09:30), Open Flush (09:30–10:00), Trend (10:00–11:30), Chop (11:30–14:00), Power Hour (15:00–16:00) | M2 | ORIGINAL_REQUEST §R2 |
 | F14 | Obsidian Dark UI Aesthetic | Obsidian dark palette (`#000000`), dynamic glassmorphism (`backdrop-blur-xl`), animated background gradient blur tinted by portfolio momentum | M3 | ORIGINAL_REQUEST §R3 |
@@ -72,7 +72,8 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | F19 | Opaque-Box E2E Test Suite | Five-tier functional/adversarial suite plus UI streaming and visual checks with 100% pass criterion | M4 | ORIGINAL_REQUEST §R4 |
 | F20 | Monday Market Open Dry Run | Deterministic mock Monday 09:25–10:30 ET replay through the production event path; simulation evidence only | M5 | ORIGINAL_REQUEST §R4 |
 | F21 | Upstream Delivery & Process Hygiene | Git commit history, push to GitHub origin main, graceful process shutdown, port release verification | M6 | ORIGINAL_REQUEST §R5 |
-| F22 | Market Trend Filter | Intraday anchored VWAP and EMA 9/21 consensus filter across SPY/QQQ with signed causal staleness guard ($elapsed \ge 0$) and macro-aligned mean reversion policy | M2 | ORIGINAL_REQUEST §R2 |
+| F22 | Market Trend Filter | Intraday anchored VWAP and EMA 9/21 consensus filter across SPY/QQQ with signed causal staleness guard ($elapsed \ge 0$), regime-separated execution (trending vs neutral), and high-RVOL ($\ge 2.20\times$) idiosyncratic breakout permission in `NEUTRAL` | M2 | ORIGINAL_REQUEST §R2 |
+| F23 | Expanded Universe & Multi-Sector Management | 12-symbol liquid roster across Semiconductors, Software, Discretionary, Communication Services, Fintech/Crypto, and Index ETFs | M7 | ORIGINAL_REQUEST §R1 |
 
 ## Milestones
 
@@ -85,6 +86,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_READY | COMPLETED / DEPLOYED (320/320 E2E tests, 272/272 backend tests, 63/63 stress & mutation tests pass) |
 | M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | COMPLETED / DEPLOYED; Integrated dry run verified ($50,308.55 equity, +$308.56 PnL, 184/184 events, 0 errors) |
 | M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | COMPLETED / DEPLOYED; Full-stack review remediated, multi-agent audit certified (5/5 PASS), Railway production live & healthy, ports clean |
+| M7 | `universe_regime_calibration` | 12-symbol watchlist expansion, multi-sector risk engine (max 2/sector, max 3 total), regime-separated execution (NEUTRAL vs trending), microstructure calibrations (news 2.0x, MR Z=1.65, wick 0.30, vol 1.30x) | M1-M6 | COMPLETED / DEPLOYED; 324/324 backend pytest pass, 320/320 E2E runner pass, integrated dry run pass, Railway deployed healthy |
 
 ### E2E Testing Track (Parallel)
 | Track | Scope | Outputs | Status |
@@ -332,5 +334,34 @@ Deterministic Test & Simulation Verification:
 - Integrated Monday Market Open Dry Run (`scripts/run_integrated_monday_dry_run.py`): Status `PASS` (184 events processed, 0 event bus errors, 0 open positions, 0 working orders, realized PnL +$308.56).
 - Frontend Production Build: Clean Next.js 15.5 static export, 0 TypeScript errors, 4/4 resilience tests passed.
 - Port Hygiene: Monitored ports 3005, 8000, 8005, 8080 confirmed 100% clean and free.
+
+### 2026-09-23: Universe Expansion, Regime-Separated Execution & Microstructure Hardening (R4-R6)
+An extensive quantitative enhancement and adversarial audit resolved the filter-stacking bottleneck, starvation of trades, and single-sector lockout. Trading frequency scaled systematically while rigorously preserving institutional risk guardrails ($1,500 circuit breaker, $25,000 position cap, 0.4%–4.0% stops, zero overnight holds).
+
+Key Architectural Enhancements:
+- **Universe Expansion (`WATCHLIST_SYMBOLS`)**: Expanded universe from 3 single stocks to 12 top liquid high-beta names: `["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "PLTR", "COIN"]`.
+- **Multi-Sector Risk Engine (`backend/app/core/risk.py`)**:
+  - Mapped symbols to granular sector buckets: Semiconductors (`NVDA`, `AMD`), Software (`MSFT`, `PLTR`), Consumer Discretionary (`TSLA`, `AMZN`), Communication Services (`GOOGL`, `META`), Fintech/Crypto (`COIN`), and Index (`SPY`, `QQQ`).
+  - Implemented multi-position sector limits: maximum of 2 positions per sector (`max_positions_per_sector = 2`), maximum of 3 concurrent positions overall (`max_concurrent_positions = 3`). Index ETFs (`SPY`, `QQQ`) are exempt from sector limits.
+  - Eliminated single-sector starvation while preventing portfolio over-concentration.
+- **Regime-Separated Execution (`backend/app/core/market_filter.py`)**:
+  - **Trending Regimes (`BULLISH` / `BEARISH`)**: ORB and VWAP Pullback enabled strictly along index beta; counter-trend Mean Reversion strictly denied with `INDEX_BETA_CONTRADICTION`.
+  - **Range-Bound / Neutral Regimes (`NEUTRAL`)**: Activated Statistical Mean Reversion to monetize intraday oscillations around 20-SMA without trend risk.
+  - **Idiosyncratic Decoupling in NEUTRAL**: High-RVOL breakouts (`RVOL >= 2.20x`) for ORB and News Momentum permitted in `NEUTRAL` regimes when institutional volume demonstrates decoupling from market chop.
+- **Microstructure & Indicator Calibrations**:
+  - **News Momentum (`news_momentum.py`)**: Volume surge threshold lowered from $3.50\times$ to $2.00\times$, preventing chasing exhaustion tops of 1-minute bars after HFT repricing.
+  - **Sentiment NLP (`sentiment.py`)**: Enforced strict regex word-boundary matching (`\b...`) across catalyst keywords, eliminating false positives (e.g., "sector" triggering SEC probe, "window" triggering contract win).
+  - **Statistical Mean Reversion (`mean_reversion.py`)**: Calibrated $Z$-score threshold from 2.00 to 1.65, volume climax multiplier from $1.75\times$ to $1.30\times$, and minimum wick rejection ratio from 0.35 to 0.30, unlocking valid exhaustion fades during moderate VIX (14–16) chop sessions.
+- **Port Hygiene Hardening (`tests/e2e/runner.py`)**:
+  - Added Port 8000 to E2E test runner audit matrix (`ports_to_check = [8080, 8005, 8000, 3005]`), guaranteeing complete process hygiene.
+
+100% Verification Test Records:
+- Backend Pytest Suite: 324/324 passed (100% pass rate in 4.46s).
+- Full Opaque-Box E2E Runner: 320/320 passed (100% pass rate in 26.87s, Exit Code 0).
+- Integrated Monday Market Open Dry Run: Status `PASS` (184 events processed, 0 event bus errors, 0 open positions, 0 working orders, flat EOD book, realized PnL +$308.56).
+- Frontend Production Build: Clean Next.js 15.5 build (0 TypeScript/lint errors).
+- UI Architecture Verification: `node frontend/scripts/verify_ui.mjs` PASSED (all design tokens, spring physics, glassmorphism, and responsive components verified).
+- Port Hygiene: Monitored ports 8000, 8005, 8080, 3005 confirmed 100% clean and free.
+
 
 

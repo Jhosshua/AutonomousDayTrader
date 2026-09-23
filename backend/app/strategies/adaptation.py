@@ -284,6 +284,7 @@ class DynamicAdaptationEngine:
         if self.market_filter is not None:
             catalyst_sentiment = getattr(signal, "catalyst_sentiment", None)
             volume_surge = getattr(signal, "volume_surge", None)
+            rvol = getattr(signal, "rvol", None)
             permitted, reason = self.market_filter.is_signal_permitted(
                 strategy_id=signal.strategy_id,
                 side=signal.side,
@@ -291,6 +292,7 @@ class DynamicAdaptationEngine:
                 asof=signal.timestamp,
                 catalyst_sentiment=catalyst_sentiment,
                 volume_surge=volume_surge,
+                rvol=rvol,
             )
             if not permitted:
                 return False, f"ADAPTATION_MARKET_FILTER_DENIED: {reason}", 0

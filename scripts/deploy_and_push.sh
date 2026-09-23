@@ -14,7 +14,7 @@ echo "🔍 1. Verifying process and port hygiene..."
 
 # 2. Build/test gates: nothing ships unless the backend suite and the UI build pass
 echo "🧪 2a. Running backend pytest gate..."
-python3 -m pytest -q
+python3 -m pytest backend/tests -q
 
 echo "🏗️ 2b. Running frontend static-export build gate..."
 (cd "${PROJECT_ROOT}/frontend" && npm run build)

@@ -159,12 +159,12 @@ class FinancialSentimentScorer:
 
         # 1. Multi-word phrase matching (highest specificity)
         for phrase, weight in self.BULLISH_KEYWORDS.items():
-            if " " in phrase and phrase in text:
+            if " " in phrase and re.search(r"\b" + re.escape(phrase) + r"\b", text):
                 raw_score += weight * 1.5
                 matches += 2
 
         for phrase, weight in self.BEARISH_KEYWORDS.items():
-            if " " in phrase and phrase in text:
+            if " " in phrase and re.search(r"\b" + re.escape(phrase) + r"\b", text):
                 raw_score += weight * 1.5
                 matches += 2
 
@@ -206,17 +206,20 @@ class FinancialSentimentScorer:
 
     def _classify_category(self, text: str, score: float) -> CatalystCategory:
         """Categorize into specific trading catalyst buckets."""
-        if any(k in text for k in ("fda", "biotech", "clinical", "drug", "phase 3", "trial")):
+        def _has_kw(keywords: Tuple[str, ...]) -> bool:
+            return any(re.search(r"\b" + re.escape(k) + r"\b", text) for k in keywords)
+
+        if _has_kw(("fda", "biotech", "clinical", "drug", "phase 3", "trial")):
             return CatalystCategory.FDA_APPROVAL if score > 0 else CatalystCategory.FDA_REJECTION
-        if any(k in text for k in ("earnings", "eps", "quarter", "revenue", "sales", "profit")):
+        if _has_kw(("earnings", "eps", "quarter", "revenue", "sales", "profit")):
             return CatalystCategory.EARNINGS_BEAT if score > 0 else CatalystCategory.EARNINGS_MISS
-        if any(k in text for k in ("guidance", "outlook", "forecast")):
+        if _has_kw(("guidance", "outlook", "forecast")):
             return CatalystCategory.GUIDANCE_RAISE if score > 0 else CatalystCategory.GUIDANCE_CUT
-        if any(k in text for k in ("sec", "probe", "investigation", "subpoena", "lawsuit", "fraud")):
+        if _has_kw(("sec", "probe", "investigation", "subpoena", "lawsuit", "fraud")):
             return CatalystCategory.LEGAL_INVESTIGATION
-        if any(k in text for k in ("upgrade", "downgrade", "target price", "pt")):
+        if _has_kw(("upgrade", "downgrade", "target price", "pt")):
             return CatalystCategory.ANALYST_UPGRADE if score > 0 else CatalystCategory.ANALYST_DOWNGRADE
-        if any(k in text for k in ("partner", "partnership", "deal", "contract", "merger", "acquisition")):
+        if _has_kw(("partner", "partnership", "deal", "contract", "merger", "acquisition")):
             return CatalystCategory.PARTNERSHIP_CONTRACT
 
         return CatalystCategory.GENERAL_CATALYST if abs(score) >= 0.5 else CatalystCategory.NEUTRAL

@@ -193,19 +193,22 @@ async def test_adv_concurrent_breakout_order_collision_10_symbols():
 def test_adv_concurrent_sector_concentration_barrier():
     """
     Stress-tests sector concentration limit under simultaneous breakout in same sector.
-    When Technology sector already has an active position (AAPL), subsequent breakout
-    signals in MSFT, NVDA, and AMD must be rejected to prevent correlated risk exposure.
+    Allows up to 2 positions in the same sector (e.g. NVDA and AMD in Semiconductors).
+    A 3rd position in Semiconductors (INTC) must be rejected with CORRELATED_SECTOR_EXPOSURE.
+    A position in a distinct sector (TSLA) is permitted up to portfolio max of 3.
+    A 4th position overall is rejected with MAX_CONCURRENT_POSITIONS_REACHED.
     """
     account = PaperTradingAccount(initial_cash=50000.00)
     risk_engine = InstitutionalRiskEngine()
+    risk_engine.register_symbol_sector("INTC", "Semiconductors")
 
     def risk_validator(order: Order, acct: PaperTradingAccount):
         active_symbols = set(acct.positions.keys())
-        active_sectors = {
+        active_sectors = [
             risk_engine.symbol_sectors.get(s, "Other")
             for s in active_symbols
             if s in risk_engine.symbol_sectors
-        }
+        ]
         res = risk_engine.evaluate_order_request(
             symbol=order.symbol,
             side=order.side.value,
@@ -223,29 +226,38 @@ def test_adv_concurrent_sector_concentration_barrier():
     engine = ExecutionEngine(account=account, risk_validator=risk_validator)
     now_dt = datetime(2026, 9, 21, 13, 30, 0, tzinfo=timezone.utc)
 
-    # 1. Open AAPL (Technology)
-    ord1 = engine.create_order("AAPL", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=150.0, stop_price=147.0)
+    # 1. Open NVDA (Semiconductors - position 1 in sector) -> allowed
+    ord1 = engine.create_order("NVDA", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=120.0, stop_price=117.0)
     sub1 = engine.submit_order(ord1.id)
     assert sub1.status == OrderState.ACCEPTED
-    engine.process_bar("AAPL", 150.0, 150.5, 149.5, 150.0, 50000, now_dt)
-    assert "AAPL" in account.positions
+    engine.process_bar("NVDA", 120.0, 120.5, 119.5, 120.0, 50000, now_dt)
+    assert "NVDA" in account.positions
 
-    # 2. Attempt NVDA (Technology) -> must be rejected
-    ord2 = engine.create_order("NVDA", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=120.0, stop_price=117.0)
+    # 2. Open AMD (Semiconductors - position 2 in sector) -> allowed (2 allowed per sector)
+    ord2 = engine.create_order("AMD", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=100.0, stop_price=98.0)
     sub2 = engine.submit_order(ord2.id)
-    assert sub2.status == OrderState.REJECTED
-    assert "CORRELATED_SECTOR_EXPOSURE" in sub2.reject_reason
+    assert sub2.status == OrderState.ACCEPTED
+    engine.process_bar("AMD", 100.0, 100.5, 99.5, 100.0, 50000, now_dt)
+    assert "AMD" in account.positions
 
-    # 3. Attempt MSFT (Technology) -> must be rejected
-    ord3 = engine.create_order("MSFT", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=400.0, stop_price=392.0)
+    # 3. Attempt INTC (Semiconductors - position 3 in sector) -> must be rejected
+    ord3 = engine.create_order("INTC", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=30.0, stop_price=29.4)
     sub3 = engine.submit_order(ord3.id)
     assert sub3.status == OrderState.REJECTED
     assert "CORRELATED_SECTOR_EXPOSURE" in sub3.reject_reason
 
-    # 4. Attempt TSLA (Consumer Discretionary) -> allowed
+    # 4. Attempt TSLA (Consumer Discretionary - distinct sector) -> allowed (3 positions total)
     ord4 = engine.create_order("TSLA", OrderSide.BUY, OrderType.LIMIT, 30, limit_price=220.0, stop_price=215.0)
     sub4 = engine.submit_order(ord4.id)
     assert sub4.status == OrderState.ACCEPTED
+    engine.process_bar("TSLA", 220.0, 220.5, 219.5, 220.0, 50000, now_dt)
+    assert "TSLA" in account.positions
+
+    # 5. Attempt 4th position total across any sector (MSFT) -> must be rejected by concurrency cap
+    ord5 = engine.create_order("MSFT", OrderSide.BUY, OrderType.LIMIT, 20, limit_price=400.0, stop_price=392.0)
+    sub5 = engine.submit_order(ord5.id)
+    assert sub5.status == OrderState.REJECTED
+    assert "MAX_CONCURRENT_POSITIONS_REACHED" in sub5.reject_reason
 
 
 def test_adv_buying_power_exhaustion_concurrency_race():

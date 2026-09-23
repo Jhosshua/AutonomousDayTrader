@@ -235,3 +235,89 @@ def test_market_filter_gracefully_handles_none_timestamp():
     # Must not raise AttributeError
     mf.on_bar(BarEvent("SPY", 500.0, 502.0, 499.0, 501.0, 10000, None))
     assert mf.spy_state.bars_count == 0
+
+
+def test_market_filter_neutral_regime_idiosyncratic_breakouts_and_mean_reversion():
+    """Verify NEUTRAL regime rules:
+    - mean_reversion allowed (both BUY and SELL)
+    - orb and news_momentum allowed when RVOL >= 2.20 (APPROVED_IDIOSYNCRATIC_BREAKOUT)
+    - orb and news_momentum denied when RVOL < 2.20 or None (INDEX_FILTER_DENIED)
+    - vwap_pullback denied (INDEX_FILTER_DENIED)
+    """
+    mf = MarketTrendFilter()
+    # Mixed early open produces NEUTRAL trend
+    mf.on_bar(_bar("SPY", 500.0, 502.0, 499.5, 501.5, minute=30))
+    mf.on_bar(_bar("QQQ", 450.0, 450.5, 447.0, 448.0, minute=30))
+    asof_dt = datetime(2026, 9, 22, 9, 30, 30, tzinfo=ET_TZ)
+    trend, _ = mf.get_current_trend(asof=asof_dt)
+    assert trend == MarketTrend.NEUTRAL
+
+    # 1. Mean reversion permitted in NEUTRAL for both sides
+    ok_buy, reason_buy = mf.is_signal_permitted("mean_reversion", OrderSide.BUY, "NVDA", asof=asof_dt)
+    assert ok_buy is True
+    assert "APPROVED" in reason_buy
+
+    ok_sell, reason_sell = mf.is_signal_permitted("mean_reversion", OrderSide.SELL, "NVDA", asof=asof_dt)
+    assert ok_sell is True
+    assert "APPROVED" in reason_sell
+
+    # 2. ORB in NEUTRAL: high RVOL >= 2.20 permitted, below 2.20 denied
+    ok_orb_high, reason_orb_high = mf.is_signal_permitted("orb", OrderSide.BUY, "AAPL", asof=asof_dt, rvol=2.25)
+    assert ok_orb_high is True
+    assert "APPROVED_IDIOSYNCRATIC_BREAKOUT" in reason_orb_high
+
+    ok_orb_low, reason_orb_low = mf.is_signal_permitted("orb", OrderSide.BUY, "AAPL", asof=asof_dt, rvol=1.90)
+    assert ok_orb_low is False
+    assert "INDEX_FILTER_DENIED" in reason_orb_low
+
+    ok_orb_none, reason_orb_none = mf.is_signal_permitted("orb", OrderSide.BUY, "AAPL", asof=asof_dt, rvol=None)
+    assert ok_orb_none is False
+    assert "INDEX_FILTER_DENIED" in reason_orb_none
+
+    # 3. News Momentum in NEUTRAL: high RVOL >= 2.20 permitted, below 2.20 denied
+    ok_news_high, reason_news_high = mf.is_signal_permitted("news_momentum", OrderSide.BUY, "TSLA", asof=asof_dt, rvol=2.50)
+    assert ok_news_high is True
+    assert "APPROVED_IDIOSYNCRATIC_BREAKOUT" in reason_news_high
+
+    ok_news_low, reason_news_low = mf.is_signal_permitted("news_momentum", OrderSide.BUY, "TSLA", asof=asof_dt, rvol=1.80)
+    assert ok_news_low is False
+    assert "INDEX_FILTER_DENIED" in reason_news_low
+
+    # 4. VWAP Pullback in NEUTRAL: strictly denied
+    ok_vwap_buy, reason_vwap_buy = mf.is_signal_permitted("vwap_pullback", OrderSide.BUY, "AAPL", asof=asof_dt)
+    assert ok_vwap_buy is False
+    assert "INDEX_FILTER_DENIED" in reason_vwap_buy
+
+    ok_vwap_sell, reason_vwap_sell = mf.is_signal_permitted("vwap_pullback", OrderSide.SELL, "AAPL", asof=asof_dt)
+    assert ok_vwap_sell is False
+    assert "INDEX_FILTER_DENIED" in reason_vwap_sell
+
+
+def test_market_filter_trending_lockouts_and_counter_trend_rejection():
+    """Verify BULLISH / BEARISH regime rules:
+    - ORB and VWAP Pullback permitted along index beta, denied counter-trend
+    - Mean reversion denied counter-trend with INDEX_FILTER_DENIED
+    """
+    mf = MarketTrendFilter()
+    for m in range(30, 36):
+        spy_p = 500.0 + (m - 30) * 0.8
+        qqq_p = 450.0 + (m - 30) * 1.0
+        mf.on_bar(_bar("SPY", spy_p - 0.2, spy_p + 0.9, spy_p - 0.3, spy_p + 0.7, vol=50000, minute=m))
+        mf.on_bar(_bar("QQQ", qqq_p - 0.2, qqq_p + 1.1, qqq_p - 0.3, qqq_p + 0.9, vol=40000, minute=m))
+
+    asof_dt = datetime(2026, 9, 22, 9, 36, 0, tzinfo=ET_TZ)
+    trend, _ = mf.get_current_trend(asof=asof_dt)
+    assert trend == MarketTrend.BULLISH
+
+    # In BULLISH: VWAP Pullback BUY allowed, SELL denied
+    ok_v_buy, _ = mf.is_signal_permitted("vwap_pullback", OrderSide.BUY, "AAPL", asof=asof_dt)
+    assert ok_v_buy is True
+    ok_v_sell, reason_v_sell = mf.is_signal_permitted("vwap_pullback", OrderSide.SELL, "AAPL", asof=asof_dt)
+    assert ok_v_sell is False
+    assert "INDEX_BETA_CONTRADICTION" in reason_v_sell
+
+    # In BULLISH: Mean Reversion SELL denied with INDEX_FILTER_DENIED
+    ok_mr_sell, reason_mr_sell = mf.is_signal_permitted("mean_reversion", OrderSide.SELL, "NVDA", asof=asof_dt)
+    assert ok_mr_sell is False
+    assert "INDEX_FILTER_DENIED" in reason_mr_sell
+

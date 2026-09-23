@@ -2,6 +2,39 @@
 
 ## Decisions
 
+### 2026-09-23: Universe Expansion, Multi-Sector Risk Modeling, Regime-Separated Execution & Microstructure Calibrations (R4-R6)
+- **Quantitative Diagnosis of Filter-Stacking Bottleneck & Trade Starvation**:
+  - *Symptom*: Trade count dropped to ~0 trades/day despite active market hours ($49,798.32 equity, $0.00 drawdown today).
+  - *Root Cause 1: Artificial Universe & Sector Bottleneck*: Monitored only 3 single stocks (`AAPL`, `NVDA`, `TSLA`). `AAPL` and `NVDA` were both categorized under "Technology", and the existing sector limit allowed only 1 position per sector. If AAPL established an open position, NVDA was locked out immediately, starving the system of trade setups.
+  - *Root Cause 2: Market Regime Freezing*: SPY and QQQ spend ~60% of intraday trading time oscillating around VWAP in `NEUTRAL` regimes. In `NEUTRAL`, all directional momentum strategies (ORB, VWAP Pullback, News Momentum) were completely locked out by `MarketTrendFilter`, while Statistical Mean Reversion was constrained by extreme hurdles ($Z \ge 2.0$, volume climax $\ge 1.75\times$, wick $\ge 0.35$), preventing any trades from printing.
+  - *Root Cause 3: Volume Climax Delusion*: News momentum required a $3.5\times$ 1-minute volume surge, which is characteristic of exhaustion tops after institutional HFTs reprice breaking news, forcing entries at the climax of the move.
+  - *Root Cause 4: NLP Keyword Leakage*: Substring matching in `FinancialSentimentScorer` suffered false positive cross-leakage (e.g. "sector" triggering SEC legal investigation, "window" triggering partnership/contract).
+- **Mathematical Rationale & Architectural Solutions**:
+  1. *Expanded Universe & Granular Sector Mapping*:
+     - Expanded `WATCHLIST_SYMBOLS` to 12 liquid high-beta symbols across 5 sectors and Index ETFs: `["SPY", "QQQ", "AAPL", "NVDA", "TSLA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "PLTR", "COIN"]`.
+     - Decomposed broad "Technology" into granular clusters: Semiconductors (`NVDA`, `AMD`), Software (`MSFT`, `PLTR`), Consumer Discretionary (`TSLA`, `AMZN`), Communication Services (`GOOGL`, `META`), Fintech/Crypto (`COIN`), and Index (`SPY`, `QQQ`).
+     - Mathematical Rationale for Sector Limits: Under Markowitz portfolio variance $\sigma_p^2 = \sum w_i^2 \sigma_i^2 + 2 \sum_{i < j} w_i w_j \sigma_i \sigma_j \rho_{ij}$, allowing at most 2 positions in a single sector ($\rho_{sector} \approx 0.70 - 0.85$) while capping total concurrent positions at 3 ($\max \sum w_i \le 1.50$ notional equity) ensures intra-sector concentration risk is bounded ($w_{sector} \le 0.67$ of open exposure) while eliminating single-name starvation. Index ETFs (`SPY`, `QQQ`) represent broad market beta and are exempt from single-sector concentration caps.
+  2. *Regime-Separated Execution Architecture*:
+     - **Trending Regimes (`BULLISH` / `BEARISH`)**: Directional strategies (ORB, VWAP Pullback, News Momentum) execute along market index beta ($\beta_{SPY/QQQ}$). Counter-trend Mean Reversion is strictly denied (`INDEX_BETA_CONTRADICTION`).
+     - **Neutral Regimes (`NEUTRAL`)**: Statistical Mean Reversion is active to monetize range-bound oscillations between standard deviation bands ($\pm 1.65\sigma$ to 20-SMA).
+     - **Idiosyncratic Decoupling in NEUTRAL**: When a single stock demonstrates high relative volume ($\text{RVOL} \ge 2.20\times$), ORB and News Momentum breakouts are permitted in `NEUTRAL` regimes because institutional volume proves price action has decoupled from systematic index chop.
+  3. *Microstructure & Indicator Calibrations*:
+     - **News Momentum Volume Threshold**: Reduced volume surge requirement from $3.50\times$ to $2.00\times$. At $2.00\times$, volume confirms institutional interest without requiring climax exhaustion.
+     - **Regex NLP Boundary Matching**: Replaced crude substring matching with strict word-boundary regular expressions (`\b(?:sec|probe|investigation|subpoena|lawsuit|fraud)\b`, `\b(?:earnings|eps|quarter|revenue|sales|profit)\b`), eliminating NLP false positives.
+     - **Statistical Mean Reversion Calibrations**: Lowered $Z$-score threshold from 2.00 to 1.65, volume climax from $1.75\times$ to $1.30\times$, and wick rejection ratio from 0.35 to 0.30. In moderate VIX regimes (14–16), standard deviation swings reach $1.65\sigma$ reliably at turning points, unlocking valid exhaustion fades without sacrificing risk/reward.
+  4. *Invariant Risk Boundaries Preserved*:
+     - Daily loss limit: $1,500 hard circuit breaker strictly binding.
+     - Maximum single position notional: $25,000 (50% equity).
+     - Stop loss distances: strictly clamped within $[0.0040, 0.0400]$.
+     - Zero overnight holding: 4-phase auto-flattening protocol liquidates all positions prior to 16:00 ET.
+- **Verification Outcomes**:
+  - Full backend pytest suite: 324/324 passed (100% pass rate in 4.46s).
+  - Opaque-box E2E test runner (`tests/e2e/runner.py`): 320/320 passed (100% pass rate in 26.87s).
+  - Integrated Monday market open dry run (`scripts/run_integrated_monday_dry_run.py`): Status `PASS`, 184 events processed, 0 event bus errors, 0 open positions, 0 working orders, flat EOD book, realized PnL +$308.56.
+  - Next.js frontend production build: Clean compile, 0 errors.
+  - UI Architecture verification: `node frontend/scripts/verify_ui.mjs` PASSED.
+  - Port hygiene verification: Ports 8000, 8005, 8080, and 3005 clean and liberated.
+
 ### 2026-09-23: R3 Full-Stack Review Remediation, Multi-Agent Audit Certification, and Production Hardening
 - **Comprehensive Full-Stack Code Review & Remediation**:
   Conducted an exhaustive audit across all 5 architectural subsystems (Ingestion, Core State & Risk, Strategies, API & Lifecycle, Frontend) cataloging and remediating 20 architectural defects without regressions:

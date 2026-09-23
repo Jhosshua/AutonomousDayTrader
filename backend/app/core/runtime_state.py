@@ -183,7 +183,12 @@ def restore_runtime_state(
     completed_brackets_recorded.update(bracket_state["completed_brackets_recorded"])
 
     for name, value in decoded["risk"].items():
-        setattr(risk_engine, name, value)
+        if name == "symbol_sectors" and isinstance(value, dict):
+            merged = dict(value)
+            merged.update(risk_engine.symbol_sectors)
+            risk_engine.symbol_sectors = merged
+        else:
+            setattr(risk_engine, name, value)
     for name, value in decoded["flattening"].items():
         setattr(flattening_engine, name, value)
     for name, value in decoded["adaptation"].items():

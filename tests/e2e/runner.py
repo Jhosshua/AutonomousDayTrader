@@ -105,7 +105,7 @@ def run_tests(
     duration = time.monotonic() - start_time
 
     # Verify ports after execution
-    ports_to_check = [8080, 8005, 3005]
+    ports_to_check = [8080, 8005, 8000, 3005]
     port_status = audit_ports(ports_to_check)
 
     all_ports_clean = all(port_status.values())
