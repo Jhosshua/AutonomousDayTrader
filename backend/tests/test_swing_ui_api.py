@@ -126,6 +126,7 @@ async def test_swing_engine_to_ui_dict_with_active_positions(client):
         strategy_id="swing_panic_dip",
         stop_loss_price=98.0,
         entry_date=date.today(),
+        entry_atr=4.2,
         holding_days=2,
     )
     swing_strategy_engine.account.positions["MU"] = pos
@@ -134,6 +135,8 @@ async def test_swing_engine_to_ui_dict_with_active_positions(client):
         assert len(ui_dict["positions"]) == 1
         pos_ui = ui_dict["positions"][0]
         assert pos_ui["symbol"] == "MU"
+        assert pos_ui["entry_atr"] == 4.2
+        assert pos_ui["entry_date"] == date.today().isoformat()
         assert "exit_triggers" in pos_ui
         assert "sma_5_cross" in pos_ui["exit_triggers"]
         assert "rsi_70_cross" in pos_ui["exit_triggers"]

@@ -289,6 +289,8 @@ class PositionState:
     strategy_id: str = "MANUAL"
     holding_days: int = 0
     stop_loss_price: Optional[float] = None
+    entry_atr: Optional[float] = None
+    entry_date: Optional[str] = None
 
 
 @dataclass(frozen=True)

@@ -1,38 +1,46 @@
-## 2026-09-23T04:10:04Z
-You are Reviewer 2: Quantitative Microstructure & Parameter Sensitivity Reviewer.
+# Dispatch Briefing: Reviewer 2 (`teamwork_preview_reviewer`)
 
-Your working directory is:
-/Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2
-All your review findings and handoff must be written to your working directory.
+## Objective
+Independently review Worker 1's remediation focusing on mathematical risk constraints, slippage integration, fill-anchored stop loss, idempotency, PositionState schema fidelity, and SQLite persistence round-trip.
 
-Authoritative source of truth:
-You MUST read /Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md before starting work.
-Also inspect:
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_3/PLAN.md
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/worker_remediation/handoff.md
-- /Users/mo/AutonomousDayTrader/PROJECT.md
-- /Users/mo/AutonomousDayTrader/MEMORY.md
-- /Users/mo/AutonomousDayTrader/ERRORS.md
-- Files modified by Worker 1:
-  - backend/app/core/market_filter.py
-  - backend/app/core/bracket.py
-  - backend/app/main.py
-  - backend/app/strategies/adaptation.py
-  - backend/app/strategies/orb.py
-  - backend/app/strategies/news_momentum.py
-  - backend/app/strategies/mean_reversion.py
-  - backend/tests/unit/test_market_filter.py
+## Authoritative Reference
+- ORIGINAL_REQUEST: `/Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md`
+- PROJECT: `/Users/mo/AutonomousDayTrader/PROJECT.md`
+- Audit Findings: `/Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_8/AUDIT_FINDINGS.md`
+- Worker 1 Changes: `/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/changes.md`
+- Worker 1 Handoff: `/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/handoff.md`
 
-Your Mission:
-1. Conduct an in-depth quantitative review of the mathematical models and parameter choices:
-   - Parameter curve-fitting audit: evaluate whether thresholds (0.8R T1, CLV 0.65/0.35, 2.2x ATR range cap, Z=2.0, RSI 70/30, 35% wick, 1.75x volume) are structurally justified by market microstructure rather than curve-fitted to a narrow fixture.
-   - Edge case & boundary condition audit: division by zero guards (e.g. high == low, candle_range == 0, sma20_vol == 0), floating point IEEE 754 precision issues, price-scaled breakeven buffer math.
-   - Fail-closed behavior: verify what happens when SPY/QQQ feeds are missing, pre-market, or stale (>120s).
-2. Run test suites:
-   `pytest backend/tests -v`
-3. Write your detailed review to:
-   /Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2/review.md
-   and write a 5-component handoff report to:
-   /Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2/handoff.md
-   Include your clear, unambiguous gate verdict: APPROVE or REQUEST_CHANGES.
-4. Send completion message to parent when done.
+## Review Focus
+1. Examine mathematical rigor: verify Rule 6 stop-loss is anchored strictly to `fill.price - 2.5 * daily_atr` (not unadjusted open price).
+2. Verify realistic slippage: verify `ExecutionEngine.calculate_slippage` or dynamic model is active on all swing fills.
+3. Verify idempotency: confirm repeated scans/evaluations strictly adhere to `available_slots = max_concurrent_positions - len(surviving_positions) - len(staged_entries)` and 2-slot cap.
+4. Verify schema fidelity: confirm `PositionState` and `Position.to_state()` properly include `entry_atr` and `entry_date`.
+5. Verify DailyBarStore checkpoint persistence across SQLite save and restore.
+6. Run `pytest backend/tests` and check `python scripts/run_integrated_swing_dry_run.py`.
+
+## Output Requirements
+Write your detailed review to:
+`/Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2/review.md`
+And summary handoff with clear verdict (`APPROVE` or `REQUEST_CHANGES`) to:
+`/Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2/handoff.md`
+Use `send_message` to communicate completion back to parent.
+
+## 2026-09-24T00:26:23Z
+You are Reviewer 2 (teamwork_preview_reviewer).
+Your working directory is: /Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2
+Your identity: Independent Quantitative Risk & Persistence Reviewer.
+
+Read your dispatch instructions in:
+/Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2/DISPATCH.md
+Read the authoritative user request at:
+/Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md
+Also refer to:
+/Users/mo/AutonomousDayTrader/PROJECT.md
+And Worker 1's documentation:
+/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/changes.md
+/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/handoff.md
+
+Your mission:
+Independently review Worker 1's code changes for mathematical risk rigor, slippage integration, fill-anchored stop loss, idempotency, PositionState schema fidelity, and DailyBarStore SQLite persistence. Run pytest backend/tests and the dry run script.
+Write your full review to /Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2/review.md and summary handoff with clear verdict (APPROVE or REQUEST_CHANGES) to /Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_2/handoff.md.
+Use send_message to report back to parent (ID: b067f9cf-98b6-4f32-8f6e-4a86f7057623).

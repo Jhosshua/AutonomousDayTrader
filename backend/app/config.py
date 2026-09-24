@@ -1,7 +1,7 @@
 """backend/app/config.py
 System configuration, network endpoints, credentials, and institutional risk parameters.
 """
-from typing import List
+from typing import List, Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -83,6 +83,14 @@ class Settings(BaseSettings):
     EARNINGS_CALENDAR_SEED_PATH: str = Field(
         default="backend/app/data/earnings_calendar.json",
         description="Path to earnings calendar seed data"
+    )
+    EARNINGS_CALENDAR_REMOTE_URL: Optional[str] = Field(
+        default=None,
+        description="Optional remote URL to refresh earnings calendar"
+    )
+    EARNINGS_CALENDAR_CACHE_PATH: str = Field(
+        default="backend/app/data/earnings_calendar_cache.json",
+        description="Path to durable earnings calendar cache file"
     )
     SUBSCRIBE_BARS: bool = Field(default=True, description="Subscribe to 1-minute OHLCV bars")
     SUBSCRIBE_QUOTES: bool = Field(default=True, description="Subscribe to NBBO top-of-book quotes")

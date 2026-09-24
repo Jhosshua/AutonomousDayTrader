@@ -88,6 +88,8 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | COMPLETED / DEPLOYED; Full-stack review remediated, multi-agent audit certified (5/5 PASS), Railway production live & healthy, ports clean |
 | M7 | `universe_regime_calibration` | 12-symbol watchlist expansion, multi-sector risk engine (max 2/sector, max 3 total), regime-separated execution (NEUTRAL vs trending), microstructure calibrations (news 2.0x, MR Z=1.65, wick 0.30, vol 1.30x) | M1-M6 | COMPLETED / DEPLOYED; 324/324 backend pytest pass, 320/320 E2E runner pass, integrated dry run pass, Railway deployed healthy |
 | M8 | `round6_adversarial_hardening` | Round 6 adversarial audit, QoS frame priority, causal indicator baselines, pre-trade drawdown & loss budgeting, committed portfolio concurrency, EOD stop preservation, JSON float sanitization | M1-M7 | COMPLETED / DEPLOYED; 355/355 backend pytest pass, 31/31 stress mutations pass, 320/320 E2E pass, dry run pass, Railway deployed healthy |
+| M9 | `swing_engine_integration` | Autonomous "2-Day Panic Dip" (Connors RSI-2) swing engine across 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`), $50k shared pool ($25k/slot, max 2), flattening exemption | M1-M8 | COMPLETED / DEPLOYED; 432/432 backend tests, 325/325 E2E runner tests pass, 6-day replay dry run verified |
+| M10 | `forensic_remediation_and_deployment` | Forensic audit remediation (10 core fixes + 3 Gate 1 fixes), 6-day concurrent simulation dry run (+$3,056.09 PnL), desktop/mobile UI visual QA (0px overflow), production cloud deployment to Railway | M1-M9 | COMPLETED / DEPLOYED; 485/485 backend tests, 325/325 E2E runner tests, live Railway health & swing state verified |
 
 ### E2E Testing Track (Parallel)
 | Track | Scope | Outputs | Status |
@@ -441,6 +443,73 @@ AutonomousDayTrader integrated an autonomous multi-day swing trading engine runn
   - Full backend pytest suite: 432/432 passed (100%).
   - Full E2E test runner: 325/325 passed (100%).
   - Local process hygiene verified: ports 3005, 8000, 8005, 8080 clean and liberated.
+
+### 2026-09-24: Milestone 10 — Deep Forensic Audit, Hardened Swing Execution, Concurrent Multi-Day Simulation & Production Cloud Deployment
+AutonomousDayTrader underwent an exhaustive forensic audit across both intraday and swing trading subsystems, remediating all 10 verified core defects and 3 Gate 1 integrity findings. The system was validated via a 6-day concurrent multi-day simulation dry run (+ $3,056.09 PnL), 100% test pass rates across all test tiers (485 backend tests, 325 E2E runner tests), certified 0px horizontal overflow UI on desktop and mobile, and verified live cloud deployment to Railway.
+
+#### 1. Forensic Audit Remediations & Hardening Diffs
+- **Defect 1: Broadened Market Open Execution Window & Stale Staged Order Purge (`backend/app/main.py`)**:
+  - Broadened the opening bar execution window from a single minute (`09:30`) to `(bar_t.hour == 9 and 30 <= bar_t.minute <= 45)`, absorbing opening cross delays and volume spikes without marooning staged orders.
+  - Added `_expire_stale_staged_swing_orders(current_time)` after 09:45 ET to expire unexecuted orders and release symbol reservations.
+- **Defect 2: Active Slot Concurrency Preservation During Staged Exits (`backend/app/strategies/swing_panic_dip.py`)**:
+  - Gated staged entry dropping when `active_count >= max_concurrent_positions` so that if `staged_exits > 0`, the entry is deferred via `continue` rather than deleted, permitting entry execution immediately after exit fills.
+- **Defect 3: Available Slots Formula Clamped to Concurrency Limit (`backend/app/strategies/swing_panic_dip.py`)**:
+  - Corrected slot math to `available_slots = max_concurrent_positions - len(surviving_positions) - len(staged_entries)`. Prevents repeated 16:00 scans from exceeding the 2-position hard ceiling.
+- **Defect 4: Non-Blocking Asynchronous Earnings Refresh (`backend/app/strategies/earnings_calendar.py`)**:
+  - Replaced blocking `urllib.request.urlopen` with asynchronous `httpx.AsyncClient(timeout=3.0)`, preventing event loop starvation.
+- **Defect 5: Intraday Quarantine for Circuit Breaker Liquidation (`backend/app/main.py`)**:
+  - Quarantined `_trip_circuit_breaker` flattening loop to `TradingArm.INTRADAY`, strictly skipping swing positions (`arm == TradingArm.SWING`) and preserving overnight swing holdings.
+- **Defect 6: Dynamic Fill Slippage & Fill-Anchored Rule 6 Stops (`backend/app/main.py`)**:
+  - Applied dynamic execution slippage (`ExecutionEngine.calculate_slippage`) to swing entry and exit fills. Anchored Rule 6 emergency stops strictly to realized fill price: `P_fill - 2.5 * Daily_ATR(14)`.
+- **Defect 7: Serialization Schema Fidelity & Safe Formatting (`backend/app/models/events.py`, `backend/app/core/account.py`, `frontend/`)**:
+  - Added `entry_atr` and `entry_date` to `PositionState` and `Position.to_state()`. Hardened `ActiveSwingPositionsTable.tsx` with `safeFixed` and `safeLocale` nullish-safe formatters, eliminating runtime crashes.
+- **Defect 8: Persistent Earnings Calendar Disk Caching (`backend/app/config.py`, `backend/app/strategies/earnings_calendar.py`)**:
+  - Added `EARNINGS_CALENDAR_REMOTE_URL` and `EARNINGS_CALENDAR_CACHE_PATH` configuration. Implemented atomic disk serialization via `save_cache_file()`.
+- **Defect 9: Multi-Day Daily Bar Persistence Across Restarts (`backend/app/core/runtime_state.py`)**:
+  - Added `get_all_bars()` to `DailyBarStore`. Serialized daily bars into SQLite runtime checkpoints and restored on container startup, preserving 200-SMA, 5-SMA, and RSI(2) calculations.
+- **Defect 10: Dedicated Forensic Remediation Regression Suite (`backend/tests/unit/test_swing_forensic_remediation.py`)**:
+  - Added 11 dedicated regression tests proving independent resolution of each defect.
+- **Gate 1 Fix 1: Stop-Loss Assertion Anchored to Fill Price (`tests/e2e/test_swing_multiday_replay.py`)**:
+  - Aligned test assertion to `lrcx_pos.avg_entry_price - 2.5 * daily_atr`, matching production Rule 6 contract.
+- **Gate 1 Fix 2: Session-Scoped Market Open Pricing Guard (`backend/app/main.py`)**:
+  - Added `today_open_prices: Dict[str, float]`, populated strictly by 09:30–09:45 regular-session opening bars (`bar.open`) and cleared at session boundaries, eliminating stale price fills.
+- **Gate 1 Fix 3: Cross-Arm Mutual Exclusion Integrity (`backend/app/main.py`)**:
+  - Required arm matching (`existing_is_swing == is_swing`) for `is_exit = True` classification in `pre_trade_risk_validator`, preventing intraday orders from cannibalizing swing holdings under the guise of an exit.
+
+#### 2. Concurrent Multi-Day Simulation Dry Run (`SWING_FULL_E2E_DRY_RUN_REPORT.md`)
+- Simulated 6 consecutive trading sessions (August 3–10, 2026) through the full production event path:
+  - Initial Capital: $50,000.00 | Ending Equity: $53,056.11 | Net Realized PnL: +$3,056.09.
+  - Zero intraday positions held overnight; zero swing positions liquidated during 15:58 flattening sweeps.
+  - Verified shared capital pool coexistence without margin double-spending or borrowing violations.
+  - Verified all 3 Rule 7 exit triggers (5-SMA cross, RSI(2) > 70, 5-day time stop) and Rule 6 emergency stop breach.
+  - Verified bidirectional AMD mutual exclusion across staging, holding, and release.
+  - Verified non-trading weekend calendar rollover invariant (holding days advance strictly on active trading sessions).
+
+#### 3. Operator UI Visual QA & WebSocket Resilience
+- Desktop (1440x900) and Mobile (390x844 - iPhone 14 Pro) live DOM audit via Headless Chrome:
+  - Exact DOM measurement: `scrollWidth == clientWidth` (0px horizontal overflow across all views and modals).
+  - 0 overflowing UI elements detected.
+- Swing Operator Components Verified:
+  - `SegmentedModeToggle` with fluid Framer Motion pill animation.
+  - `SwingTelemetryBar` with real-time slot utilization and "OVERNIGHT EXEMPT" green shield badge.
+  - `ActiveSwingPositionsTable` with ATR stop meters, holding day counters, and exit condition checklists.
+  - `SwingCandidateWatchlist` with desktop table and mobile stacked card layouts.
+  - Verified manual operator WebSocket dispatches (`SWING_EXIT_NEXT_OPEN`, `SWING_TIGHTEN_STOP`, `SWING_EXIT_IMMEDIATE`).
+- WebSocket Streaming Resilience:
+  - 5/5 stress tests passed covering high-frequency message bursts (>1,000,000 msg/sec) and malformed frames without React unmounting.
+
+#### 4. Test Suite Pass Records & Verification
+- Full Backend Pytest Suite: **485/485 passed** in 7.48s (100% pass rate).
+- Full Opaque-Box E2E Runner: **325/325 passed** in 25.43s (100% pass rate, Exit Code 0).
+- Multi-Day Dry Run: **PASS** (6/6 days simulated, +$3,056.09 PnL).
+- Process & Port Hygiene: Ports 3005, 8000, 8005, 8080 confirmed 100% liberated and clean.
+
+#### 5. Railway Cloud Deployment & Remote Telemetry
+- Service: `AutonomousDayTrader` (Repo: `Jhosshua/AutonomousDayTrader`, branch `main`).
+- Live Production URL: `https://autonomousdaytrader-production.up.railway.app`.
+- Remote Health Endpoint: `GET /health` $\to$ HTTP 200 OK (`status: "healthy"`, relay feeds connected, durable SQLite persistence active).
+- Remote Swing State Endpoint: `GET /api/swing/state` $\to$ HTTP 200 OK (telemetry active, 5 candidate stocks evaluated).
+
 
 
 

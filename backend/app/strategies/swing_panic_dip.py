@@ -31,7 +31,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 
 from backend.app.core.account import PaperTradingAccount, Position, TradingArm
-from backend.app.core.engine import ExecutionEngine, OrderSide, OrderType
+from backend.app.core.engine import ExecutionEngine, Order, OrderSide, OrderType
 from backend.app.core.risk import InstitutionalRiskEngine
 from backend.app.models.events import BarEvent
 from backend.app.strategies.earnings_calendar import EarningsCalendar
@@ -297,13 +297,18 @@ class SwingStrategyEngine:
         # STEP 2: EVALUATE CANDIDATE ENTRIES
         # -------------------------------------------------------------
         # Exiting positions will be sold at tomorrow's open, freeing their slots
-        exiting_symbols = {e.symbol for e in staged_exits}
+        exiting_symbols = {e.symbol for e in staged_exits} | {e.symbol for e in self.staged_manager.get_staged_exits()}
         surviving_positions = {sym for sym in active_positions if sym not in exiting_symbols}
-        available_slots = self.max_concurrent_positions - len(surviving_positions)
+        existing_staged_entries = self.staged_manager.get_staged_entries()
+        existing_staged_symbols = {e.symbol for e in existing_staged_entries}
+
+        # Deduct already staged entries from available slots to enforce strict idempotency
+        available_slots = self.max_concurrent_positions - len(surviving_positions) - len(existing_staged_symbols)
+        available_slots = max(0, available_slots)
 
         log.info(
-            f"16:00 Swing Close Scan: {len(active_positions)} active, {len(staged_exits)} exiting, "
-            f"{available_slots} available slots"
+            f"16:00 Swing Close Scan: {len(active_positions)} active, {len(exiting_symbols)} exiting, "
+            f"{len(existing_staged_symbols)} already staged, {available_slots} available slots"
         )
 
         if available_slots > 0:
@@ -313,14 +318,13 @@ class SwingStrategyEngine:
                 if available_slots <= 0:
                     break
 
-                # Skip if already held or scheduled to exit at next open (cannot enter and exit simultaneously)
-                if sym in active_positions or sym in exiting_symbols:
+                # Skip if already held, scheduled to exit at next open, or already staged for entry
+                if sym in active_positions or sym in exiting_symbols or sym in existing_staged_symbols:
                     continue
 
-                # Skip if already staged for entry
+                # Skip if already staged for entry in manager
                 if self.staged_manager.is_staged_for_entry(sym):
                     continue
-
 
                 # Mutual exclusion: check if intraday has open position in this symbol
                 intraday_pos = self.account.positions.get(sym)
@@ -358,6 +362,7 @@ class SwingStrategyEngine:
                         reason=f"PANIC_DIP_RSI2_{qual_res.rsi_2:.2f}_SMA200_{qual_res.sma_200:.2f}",
                     )
                     staged_entries.append(staged_buy)
+                    existing_staged_symbols.add(sym)
                     available_slots -= 1
 
                     # Lock symbol for swing so intraday engine cannot enter tomorrow morning
@@ -378,6 +383,10 @@ class SwingStrategyEngine:
         self,
         open_prices: Dict[str, float],
         open_time: datetime,
+        bar_volumes: Optional[Dict[str, int]] = None,
+        bar_highs: Optional[Dict[str, float]] = None,
+        bar_lows: Optional[Dict[str, float]] = None,
+        apply_slippage: bool = True,
     ) -> Dict[str, Any]:
         """Execute staged swing orders at 09:30 ET market open.
         
@@ -398,7 +407,7 @@ class SwingStrategyEngine:
             # -------------------------------------------------------------
             staged_exits = self.staged_manager.get_staged_exits()
             for exit_order in staged_exits:
-                sym = exit_order.symbol
+                sym = exit_order.symbol.upper()
                 pos = self.account.positions.get(sym)
                 if not pos or pos.shares <= 0:
                     self.staged_manager.remove_staged_order(exit_order.order_id)
@@ -420,21 +429,42 @@ class SwingStrategyEngine:
                         arm=TradingArm.SWING,
                     )
                     self.execution_engine.submit_order(order_obj.id)
+
+                    # Realistic exit slippage (adverse downward on sells)
+                    if apply_slippage:
+                        raw_slippage = (
+                            self.execution_engine.calculate_slippage(
+                                order_obj,
+                                market_price=open_price,
+                                bar_volume=bar_volumes.get(sym, 10000) if bar_volumes else 10000,
+                                bar_high=bar_highs.get(sym) if bar_highs else None,
+                                bar_low=bar_lows.get(sym) if bar_lows else None,
+                            )
+                            if hasattr(self.execution_engine, "calculate_slippage")
+                            else max(0.01, round(open_price * 0.0003, 4))
+                        )
+                        slippage = max(0.01, round(raw_slippage, 4))
+                        fill_price = round(open_price - slippage, 2)
+                    else:
+                        slippage = 0.0
+                        fill_price = open_price
+
                     fill = self.execution_engine._execute_fill(
                         order=order_obj,
                         qty=shares,
-                        price=open_price,
-                        slippage=0.0,
+                        price=fill_price,
+                        slippage=slippage,
                         timestamp=open_time,
                     )
                     exits_executed.append({
                         "symbol": sym,
                         "shares": shares,
-                        "price": open_price,
+                        "price": fill_price,
+                        "slippage": slippage,
                         "realized_pnl": fill.realized_pnl,
                         "reason": exit_order.reason,
                     })
-                    log.info(f"Executed swing EXIT for {sym}: {shares} shares @ ${open_price:,.2f} ({exit_order.reason})")
+                    log.info(f"Executed swing EXIT for {sym}: {shares} shares @ ${fill_price:,.2f} ({exit_order.reason})")
                 except Exception as e:
                     log.error(f"Error executing swing exit for {sym}: {e}")
                     errors.append(f"Exit error for {sym}: {e}")
@@ -449,9 +479,18 @@ class SwingStrategyEngine:
             # -------------------------------------------------------------
             staged_entries = self.staged_manager.get_staged_entries()
             for entry_order in staged_entries:
-                sym = entry_order.symbol
+                sym = entry_order.symbol.upper()
                 active_count = len(self.get_active_swing_positions())
+                pending_exits = self.staged_manager.get_staged_exits()
+
+                # Defect 2: If active_count >= max_concurrent_positions, check for pending staged exits
                 if active_count >= self.max_concurrent_positions:
+                    if len(pending_exits) > 0:
+                        log.info(
+                            f"Concurrency cap reached ({active_count}/{self.max_concurrent_positions}) on {sym}, "
+                            f"but {len(pending_exits)} staged exit(s) still pending. Retaining/deferring staged entry."
+                        )
+                        continue
                     log.warning(
                         f"Concurrency cap reached ({active_count}/{self.max_concurrent_positions}): "
                         f"Cannot enter swing trade on {sym}"
@@ -463,11 +502,10 @@ class SwingStrategyEngine:
 
                 open_price = open_prices.get(sym)
                 if not open_price or open_price <= 0.0:
-                    errors.append(f"Missing open price for {sym}; cannot execute staged entry")
-                    continue  # Await this symbol's open bar
+                    errors.append(f"Missing open price for {sym}; awaiting open bar")
+                    continue  # Await this symbol's open bar; do not delete staged order
 
-
-                # Calculate integer shares: floor($25,000 / P_open)
+                # Size strictly using Rule 5 slot notional / open price
                 qty = int(math.floor(self.slot_notional / open_price))
                 if qty <= 0:
                     log.warning(f"Calculated 0 shares for {sym} at price ${open_price:,.2f}; skipping")
@@ -476,9 +514,31 @@ class SwingStrategyEngine:
                         self.release_symbol_cb(sym)
                     continue
 
-                # Rule 6: Emergency Stop Price = P_open - 2.5 * Daily_ATR(14)
+                # Realistic entry slippage (adverse upward on buys)
+                if apply_slippage:
+                    raw_slippage = (
+                        self.execution_engine.calculate_slippage(
+                            Order(
+                                id="tmp_slip", client_order_id="tmp_slip", symbol=sym,
+                                side=OrderSide.BUY, order_type=OrderType.MARKET, qty=qty
+                            ),
+                            market_price=open_price,
+                            bar_volume=bar_volumes.get(sym, 10000) if bar_volumes else 10000,
+                            bar_high=bar_highs.get(sym) if bar_highs else None,
+                            bar_low=bar_lows.get(sym) if bar_lows else None,
+                        )
+                        if hasattr(self.execution_engine, "calculate_slippage")
+                        else max(0.01, round(open_price * 0.0003, 4))
+                    )
+                    slippage = max(0.01, round(raw_slippage, 4))
+                    fill_price = round(open_price + slippage, 2)
+                else:
+                    slippage = 0.0
+                    fill_price = open_price
+
+                # Rule 6: Emergency Stop Price = P_fill - 2.5 * Daily_ATR(14)
                 stop_distance = self.stop_atr_multiplier * entry_order.daily_atr
-                stop_price = round(open_price - stop_distance, 2)
+                stop_price = round(fill_price - stop_distance, 2)
                 try:
                     # Pre-trade risk validation if risk engine is present
                     if self.risk_engine:
@@ -487,7 +547,7 @@ class SwingStrategyEngine:
                             symbol=sym,
                             side="BUY",
                             requested_qty=qty,
-                            entry_price=open_price,
+                            entry_price=fill_price,
                             stop_price=stop_price,
                             account_equity=self.account.equity,
                             buying_power=self.account.buying_power,
@@ -514,7 +574,7 @@ class SwingStrategyEngine:
                         order_type=OrderType.MARKET,
                         qty=qty,
                         stop_price=stop_price,
-                        estimated_price=open_price,
+                        estimated_price=fill_price,
                         strategy_id="swing_panic_dip",
                         arm=TradingArm.SWING,
                     )
@@ -522,19 +582,22 @@ class SwingStrategyEngine:
                     fill = self.execution_engine._execute_fill(
                         order=order_obj,
                         qty=qty,
-                        price=open_price,
-                        slippage=0.0,
+                        price=fill_price,
+                        slippage=slippage,
                         timestamp=open_time,
                     )
+
+                    # Rule 6: Stop Anchored strictly to realized fill.price
+                    realized_stop_price = round(fill.price - stop_distance, 2)
 
                     # Explicitly populate swing metadata on position
                     pos = self.account.positions.get(sym)
                     if pos:
                         pos.arm = TradingArm.SWING
                         pos.strategy_id = "swing_panic_dip"
-                        pos.stop_loss_price = stop_price
+                        pos.stop_loss_price = realized_stop_price
                         pos.entry_atr = entry_order.daily_atr
-                        pos.entry_date = open_time.date()
+                        pos.entry_date = open_time.date() if isinstance(open_time, datetime) else open_time
                         pos.holding_days = 1  # Day 1 of the swing trade upon fill
 
                     if self.reserve_symbol_cb:
@@ -544,13 +607,15 @@ class SwingStrategyEngine:
                         "symbol": sym,
                         "shares": qty,
                         "price": open_price,
-                        "notional": round(qty * open_price, 2),
-                        "stop_loss_price": stop_price,
+                        "fill_price": fill.price,
+                        "slippage": slippage,
+                        "notional": round(qty * fill.price, 2),
+                        "stop_loss_price": realized_stop_price,
                         "daily_atr": entry_order.daily_atr,
                     })
                     log.info(
-                        f"Executed swing ENTRY for {sym}: {qty} shares @ ${open_price:,.2f} "
-                        f"(stop=${stop_price:,.2f}, ATR=${entry_order.daily_atr:.2f})"
+                        f"Executed swing ENTRY for {sym}: {qty} shares @ ${fill.price:,.2f} "
+                        f"(stop=${realized_stop_price:,.2f}, ATR=${entry_order.daily_atr:.2f}, slippage=${slippage:.4f})"
                     )
                 except Exception as e:
                     log.error(f"Error executing swing entry for {sym}: {e}")
@@ -606,18 +671,29 @@ class SwingStrategyEngine:
                         strategy_id="swing_panic_dip",
                         arm=TradingArm.SWING,
                     )
-                    self.execution_engine.submit_order(order_obj.id)
+                    spread_half = max(0.005, round(current_p * 0.0002, 4))
+                    raw_slippage = (
+                        self.execution_engine.calculate_slippage(
+                            order_obj,
+                            market_price=current_p,
+                            bar_volume=10000,
+                        )
+                        if hasattr(self.execution_engine, "calculate_slippage")
+                        else max(0.01, round(current_p * 0.0004, 4))
+                    )
+                    slippage = max(0.01, round(spread_half + raw_slippage, 4))
+                    fill_price = round(current_p - slippage, 2)
                     fill = self.execution_engine._execute_fill(
                         order=order_obj,
                         qty=pos.shares,
-                        price=current_p,
-                        slippage=0.0,
+                        price=fill_price,
+                        slippage=slippage,
                         timestamp=timestamp,
                     )
                     stops_triggered.append({
                         "symbol": sym,
                         "shares": pos.shares,
-                        "fill_price": current_p,
+                        "fill_price": fill_price,
                         "stop_price": stop_price,
                         "realized_pnl": fill.realized_pnl,
                         "timestamp": timestamp.isoformat(),
@@ -765,11 +841,23 @@ class SwingStrategyEngine:
                 arm=TradingArm.SWING,
             )
             self.execution_engine.submit_order(order_obj.id)
+            spread_half = max(0.005, round(exec_price * 0.0002, 4))
+            raw_slippage = (
+                self.execution_engine.calculate_slippage(
+                    order_obj,
+                    market_price=exec_price,
+                    bar_volume=10000,
+                )
+                if hasattr(self.execution_engine, "calculate_slippage")
+                else max(0.01, round(exec_price * 0.0003, 4))
+            )
+            slippage = max(0.01, round(spread_half + raw_slippage, 4))
+            fill_price = round(exec_price - slippage, 2)
             fill = self.execution_engine._execute_fill(
                 order=order_obj,
                 qty=pos.shares,
-                price=exec_price,
-                slippage=0.0,
+                price=fill_price,
+                slippage=slippage,
                 timestamp=now_dt,
             )
             self.staged_manager.remove_for_symbol(sym)
@@ -777,12 +865,13 @@ class SwingStrategyEngine:
                 self.release_symbol_cb(sym)
             log.info(
                 f"Operator executed IMMEDIATE exit for swing position {sym}: "
-                f"{pos.shares} shares @ ${exec_price:,.2f}"
+                f"{pos.shares} shares @ ${fill_price:,.2f}"
             )
             return {
                 "symbol": sym,
                 "shares": pos.shares,
-                "fill_price": exec_price,
+                "fill_price": fill_price,
+                "slippage": slippage,
                 "realized_pnl": fill.realized_pnl,
                 "timestamp": now_dt.isoformat(),
             }
@@ -851,6 +940,7 @@ class SwingStrategyEngine:
                 "stop_loss": stop_price,
                 "stop_loss_price": stop_price,
                 "atr_14": entry_atr,
+                "entry_atr": entry_atr,
                 "atr_stop_distance": stop_dist,
                 "atr_stop_pct": stop_pct,
                 "entry_date": entry_d_str,

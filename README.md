@@ -186,18 +186,27 @@ python3 tests/e2e/runner.py
 # Run all E2E tests using pytest (covering Tier 1-5, swing multi-day replay, and visual checks)
 pytest tests/e2e
 
-# Run backend unit & integration test suite (432 tests)
+# Run backend unit & integration test suite (485 tests)
 pytest backend/tests
+
+# Run dedicated forensic remediation unit test suite (11 tests)
+pytest backend/tests/unit/test_swing_forensic_remediation.py -v
+
+# Run cross-arm isolation and persistence stress test suite (12 tests)
+pytest backend/tests/stress/test_cross_arm_isolation_persistence.py -v
 
 # Run frontend architecture and streaming stress tests
 cd frontend && npm test
 
-# Run Playwright desktop (1440x900) & mobile (390x844) visual QA audit
-python3 scripts/verify_visual_qa.py
+# Run Headless Chrome live visual QA & viewport overflow audit
+python3 scripts/verify_visual_qa_live.py
 ```
 
 ### Deterministic Simulation Replays & Dry Runs
 ```bash
+# Execute Concurrent Multi-Day E2E Dry Run (6-day concurrent Intraday + Swing replay, +$3,056.09 PnL)
+python3 scripts/run_concurrent_multiday_e2e_dry_run.py
+
 # Execute Integrated Multi-Day Swing Dry Run (6-day deterministic replay verifying all 7 rules)
 python3 scripts/run_integrated_swing_dry_run.py
 
@@ -245,7 +254,7 @@ AutonomousDayTrader/
 │   │   └── replay/
 │   │       ├── mock_relay.py     # Protocol-accurate AlpacaRelay mock server
 │   │       └── feed_player.py    # Historical & synthetic feed replay player
-│   └── tests/                    # Unit, stress, and mutation test suites (432 tests)
+│   └── tests/                    # Unit, stress, and mutation test suites (485 tests)
 ├── frontend/                     # Mobile Trading UI (Next.js 15 / React 19)
 │   ├── app/                      # App router layout, page, and globals
 │   ├── components/               # Header, Strategy Cards, SegmentedModeToggle, Swing components
@@ -255,12 +264,14 @@ AutonomousDayTrader/
 │   └── e2e/                      # Opaque-box E2E test suite (325 tests)
 ├── scripts/
 │   ├── run_dev.sh                # Local development launcher
+│   ├── run_concurrent_multiday_e2e_dry_run.py # Concurrent Multi-Day E2E dry run (+ $3,056.09 PnL)
 │   ├── run_integrated_swing_dry_run.py # Production-path multi-day swing replay
-│   ├── verify_visual_qa.py       # Desktop & mobile Playwright visual QA
+│   ├── verify_visual_qa_live.py  # Headless Chrome live visual QA (0px overflow)
 │   ├── run_monday_dry_run.sh     # Monday market open live simulation script
 │   ├── run_integrated_monday_dry_run.py # Production-path integration replay
 │   ├── verify_port_hygiene.sh    # Process hygiene & port liberation auditor
 │   └── deploy_and_push.sh        # Git commit and push upstream deployment script
+├── SWING_FULL_E2E_DRY_RUN_REPORT.md # Master 6-day concurrent simulation dry run report
 ├── SWING_SIMULATION_REPORT.md    # Multi-day swing dry run verification report
 ├── MONDAY_SIMULATION_REPORT.md   # Intraday Monday dry run replay report
 ├── TEST_INFRA.md                 # E2E test methodology & coverage matrix

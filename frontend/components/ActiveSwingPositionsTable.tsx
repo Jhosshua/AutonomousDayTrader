@@ -22,6 +22,16 @@ interface ActiveSwingPositionsTableProps {
   onTightenStop: (symbol: string, newStop: number) => void;
 }
 
+function safeFixed(val: number | null | undefined, digits: number = 2): string {
+  if (val == null || !Number.isFinite(val)) return "—";
+  return val.toFixed(digits);
+}
+
+function safeLocale(val: number | null | undefined, minDigits: number = 2, maxDigits: number = 2): string {
+  if (val == null || !Number.isFinite(val)) return "—";
+  return val.toLocaleString("en-US", { minimumFractionDigits: minDigits, maximumFractionDigits: maxDigits });
+}
+
 export default function ActiveSwingPositionsTable({
   positions = [],
   onExitNextOpen,
@@ -117,7 +127,7 @@ export default function ActiveSwingPositionsTable({
                     )}
                   </div>
                   <div className="text-xs text-neutral-400 mt-0.5">
-                    {pos.shares} shares @ ${pos.entry_price?.toFixed(2)} entry • Market: ${pos.market_price?.toFixed(2)}
+                    {pos.shares ?? 0} shares @ ${safeFixed(pos.entry_price)} entry • Market: ${safeFixed(pos.market_price)} • Opened: {pos.entry_date || "Recent"}
                   </div>
                 </div>
 
@@ -129,7 +139,7 @@ export default function ActiveSwingPositionsTable({
                     }`}
                   >
                     {isProfitable ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
-                    <span>{isProfitable ? "+" : ""}${Math.abs(pos.unrealized_pnl ?? 0).toFixed(2)}</span>
+                    <span>{isProfitable ? "+" : ""}${safeFixed(Math.abs(pos.unrealized_pnl ?? 0))}</span>
                   </div>
                   <div
                     className={`text-xs font-semibold num-tabular ${
@@ -137,7 +147,7 @@ export default function ActiveSwingPositionsTable({
                     }`}
                   >
                     {isProfitable ? "+" : ""}
-                    {((pos.unrealized_pnl_pct ?? 0) * 100).toFixed(2)}%
+                    {safeFixed((pos.unrealized_pnl_pct ?? 0) * 100)}%
                   </div>
                 </div>
               </div>
@@ -152,13 +162,13 @@ export default function ActiveSwingPositionsTable({
                       2.5x ATR Hard Stop
                     </span>
                     <span className="text-white font-bold num-tabular">
-                      ${stopLoss.toFixed(2)}
+                      ${safeFixed(stopLoss)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
                     <span>Safety Buffer:</span>
                     <span className="text-apple-green font-semibold num-tabular">
-                      ${stopDist.toFixed(2)} ({stopPct.toFixed(1)}% away)
+                      ${safeFixed(stopDist)} ({safeFixed(stopPct, 1)}% away) • Entry ATR: ${safeFixed(pos.entry_atr ?? pos.atr_14)}
                     </span>
                   </div>
                   {/* Visual stop distance meter */}
@@ -356,7 +366,7 @@ export default function ActiveSwingPositionsTable({
                   <input
                     type="number"
                     step="0.10"
-                    placeholder={`e.g. ${(stopLoss + 1.0).toFixed(2)}`}
+                    placeholder={`e.g. ${safeFixed(stopLoss + 1.0)}`}
                     value={tightenInput[sym] ?? ""}
                     onChange={(e) => setTightenInput({ ...tightenInput, [sym]: e.target.value })}
                     className="w-28 px-2.5 py-1.5 rounded-xl bg-white/[0.08] border border-white/[0.15] text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-apple-teal num-tabular"

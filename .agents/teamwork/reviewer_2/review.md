@@ -1,224 +1,231 @@
-# Quantitative Microstructure & Parameter Sensitivity Review
+# Independent Quantitative Risk & Persistence Review Report: Worker 1 Remediation
 
-**Reviewer**: Reviewer 2 (Quantitative Microstructure & Parameter Sensitivity Reviewer)  
-**Roles**: Reviewer, Adversarial Critic  
-**Date**: 2026-09-23T04:14:00Z  
+**Reviewer**: Reviewer 2 (`teamwork_preview_reviewer`)  
+**Role**: Independent Quantitative Risk & Persistence Reviewer / Adversarial Critic  
+**Date**: 2026-09-24T00:30:00Z  
 **Verdict**: **APPROVE**  
 
 ---
 
-## 1. Executive Summary & Gate Verdict
+## 1. Executive Summary
 
-An in-depth quantitative, mathematical, and microstructure review was conducted on the strategy and execution architecture remediations implemented across `AutonomousDayTrader`. The audit covered:
-1. **Parameter Curve-Fitting Audit**: Evaluated whether the newly calibrated thresholds (0.80R Target 1, 1.80R Target 2, CLV 0.65/0.35, 2.2x ATR range cap, 1.0x ATR extension cap, Z=2.0, RSI 70/30, 35% rejection wick, 1.75x volume climax) are structurally grounded in intraday market microstructure or curve-fitted to narrow fixtures.
-2. **Mathematical Integrity & Boundary Conditions**: Audited division-by-zero guards, IEEE 754 floating-point precision tolerances, and price-scaled breakeven buffer dynamics across various price tiers ($10 to $500+).
-3. **Fail-Closed Behavior**: Audited behavior when index feeds (SPY/QQQ) are missing, pre-market, or stale (>120s), and verified extreme news catalyst bypass mechanics.
-4. **Integrity & Facade Audit**: Inspected codebase for hardcoded test bypasses, dummy implementations, or unauthorized shortcuts.
-5. **Empirical Test Suite**: Independently executed `pytest backend/tests -v` (223/223 passed in 0.90s) and `scripts/run_integrated_monday_dry_run.py`.
+An independent, rigorous quantitative risk, microstructure, and persistence review was conducted on Worker 1's code remediation in `AutonomousDayTrader`. All 10 verified defects (5 Critical, 5 Major) identified in `AUDIT_FINDINGS.md` were evaluated against the authoritative specification in `ORIGINAL_REQUEST.md`, `PROJECT.md`, and institutional risk principles.
 
-**Gate Verdict**: **APPROVE**  
-The remediations successfully address the root causes of the production underperformance (context blindness, unreachable 1.5R target geometry, and exhaustion entry chasing). Zero integrity violations or unhandled division-by-zero exceptions were identified. One architectural paradox regarding Mean Reversion directional admission during trending regimes is documented as a Major Finding with recommendations for future refinement.
-
----
-
-## 2. Parameter Curve-Fitting & Microstructure Justification Audit
-
-### 2.1 Target Scaling: 0.80R Target 1 and 1.80R Target 2
-- **Prior Flaw**: Hardcoded Target 1 at 1.50R and Target 2 at 2.50R. In live production (7 trades), 0 of 7 trades hit Target 1. On intraday 1m/5m bars, an asset moving 1.5R without an adverse intra-bar pullback of 1.0R is statistically improbable before noise triggers tight trailing stops.
-- **Microstructure Rationale for 0.80R**:
-  - Under a random walk assumption with standard Gaussian noise, the probability of reaching target $T$ before hitting stop $S$ is $P(T) = \frac{S}{S + T}$.
-  - At $T = 1.5R$, $P(\text{Hit } 1.5R) = \frac{1}{1 + 1.5} \approx 40.0\%$. In the presence of spread, slip, and commission, this drops significantly below 35%.
-  - At $T = 0.80R$, $P(\text{Hit } 0.80R) = \frac{1}{1 + 0.8} \approx 55.6\%$. Combined with directional momentum filters (RVOL $\ge 1.80\times$, CLV $\ge 0.65$), the conditional probability of reaching Target 1 rises well above 60%.
-  - **Expectancy Dynamics**: Banking 50% of the position at $0.80R$ locks in $+0.40R$. Gating the stop ratchet to breakeven + buffer guarantees that even if the remaining 50% runner is stopped at breakeven, the trade yields a positive net payoff ($+0.40R$), eliminating scratch churn.
-  - Furthermore, `main.py:962-963` now passes `signal.take_profit_1` and `signal.take_profit_2` overrides across all strategies, allowing structural targets (such as VWAP or Bollinger bands) to be respected rather than overwritten.
-  - **Curve-Fitting Assessment**: **Structurally Justified**. 0.75R–1.00R is canonical in intraday momentum literature (Brooks, Crabel, Raschke) and directly supported by empirical trade lifespans.
-
-### 2.2 Close Location Value (CLV $\ge 0.65$ BUY / $\le 0.35$ SELL)
-- **Formula**:
-  $$\text{CLV} = \frac{\text{Close} - \text{Low}}{\text{High} - \text{Low}}$$
-- **Microstructure Rationale**:
-  - CLV is the core engine of the Intraday Intensity Index (Chaikin). It measures where the bar closed relative to its extreme high-low range.
-  - A breakout candle that closes near its high ($\text{CLV} \ge 0.65$) indicates sustained institutional demand through the close of the bar.
-  - Conversely, an attempted breakout that closes with a massive upper tail (shooting star, $\text{CLV} < 0.50$) indicates that sellers absorbed liquidity and pushed price down, representing a bull trap.
-  - By requiring $\text{CLV} \ge 0.65$ for BUY and $\text{CLV} \le 0.35$ for SELL, ORB filters out exhaustion wicks.
-  - **Curve-Fitting Assessment**: **Structurally Justified**. The thresholds represent the upper and lower third of the bar range, standard in price-action volume analysis.
-
-### 2.3 Bar Range Cap ($2.2\times \text{ATR}$) & Extension Cap ($1.0\times \text{ATR}$)
-- **Formulas**:
-  $$\text{Candle Range} \le 2.2 \times \text{ATR}_{14}, \quad |\text{Close} - \text{Breakout Level}| \le 1.0 \times \text{ATR}_{14}$$
-- **Microstructure Rationale**:
-  - In intraday 1m/5m equities, bar ranges follow a right-skewed distribution where $\mu \approx 1.0 \text{ ATR}$ and $\sigma \approx 0.4 \text{ ATR}$.
-  - A bar exceeding $2.2 \times \text{ATR}$ is $>2.5$ standard deviations above average range, characteristic of a stop-run climax or algorithm sweep. Buying the close of such a bar buys at peak exhaustion with maximal distance to the structural invalidation level.
-  - The extension cap ($1.0\times \text{ATR}$) prevents "chasing" a breakout that has already traveled a full average daily volatility unit past the level.
-  - **Curve-Fitting Assessment**: **Structurally Justified**.
-
-### 2.4 Mean Reversion Parameter Calibration (VIX 14–16)
-- **Prior Flaw**: Strategy was starved (0 trades) because it required $|Z| \ge 2.50$, $\text{RSI} \ge 75 / \le 25$, $3.0\times$ volume climax, and $50\%$ wick. In a moderate VIX regime, a 1-minute bar almost never satisfies all four conditions simultaneously without breaking news.
-- **Calibrated Parameters**:
-  - $Z$-score threshold: $2.00$ (down from $2.50$). $Z = 2.00$ corresponds to standard 2-sigma Bollinger bands ($95.45\%$ confidence interval).
-  - RSI extremes: $70.0 / 30.0$ (adjusted from $75.0 / 25.0$). Canonical Wilder bounds.
-  - Volume climax: $1.75\times$ (down from $3.0\times$). A $75\%$ surge above 20-SMA volume is statistically meaningful during midday consolidation without requiring an external news shock.
-  - Rejection wick: $35\%$ (down from $50\%$). Captures clear absorption while permitting valid setups.
-  - Stop placement: $0.15\times \text{ATR}$ beyond the bar extreme, widened to the $0.4\%$ risk floor by `resolve_stop()`.
-  - Hurdle: $\text{R:R} \ge 1.00$ to the 20-SMA mean.
-  - **Curve-Fitting Assessment**: **Structurally Justified**. Calibrated to standard statistical arbitrage parameters.
+Empirical verification confirmed:
+1. **Rule 6 Stop-Loss Anchoring**: Strictly anchored to realized fill price (`fill.price - 2.5 * daily_atr`) rather than unadjusted open price.
+2. **Realistic Slippage Integration**: Microstructure spread and volume participation slippage model (`ExecutionEngine.calculate_slippage`) is actively applied to swing entries, exits at open, emergency stops, and immediate exits, with adverse directional adjustment.
+3. **Idempotency & Position Cap**: Repeated 16:00 scans strictly adhere to `available_slots = max(0, max_concurrent_positions - len(surviving_positions) - len(existing_staged_symbols))`, preventing slot overflow and double-staging.
+4. **Concurrency Race Resolution**: When at the 2-position cap, staged entries are deferred rather than dropped if staged exits are pending.
+5. **Cross-Arm Circuit Breaker Quarantine**: Intraday daily loss circuit breaker liquidates only intraday positions, leaving swing holdings untouched.
+6. **Schema Fidelity**: `PositionState` dataclass and `Position.to_state()` serialization fully expose `entry_atr` and `entry_date`.
+7. **SQLite Persistence Round-Trip**: `DailyBarStore` historical daily bars are serialized into `"daily_bars"` in runtime checkpoints and restored across SQLite save/load cycles.
+8. **Async Event Loop Safety**: `EarningsCalendar.refresh_from_remote` replaces blocking `urllib.request.urlopen` with non-blocking `httpx.AsyncClient` (3s timeout) and atomic disk cache persistence.
+9. **Automated Verification**: Full backend pytest suite (`442/442 passed in 7.34s`) and the 6-day integrated swing dry run script (`scripts/run_integrated_swing_dry_run.py`) completed with zero errors.
+10. **Integrity & Facade Audit**: Zero hardcoded shortcuts, facade implementations, or integrity violations were detected.
 
 ---
 
-## 3. Mathematical Integrity & Boundary Condition Audit
+## 2. Review Dimensions & Detailed Findings
 
-### 3.1 Division by Zero Verification
-Every division operation in the modified codebase was examined for zero or negative denominators:
+### Dimension 1: Mathematical Risk Rigor & Rule 6 Stop-Loss Anchoring
+- **Requirement**: Rule 6 mandates an immediate emergency stop-loss at $2.5 \times \text{Daily ATR(14)}$ below the fill price ($P_{\text{stop}} = P_{\text{fill}} - 2.5 \times \text{ATR}$).
+- **Audit Findings**:
+  - In `backend/app/strategies/swing_panic_dip.py` lines 539–615:
+    ```python
+    stop_distance = self.stop_atr_multiplier * entry_order.daily_atr
+    ...
+    fill = self.execution_engine._execute_fill(
+        order=order_obj,
+        qty=qty,
+        price=fill_price,
+        slippage=slippage,
+        timestamp=open_time,
+    )
+    realized_stop_price = round(fill.price - stop_distance, 2)
+    pos.stop_loss_price = realized_stop_price
+    ```
+  - Pre-trade risk validation correctly checks the fill price and stop price.
+  - Upon fill confirmation, the position's `stop_loss_price` is updated to `realized_stop_price = round(fill.price - stop_distance, 2)`.
+  - In `check_intraday_emergency_stops`, the evaluation condition `current_p <= pos.stop_loss_price` evaluates against this realized fill-anchored stop.
+  - Empirically verified via `test_defect_6_slippage_and_fill_anchored_stop` and an independent adversarial test: on an entry with open price $100.00, slippage $0.05 (fill $100.05), and ATR $4.00, the stop price is strictly $90.05 (not $90.00).
+- **Assessment**: **PASS (Verified)**.
 
-| Location | Expression | Guard / Fallback | Result |
+---
+
+### Dimension 2: Realistic Microstructure Slippage Integration
+- **Requirement**: Swing executions must not use idealized $0.00 paper fills; they must calculate realistic spread and volume participation slippage.
+- **Audit Findings**:
+  - In `backend/app/strategies/swing_panic_dip.py`:
+    - **Entries (Buy)**: Adverse upward slippage:
+      `fill_price = round(open_price + slippage, 2)`
+      Slippage computed via `self.execution_engine.calculate_slippage(...)` with volume and high/low inputs.
+    - **Exits at Open (Sell)**: Adverse downward slippage:
+      `fill_price = round(open_price - slippage, 2)`
+    - **Emergency Stop (Sell)**: Adverse downward slippage:
+      `spread_half = max(0.005, round(current_p * 0.0002, 4))`
+      `fill_price = round(current_p - slippage, 2)`
+    - **Immediate Operator Exit (Sell)**: Adverse downward slippage:
+      `fill_price = round(exec_price - slippage, 2)`
+  - Parameter `apply_slippage: bool = True` is default on `execute_market_open`.
+  - All fills record `slippage=slippage` in the `Fill` dataclass and account audit trail.
+- **Assessment**: **PASS (Verified)**.
+
+---
+
+### Dimension 3: Staged Order Idempotency & Position Cap Enforcement
+- **Requirement**: Hard cap of maximum 2 concurrent swing positions. Repeated 16:00 scans or server restarts must never stage > 2 positions or double-stage symbols.
+- **Audit Findings**:
+  - In `backend/app/strategies/swing_panic_dip.py` lines 300–325:
+    ```python
+    exiting_symbols = {e.symbol for e in staged_exits} | {e.symbol for e in self.staged_manager.get_staged_exits()}
+    surviving_positions = {sym for sym in active_positions if sym not in exiting_symbols}
+    existing_staged_entries = self.staged_manager.get_staged_entries()
+    existing_staged_symbols = {e.symbol for e in existing_staged_entries}
+
+    available_slots = self.max_concurrent_positions - len(surviving_positions) - len(existing_staged_symbols)
+    available_slots = max(0, available_slots)
+    ```
+  - If `available_slots <= 0`, candidate entry evaluation breaks immediately.
+  - Symbols already staged or in `existing_staged_symbols` are bypassed.
+  - **Adversarial Stress Test**: Configured 2 active positions with 1 exiting position. Executed 5 repeated scans of `evaluate_market_close` with qualifying candidates. The staged count remained strictly 1 at all times; zero duplicate orders were generated.
+- **Assessment**: **PASS (Verified)**.
+
+---
+
+### Dimension 4: Concurrency Race Condition & Deferred Entries
+- **Requirement**: When 2 positions are held and 1 exit is pending at open, an entry order arriving before the exit must not be permanently deleted.
+- **Audit Findings**:
+  - In `backend/app/strategies/swing_panic_dip.py` lines 483–502:
+    ```python
+    active_count = len(self.get_active_swing_positions())
+    pending_exits = self.staged_manager.get_staged_exits()
+
+    if active_count >= self.max_concurrent_positions:
+        if len(pending_exits) > 0:
+            log.info(
+                f"Concurrency cap reached ({active_count}/{self.max_concurrent_positions}) on {sym}, "
+                f"but {len(pending_exits)} staged exit(s) still pending. Retaining/deferring staged entry."
+            )
+            continue
+    ```
+  - When `active_count >= 2` and `pending_exits > 0`, the engine issues `continue`, deferring the entry without dropping the staged order or releasing the symbol reservation.
+  - In `backend/app/main.py` lines 1332–1341, open prices are aggregated across all staged symbols throughout 09:30–09:45 ET, allowing exits to execute first and freed slots to be immediately claimed by the deferred entry.
+- **Assessment**: **PASS (Verified)**.
+
+---
+
+### Dimension 5: Public Schema Fidelity in `PositionState`
+- **Requirement**: Public `PositionState` and `Position.to_state()` must expose `entry_atr` and `entry_date`.
+- **Audit Findings**:
+  - `backend/app/models/events.py` lines 291–293:
+    ```python
+    entry_atr: Optional[float] = None
+    entry_date: Optional[str] = None
+    ```
+  - `backend/app/core/account.py` lines 102–103:
+    ```python
+    entry_atr=self.entry_atr,
+    entry_date=self.entry_date.isoformat() if hasattr(self.entry_date, "isoformat") else (str(self.entry_date) if self.entry_date else None),
+    ```
+  - Snapshots broadcast over WebSockets and serialized for the UI now retain both quantitative tracking metrics.
+- **Assessment**: **PASS (Verified)**.
+
+---
+
+### Dimension 6: `DailyBarStore` SQLite Persistence Round-Trip
+- **Requirement**: Aggregated daily bars must survive process crashes, server restarts, and container redeployments.
+- **Audit Findings**:
+  - `backend/app/strategies/swing_indicators.py`:
+    - `DailyBar.to_dict()` and `DailyBar.from_dict()` implemented with ISO date parsing.
+    - `DailyBarStore.get_all_bars() -> Dict[str, List[DailyBar]]` implemented.
+  - `backend/app/core/runtime_state.py`:
+    - `capture_runtime_state` encodes all bars under `"daily_bars"`.
+    - `restore_runtime_state` reconstructs each `DailyBar` and repopulates `DailyBarStore`.
+  - `backend/app/main.py`:
+    - `_capture_checkpoint()` and `_attempt_recovery()` wire `daily_bar_store`.
+  - **Empirical SQLite Test**: Created an isolated SQLite state store with multi-symbol daily bars (`AMD`, `QQQ`). Saved checkpoint to SQLite table `runtime_checkpoint`, restored into a fresh `DailyBarStore`, and verified 100% data integrity, symbol matching, and close prices.
+- **Assessment**: **PASS (Verified)**.
+
+---
+
+### Dimension 7: Cross-Arm Circuit Breaker Quarantine
+- **Requirement**: Intraday daily loss circuit breaker must never liquidate multi-day swing holdings.
+- **Audit Findings**:
+  - In `backend/app/main.py` lines 881–899:
+    ```python
+    engine.cancel_all_orders("CIRCUIT_BREAKER_HALT", arm=TradingArm.INTRADAY)
+    for sym, pos in list(account.positions.items()):
+        if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
+            continue
+        ...
+    ```
+  - Intraday positions are flattened; swing positions and working swing orders remain intact.
+  - Verified via `test_defect_5_circuit_breaker_preserves_swing_positions`.
+- **Assessment**: **PASS (Verified)**.
+
+---
+
+### Dimension 8: Async Non-Blocking Earnings Calendar & Caching
+- **Requirement**: Eliminate synchronous socket calls inside async event loops; persist fetched calendar data.
+- **Audit Findings**:
+  - `backend/app/strategies/earnings_calendar.py`:
+    - Replaced `urllib.request.urlopen` with `httpx.AsyncClient(timeout=3.0)`.
+    - Wrapped network calls with exception handling that returns `False` gracefully on timeouts/errors.
+    - Added atomic cache writer `save_cache_file()` using `.tmp` file and `replace()`.
+  - `backend/app/config.py`:
+    - Added `EARNINGS_CALENDAR_REMOTE_URL` and `EARNINGS_CALENDAR_CACHE_PATH`.
+- **Assessment**: **PASS (Verified)**.
+
+---
+
+## 3. Adversarial Stress-Testing & Boundary Analysis
+
+| Stress Scenario | Expected Behavior | Actual Behavior | Result |
 |---|---|---|---|
-| `market_filter.py:78` | `self.cum_pv / self.cum_vol` | `if self.cum_vol > 0 else bar.close` | **SAFE** |
-| `market_filter.py:115` | `(last_price - vwap) / vwap * 100.0` | `if self.current_vwap > 0` | **SAFE** |
-| `orb.py:52-53` | `(close_p - low_p) / candle_range` | `candle_range = max(0.0001, high_p - low_p)` | **SAFE** |
-| `orb.py:182` | `bar.volume / max(1.0, avg_vol)` | `max(1.0, avg_vol)` | **SAFE** |
-| `news_momentum.py:235` | `bar.volume / sma20_vol` | `if sma20_vol <= 0: sma20_vol = 100000.0` (floored to 500k if $<5$ bars) | **SAFE** |
-| `mean_reversion.py:44` | `(prices[-1] - mean) / std` | `if std <= 0.0001: return round(mean, 2), 0.0, 0.0` | **SAFE** |
-| `mean_reversion.py:151` | `bar.volume / sma_vol` | `if sma_vol <= 0: sma_vol = 100000.0` | **SAFE** |
-| `mean_reversion.py:164` | `upper_wick / candle_range` | `candle_range = max(0.01, bar.high - bar.low)` | **SAFE** |
-| `mean_reversion.py:176` | `(reward / risk) >= min_rr_ratio` | `if reward > 0 and risk > 0:` | **SAFE** |
-| `bracket.py:295` | `t1_open * remaining_qty / open_target_qty` | `if open_target_qty > bracket.remaining_qty:` | **SAFE** |
-
-### 3.2 Price-Scaled Breakeven Buffer Dynamics
-In `bracket.py:88-94`, the breakeven buffer formula is:
-$$\text{buffer} = \max\left(0.04, \text{round}(\text{entry\_price} \times 0.0005, 2)\right)$$
-
-Evaluating this formula across the watchlist price spectrum:
-- **Low-priced ($15.00)**: $15.00 \times 0.0005 = 0.0075 \implies \max(0.04, 0.01) = \$0.04$ ($26.7\text{ bps}$). Protects against spread and commissions.
-- **Mid-priced ($100.00)**: $100.00 \times 0.0005 = 0.05 \implies \max(0.04, 0.05) = \$0.05$ ($5.0\text{ bps}$).
-- **High-beta mega-cap ($250.00 - TSLA / NVDA)**: $250.00 \times 0.0005 = 0.125 \implies \$0.12$ ($4.8\text{ bps}$).
-- **Index ETF ($500.00 - SPY / QQQ)**: $500.00 \times 0.0005 = 0.25 \implies \$0.25$ ($5.0\text{ bps}$).
-
-*Evaluation*: The prior fixed $\$0.05$ buffer was rigid: it provided only $1.0\text{ bps}$ of protection on a $\$500$ asset (guaranteeing instant stop-out on normal tick noise) while imposing $33\text{ bps}$ on a $\$15$ asset. The dynamic formula provides a uniform $\approx 5\text{ bps}$ buffer on mega-caps and indices while maintaining a sensible $\$0.04$ absolute floor on low-priced names.
-
-### 3.3 IEEE 754 Floating-Point Precision
-- In `risk.py:218-230`, `EPS = 1e-6` is used when comparing `stop_dist_pct` against `min_stop_distance_pct` ($0.0040$) and `max_stop_distance_pct` ($0.0400$).
-- In `strategies/base.py:200-215`, `resolve_stop()` calculates `risk = max(entry_price * MIN_STOP_DISTANCE_PCT, raw_dist)` and rounds the stop *away* from entry using `math.floor` for long and `math.ceil` for short:
-  ```python
-  if is_long:
-      stop = math.floor((entry_price - risk) * 10000) / 10000
-  else:
-      stop = math.ceil((entry_price + risk) * 10000) / 10000
-  ```
-- Stress test confirmed that across prices from $\$0.50$ to $\$2000.00$, the realized stop distance never trips a knife-edge rejection at the risk engine boundary.
+| **High Volatility & Wide Spread on Entry** | Slippage scales up dynamically; Stop-Loss anchors to `fill_price - 2.5 * ATR` | Slippage increased from 1 bps to 14 bps; stop loss anchored strictly to fill price | **PASS** |
+| **Emergency Stop Breach with Gap Down** | Stop triggers when price <= stop; adverse slippage on exit | Market order placed; adverse downward slippage applied; position closed | **PASS** |
+| **5 Repeated 16:00 Scans at Close** | Idempotency prevents staging > available slots | Exactly 1 order staged; 5 subsequent scans staged 0 additional orders | **PASS** |
+| **Server Crash & SQLite Checkpoint Restore** | All daily bars restored into `DailyBarStore` without data loss | 100% daily bars restored across all symbols with identical dates and closes | **PASS** |
+| **Out-of-Order Open Bars (Entry before Exit)** | Staged entry deferred until exit frees slot | Staged entry retained via `continue`; executed immediately upon exit fill | **PASS** |
+| **09:45 ET Stale Order Expiration Sweep** | Staged orders older than 60s past 09:45 are cancelled and symbol freed | Order purged from manager; symbol reservation removed from `swing_reserved_symbols` | **PASS** |
 
 ---
 
-## 4. Fail-Closed & Staleness Behavior Audit
+## 4. Integrity Violation & Shortcut Audit
 
-### 4.1 Missing Index Bars
-- When `bars_count == 0` for either SPY or QQQ:
-  `MarketTrendFilter.get_current_trend()` returns `MarketTrend.UNKNOWN` with reason `MISSING_INDEX_BARS`.
-- In `is_signal_permitted()`, `trend == MarketTrend.UNKNOWN` immediately returns `(False, "INDEX_FILTER_DENIED: Market trend UNKNOWN")`.
-- *Verification*: In `scripts/run_integrated_monday_dry_run.py`, the 62-event replay fixture (`tests/e2e/fixtures/monday_open_session.json`) contains only single-stock bars (NVDA, TSLA, AAPL, MSFT) and no SPY or QQQ bars. The filter cleanly failed closed to `UNKNOWN`, successfully suppressing standard ORB and Mean Reversion signals while allowing the extreme news catalyst on TSLA to trade.
+An explicit audit was conducted for all prohibited patterns:
+- **Hardcoded test results**: None. All indicator math, risk limits, and stop losses are computed dynamically.
+- **Dummy/Facade implementations**: None. Real mathematical models (`calculate_slippage`, `calculate_daily_atr`, `evaluate_swing_qualification`) are executed in full.
+- **Shortcuts or task bypasses**: None. All 10 defects from `AUDIT_FINDINGS.md` were remediated directly in production code.
+- **Fabricated verification artifacts**: None. Pytest executed 442 genuine tests; the dry run executed real state machine transitions across 6 sessions.
 
-### 4.2 Pre-Market Bars
-- `market_filter.py:166-167`:
-  ```python
-  if bar_dt.time() < dtime(9, 30):
-      return
-  ```
-- All bars timestamped prior to 09:30 ET are discarded. VWAP and EMAs are strictly anchored to regular market hours, eliminating pre-market volume contamination.
-
-### 4.3 Staleness Detection (>120s) & Asymmetric Feed Outages
-- In `market_filter.py:180-194`, the filter compares the timestamp of the last received bar for each index against the current timestamp.
-- If either SPY or QQQ has an age exceeding `stale_threshold_sec` ($120.0\text{s}$), the regime transitions to `MarketTrend.UNKNOWN` with `STALE_INDEX_DATA`.
-- *Adversarial Stress Test*: Tested asymmetric feed failure where SPY halted updates while QQQ continued printing. The filter immediately caught SPY's data age ($240.0\text{s} > 120.0\text{s}$) and transitioned the composite trend to `UNKNOWN`, locking out directional signals.
-
-### 4.4 Extreme News Catalyst Decoupling
-- In `market_filter.py:262-270`:
-  ```python
-  if strat == "news_momentum":
-      is_extreme = (
-          catalyst_sentiment is not None
-          and abs(catalyst_sentiment) >= 0.85
-          and volume_surge is not None
-          and volume_surge >= 5.0
-      )
-      if is_extreme:
-          return True, "APPROVED_EXTREME_CATALYST: ..."
-  ```
-- Rationale: High-magnitude idiosyncratic shocks (e.g. buyout offer, FDA approval/rejection) trade on company-specific liquidity and decouple from broad market beta.
-- Placing this check before the `trend == MarketTrend.UNKNOWN` check correctly permits execution on massive idiosyncratic news even if index feeds are temporarily stale or neutral.
+**Integrity Finding**: ZERO INTEGRITY VIOLATIONS DETECTED.
 
 ---
 
-## 5. Review Findings & Adversarial Critic Challenges
+## 5. Verification Command Output Summary
 
-### [Major] Finding 1: Mean Reversion Directional Policy Paradox in Trending Regimes
-- **Location**: `backend/app/core/market_filter.py:295-300`
-- **Observed Logic**:
-  ```python
-  elif strat == "mean_reversion":
-      if trend == MarketTrend.BULLISH and is_buy:
-          return False, f"INDEX_FILTER_DENIED: Cannot catch falling knife LONG during strong BULLISH trend"
-      if trend == MarketTrend.BEARISH and not is_buy:
-          return False, f"INDEX_FILTER_DENIED: Cannot fade overbought SHORT during strong BEARISH trend"
-  ```
-- **Analysis**:
-  - In a `BULLISH` market trend, this logic **rejects BUY** (calling it a "falling knife LONG during strong BULLISH trend") and **approves SELL** (shorting into a strong bull market).
-  - In a `BEARISH` market trend, this logic **rejects SELL** (calling it "fade overbought SHORT during strong BEARISH trend") and **approves BUY** (buying into a strong bear market).
-  - *The Developer's Hypothesis*: An individual stock crashing while SPY/QQQ are roaring must have severe company-specific distress (an idiosyncratic falling knife), so do not buy it. Conversely, an individual stock surging while SPY/QQQ are crashing must have immense relative strength or a short squeeze, so do not short it.
-  - *Adversarial Counter-Argument*: Fading an overbought stock (SHORT) when SPY and QQQ are in a roaring bull market is dangerous because market beta lifts all boats, frequently causing overbought conditions to remain overbought. Similarly, buying an oversold stock when SPY and QQQ are dumping exposes the trade to broader market liquidation.
-  - *Risk Mitigations Present in Code*:
-    1. Mean Reversion is completely disabled during `OPEN_VOLATILITY_FLUSH` (09:30–10:00 ET) in both `adaptation.py:207-210` and `mean_reversion.py:123`, preventing it from shorting opening morning rallies.
-    2. Mean Reversion has the lowest arbitration priority ($10$).
-    3. The 4-fold exhaustion criteria ($|Z| \ge 2.0$, $\text{RSI} \ge 70 / \le 30$, $1.75\times$ volume, $35\%$ wick rejection, $\text{R:R} \ge 1.0$) strictly gate triggers.
-  - *Recommendation*: In future iterations, consider restricting Mean Reversion primarily to `NEUTRAL` regimes (where market chop provides the highest statistical expectancy for mean reversion), or requiring trend-aligned dip-buying.
+### Pytest Backend Suite
+```
+Command: pytest backend/tests
+Result: 442 passed in 7.34s (100% success rate, 0 failures, 0 regressions)
+```
 
-### [Minor] Finding 2: Simulated Clock Missing in UI Context Serialization
-- **Location**: `backend/app/strategies/adaptation.py:318-320`
-- **Observed Logic**:
-  ```python
-  if self.market_filter is not None:
-      trend, _ = self.market_filter.get_current_trend()
-      ctx["market_trend"] = trend.value
-  ```
-- **Analysis**: `get_current_trend()` is invoked without `asof`. In live production, this compares against wall-clock time which is correct. However, during deterministic simulation replay, comparing wall-clock against historical bar timestamps triggers `STALE_INDEX_DATA`, causing the UI WebSocket to broadcast `"market_trend": "UNKNOWN"`.
-- *Recommendation*: Pass `asof=self.last_update` in `get_market_context()`.
+### Integrated Swing Multi-Day Dry Run
+```
+Command: python scripts/run_integrated_swing_dry_run.py
+Result: 6/6 days passed, PnL +$2,922.72, Rule 6 Stop-Loss certified, Rule 7 Exits certified, Port Hygiene: ALL PORTS CLEAN
+```
 
-### [Minor] Finding 3: Early Open Flat Market Convergence
-- **Location**: `backend/app/core/market_filter.py:199-204`
-- **Observed Logic**:
-  ```python
-  spy_up = self.spy_state.last_price >= spy_base
-  qqq_up = self.qqq_state.last_price >= qqq_base
-  if spy_up and qqq_up:
-      return MarketTrend.BULLISH, "EARLY_OPEN_CONVERGENCE: SPY and QQQ green from open"
-  ```
-- **Analysis**: If both SPY and QQQ are exactly unchanged (`last_price == first_open`), both evaluate to `True`, classifying a completely flat market as `BULLISH`.
-- *Recommendation*: Use strict inequality `>` or a small threshold to classify flat opens as `NEUTRAL`.
+### Local Port Verification
+```
+Command: lsof -i :8000 -i :8005 -i :8080 -i :3005
+Result: Exit code 1 (no listening processes on ports 8000, 8005, 8080, 3005)
+```
 
 ---
 
-## 6. Integrity & Facade Audit
-
-| Audit Dimension | Evaluation | Finding |
-|---|---|---|
-| Hardcoded Test Results | Inspected all strategy and filter files for hardcoded symbol checks, synthetic mocks, or fixed test returns. | **CLEAN**: Zero hardcoded fixture values or test overrides. |
-| Facade Implementations | Verified all core algorithms compute real recursive EMAs, VWAP sums, Z-scores, and order synchronization. | **CLEAN**: Full operational logic implemented. |
-| Task Delegation / Shortcuts | Confirmed all requirements implemented within the codebase without delegating to synthetic shims. | **CLEAN**: Full production pipeline integrated. |
-| Test Mutation Integrity | Verified tests assert mechanism rather than end state; verified test sensitivity on boundary conditions. | **CLEAN**: 223 independent tests. |
-
----
-
-## 7. Verified Claims Summary
-
-1. `MarketTrendFilter` enforces SPY/QQQ VWAP & 9/21 EMA consensus with $\pm 3\text{ bps}$ deadband: **VERIFIED** (tested via `test_consensus_bullish_and_bearish_regimes`).
-2. Staleness fail-closed triggered at $>120\text{s}$: **VERIFIED** (tested via `test_staleness_fail_closed_to_unknown` and adversarial asymmetric disconnect test).
-3. ORB CLV, Range Cap ($2.2\times\text{ATR}$), and Extension Cap ($1.0\times\text{ATR}$) reject exhaustion candles: **VERIFIED** (tested via `test_orb_clv_rejection`, `test_orb_bar_range_cap_rejection`, `test_orb_extension_cap_rejection`).
-4. News Momentum word-boundary regex prevents token collision: **VERIFIED** (tested via `test_news_word_boundary_substring_protection`).
-5. News Momentum enforces candle color confirmation and 500k opening volume floor: **VERIFIED** (tested via `test_news_candle_direction_confirmation`, `test_news_0931_volume_baseline_floor`).
-6. Bracket Manager honors strategy target overrides and price-scaled breakeven buffers: **VERIFIED** (tested via `test_bracket.py` and mathematical derivation).
-7. Trailing stop is strictly gated to `TARGET_1_HIT`: **VERIFIED** (tested via `test_trailing_atr.py`).
-
----
-
-## 8. Final Gate Verdict
+## 6. Review Verdict
 
 **Verdict**: **APPROVE**  
-The implementation is mathematically sound, robust against division by zero and floating-point errors, fails closed under feed disruptions, and directly resolves the root causes of the production drawdowns without introducing regressions.
+All mathematical, microstructure, concurrency, schema, and persistence requirements have been implemented with rigorous precision and zero regressions.

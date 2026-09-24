@@ -92,7 +92,7 @@ export default function AmbientBackground({
 
       {/* Top Right Orb */}
       <motion.div
-        className="absolute top-12 -right-28 w-[340px] h-[340px] rounded-full blur-[110px] will-change-transform"
+        className="absolute top-12 -right-8 sm:-right-28 w-[240px] sm:w-[340px] h-[240px] sm:h-[340px] rounded-full blur-[80px] sm:blur-[110px] will-change-transform"
         animate={{
           background: `radial-gradient(circle, ${glow.secondary} 0%, transparent 70%)`,
           scale: [1.05, 0.95, 1.05],
@@ -108,7 +108,7 @@ export default function AmbientBackground({
 
       {/* Bottom Center Flow Orb */}
       <motion.div
-        className="absolute bottom-10 left-1/4 w-[420px] h-[420px] rounded-full blur-[130px] will-change-transform"
+        className="absolute bottom-10 left-4 sm:left-1/4 w-[280px] sm:w-[420px] h-[280px] sm:h-[420px] rounded-full blur-[90px] sm:blur-[130px] will-change-transform"
         animate={{
           background: `radial-gradient(circle, ${glow.accent} 0%, transparent 70%)`,
           scale: [0.95, 1.05, 0.95],

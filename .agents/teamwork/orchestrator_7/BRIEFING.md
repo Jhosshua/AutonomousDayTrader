@@ -65,17 +65,17 @@ Integrate an autonomous, multi-day swing trading engine ("2-Day Panic Dip" Conno
 | worker_remediation_1 | teamwork_preview_worker | Remediation Code Implementation | completed | c578adc8-69b4-4b6b-aac0-9d3a80ae58b5 |
 | auditor_2 | teamwork_preview_auditor | Forensic Integrity Re-Audit | completed | 383742ce-c027-462c-b3b0-621f4115df6f |
 | reviewer_adv_4 | teamwork_preview_reviewer | Pass 4: Adversarial Re-Review | completed | 286cc02f-8a23-4d97-b74f-32f510c94434 |
-| worker_m9e_1 | teamwork_preview_worker | Milestone M9E Replay QA & Railway Deployment | in-progress | 855013e9-40aa-46b7-9ab6-8cedbe0115a3 |
+| worker_m9e_1 | teamwork_preview_worker | Milestone M9E Replay QA & Railway Deployment | completed | 855013e9-40aa-46b7-9ab6-8cedbe0115a3 |
 
 ## Succession Status
-- Succession required: no
+- Succession required: no (mission complete)
 - Spawn count: 17 / 128
-- Pending subagents: 855013e9-40aa-46b7-9ab6-8cedbe0115a3
+- Pending subagents: none
 - Predecessor: none
-- Successor: not yet spawned
+- Successor: not needed (mission fully completed)
 
 ## Active Timers
-- Heartbeat cron: 8f602370-8fd6-478f-9f31-f33f00dc4661/task-241
+- Heartbeat cron: 8f602370-8fd6-478f-9f31-f33f00dc4661/task-241 (to be killed)
 - Safety timer: none
 - On succession: kill all timers before spawning successor
 - On context truncation: run manage_task(Action="list") — re-create if missing

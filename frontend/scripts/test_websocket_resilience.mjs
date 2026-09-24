@@ -152,6 +152,8 @@ class HookSimulationInstance {
             take_profit_1: first.take_profit_1,
             take_profit_2: first.take_profit_2,
             strategy_id: first.strategy_id || "ORB",
+            entry_atr: first.entry_atr ?? null,
+            entry_date: first.entry_date ?? null,
           };
         }
 
@@ -516,4 +518,161 @@ console.log("\n[TEST 4] Testing Simulated React Tree Mounting & Error Boundary I
   console.log("  ✅ React component tree integrity PASSED.");
 }
 
-console.log("\n🎉 ALL 4 WEBSOCKET RESILIENCE & STREAMING STRESS TESTS PASSED!");
+// ============================================================================
+// TEST 5: SWING PAYLOAD RESILIENCE & NULLISH DEFAULTS FOR ENTRY_ATR & ENTRY_DATE (DEFECT 7)
+// ============================================================================
+console.log("\n[TEST 5] Testing Swing Payload Resilience & Nullish Defaults for entry_atr & entry_date (Defect 7)...");
+
+{
+  const client = new HookSimulationInstance();
+
+  function safeFixed(val, digits = 2) {
+    if (val == null || !Number.isFinite(val)) return "—";
+    return val.toFixed(digits);
+  }
+
+  function safeLocale(val, minDigits = 2, maxDigits = 2) {
+    if (val == null || !Number.isFinite(val)) return "—";
+    return val.toLocaleString("en-US", { minimumFractionDigits: minDigits, maximumFractionDigits: maxDigits });
+  }
+
+  // Case A: Full swing payload with populated entry_atr and entry_date
+  const fullSwingPayload = {
+    type: "STATE_UPDATE",
+    timestamp: "2026-09-24T00:00:00Z",
+    account: { equity: 50000, daily_pnl: 250 },
+    swing: {
+      status: "ACTIVE",
+      strategy_name: "2-Day Panic Dip (Connors RSI-2)",
+      allocated_capital: 50000,
+      slot_notional: 25000,
+      max_slots: 2,
+      active_slots_used: 1,
+      available_slots: 1,
+      flattening_exempt: true,
+      candidates: [
+        { symbol: "LRCX", price: 850.25, sma_200: 820.0, rsi_2: 8.5, status: "QUALIFIED" },
+        { symbol: "KLAC", price: 680.10, sma_200: 700.0, rsi_2: 12.0, status: "WATCHING" },
+      ],
+      positions: [
+        {
+          symbol: "MU",
+          side: "LONG",
+          shares: 240,
+          entry_price: 104.15,
+          market_price: 106.30,
+          market_value: 25512.0,
+          unrealized_pnl: 516.0,
+          unrealized_pnl_pct: 2.06,
+          stop_loss: 95.80,
+          stop_loss_price: 95.80,
+          atr_14: 3.34,
+          entry_atr: 3.34,
+          atr_stop_distance: 10.50,
+          atr_stop_pct: 9.88,
+          entry_date: "2026-09-23",
+          holding_days: 1,
+          max_holding_days: 5,
+          holding_progress: "Day 1 of 5",
+          sma_5: 103.50,
+          rsi_2: 45.2,
+          exit_triggers: {
+            sma_5_cross: false,
+            rsi_70_cross: false,
+            time_stop_day_5: false,
+            earnings_tomorrow: false,
+          },
+          staged_exit_at_open: false,
+        },
+      ],
+      last_scan_time: "2026-09-23T16:00:00Z",
+    },
+  };
+
+  client.handleMessage(JSON.stringify(fullSwingPayload));
+
+  assert.ok(client.state.swing, "Swing state must be ingested");
+  assert.strictEqual(client.state.swing.status, "ACTIVE");
+  assert.strictEqual(client.state.swing.positions.length, 1);
+  const pos = client.state.swing.positions[0];
+  assert.strictEqual(pos.symbol, "MU");
+  assert.strictEqual(pos.entry_atr, 3.34);
+  assert.strictEqual(pos.entry_date, "2026-09-23");
+  assert.strictEqual(safeFixed(pos.entry_atr), "3.34");
+  assert.strictEqual(safeLocale(pos.market_value), "25,512.00");
+
+  // Case B: Nullish / missing entry_atr and entry_date (Defect 7 regression test)
+  const nullishSwingPayload = {
+    type: "STATE_UPDATE",
+    timestamp: "2026-09-24T00:01:00Z",
+    swing: {
+      status: "ACTIVE",
+      positions: [
+        {
+          symbol: "AMD",
+          side: "LONG",
+          shares: 160,
+          entry_price: 155.0,
+          market_price: 158.0,
+          market_value: 25280.0,
+          unrealized_pnl: 480.0,
+          unrealized_pnl_pct: 1.94,
+          stop_loss: 145.0,
+          atr_14: 4.0,
+          entry_atr: null,
+          entry_date: null,
+          holding_days: 0,
+          max_holding_days: 5,
+          exit_triggers: {
+            sma_5_cross: false,
+            rsi_70_cross: false,
+            time_stop_day_5: false,
+            earnings_tomorrow: false,
+          },
+        },
+      ],
+    },
+  };
+
+  client.handleMessage(JSON.stringify(nullishSwingPayload));
+  const nullPos = client.state.swing.positions[0];
+  assert.strictEqual(nullPos.symbol, "AMD");
+  assert.strictEqual(nullPos.entry_atr, null);
+  assert.strictEqual(nullPos.entry_date, null);
+
+  // Safe formatting must NEVER crash on null/undefined/NaN
+  assert.strictEqual(safeFixed(nullPos.entry_atr), "—", "safeFixed must return '—' for null entry_atr");
+  assert.strictEqual(safeFixed(undefined), "—", "safeFixed must return '—' for undefined");
+  assert.strictEqual(safeFixed(NaN), "—", "safeFixed must return '—' for NaN");
+  assert.strictEqual(nullPos.entry_date || "Recent", "Recent", "entry_date fallback must be 'Recent'");
+  assert.strictEqual(safeLocale(null), "—", "safeLocale must return '—' for null");
+
+  // Case C: Primary position extraction with entry_atr and entry_date
+  const primaryFromAllPayload = {
+    type: "STATE_UPDATE",
+    all_positions: [
+      {
+        symbol: "GS",
+        side: "LONG",
+        shares: 50,
+        entry_price: 490.0,
+        market_price: 495.0,
+        market_value: 24750.0,
+        unrealized_pnl: 250.0,
+        entry_atr: 5.5,
+        entry_date: "2026-09-23",
+      },
+    ],
+  };
+
+  client.handleMessage(JSON.stringify(primaryFromAllPayload));
+  assert.ok(client.state.primary_position);
+  assert.strictEqual(client.state.primary_position.symbol, "GS");
+  assert.strictEqual(client.state.primary_position.entry_atr, 5.5);
+  assert.strictEqual(client.state.primary_position.entry_date, "2026-09-23");
+
+  console.log("  ✅ Swing payload resilience & nullish defaults (Defect 7) PASSED.");
+}
+
+console.log("\n🎉 ALL 5 WEBSOCKET RESILIENCE & STREAMING STRESS TESTS PASSED!");
+

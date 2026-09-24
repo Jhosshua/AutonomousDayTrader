@@ -107,7 +107,10 @@ const activeSwingTable = fs.readFileSync(path.join(FRONTEND_DIR, "components/Act
 assert(activeSwingTable.includes("2.5x ATR Hard Stop"), "Missing 2.5x ATR stop line");
 assert(activeSwingTable.includes("Holding Day Counter"), "Missing visual holding day counter");
 assert(activeSwingTable.includes("Exit Rule Triggers"), "Missing exit rule triggers");
-console.log("  ✅ Verified Swing Trading UI components (SegmentedToggle, Telemetry, Watchlist, ActiveTable)");
+assert(activeSwingTable.includes("safeFixed"), "Missing safeFixed in ActiveSwingPositionsTable");
+assert(activeSwingTable.includes("safeLocale"), "Missing safeLocale in ActiveSwingPositionsTable");
+assert(activeSwingTable.includes("Entry ATR"), "Missing Entry ATR in ActiveSwingPositionsTable");
+console.log("  ✅ Verified Swing Trading UI components (SegmentedToggle, Telemetry, Watchlist, ActiveTable with safe formatting)");
 
 // 7. Verify safe UI port 3005 in package.json
 const pkgJson = JSON.parse(fs.readFileSync(path.join(FRONTEND_DIR, "package.json"), "utf8"));

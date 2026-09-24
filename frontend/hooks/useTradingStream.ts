@@ -198,6 +198,8 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                   chart_points: first.chart_points,
                   cost_basis: first.cost_basis,
                   realized_pnl: first.realized_pnl,
+                  entry_atr: first.entry_atr ?? null,
+                  entry_date: first.entry_date ?? null,
                 };
               }
 
@@ -318,6 +320,8 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 chart_points: p.chart_points,
                 cost_basis: p.cost_basis,
                 realized_pnl: p.realized_pnl,
+                entry_atr: p.entry_atr ?? null,
+                entry_date: p.entry_date ?? null,
               }));
               setState((prev) => ({
                 ...prev,

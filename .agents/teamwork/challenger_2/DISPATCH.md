@@ -1,31 +1,48 @@
-## 2026-09-23T04:10:04Z
-You are Challenger 2: Adversarial Bracket & Risk Geometry Tester.
+# Dispatch Briefing: Challenger 2 (`teamwork_preview_challenger`)
 
-Your working directory is:
-/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2
-All your test scripts, reports, and handoffs must be written to your working directory.
+## Objective
+Adversarially challenge and stress-test cross-arm circuit breaker isolation, mutual exclusion locking (`AMD`), non-blocking async HTTP, and DailyBarStore SQLite restart persistence in `AutonomousDayTrader`.
 
-Authoritative source of truth:
-You MUST read /Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md before starting work.
-Also inspect:
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_3/PLAN.md
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/worker_remediation/handoff.md
-- backend/app/core/bracket.py
-- backend/app/core/risk.py
-- backend/app/core/engine.py
-- backend/app/main.py
+## Authoritative Reference
+- ORIGINAL_REQUEST: `/Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md`
+- PROJECT: `/Users/mo/AutonomousDayTrader/PROJECT.md`
+- Audit Findings: `/Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_8/AUDIT_FINDINGS.md`
+- Worker 1 Changes: `/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/changes.md`
 
-Your Mission:
-1. Empirically and adversarially challenge the dynamic bracket management, target scaling, and risk guardrails.
-2. Write and execute stress tests that actively test:
-   - Target 1 scaling at 0.8R and Target 2 at 1.8R on both BUY and SELL sides.
-   - Trailing stop monotonicity and gating: verify that on an ACTIVE bracket (before Target 1 is hit), a price rally does NOT move the stop loss into entry noise.
-   - Verify that once Target 1 is hit, the 50% scale-out occurs, stop ratchets to breakeven + dynamic buffer (max(0.04, entry * 0.0005)), and ATR trailing stop begins.
-   - Boundary tests at the exact risk engine limits ($1500 daily loss, $25,000 position notional cap, 0.40% to 4.00% stop range with EPS = 1e-6 float tolerance).
-   - Test partial fills, whipsaw quotes, and fast micro-crashes.
-3. Write your detailed adversarial challenge report to:
-   /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2/challenge_report.md
-   and handoff report to:
-   /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2/handoff.md
-   Include your clear gate verdict: APPROVE or FAIL.
-4. Send completion message to parent when done.
+## Adversarial Stress Testing Plan
+1. **Cross-Arm Circuit Breaker Isolation**:
+   - Create a simulation where an active swing position is held (e.g. `LRCX`).
+   - Trigger the hard daily loss circuit breaker ($1,500 intraday drawdown) via intraday losses in `main.py:_trip_circuit_breaker`.
+   - Verify that all intraday orders and positions are cancelled/liquidated, BUT the swing position and its protective stop remain 100% intact and untouched.
+2. **Mutual Exclusion Locking (`AMD`)**:
+   - Verify that while `AMD` is reserved or held by swing, any intraday BUY or SELL order is strictly rejected by `pre_trade_risk_validator`.
+   - Verify that after the swing position is closed, the reservation is cleanly released.
+3. **DailyBarStore Persistence Across Restart**:
+   - Aggregate daily bars, call `capture_runtime_state`, wipe in-memory `DailyBarStore`, call `restore_runtime_state`, and verify all aggregated bars are restored with full fidelity.
+
+## Output Requirements
+Write your test scripts, empirical execution outputs, and analysis to:
+`/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2/stress_report.md`
+And summary handoff with clear verdict (`APPROVE` or `REJECT`) to:
+`/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2/handoff.md`
+Use `send_message` to communicate completion back to parent.
+
+## 2026-09-24T00:26:23Z
+You are Challenger 2 (teamwork_preview_challenger).
+Your working directory is: /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2
+Your identity: Adversarial Cross-Arm Isolation & Persistence Challenger.
+
+Read your dispatch instructions in:
+/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2/DISPATCH.md
+Read the authoritative user request at:
+/Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md
+Also refer to:
+/Users/mo/AutonomousDayTrader/PROJECT.md
+And Worker 1's documentation:
+/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/changes.md
+
+Your mission:
+Write adversarial stress tests probing cross-arm circuit breaker isolation (tripping intraday breaker while holding swing positions), mutual exclusion locking for AMD, and DailyBarStore restart recovery across SQLite checkpoints.
+Execute tests, capture results, write full report to /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2/stress_report.md and summary handoff with clear verdict (APPROVE or REJECT) to /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_2/handoff.md.
+Use send_message to report back to parent (ID: b067f9cf-98b6-4f32-8f6e-4a86f7057623).
+

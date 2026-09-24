@@ -1,32 +1,44 @@
-## 2026-09-23T04:10:04Z
-You are Challenger 1: Adversarial Market Filter & Entry Stress Tester.
+# Dispatch Briefing: Challenger 1 (`teamwork_preview_challenger`)
 
-Your working directory is:
-/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1
-All your test scripts, reports, and handoffs must be written to your working directory.
+## Objective
+Adversarially challenge and stress-test Worker 1's timing window tolerance and staged order idempotency fixes in `AutonomousDayTrader`.
 
-Authoritative source of truth:
-You MUST read /Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md before starting work.
-Also inspect:
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_3/PLAN.md
-- /Users/mo/AutonomousDayTrader/.agents/teamwork/worker_remediation/handoff.md
-- backend/app/core/market_filter.py
-- backend/app/strategies/adaptation.py
-- backend/app/strategies/orb.py
-- backend/app/strategies/news_momentum.py
-- backend/app/strategies/mean_reversion.py
+## Authoritative Reference
+- ORIGINAL_REQUEST: `/Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md`
+- PROJECT: `/Users/mo/AutonomousDayTrader/PROJECT.md`
+- Audit Findings: `/Users/mo/AutonomousDayTrader/.agents/teamwork/orchestrator_8/AUDIT_FINDINGS.md`
+- Worker 1 Changes: `/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/changes.md`
 
-Your Mission:
-1. Empirically and adversarially challenge the MarketTrendFilter and strategy entry guards.
-2. Write and execute stress tests that actively try to break the implementation:
-   - Test extreme market filter inputs: gap opens, inverted bars, zero volume, flat prices (high == low == open == close), missing timestamps, timestamps 5 minutes apart (> 120s staleness guard).
-   - Test ORB with shooting star candles (upper wick 80%) and hammer candles (lower wick 80%) to verify CLV rejects false breakouts.
-   - Test News Momentum with headline tokens containing substrings like 'emission', 'commission', 'transmission', 'crash test', 'backdrop' to verify regex word-boundary isolation. Test green candles with negative news to verify candle direction filter.
-   - Test Mean Reversion with boundary Z-scores and RSI prints.
-3. Verify test outcomes and assert that zero unhandled exceptions, zero data corruptions, and zero false breakouts occur.
-4. Write your detailed adversarial challenge report to:
-   /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1/challenge_report.md
-   and handoff report to:
-   /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1/handoff.md
-   Include your clear gate verdict: APPROVE or FAIL.
-5. Send completion message to parent when done.
+## Adversarial Stress Testing Plan
+1. **Timing Window & Out-of-Order Jitter**:
+   - Write a stress test simulating bars arriving at 09:30:00, 09:31:00, 09:35:00, and 09:44:00. Verify staged orders execute reliably across all minutes in the window.
+   - Simulate out-of-order bar arrivals: when holding 2 positions where 1 has a staged exit, feed the staged entry's bar first. Verify the entry is NOT deleted, that it is deferred, and that it successfully executes once the exit bar arrives.
+   - Simulate 09:46:00 ET: verify stale unexecuted staged orders are purged and reservations released.
+2. **Idempotency Under Rapid-Fire Evaluations**:
+   - Call `evaluate_market_close` 10 times consecutively with multiple qualifying symbols. Verify that the staged entries NEVER exceed the 2-position cap, and duplicate symbols are never staged.
+
+## Output Requirements
+Write your test scripts, empirical execution outputs, and analysis to:
+`/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1/stress_report.md`
+And summary handoff with clear verdict (`APPROVE` or `REJECT`) to:
+`/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1/handoff.md`
+Use `send_message` to communicate completion back to parent.
+
+## 2026-09-24T00:26:23Z
+You are Challenger 1 (teamwork_preview_challenger).
+Your working directory is: /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1
+Your identity: Adversarial Timing & Idempotency Challenger.
+
+Read your dispatch instructions in:
+/Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1/DISPATCH.md
+Read the authoritative user request at:
+/Users/mo/AutonomousDayTrader/ORIGINAL_REQUEST.md
+Also refer to:
+/Users/mo/AutonomousDayTrader/PROJECT.md
+And Worker 1's documentation:
+/Users/mo/AutonomousDayTrader/.agents/teamwork/worker_1_remediation/changes.md
+
+Your mission:
+Write adversarial stress tests probing the 09:30–09:45 open execution window (delayed 09:31 bars, out-of-order entry before exit bars, 09:46 expiration) and staged order idempotency under rapid-fire evaluations.
+Execute tests, capture results, write full report to /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1/stress_report.md and summary handoff with clear verdict (APPROVE or REJECT) to /Users/mo/AutonomousDayTrader/.agents/teamwork/challenger_1/handoff.md.
+Use send_message to report back to parent (ID: b067f9cf-98b6-4f32-8f6e-4a86f7057623).

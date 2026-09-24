@@ -99,6 +99,8 @@ class Position:
             strategy_id=self.strategy_id,
             holding_days=self.holding_days,
             stop_loss_price=self.stop_loss_price,
+            entry_atr=self.entry_atr,
+            entry_date=self.entry_date.isoformat() if hasattr(self.entry_date, "isoformat") else (str(self.entry_date) if self.entry_date else None),
         )
 
 

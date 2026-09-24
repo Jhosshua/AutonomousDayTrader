@@ -1,109 +1,115 @@
-# Handoff Report — Adversarial Bracket & Risk Geometry Verification
+# Handoff Report: Challenger 2 — Cross-Arm Isolation & Persistence
 
-**Agent**: Challenger 2 (Empirical Challenger, Critic, Specialist)  
-**Date**: 2026-09-23T00:15:00Z  
-**Type**: Hard Handoff (Task Complete)  
-**Verdict**: **APPROVE**  
+**Agent**: Challenger 2 (`teamwork_preview_challenger`)  
+**Roles**: `critic`, `specialist` (Empirical Challenger)  
+**Date**: 2026-09-24  
+**Milestone**: Swing Trading Engine & Intraday Isolation Hardening  
+**Verdict**: **REJECT** (Blocking Defect in Mutual Exclusion Locking for `AMD`)
 
 ---
 
 ## 1. Observation
 
-1. **Target 1 & 2 Scaling Verification**:
-   - `backend/app/core/bracket.py:77-78`: `default_target_1_r: float = 0.80`, `default_target_2_r: float = 1.80`.
-   - `backend/app/main.py:962-963`: Passes `target_1_override=signal.take_profit_1` and `target_2_override=signal.take_profit_2` for all strategies.
-   - `backend/app/strategies/orb.py:86-87`: `target_1_r: float = 0.8`, `target_2_r: float = 1.8`.
-   - `backend/app/strategies/news_momentum.py:90-91`: `target_1_r: float = 0.80`, `target_2_r: float = 1.80`.
-   - Tested in `stress_bracket_risk.py::TestTargetScalingBuySell`:
-     - BUY: Entry $100.00, Stop $98.00 -> T1 = $101.60, T2 = $103.60.
-     - SELL: Entry $100.00, Stop $102.00 -> T1 = $98.40, T2 = $96.40.
-     - Odd share quantities: 1 share -> Q1 = 1, Q2 = 0; 7 shares -> Q1 = 3, Q2 = 4.
+1. **`backend/app/main.py:251–255`**:
+   `pre_trade_risk_validator` defines position-reducing exit orders as:
+   ```python
+   existing_pos = acct.positions.get(sym)
+   is_exit = False
+   if getattr(order, "strategy_id", None) in (...):
+       is_exit = True
+   elif existing_pos is not None:
+       if existing_pos.side == PositionSide.LONG and order.side == OrderSide.SELL:
+           is_exit = True
+       elif existing_pos.side == PositionSide.SHORT and order.side == OrderSide.BUY:
+           is_exit = True
+   ```
+   No comparison is made between `order.arm` and `existing_pos.arm`.
 
-2. **Trailing Stop Monotonicity & Gating Verification**:
-   - `backend/app/core/bracket.py:426-427`:
-     ```python
-     if not bracket or bracket.status != BracketStatus.TARGET_1_HIT:
-         return None
-     ```
-   - Tested in `stress_bracket_risk.py::TestTrailingStopMonotonicityAndGating`:
-     - BUY rally from $100.00 to $101.50 while `ACTIVE` produces `None`; stop remains locked at $98.00.
-     - SELL drop from $100.00 to $98.50 while `ACTIVE` produces `None`; stop remains locked at $102.00.
-     - Post-T1: 6x ATR expansion and whipsaw bars verified that the stop never loosens on either side.
+2. **Empirical Execution & Failure (`pytest backend/tests/stress/test_cross_arm_isolation_persistence.py:257`)**:
+   When `AMD` is held long by Swing (`TradingArm.SWING`, 100 shares), an Intraday SELL order for 50 shares (`strategy_id="orb"`, `arm=TradingArm.INTRADAY`) evaluates to `is_exit = True`.
+   Result: `approved = True`, `reason = "APPROVED_EXIT: Position reducing or liquidation order approved"`.
+   Verbatim output from `pytest backend/tests/stress/test_cross_arm_isolation_persistence.py`:
+   ```
+   FAILED backend/tests/stress/test_cross_arm_isolation_persistence.py::TestAmdMutualExclusionLocking::test_amd_held_by_swing_probe_intraday_sell_vulnerability
+   AssertionError: VULNERABILITY DETECTED in pre_trade_risk_validator: Intraday SELL order on Swing-held AMD was APPROVED!
+   Reason: APPROVED_EXIT: Position reducing or liquidation order approved. Intraday arm can liquidate or cannibalize Swing's long position!
+   assert True is False
+   ```
 
-3. **Dynamic Breakeven Buffer Verification**:
-   - `backend/app/core/bracket.py:91`: `scaled = max(0.04, round(entry_price * 0.0005, 2))`.
-   - Tested in `stress_bracket_risk.py::TestTarget1HitBreakevenAndTrailingATR`:
-     - $10.00: 0.04 buffer -> Long stop $10.04.
-     - $100.00: 0.05 buffer -> Long stop $100.05, Short stop $99.95.
-     - $400.00: 0.20 buffer -> Long stop $400.20.
-     - $1000.00: 0.50 buffer -> Long stop $1000.50.
+3. **Symmetric Reverse Execution & Failure (`test_reverse_swing_sell_on_intraday_held_amd_probe_vulnerability`)**:
+   When `AMD` is held long by Intraday (`TradingArm.INTRADAY`, 100 shares), a Swing SELL order for 50 shares evaluates to `is_exit = True` and is approved as `APPROVED_EXIT`.
+   Verbatim output:
+   ```
+   FAILED backend/tests/stress/test_cross_arm_isolation_persistence.py::TestAmdMutualExclusionLocking::test_reverse_swing_sell_on_intraday_held_amd_probe_vulnerability
+   AssertionError: VULNERABILITY DETECTED in pre_trade_risk_validator: Swing SELL order on Intraday-held AMD was APPROVED!
+   Reason: APPROVED_EXIT: Position reducing or liquidation order approved. Swing arm can cannibalize Intraday position!
+   assert True is False
+   ```
 
-4. **Risk Engine Boundary Verification**:
-   - `backend/app/core/risk.py:97-105`: Hard daily loss threshold of $1,500.00.
-   - `backend/app/core/risk.py:218-240`: Stop distance 0.40% to 4.00% with `EPS = 1e-6`.
-   - `backend/app/core/risk.py:253`: Max position notional cap (50% of equity = $25,000.00).
-   - Tested in `stress_bracket_risk.py::TestRiskEngineLimitsAndFloatTolerance`:
-     - Drawdown $1,499.99 is `ARMED` (WARNING); exactly $1,500.00 triggers `HALTED_DAILY_LOSS`.
-     - Entry price $100.00 authorizes 250 shares ($25,000.00); entry $100.01 clamps to 249 shares ($24,902.49).
-     - Stop boundaries at 0.40% and 4.00% pass across 7 arbitrary float prices ($9.97 to $1041.07).
+4. **Execution Fill Demonstration**:
+   When the intraday sell order was executed via `engine._execute_fill`, `acct.positions["AMD"].shares` decreased from 100 to 60, directly liquidating 40 shares of Swing's position. An order for 150 shares flipped Swing's long position into an intraday 50-share short position (`arm=TradingArm.INTRADAY`).
 
-5. **Adversarial Microstructure Finding**:
-   - In `backend/app/core/bracket.py:334`:
-     ```python
-     elif child_type == BracketChildType.TAKE_PROFIT_1:
-         bracket.target_1_filled = True
-         bracket.remaining_qty -= filled_qty
-     ```
-   - In `backend/app/core/bracket.py:317`:
-     ```python
-     if bracket.target_1_order_id and not bracket.target_1_filled:
-         orders_to_cancel.append(bracket.target_1_order_id)
-     ```
-   - When Target 1 partially fills (e.g. 20 of 50 shares), `target_1_filled` is set to `True`. If the trade subsequently stops out, `target_1_order_id` is omitted from `orders_to_cancel`, leaving an orphaned limit order in `ExecutionEngine.working_orders`. Verified end-to-end in `test_target_1_partial_fill_orphans_limit_order_in_engine_end_to_end`.
-
-6. **Test Suite Execution Results**:
-   - Adversarial stress suite: `pytest .agents/teamwork/challenger_2/stress_bracket_risk.py -v` -> **33 passed in 0.09s**.
-   - Entire backend test suite: `pytest backend/tests -v` -> **223 passed in 0.90s**.
+5. **Circuit Breaker Isolation & Persistence Observations**:
+   - `main._trip_circuit_breaker(now_dt)` correctly preserved `LRCX` (30 shares, $800 avg entry, $762.50 stop loss) and working swing orders on `KLAC`, while 100% flattening `AAPL` and `TSLA`.
+   - `check_intraday_emergency_stops` successfully triggered and liquidated `LRCX` under `CIRCUIT_HALTED` when price dropped to $760.00.
+   - `TradingStateStore` SQLite round-trip restored all 6 symbols with 100% bar fidelity and identical indicator math (`200 SMA`, `5 SMA`, `14 ATR`, `RSI-2`, `60d RS vs QQQ`).
 
 ---
 
 ## 2. Logic Chain
 
-1. **Target Scaling**: From Observation 1, `DynamicBracketManager`, `main.py`, and the strategies consistently implement Target 1 at 0.80R and Target 2 at 1.80R. Quantitative testing confirmed that odd-share splits round Target 1 down and allocate the remainder to Target 2, ensuring `target_1_qty + target_2_qty == total_qty`.
-2. **Trailing Stop Noise Protection**: From Observation 2, `update_trailing_stop` checks `bracket.status != BracketStatus.TARGET_1_HIT` as its initial guard. Therefore, price movements during the `ACTIVE` phase cannot alter `current_stop_price`. This directly resolves the live failure mode from 2026-09-21 where noise prematurely scratched trades.
-3. **Breakeven Ratchet**: From Observation 3, when Target 1 fills, `on_child_order_fill` scales out 50% of the position and ratchets the stop to `entry_price + (direction * buffer)`. Since `buffer = max(0.04, round(entry * 0.0005, 2))`, the buffer dynamically widens for higher-priced equities ($0.20 for TSLA vs $0.04 for lower-priced stocks), guaranteeing that the ratcheted stop covers both exchange fees and spread costs.
-4. **Institutional Invariants**: From Observation 4, the risk engine enforces a hard circuit breaker at $1,500.00 drawdown, position sizing clamped to $25,000 notional, and stop distances within 0.40%–4.00%. Incorporating `EPS = 1e-6` eliminates floating-point representation failures.
-5. **Adversarial Assessment**: From Observation 5, an edge-case defect exists where a partial fill on Target 1 followed by a stop hit leaves the remaining Target 1 limit order uncancelled. However, this is a pre-existing latency in M1 and does not compromise the M3 remediation goals. All M3 requirements are verified and operate as designed.
+1. **Step 1 (From Observation 1)**: In `backend/app/main.py:251–255`, `existing_pos` is fetched solely by ticker (`acct.positions.get(sym)`). If `existing_pos.side == PositionSide.LONG and order.side == OrderSide.SELL`, the code flags `is_exit = True`.
+2. **Step 2 (From Observation 1 & 2)**: Because `order.arm` (e.g. `TradingArm.INTRADAY`) is not checked against `existing_pos.arm` (e.g. `TradingArm.SWING`), any cross-arm opposite-side order is classified as an exit of the other arm's position.
+3. **Step 3 (From Observation 1 & 2)**: In `backend/app/main.py:263`, the mutual exclusion check `if not is_exit:` is skipped entirely when `is_exit` is `True`. Consequently, `is_symbol_reserved_for_swing(sym)` is never called for short sell orders.
+4. **Step 4 (From Observation 1 & 2)**: In `backend/app/core/risk.py:164–172`, `if is_exit:` returns `approved = True` immediately, bypassing all circuit breakers, sector limits, and arm checks.
+5. **Step 5 (From Observation 4)**: When the order fills in `engine._execute_fill`, it deducts shares from `existing_pos`, allowing an intraday strategy to unknowingly liquidate or cannibalize Swing's multi-day holding.
+6. **Step 6**: This directly violates the core requirement in `DISPATCH.md §2`: *"Verify that while AMD is reserved or held by swing, any intraday BUY or SELL order is strictly rejected by pre_trade_risk_validator."* and `PROJECT.md F25`.
 
 ---
 
 ## 3. Caveats
 
-- **No Caveats on M3 Remediation**: Target scaling, trailing stop gating, and risk guardrails are fully functional and verified.
-- **Target 1 Partial Fill Edge Case**: While rare for small lots (50 shares) on liquid mega-cap equities, partial fills on Target 1 should be patched in the next worker cycle by tracking `target_1_qty` decrementally before marking `target_1_filled = True`.
+- **Scope of Defect**: The mutual exclusion lock works correctly when `AMD` is in `swing_reserved_symbols` (prior to entry fill), and works correctly for BUY orders when `AMD` is held. It fails specifically for SELL orders (intraday short entries) against swing long positions, and swing sell orders against intraday long positions.
+- **Circuit Breaker and DailyBarStore**: Circuit breaker isolation and DailyBarStore restart persistence were empirically tested and found completely sound; the rejection verdict is strictly scoped to the AMD mutual exclusion defect.
+- No other untested assumptions: all findings are reproduced empirically via automated test execution.
 
 ---
 
 ## 4. Conclusion
 
-- **Gate Verdict**: **APPROVE**
-- The dynamic bracket management, target scaling (0.8R / 1.8R), trailing stop gating, breakeven buffer scaling, and institutional risk limits are verified, robust, and safe for production trading.
+**Verdict: REJECT.**
+
+The codebase fails Milestone 2 / Feature F25 verification due to a critical cross-arm mutual exclusion defect:
+- Intraday SELL orders are mistakenly approved as position-reducing exits on Swing-held `AMD` positions, cannibalizing multi-day swing positions.
+- The defect must be remediated by a remediation worker agent by ensuring that `is_exit = True` is only assigned when `getattr(existing_pos, "arm", TradingArm.INTRADAY) == order_arm` in `backend/app/main.py:251–255`.
 
 ---
 
 ## 5. Verification Method
 
-To independently reproduce the stress test suite and findings:
+To independently reproduce and verify this finding:
 
-```bash
-# 1. Execute Challenger 2 stress test suite (33 adversarial tests)
-pytest .agents/teamwork/challenger_2/stress_bracket_risk.py -v
+1. **Run the Adversarial Test Suite**:
+   ```bash
+   pytest backend/tests/stress/test_cross_arm_isolation_persistence.py -v
+   ```
+   **Expected Outcome**: 10 tests pass, 2 fail at:
+   - `TestAmdMutualExclusionLocking::test_amd_held_by_swing_probe_intraday_sell_vulnerability`
+   - `TestAmdMutualExclusionLocking::test_reverse_swing_sell_on_intraday_held_amd_probe_vulnerability`
 
-# 2. Run the full backend regression suite (223 tests)
-pytest backend/tests -v
-```
+2. **Standalone Python Reproduction**:
+   ```bash
+   python3 -c "
+   from backend.app import main
+   from backend.app.core.account import TradingArm
+   from backend.app.core.engine import OrderSide, OrderType
 
-### Invalidation Conditions:
-- Any test failure in `stress_bracket_risk.py`.
-- Any trailing stop update modifying `current_stop_price` while bracket status is `ACTIVE`.
-- Any order authorization allowing position notional $> \$25,000.00$ or stop distance $< 0.40\% - 1\times 10^{-6}$.
+   main.account.positions.clear()
+   main.account.apply_fill('sw1', 'AMD', 'BUY', 100, 150.0, 0.0, None, arm=TradingArm.SWING, strategy_id='swing_panic_dip')
+   ord_sell = main.engine.create_order('AMD', OrderSide.SELL, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id='orb')
+   approved, reason = main.pre_trade_risk_validator(ord_sell, main.account)
+   print(f'Intraday SELL on Swing AMD: approved={approved}, reason={reason}')
+   assert approved is False, 'Cross-arm cannibalization defect present!'
+   "
+   ```
+   **Invalidation Condition**: Once `main.py` is patched to require `existing_arm == order_arm` for `is_exit = True`, both adversarial tests will pass with 12/12 (100%) success.

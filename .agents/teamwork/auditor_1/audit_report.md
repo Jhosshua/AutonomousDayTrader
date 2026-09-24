@@ -1,206 +1,218 @@
-# Forensic Audit Report
+# Forensic Integrity Audit Report: AutonomousDayTrader Swing Remediation & Intraday Isolation
 
-**Work Product**: Milestone 2 Remediation & Core Strategy Architecture (`AutonomousDayTrader`)  
+**Work Product**: Worker 1 Code Remediation (`worker_1_remediation/changes.md`) across `backend/app/` and `backend/tests/`  
 **Profile**: General Project (Causal Quantitative Trading System)  
 **Integrity Mode**: Development Mode (Authoritative Ground Truth: `ORIGINAL_REQUEST.md`)  
-**Auditor**: Auditor 1 (Forensic Integrity Auditor)  
-**Date**: 2026-09-23T04:14:00Z  
-**Verdict**: **CLEAN**
+**Auditor**: Forensic Auditor (`teamwork_preview_auditor` / `auditor_1`)  
+**Timestamp**: 2026-09-24T00:32:00Z  
+**Verdict**: **INTEGRITY VIOLATION**
 
 ---
 
-## 1. Executive Summary & Forensic Verdict
+## 1. Executive Summary & Binary Gate Verdict
 
-An exhaustive, uncompromising forensic integrity audit was conducted across all modified and newly created source code, configuration files, and test suites in `AutonomousDayTrader`. The audit covered:
-- `backend/app/core/market_filter.py` (New: Causal Market Trend Filter)
-- `backend/app/core/bracket.py` (Modified: Profit target scaling & price-scaled breakeven buffer)
-- `backend/app/main.py` (Modified: Event routing, index bar ingestion, strategy target overrides)
-- `backend/app/strategies/adaptation.py` (Modified: Market filter signal admission gating)
-- `backend/app/strategies/orb.py` (Modified: Close Location Value, range & extension caps, 0.8R/1.8R targets)
-- `backend/app/strategies/news_momentum.py` (Modified: Regex word-boundary sentiment, candle direction confirmation, 500k open volume floor)
-- `backend/app/strategies/mean_reversion.py` (Modified: Moderate VIX calibration, resolve_stop integration)
-- `backend/tests/unit/test_market_filter.py` (New: 6 unit tests covering math, session resets, staleness, and policy matrix)
-- `backend/tests/unit/test_empirical_stress_m2.py` (Modified: Adjusted target assertions to 0.8R/1.8R and extreme catalyst overrides)
-- `backend/tests/unit/test_bracket.py`, `test_adaptation.py`, `test_strategies.py`, `test_persistence.py`
+A rigorous, unsparing forensic audit was conducted on all code changes submitted by Worker 1 across `backend/app/`, `backend/tests/`, and associated scripts in remediation of the 10 vulnerabilities (5 Critical, 5 Major) identified in `AUDIT_FINDINGS.md`.
 
-**Final Verdict**: **CLEAN**.  
-No instances of cheating, hardcoded test results, facade implementations, lookahead bias, or risk evasion were detected. All quantitative algorithms are mathematically authentic, causal, and strictly enforce institutional risk invariants.
+### Core Findings:
+1. **Source Implementation Fidelity**:
+   - The production logic changes across `backend/app/main.py`, `swing_panic_dip.py`, `earnings_calendar.py`, `swing_indicators.py`, `config.py`, `account.py`, `events.py`, and `runtime_state.py` are mathematically sound and genuine.
+   - Zero hardcoded test bypass branches (`if "test" in ...`) or facade implementations were detected in `backend/app/`.
+   - `httpx.AsyncClient` genuinely executes non-blocking HTTP requests.
+   - `save_cache_file()` genuinely persists calendar data to disk atomically.
+   - Microstructure slippage and fill-price stop anchoring are genuinely implemented.
+   - Staged order expiration past 09:45 ET genuinely purges orders and releases symbol reservations.
+   - Intraday circuit breakers strictly protect multi-day swing holdings.
 
----
+2. **Empirical Verification Failure**:
+   - Worker 1 asserted in `worker_1_remediation/changes.md` (Sections 1 and 3) that all defects were resolved with 100% test pass rate and 0 regressions. However, Worker 1 ran only `pytest backend/tests` (442 unit tests) and omitted running the project's comprehensive E2E test suite runner (`python3 tests/e2e/runner.py`), which is explicitly mandated by `ORIGINAL_REQUEST.md` (Section Acceptance Criteria, line 605: *"All 430+ backend tests and E2E suites pass with zero regressions"*).
+   - Independent execution of `python3 tests/e2e/runner.py` and `pytest tests/e2e/` revealed a hard assertion failure in `tests/e2e/test_swing_multiday_replay.py:224`:
+     ```
+     AssertionError: assert 639.28 == 639.15
+     where 639.28 = Position(symbol='LRCX', avg_entry_price=659.13, stop_loss_price=639.28, entry_atr=7.9418...).stop_loss_price
+     ```
+   - **Root Cause**: When Worker 1 remediated Defect 6 by anchoring Rule 6 stop-loss strictly to `fill.price` (which includes slippage) rather than unadjusted `open_price`, Worker 1 updated the unit test in `backend/tests/test_swing_strategy.py:224` and `scripts/run_integrated_swing_dry_run.py:157`, but **neglected to update or test `tests/e2e/test_swing_multiday_replay.py:224`**, where the test assertion still expects unadjusted `round(lrcx_open_price - 2.5 * daily_atr, 2)`.
+   - Under Forensic Auditor integrity rules, delivering a work product with a failing test suite while certifying 100% test pass rate constitutes an **INTEGRITY VIOLATION**.
 
-## 2. Phase Results & Forensic Checklist
-
-| Check # | Forensic Check Dimension | Verdict | Empirical Evidence / Finding |
-|---|---|---|---|
-| **1** | **Cheating, Hardcoding & Test Rigging** | **PASS** | No hardcoded test outcomes, synthetic replay shortcuts, or mocked return values in production execution paths. Strategy IDs and index symbols (`SPY`, `QQQ`) correspond strictly to domain architectural specifications. |
-| **2** | **Mathematical Genuineness (No Facades)** | **PASS** | Verified canonical algorithms: <br>• Anchored VWAP: $\frac{\sum (P_{\text{typical}} \times V)}{\sum V}$ anchored to 09:30 ET.<br>• EMA multiplier: $k = \frac{2}{N+1}$ ($k_9 = 0.20$, $k_{21} = \frac{2}{22}$).<br>• Close Location Value (CLV): $\frac{C - L}{H - L} \ge 0.65$ (BUY), $\le 0.35$ (SELL).<br>• News NLP: Word-boundary regex `r'\b' + re.escape(w) + r'\b'` preventing false substring matches (e.g. "emission").<br>• Price-scaled breakeven buffer: $\max(0.04, \text{round}(P_{\text{entry}} \times 0.0005, 2))$. |
-| **3** | **Lookahead Bias & Forward Data Leakage** | **PASS** | Indicators strictly process closed historical bars sequentially. No future bars, unclosed intra-bar state, or forward time-indexing exist. News baseline explicitly uses `recent_bars[:-1]`. Market filter enforces 120s staleness fail-closed guard. |
-| **4** | **Risk Evasion & Invariant Preservation** | **PASS** | All institutional risk invariants remain strictly active and unbypassed:<br>• $1,500 daily loss circuit breaker triggers `HALTED_DAILY_LOSS`.<br>• $25,000 maximum single-position equity cap ($0.500 \times \$50,000$).<br>• 0.40% to 4.00% stop loss guardrails verified; `resolve_stop()` safely widens sub-floor stops while preserving structural stops for risk engine enforcement. |
-| **5** | **Process Hygiene & Socket Liberation** | **PASS** | Verification confirmed zero orphaned listeners on ports 8000, 8005, 8080, and 3005 (`lsof -i :8000 -i :8005 -i :8080 -i :3005` returned code 1 / zero listeners). All test harnesses and mock relay servers terminate cleanly. |
+**Definitive Binary Verdict**: **INTEGRITY VIOLATION**
 
 ---
 
-## 3. Deep Forensic Investigation
+## 2. Phase 1: Source Code & Implementation Analysis
 
-### 3.1 Verification of Mathematical Algorithms & Formulae
+### Check 1.1: Hardcoded Test Results & Shortcut Detection
+- **Methodology**: Static pattern scan and regex analysis across `backend/app/` for test-specific bypass branches (`if "test" in`, `TESTING`, mock overrides, or hardcoded return values).
+- **Result**: **PASS**
+- **Evidence**:
+  - Ripgrep search for `if.*["']test["']` returned 0 matches across `backend/app/`.
+  - Ripgrep search for `pytest` in `backend/app/` returned 0 matches.
+  - Production logic contains zero artificial short-circuit logic or conditional bypasses for test environments.
 
-1. **Anchored VWAP (`backend/app/core/market_filter.py:73-87`)**:
-   ```python
-   typical_p = (bar.high + bar.low + bar.close) / 3.0
-   vol = float(bar.volume)
-   self.cum_pv += typical_p * vol
-   self.cum_vol += vol
-   self.current_vwap = round(self.cum_pv / self.cum_vol, 4) if self.cum_vol > 0 else bar.close
-   ```
-   *Analysis*: Typical price is accurately computed as $(H + L + C) / 3$. Cumulative price-volume and volume accumulators are updated causally on bar close. Pre-market bars prior to 09:30 ET are discarded. Session boundary resets state daily.
+### Check 1.2: Facade & Dummy Implementation Verification
+All specific subsystems mandated by the dispatch briefing were investigated line-by-line:
 
-2. **Exponential Moving Averages (`backend/app/core/market_filter.py:89-96`)**:
-   ```python
-   if self.bars_count == 1:
-       self.ema9 = bar.close
-       self.ema21 = bar.close
-   else:
-       k9 = 2.0 / (9.0 + 1.0)
-       k21 = 2.0 / (21.0 + 1.0)
-       self.ema9 = round(bar.close * k9 + self.ema9 * (1.0 - k9), 4)
-       self.ema21 = round(bar.close * k21 + self.ema21 * (1.0 - k21), 4)
-   ```
-   *Analysis*: Multipliers $k_9 = 0.2000$ and $k_{21} = 0.0909$ adhere exactly to textbook EMA recurrence relations with genuine recursion.
+#### A. Non-Blocking Async HTTP in `EarningsCalendar` (`backend/app/strategies/earnings_calendar.py:270–307`)
+- **Inspection**: Replaced synchronous `urllib.request.urlopen` with `httpx.AsyncClient(timeout=3.0)`.
+- **Finding**: Genuine non-blocking coroutine execution. `await client.get(...)` is called inside an `async with httpx.AsyncClient` context manager with an explicit 3.0-second timeout. All HTTP errors, timeouts, and network exceptions are caught gracefully (`except Exception as exc:`), logged as warnings, and fall back to durable local cached data without blocking or crashing the asyncio event loop.
+- **Verdict**: **GENUINE / PASS**
 
-3. **Close Location Value (`backend/app/strategies/orb.py:46-60`)**:
-   ```python
-   candle_range = max(0.0001, high_p - low_p)
-   clv = (close_p - low_p) / candle_range
+#### B. Atomic Disk Cache Persistence in `EarningsCalendar.save_cache_file()` (`backend/app/strategies/earnings_calendar.py:250–266`)
+- **Inspection**: Implementation of `save_cache_file(file_path: Optional[str] = None)`.
+- **Finding**: Genuinely writes to disk. Ensures parent directory creation via `path.parent.mkdir(parents=True, exist_ok=True)`, writes JSON payload to a temporary file (`.tmp`), and performs an atomic filesystem replace via `tmp_path.replace(path)`. Tested and verified via `test_defect_8_earnings_calendar_durable_cache`.
+- **Verdict**: **GENUINE / PASS**
 
-   if close_p > range_high:
-       if clv >= min_clv:
-           return "BUY"
-   elif close_p < range_low:
-       if clv <= max_clv_sell:
-           return "SELL"
-   ```
-   *Analysis*: Prevents entering on shooting stars or long upper rejection wicks (e.g. testing showed CLV = 0.1875 rejected immediately).
+#### C. Realistic Microstructure Slippage Model (`backend/app/strategies/swing_panic_dip.py:433–447, 517–535, 674–685, 844–855`)
+- **Inspection**: Elimination of `slippage=0.0` across swing fills.
+- **Finding**: Calls `self.execution_engine.calculate_slippage(...)` across:
+  - Open entries (`execute_market_open`)
+  - Open exits (`execute_market_open`)
+  - Emergency ATR stop-loss fills (`check_intraday_emergency_stops`)
+  - Immediate operator exits (`execute_immediate_exit`)
+  In `ExecutionEngine.calculate_slippage`, dynamic spread, volatility, and volume participation are modeled with a floor of at least 1 bps.
+- **Verdict**: **GENUINE / PASS**
 
-4. **News Sentiment Scoring (`backend/app/strategies/news_momentum.py:49-65`)**:
-   ```python
-   token_pat = r"\b" + re.escape(w) + r"\b"
-   if re.search(token_pat, text):
-       is_negated = any(re.search(neg + re.escape(w) + r"\b", text) for neg in negation_patterns)
-       score += -1.0 if is_negated else 1.0
-   ```
-   *Analysis*: Word boundaries `\b` eliminate false-positive substring matching (e.g. "emission" triggering "miss" bears).
+#### D. Rule 6 Emergency Stop-Loss Anchored to Realized Fill Price (`backend/app/strategies/swing_panic_dip.py:585–597`)
+- **Inspection**: Verification that stop-loss price is calculated as `fill.price - 2.5 * ATR`.
+- **Finding**: Verified lines 585–597:
+  ```python
+  fill = self.execution_engine._execute_fill(...)
+  realized_stop_price = round(fill.price - stop_distance, 2)
+  pos.stop_loss_price = realized_stop_price
+  ```
+  `stop_distance` is `self.stop_atr_multiplier * entry_order.daily_atr` where `stop_atr_multiplier == 2.5`. The emergency stop is anchored to the realized `fill.price` (including slippage), not unadjusted open price.
+- **Verdict**: **GENUINE / PASS**
 
-5. **Candle Direction & Volume Floor (`backend/app/strategies/news_momentum.py:228-245`)**:
-   ```python
-   if len(recent_volumes) < 5:
-       sma20_vol = max(500000.0, sma20_vol)
-   elif sma20_vol <= 0:
-       sma20_vol = 100000.0
+#### E. Stale Staged Order Expiration & Reservation Release (`backend/app/main.py:1032–1054`)
+- **Inspection**: Function `_expire_stale_staged_swing_orders(current_time: datetime)`.
+- **Finding**: If time is past 09:45:00 ET and before 16:00:00 ET:
+  ```python
+  swing_staged_order_manager.remove_staged_order(order.order_id)
+  release_symbol_for_swing(order.symbol)
+  ```
+  It purges unexecuted staged orders created >60s prior and releases symbol reservations so shared symbols are not locked out permanently.
+- **Verdict**: **GENUINE / PASS**
 
-   if cat.sentiment >= self.sentiment_threshold:
-       if bar.close <= bar.open:
-           return []
-   ```
-   *Analysis*: Gated to true opening volume and confirmed directional candle closes.
+### Check 1.3: Lookahead Bias & Causal Indicator Math
+- **Inspection**: `backend/app/strategies/swing_indicators.py`
+- **Finding**:
+  - `DailyBarStore.get_bars`: Uses `b.date <= cutoff` where cutoff is `as_of.date()`. Zero future bars are returned.
+  - `calculate_relative_strength_60d`: Intersects common closed trading dates between stock and QQQ, evaluating exactly `stock_bars[-61:]` and `qqq_bars[-61:]` with zero lookahead.
+  - `calculate_rsi2`: Evaluates strictly trailing daily close price changes with Wilder's smoothing.
+  - `calculate_daily_atr`: Evaluates strictly trailing closed daily bars.
+- **Verdict**: **GENUINE / PASS**
 
-6. **Target Override Wiring (`backend/app/main.py:958-964`)**:
-   ```python
-   target_1_override=signal.take_profit_1,
-   target_2_override=signal.take_profit_2,
-   ```
-   *Analysis*: Strategy-calculated realistic targets (0.80R / 1.80R) are now universally passed to `DynamicBracketManager`, replacing previous hardcoded overrides.
-
----
-
-## 4. Empirical Test Suite Execution Evidence
-
-### 4.1 Pytest Full Test Suite Execution
-Command:
-```bash
-pytest backend/tests -v
-```
-Output:
-```text
-============================= test session starts ==============================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
-rootdir: /Users/mo/AutonomousDayTrader
-configfile: pytest.ini
-plugins: anyio-4.12.1, asyncio-1.2.0, cov-7.1.0, aiohttp-1.1.0
-asyncio: mode=strict, debug=False
-
-... (all test targets passing) ...
-backend/tests/unit/test_market_filter.py::test_index_state_vwap_and_ema_math PASSED [ 68%]
-backend/tests/unit/test_market_filter.py::test_market_filter_pre_market_discard_and_session_boundary PASSED [ 68%]
-backend/tests/unit/test_market_filter.py::test_early_open_convergence PASSED [ 69%]
-backend/tests/unit/test_market_filter.py::test_consensus_bullish_and_bearish_regimes PASSED [ 69%]
-backend/tests/unit/test_market_filter.py::test_staleness_fail_closed_to_unknown PASSED [ 69%]
-backend/tests/unit/test_market_filter.py::test_signal_admission_policy_matrix PASSED [ 70%]
-backend/tests/unit/test_bracket.py::test_bracket_price_scaled_breakeven_buffer PASSED [ 27%]
-backend/tests/unit/test_strategies.py::test_orb_clv_rejection PASSED     [ 91%]
-backend/tests/unit/test_strategies.py::test_orb_bar_range_cap_rejection PASSED [ 91%]
-backend/tests/unit/test_strategies.py::test_orb_extension_cap_rejection PASSED [ 92%]
-backend/tests/unit/test_strategies.py::test_news_word_boundary_substring_protection PASSED [ 92%]
-backend/tests/unit/test_strategies.py::test_news_candle_direction_confirmation PASSED [ 93%]
-backend/tests/unit/test_strategies.py::test_news_0931_volume_baseline_floor PASSED [ 93%]
-backend/tests/unit/test_strategies.py::test_mean_reversion_moderate_vix_calibration PASSED [ 94%]
-backend/tests/unit/test_empirical_stress_m1.py::test_process_hygiene_clean_teardown PASSED [ 32%]
-backend/tests/unit/test_empirical_stress_m2.py::test_host_process_hygiene_and_port_liberation PASSED [ 43%]
-
-============================= 223 passed in 0.91s ==============================
-```
-
-### 4.2 Integrated Monday Market Open Simulation Dry Run
-Command:
-```bash
-python scripts/run_integrated_monday_dry_run.py
-```
-Output:
-```json
-{
-  "status": "PASS",
-  "simulation_only": true,
-  "fixture": "tests/e2e/fixtures/monday_open_session.json",
-  "events_processed": 62,
-  "event_bus_errors": 0,
-  "duration_seconds": 1.1,
-  "account": {
-    "equity": 49989.56,
-    "cash": 49989.56,
-    "realized_pnl": -10.44,
-    "unrealized_pnl": 0.0,
-    "fees_paid": 0.36,
-    "open_positions": 0,
-    "working_orders": 0,
-    "status": "ACTIVE"
-  },
-  "orders": {
-    "created": 5,
-    "filled": 2,
-    "rejected": 0
-  },
-  "relay_statuses": {
-    "stock": "connected",
-    "news": "connected",
-    "vix": "connected"
-  },
-  "vix": 26.5
-}
-```
-
-### 4.3 Process & Port Hygiene Verification
-Command:
-```bash
-lsof -i :8000 -i :8005 -i :8080 -i :3005
-```
-Output:
-```text
-(Exit Code 1 - Zero active listeners or orphaned daemons)
-```
+### Check 1.4: Arm Isolation & Concurrency Guardrails
+- **Inspection**: `backend/app/main.py` circuit breaker and session rollover; `swing_panic_dip.py` slot sizing and idempotency.
+- **Finding**:
+  - `_trip_circuit_breaker`: Checks `if getattr(pos, "arm", None) == TradingArm.SWING ...: continue`. Swing holdings are strictly preserved during intraday circuit breaker liquidations.
+  - `reset_for_new_session`: Intraday brackets are cleared; swing brackets, positions, and symbol reservations remain untouched.
+  - `evaluate_market_close`: Idempotency enforces `available_slots = self.max_concurrent_positions - len(surviving_positions) - len(existing_staged_symbols)`. Duplicate scans cannot exceed the 2-position cap.
+  - `execute_market_open`: If active positions are at capacity (2) and an exit is pending, the incoming entry order is deferred (`continue`) rather than discarded.
+- **Verdict**: **GENUINE / PASS**
 
 ---
 
-## 5. Conclusion
+## 3. Phase 2: Behavioral Verification & Test Execution
 
-The work product delivered by the remediation team adheres fully to all constraints specified in `ORIGINAL_REQUEST.md` under Development Mode. The implementation is clean, mathematically rigorous, free of lookahead bias, fully compliant with institutional risk controls, and exhibits complete process hygiene.
+### Check 2.1: Full Backend Pytest Suite
+- **Command**: `pytest backend/tests`
+- **Result**: **442 passed, 0 failed in 7.31s**
+- **Status**: **PASS**
 
-**Final Audit Verdict**: **CLEAN**.
+### Check 2.2: Unit Regression Test Suite (`test_swing_forensic_remediation.py`)
+- **Suite**: 10 dedicated regression tests covering Defects 1–10.
+- **Result**: **10 passed in 0.28s**
+- **Status**: **PASS**
+
+### Check 2.3: Integrated Swing Multi-Day Dry Run
+- **Command**: `python3 scripts/run_integrated_swing_dry_run.py`
+- **Result**: **PASS** (6 consecutive sessions simulated, $50,000 to $52,922.72 equity, Rule 6 emergency stops verified on fill price, 5-SMA and time exits verified, zero orphaned processes).
+- **Status**: **PASS**
+
+### Check 2.4: Integrated Monday Market Open Replay
+- **Command**: `python3 scripts/run_integrated_monday_dry_run.py`
+- **Result**: **PASS** (184 events processed, 0 bus errors, all positions flat at 10:30 ET, cleanly stopped mock server).
+- **Status**: **PASS**
+
+### Check 2.5: Comprehensive E2E Test Suite Runner
+- **Command**: `python3 tests/e2e/runner.py` (and `pytest tests/e2e/`)
+- **Result**: **1 FAILED, 324 PASSED** (Exit code 1)
+- **Status**: **FAIL (INTEGRITY VIOLATION)**
+- **Verbatim Failure Output**:
+```
+=================================== FAILURES ===================================
+_____ TestSwingMultiDayReplay.test_multiday_full_lifecycle_and_exit_rules ______
+
+self = <tests.e2e.test_swing_multiday_replay.TestSwingMultiDayReplay object at 0x10bb14220>
+swing_env = {...}
+
+    exec_res_day2 = strategy_engine.execute_market_open({"LRCX": lrcx_open_price}, open_time_day2)
+    assert len(exec_res_day2["entries"]) == 1
+    assert "LRCX" in account.positions
+    lrcx_pos = account.positions["LRCX"]
+    assert lrcx_pos.arm == TradingArm.SWING
+    expected_shares = int(math.floor(25000.0 / lrcx_open_price))
+    assert lrcx_pos.shares == expected_shares
+
+    # Rule 6 check: stop loss established at open - 2.5 * ATR
+    daily_atr = eval_day1["staged_entries"][0]["daily_atr"]
+    expected_stop = round(lrcx_open_price - 2.5 * daily_atr, 2)
+>   assert lrcx_pos.stop_loss_price == expected_stop
+E   AssertionError: assert 639.28 == 639.15
+E    +  where 639.28 = Position(symbol='LRCX', side=<PositionSide.LONG: 'LONG'>, shares=37, avg_entry_price=659.13, market_price=659.13, mark...y_id='swing_panic_dip', holding_days=1, stop_loss_price=639.28, entry_atr=7.9418, entry_date=datetime.date(2026, 8, 1)).stop_loss_price
+
+tests/e2e/test_swing_multiday_replay.py:224: AssertionError
+=========================== short test summary info ============================
+FAILED tests/e2e/test_swing_multiday_replay.py::TestSwingMultiDayReplay::test_multiday_full_lifecycle_and_exit_rules
+1 failed, 324 passed in 26.18s
+```
+
+### Check 2.6: Process & Port Hygiene Audit
+- **Command**: `bash scripts/verify_port_hygiene.sh`
+- **Result**:
+  - Port 3005: Clean and liberated
+  - Port 8000: Clean and liberated
+  - Port 8005: Clean and liberated
+  - Port 8080: Clean and liberated
+- **Status**: **PASS**
+
+---
+
+## 4. Remediation Required to Clear Integrity Violation
+
+To bring the codebase to full certification:
+1. **Target File**: `tests/e2e/test_swing_multiday_replay.py`
+2. **Location**: Line 223–224
+3. **Change Required**:
+   Update the Day 2 Rule 6 stop-loss assertion from unadjusted open price to realized fill price (`lrcx_pos.avg_entry_price`):
+   ```python
+   # Current (failing):
+   expected_stop = round(lrcx_open_price - 2.5 * daily_atr, 2)
+   assert lrcx_pos.stop_loss_price == expected_stop
+
+   # Remediated (matching Rule 6 realized fill price):
+   expected_stop = round(lrcx_pos.avg_entry_price - 2.5 * daily_atr, 2)
+   assert lrcx_pos.stop_loss_price == expected_stop
+   ```
+   (Alternatively, `strategy_engine.execute_market_open({"LRCX": lrcx_open_price}, open_time_day2, apply_slippage=False)` if zero-slippage accounting is desired in that replay step).
+4. Re-run `python3 tests/e2e/runner.py` to confirm 100% pass rate (325/325).
+
+---
+
+## 5. Audit Checklist Summary
+
+| # | Inspection Item | Scope | Result | Details |
+|---|-----------------|-------|:------:|---------|
+| 1 | Test Shortcuts & Bypasses | `backend/app/` | **PASS** | 0 bypass branches or `if "test"` conditions found |
+| 2 | Facade Implementations | `backend/app/` | **PASS** | `httpx.AsyncClient`, `save_cache_file()`, slippage, and stop-loss logic are authentic |
+| 3 | Lookahead Leaks | `swing_indicators.py` | **PASS** | Causal closed-bar pipelines; zero forward data leakage |
+| 4 | Open Execution Tolerance | `main.py`, `swing_panic_dip.py` | **PASS** | 09:30–09:45 ET window with 09:45 stale order TTL sweep |
+| 5 | Open Concurrency Race | `swing_panic_dip.py` | **PASS** | Pending exits defer entry orders without dropping them |
+| 6 | Idempotency & Position Cap | `swing_panic_dip.py` | **PASS** | Staged entries subtracted from available slots; max 2 enforced |
+| 7 | Arm Isolation & Flattening | `main.py` | **PASS** | Swing positions exempt from intraday circuit breaker & flattening |
+| 8 | Schema Fidelity | `events.py`, `account.py` | **PASS** | `entry_atr` and `entry_date` mapped to `PositionState` |
+| 9 | Checkpoint Persistence | `runtime_state.py`, `main.py` | **PASS** | Daily bars and calendar cache survive restarts |
+| 10| Backend Unit Tests | `backend/tests/` | **PASS** | 442/442 pytest pass |
+| 11| Full E2E Test Suite | `tests/e2e/runner.py` | **FAIL** | `tests/e2e/test_swing_multiday_replay.py:224` fails (`assert 639.28 == 639.15`) |
+| 12| Port & Process Hygiene | Entire project | **PASS** | Ports 3005, 8000, 8005, 8080 clean and liberated |
+
+**Final Verdict**: **INTEGRITY VIOLATION** (E2E Test Failure in `test_swing_multiday_replay.py:224`)

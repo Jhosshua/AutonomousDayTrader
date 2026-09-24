@@ -1,233 +1,196 @@
-# Architecture & Lookahead Bias Audit Report
+# Independent Code Quality & Architecture Review Report: Worker 1 Forensic Remediation
 
-**Auditor**: Reviewer 1 (Architecture & Lookahead Bias Auditor)  
-**Date**: 2026-09-23T04:14:00Z  
-**Target Under Review**: Worker 1 Remediation (PR / Changeset for Strategy & Execution Architecture)  
-**Gate Verdict**: **REQUEST_CHANGES**
-
----
-
-## 1. Executive Summary & Verdict
-
-Worker 1 implemented significant structural enhancements aimed at addressing the empirical defects identified in live paper execution (notably context blindness, unrealistic 1.5R target geometry, and crude entry triggers).
-
-However, an exhaustive architectural, mathematical, and adversarial code audit has surfaced **1 CRITICAL finding**, **3 MAJOR findings**, and **1 MINOR finding**. Most notably:
-1. **Critical Inverted Logic in Market Trend Filter**: In `backend/app/core/market_filter.py:295-301`, the policy for `mean_reversion` is backwards: during a strong `BULLISH` market rally, it approves `SELL` (shorting) orders claiming they are "aligned with MarketTrend.BULLISH", while rejecting `BUY` orders. Conversely, during a `BEARISH` market decline, it approves `BUY` (catching a falling knife) while rejecting `SELL`. This directly recreates the catastrophic failure mode observed on 2026-09-22 where high-beta assets were shorted into a market-wide rally.
-2. **Forward Data Leakage Vulnerability via `abs()` in Staleness Check**: In `backend/app/core/market_filter.py:185, 191`, computing elapsed time as `abs((now - spy_ts).total_seconds())` allows future index bars (`spy_ts > now`) to pass freshness checks. If index bars arrive out of order or ahead of symbol bars, future data leaks into the trend determination for past signals.
-3. **E2E Test Suite Regression**: While `pytest backend/tests -v` passes (223/223), the full end-to-end regression suite (`python3 tests/e2e/runner.py`) fails with **7 test failures** across `test_tier5_adversarial.py` and `test_challenger_bracket_2.py`, violating Acceptance Criterion R4 ("100% pass rate with zero regression").
-4. **Execution Slippage Hazard on Fixed Absolute Overrides**: Overriding bracket targets with pre-calculated absolute prices (`signal.take_profit_1`, `signal.take_profit_2`) without validating `(target_price - fill_price) * direction > 0` risks placing immediate resting exit orders on the loss side of a filled market order if slippage occurs.
-
-Until these findings are remediated, the changes cannot be certified for live production deployment.
+**Reviewer**: Reviewer 1 (`teamwork_preview_reviewer`)  
+**Role**: Independent Code Quality & Architecture Reviewer / Adversarial Critic  
+**Working Directory**: `/Users/mo/AutonomousDayTrader/.agents/teamwork/reviewer_1`  
+**Milestone**: Swing Engine Hardening & Intraday Isolation Forensic Remediation  
+**Date**: 2026-09-24T00:32:00Z  
+**Verdict**: **REQUEST_CHANGES**
 
 ---
 
-## 2. Exhaustive Audit by Dimension
+## 1. Executive Summary
 
-### A. Lookahead Bias & Forward Data Leakage Audit
-- **MarketTrendFilter (`backend/app/core/market_filter.py`)**:
-  - Anchored VWAP and EMA 9/21 are computed online using closed 1-minute bars (`typical_p = (h + l + c) / 3`, cumulative $PV$ and volume, and recursive exponential smoothing). No future bars or future ticks are referenced within `IndexState.update_bar()`.
-  - Pre-market bars prior to 09:30:00 ET are strictly discarded, ensuring the regular session VWAP anchor is clean.
-  - **VULNERABILITY DETECTED (`market_filter.py:185, 191`)**:
-    ```python
-    dt_spy = abs((now - spy_ts).total_seconds())
-    dt_qqq = abs((now - qqq_ts).total_seconds())
-    ```
-    If `spy_ts > now` (e.g. index data arrives with a clock skew or out of order ahead of the stock signal timestamp `now`), `(now - spy_ts)` is negative. Applying `abs()` converts negative elapsed time to positive, treating future index bars as valid "fresh" past observations. This is forward data leakage. It must strictly require `0 <= (now - spy_ts).total_seconds() <= self.stale_threshold_sec`.
-- **Opening Range Breakout (`backend/app/strategies/orb.py`)**:
-  - `prior_bars = state.all_bars[:-1][-20:]` correctly slices `[:-1]`, excluding the candidate breakout bar from the baseline average volume calculation.
-  - `calculate_atr(state.all_bars, period=14)` uses the closed bars up to and including the current bar.
-  - CLV and range checks operate strictly on the completed candidate bar. Zero lookahead detected.
-- **News Momentum (`backend/app/strategies/news_momentum.py`)**:
-  - `recent_volumes = [float(b.volume) for b in self.recent_bars[sym][:-1][-20:]]` correctly excludes the candidate surge bar from the SMA20 volume baseline.
-  - Candle direction confirmation `bar.close > bar.open` (for BUY) and `bar.close < bar.open` (for SELL) operates strictly on the completed bar. Zero lookahead detected.
-- **Mean Reversion (`backend/app/strategies/mean_reversion.py`)**:
-  - `volumes[:-1]` correctly excludes the current bar from the volume baseline.
-  - Z-score, RSI, and ATR use completed historical bars. Zero lookahead detected.
+A comprehensive, adversarial code review was conducted on Worker 1's remediation of the 10 verified forensic defects across `AutonomousDayTrader`. The audit covered static control flow analysis, async event loop safety, open-window execution timing, circuit breaker arm isolation, microstructure slippage modeling, SQLite persistence round-trip fidelity, and live test suite execution (`pytest backend/tests`, `pytest tests/e2e/test_swing_multiday_replay.py`, and `scripts/run_integrated_swing_dry_run.py`).
+
+### Verification Highlights
+- **Backend Unit & Integration Suite (`pytest backend/tests`)**: 442/442 passed in 7.27s (100% pass rate).
+- **Remediation Regression Suite (`pytest backend/tests/unit/test_swing_forensic_remediation.py`)**: 10/10 passed in 0.19s.
+- **Integrated Multi-Day Dry Run (`scripts/run_integrated_swing_dry_run.py`)**: 6/6 days passed, PnL +$2,922.72, all ports clean.
+- **Port Hygiene**: Ports 8000, 8005, 8080, and 3005 verified completely released and clean (`exit code 1`).
+- **Integrity Check**: No facade implementations, hardcoded mock results, or deceptive shortcuts detected. The core remediations are genuine and robust.
+
+### Why REQUEST_CHANGES?
+Despite substantial high-quality engineering across all 10 defect fixes, independent adversarial testing surfaced **two Major issues** that must be resolved:
+1. **[MAJOR] Stale Prior-Session Price Injection at 09:30 Open (`backend/app/main.py:1334–1341`)**:
+   `latest_market_prices` is not purged across session boundaries. When the first 09:30 opening bar for one symbol arrives, `main.py` populates `open_price_map` for all other staged orders using `latest_market_prices` (yesterday's 16:00 close price). Consequently, any other staged symbol is filled using yesterday's close price *before* today's 09:30 opening bar arrives.
+2. **[MAJOR] E2E Regression in `tests/e2e/test_swing_multiday_replay.py:224`**:
+   `TestSwingMultiDayReplay::test_multiday_full_lifecycle_and_exit_rules` fails with `AssertionError: assert 639.28 == 639.15`. Worker 1 updated the stop loss assertion in unit tests and dry run scripts to anchor to realized fill price (`round(pos.avg_entry_price - 2.5 * ATR, 2)`), but omitted updating this E2E replay test.
 
 ---
 
-### B. Invariant Violations Audit
-- **$1,500 Daily Drawdown Circuit Breaker**:
-  - `backend/app/config.py:MAX_DAILY_LOSS_LIMIT = 1500.0` is wired into `risk_engine = InstitutionalRiskEngine(config=RiskEngineConfig(max_daily_loss=settings.MAX_DAILY_LOSS_LIMIT, ...))`.
-  - Confirmed via `backend/tests/unit/test_risk.py::test_circuit_breaker_hard_halt_at_1500_loss` (PASSED). Invariant strictly preserved.
-- **$25,000 Single Position Cap**:
-  - `backend/app/config.py:MAX_POSITION_NOTIONAL = 25000.0` is wired into `main.py` and `risk_engine`.
-  - Confirmed via `backend/tests/unit/test_risk.py::test_production_wiring_caps_a_single_position_at_25k` (PASSED). Invariant strictly preserved.
-- **0.40% to 4.00% Stop Guardrails**:
-  - In `mean_reversion.py:172, 205`, raw stop distances are routed through `resolve_stop(entry_price, raw_dist, is_buy)`. Previously, unscaled ATR stops could violate the 40 bps floor. Now, stops tighter than 0.40% are cleanly expanded to 0.40% with outward rounding.
-  - In `bracket.py:get_breakeven_buffer()`, dynamic scaling `max(0.04, round(entry_price * 0.0005, 2))` ensures the breakeven ratchet maintains a safe 5 bps distance without colliding with entry noise.
-  - Invariant strictly preserved.
+## 2. Forensic Evaluation of the 10 Remediated Defects
+
+### Defect 1: 09:30 ET Market-Open Trigger Brittleness & Order Marooning
+- **Files Modified**: `backend/app/main.py:1032–1056, 1330–1344, 1669`
+- **Assessment**: **VERIFIED (With 1 finding noted below in Finding 1)**
+- **Findings**:
+  - The execution window was successfully broadened from strict `minute == 30` to `(bar_t.hour == 9 and 30 <= bar_t.minute <= 45)`. This accommodates delayed opening bars (09:31+).
+  - The expiration sweep `_expire_stale_staged_swing_orders(current_time)` purges unexecuted staged orders past 09:45 ET and releases the symbol reservation via `release_symbol_for_swing()`.
+  - Both `handle_bar_event` and `_runtime_clock_loop` trigger the expiration sweep.
+  - Timezone safety is handled properly (`current_time.replace(tzinfo=timezone.utc)` and `created.replace(tzinfo=timezone.utc)`).
+
+### Defect 2: Concurrency Annihilation Race Condition at Open
+- **Files Modified**: `backend/app/strategies/swing_panic_dip.py:483–502`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - In `execute_market_open`, if `active_count >= self.max_concurrent_positions` and `len(pending_exits) > 0`, the engine logs deferral and issues `continue` without deleting the staged entry or releasing the symbol reservation.
+  - Staged exits are processed first in `execute_market_open`, guaranteeing that if both exit and entry prices are present, the exit frees the slot before entry evaluation.
+  - Unit test `test_defect_2_entry_deferral_when_exits_pending` deterministically passes.
+
+### Defect 3: Staged Order Idempotency Breakdown & Position Cap Breach
+- **Files Modified**: `backend/app/strategies/swing_panic_dip.py:301–326, 365–366`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - Available slots calculation now deducts already staged entries:
+    `available_slots = self.max_concurrent_positions - len(surviving_positions) - len(existing_staged_symbols)`.
+  - Staging loop breaks immediately if `available_slots <= 0`.
+  - Candidate symbols already staged in `existing_staged_symbols` or `staged_manager.is_staged_for_entry(sym)` are skipped.
+  - Repeated close scans across the evening cannot stage more than 2 positions total.
+
+### Defect 4: Blocking I/O in Async Event Loop
+- **Files Modified**: `backend/app/strategies/earnings_calendar.py:270–309`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - Replaced synchronous `urllib.request.urlopen` with `httpx.AsyncClient(timeout=3.0)`.
+  - Grep search confirms zero remaining `urllib.request.urlopen`, `requests`, or `time.sleep` calls in `backend/app`.
+  - All network errors (connect timeout, HTTP status error, DNS failure) are cleanly caught in `except Exception as exc:`, logging a warning and returning `False` without halting the event loop or raising unhandled exceptions. Cached seed calendar remains intact.
+
+### Defect 5: Cross-Arm Circuit Breaker Contamination Liquidating Swing Holdings
+- **Files Modified**: `backend/app/main.py:880–895`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - `_trip_circuit_breaker` explicitly checks:
+    `if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip": continue`
+  - Cancelling working orders is strictly quarantined to `engine.cancel_all_orders("CIRCUIT_BREAKER_HALT", arm=TradingArm.INTRADAY)`.
+  - Multi-day swing positions and their stops remain completely untouched by intraday circuit breaker trips.
+
+### Defect 6: Zero Slippage Bypass & Rule 6 Stop-Loss Anchoring
+- **Files Modified**: `backend/app/strategies/swing_panic_dip.py:434–458, 518–537, 582–600, 674–685, 844–855`
+- **Assessment**: **VERIFIED (Engine Logic)**
+- **Findings**:
+  - Integrated `self.execution_engine.calculate_slippage(...)` across entries, exits, emergency stop executions, and operator exits.
+  - Adverse slippage is correctly modeled: added to entry prices (`open_price + slippage`), subtracted from exit prices (`open_price - slippage`).
+  - Rule 6 emergency stop is anchored strictly to realized fill price:
+    `realized_stop_price = round(fill.price - stop_distance, 2)` and `pos.stop_loss_price = realized_stop_price`.
+  - Added `apply_slippage: bool = True` parameter to `execute_market_open`.
+
+### Defect 7: Public Schema Degradation in `PositionState`
+- **Files Modified**: `backend/app/models/events.py:289–293`, `backend/app/core/account.py:99–103`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - Added `entry_atr: Optional[float] = None` and `entry_date: Optional[str] = None` to `PositionState`.
+  - `Position.to_state()` correctly serializes `entry_atr` and `entry_date` (`self.entry_date.isoformat()` or `None`).
+
+### Defect 8: Remote Calendar Non-Persistence & Missing Configuration
+- **Files Modified**: `backend/app/config.py:87–94`, `backend/app/strategies/earnings_calendar.py:70–79, 250–267`, `backend/app/main.py:349–353`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - `Settings` in `config.py` provides `EARNINGS_CALENDAR_REMOTE_URL: Optional[str] = None` and `EARNINGS_CALENDAR_CACHE_PATH: str`.
+  - `EarningsCalendar.save_cache_file()` writes atomically via temporary file and `replace()`.
+  - `EarningsCalendar.__init__()` loads `cache_path` on startup if present, preserving remote updates across container restarts.
+
+### Defect 9: `DailyBarStore` Data Loss Across Restarts
+- **Files Modified**: `backend/app/strategies/swing_indicators.py:531–534`, `backend/app/core/runtime_state.py:42, 132–136, 162, 235–242`, `backend/app/main.py:417, 543`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - Added `DailyBarStore.get_all_bars() -> Dict[str, List[DailyBar]]`.
+  - `capture_runtime_state` encodes all bars under `"daily_bars"`.
+  - `restore_runtime_state` unpacks `"daily_bars"` and calls `daily_bar_store.append_bar(bar_obj)`.
+  - `append_bar` deduplicates by date and preserves chronological order.
+  - Wired into `_capture_checkpoint()` and `_restore_checkpoint()` in `main.py`.
+
+### Defect 10: Multi-Day Dry Run Shortfall & Unit Regression Suite
+- **Files Created/Modified**: `backend/tests/unit/test_swing_forensic_remediation.py`, `scripts/run_integrated_swing_dry_run.py`
+- **Assessment**: **VERIFIED**
+- **Findings**:
+  - 10 targeted unit regression tests in `test_swing_forensic_remediation.py` verify all 10 fixes.
+  - `scripts/run_integrated_swing_dry_run.py` exercises 6 consecutive trading sessions with shared capital, intraday flattening exemption, multi-arm concurrency, Rule 6 emergency stops, and 5-day time exits.
+  - Simulation finishes cleanly with $52,922.72 equity and zero lingering background processes.
 
 ---
 
-### C. Interface Conformance Audit
-- **`MarketTrendFilter` ↔ `backend/app/main.py`**:
-  - Instantiated as `market_filter = MarketTrendFilter()` in `main.py:63`.
-  - Session reset invoked on ET rollover in `_check_session_boundary(now_dt)` (`main.py:756`) and `reset_runtime_state()` (`main.py:1347`).
-  - Bar dispatch wired in `handle_bar_event()` (`main.py:984-985`):
-    ```python
-    if bar.symbol.upper() in ("SPY", "QQQ"):
-        market_filter.on_bar(bar)
-    ```
-- **`MarketTrendFilter` ↔ `backend/app/strategies/adaptation.py`**:
-  - `adaptation_engine` receives `market_filter` in constructor (`main.py:73`).
-  - In `evaluate_signal_admission()`, signal gating evaluates:
-    ```python
-    permitted, reason = self.market_filter.is_signal_permitted(
-        strategy_id=signal.strategy_id,
-        side=signal.side,
-        symbol=signal.symbol,
-        asof=signal.timestamp,
-        catalyst_sentiment=catalyst_sentiment,
-        volume_surge=volume_surge,
-    )
-    ```
-  - In `get_market_context()`, `market_trend` is exported to the UI payload.
-  - **MINOR INTERFACE DEFECT**: `adaptation.get_market_context()` calls `self.market_filter.get_current_trend()` without passing `asof`. When called during simulation or replay, `get_current_trend()` compares historical bar timestamps against wall-clock `datetime.now(timezone.utc)`, returning `MarketTrend.UNKNOWN`. It should pass `self.last_update` as `asof`.
+## 3. Findings Requiring Remediation
 
----
-
-### D. Target Override Pass-Through Audit (`main.py:962-963`)
-- **Wiring Verification**:
-  In `main.py:962-963`:
+### Finding 1 [MAJOR]: Stale Prior-Session Closing Price Injected into `open_price_map` at Market Open
+- **Location**: `backend/app/main.py:1334–1341`
+- **Problem**:
+  In `handle_bar_event`:
   ```python
-  target_1_override=signal.take_profit_1,
-  target_2_override=signal.take_profit_2,
+  if bar_t.hour == 9 and 30 <= bar_t.minute <= 45:
+      if swing_staged_order_manager.is_staged_for_entry(bar_sym) or swing_staged_order_manager.is_staged_for_exit(bar_sym):
+          open_price_map = {bar_sym: bar.open}
+          for stg_ent in swing_staged_order_manager.get_staged_entries():
+              if stg_ent.symbol in latest_market_prices and stg_ent.symbol not in open_price_map:
+                  open_price_map[stg_ent.symbol] = latest_market_prices[stg_ent.symbol]
+          for stg_ext in swing_staged_order_manager.get_staged_exits():
+              if stg_ext.symbol in latest_market_prices and stg_ext.symbol not in open_price_map:
+                  open_price_map[stg_ext.symbol] = latest_market_prices[stg_ext.symbol]
+          swing_strategy_engine.execute_market_open(open_price_map, bar.timestamp)
   ```
-  This cleanly passes strategy-derived take-profit targets for ALL strategies, eliminating the previous defect where only `mean_reversion` targets were respected while `orb` and `news_momentum` targets were discarded.
-- **Execution Slippage Vulnerability (`bracket.py:207-214`)**:
-  When `target_1_override` is passed, `DynamicBracketManager.activate_bracket_on_fill()` uses the literal override price without verifying its geometric relation to the actual `fill_price`. If positive slippage occurs on entry (e.g., BUY order filled at $101.50 while `target_1_override` was set to $101.20), the resulting take-profit limit order will be placed below entry price, triggering immediate execution at an unintended price.
+  `latest_market_prices` is not cleared at session boundary (`_check_session_boundary`). When the first opening bar arrives at 09:30:00 (e.g. `KLAC`), `main.py` pulls `latest_market_prices` for all other staged orders (e.g. `LRCX`).
+  Because `LRCX` has not yet received today's 09:30 bar, `latest_market_prices["LRCX"]` holds **yesterday's 16:00 close price**.
+  This injects yesterday's close price into `open_price_map["LRCX"]`, causing `execute_market_open` to execute the `LRCX` order on stale prior-day data before `LRCX`'s 09:30 candle even arrives.
+- **Risk / Impact**:
+  If a stock gaps up or down overnight, the trade fills at yesterday's close price instead of the actual open auction price. This distorts fill prices, slippage calculations, and stop-loss anchoring.
+- **Required Fix**:
+  Only pass prices for symbols that have actually arrived in today's regular session. Either:
+  1. Clear `latest_market_prices.clear()` at session boundary (`_check_session_boundary`), OR
+  2. Only include symbols whose bars have arrived on the current session date, OR
+  3. Remove the `latest_market_prices` fallback and let `open_price_map = {bar_sym: bar.open}`, relying on `execute_market_open`'s native deferral mechanism (`if not open_price: continue`) to process each symbol when its own opening bar arrives.
 
 ---
 
-## 3. Findings Breakdown
-
-### [CRITICAL] Finding 1: Inverted Admission Logic in `MarketTrendFilter` for `mean_reversion`
-- **Location**: `backend/app/core/market_filter.py:295-301`
-- **Code**:
-  ```python
-  # 4. Statistical Mean Reversion (Exhaustion fades)
-  elif strat == "mean_reversion":
-      if trend == MarketTrend.BULLISH and is_buy:
-          return False, f"INDEX_FILTER_DENIED: Cannot catch falling knife LONG during strong BULLISH trend"
-      if trend == MarketTrend.BEARISH and not is_buy:
-          return False, f"INDEX_FILTER_DENIED: Cannot fade overbought SHORT during strong BEARISH trend"
-
-  return True, f"APPROVED: Signal {side} on {symbol} aligned with MarketTrend.{trend.value}"
+### Finding 2 [MAJOR]: E2E Test Suite Regression in `tests/e2e/test_swing_multiday_replay.py`
+- **Location**: `tests/e2e/test_swing_multiday_replay.py:224`
+- **Problem**:
+  Running `pytest tests/e2e/test_swing_multiday_replay.py` fails:
   ```
-- **Analysis & Impact**:
-  1. If `trend == MarketTrend.BULLISH` and `side == OrderSide.SELL`:
-     - Line 296 (`is_buy`) evaluates to `False`.
-     - Line 298 (`trend == BEARISH`) evaluates to `False`.
-     - Line 301 executes: `return True, "APPROVED: Signal OrderSide.SELL on NVDA aligned with MarketTrend.BULLISH"`.
-     - **Result**: The engine APPROVES shorting stocks during a strong BULLISH market rally, claiming a SELL order is "aligned with MarketTrend.BULLISH". This completely defeats the primary objective of eliminating counter-trend shorting into market rallies (which caused the AAPL and TSLA losses on 2026-09-22).
-  2. If `trend == MarketTrend.BULLISH` and `side == OrderSide.BUY`:
-     - Line 296 triggers: `return False, "Cannot catch falling knife LONG during strong BULLISH trend"`.
-     - **Result**: Dip-buying an oversold pullback during a strong bull trend is rejected.
-  3. If `trend == MarketTrend.BEARISH` and `side == OrderSide.BUY`:
-     - Evaluates to line 301: `APPROVED: Signal OrderSide.BUY on NVDA aligned with MarketTrend.BEARISH`.
-     - **Result**: Catching a falling knife in a crashing bear market is APPROVED!
-  4. If `trend == MarketTrend.BEARISH` and `side == OrderSide.SELL`:
-     - Line 298 triggers: `INDEX_FILTER_DENIED: Cannot fade overbought SHORT during strong BEARISH trend`.
-     - **Result**: Shorting an overbought relief rally in a bear market is REJECTED.
-- **Required Remediation**:
-  Invert the checks or define the correct policy for mean reversion:
-  - In a `BULLISH` trend: permit BUY (buying oversold dips aligned with macro bull trend); reject SELL (shorting overbought bars into a runaway bull rally) unless extreme statistical exhaustion (e.g. $Z \ge 3.5$) is present.
-  - In a `BEARISH` trend: permit SELL (shorting overbought bounces aligned with macro bear trend); reject BUY (catching falling knives into a runaway bear decline) unless extreme statistical exhaustion (e.g. $Z \le -3.5$) is present.
-
----
-
-### [MAJOR] Finding 2: Forward Data Leakage via `abs()` in Staleness Check
-- **Location**: `backend/app/core/market_filter.py:185, 191`
-- **Code**:
-  ```python
-  spy_ts = _to_utc(self.spy_state.last_timestamp)
-  dt_spy = abs((now - spy_ts).total_seconds())
-  if dt_spy > self.stale_threshold_sec:
-      return MarketTrend.UNKNOWN, f"STALE_INDEX_DATA: SPY data age ({dt_spy:.1f}s) > {self.stale_threshold_sec}s"
+  FAILED tests/e2e/test_swing_multiday_replay.py::TestSwingMultiDayReplay::test_multiday_full_lifecycle_and_exit_rules
+  AssertionError: assert 639.28 == 639.15
   ```
-- **Analysis & Impact**:
-  If a trading signal from a symbol bar at `now = 09:35:00` is evaluated when `self.spy_state.last_timestamp = 09:36:00` (e.g. due to feed latency differences, bar arrival ordering, or historical replay), `now - spy_ts` is `-60.0`. Taking `abs()` makes it `+60.0`, passing the staleness threshold. Consequently, the trend decision uses future market index information to validate a past trade signal.
-- **Required Remediation**:
-  Enforce strict non-negative chronological causality:
-  ```python
-  elapsed_spy = (now - spy_ts).total_seconds()
-  if elapsed_spy < 0:
-      return MarketTrend.UNKNOWN, f"FUTURE_INDEX_DATA: SPY timestamp ({spy_ts.isoformat()}) is in the future of asof ({now.isoformat()})"
-  if elapsed_spy > self.stale_threshold_sec:
-      return MarketTrend.UNKNOWN, f"STALE_INDEX_DATA: SPY data age ({elapsed_spy:.1f}s) > {self.stale_threshold_sec}s"
-  ```
+  Line 223–224 computes the expected stop price using `lrcx_open_price - 2.5 * daily_atr` (the pre-remediation calculation).
+  Under Defect 6 remediation, `execute_market_open` calculates realistic slippage and anchors the emergency stop to `fill.price` (659.13 - 2.5 * 7.9418 = 639.28).
+  Worker 1 updated this assertion in `test_swing_strategy.py` and `run_integrated_swing_dry_run.py`, but omitted updating `tests/e2e/test_swing_multiday_replay.py`.
+- **Required Fix**:
+  Update line 223 in `tests/e2e/test_swing_multiday_replay.py` to anchor the stop assertion to `lrcx_pos.avg_entry_price`:
+  `expected_stop = round(lrcx_pos.avg_entry_price - 2.5 * daily_atr, 2)`
+  or call `execute_market_open({"LRCX": lrcx_open_price}, open_time_day2, apply_slippage=False)` if zero-slippage is explicitly tested.
 
 ---
 
-### [MAJOR] Finding 3: E2E Test Suite Regression (7 Test Failures)
-- **Location**: `tests/e2e/test_tier5_adversarial.py`, `tests/e2e/test_challenger_bracket_2.py`
-- **Failures**:
-  1. `test_adv_bracket_volatility_flash_double_fill_race` (`test_tier5_adversarial.py:326`):
-     Fails because default Target 1 was changed from 1.5R to 0.8R (`assert 101.6 == 103.0`).
-  2. `TestNewsMomentumStopDistanceClamping` (3 parametrizations: $5, $150, $1000):
-     Fails because `bar.close <= bar.open` in `news_momentum.py:244` rejects doji bars (`open == close`), returning 0 signals instead of 1.
-  3. `TestOrbStopDistanceClamping` (2 parametrizations) and `TestExtremePricesClamping` (1 parametrization):
-     Fails because `min_clv >= 0.65` in `orb.py` rejects synthetic test candles with 50% midpoint closes (`clv = 0.50`), returning 0 signals instead of 1.
-- **Analysis & Impact**:
-  Worker 1 only tested `pytest backend/tests` and failed to run `python3 tests/e2e/runner.py`. Breaking 7 tests in the pre-existing test suite violates Acceptance Criteria R3 and R4 ("100% pass rate with zero regression").
-- **Required Remediation**:
-  Update and align the test fixtures / assertions in `tests/e2e/` so the full E2E suite passes 100% (320/320).
+## 4. Adversarial Stress-Test Scenarios
+
+| Scenario | Expected Behavior | Actual Behavior | Result |
+|---|---|---|---|
+| **Staged Entry Order Arrives at 09:31:00 ET** | Executes within 09:30–09:45 tolerance window | `30 <= bar_t.minute <= 45` matches; executes cleanly | **PASS** |
+| **Unexecuted Staged Order at 09:46:00 ET** | Purged by expiration sweep; symbol reservation released | `_expire_stale_staged_swing_orders` cancels order and releases symbol | **PASS** |
+| **Active Count = 2, 1 Staged Exit, 1 Staged Entry; Entry bar arrives first** | Entry is deferred (not deleted); executes once exit clears slot | `execute_market_open` detects `len(pending_exits) > 0` and defers entry | **PASS** |
+| **Close scan evaluated 3 times between 16:00 and 09:30** | Idempotent; never stages > 2 positions total | `available_slots` deducts `existing_staged_symbols`; cap enforced at 2 | **PASS** |
+| **Remote earnings provider hangs or returns 500** | Non-blocking async timeout; graceful fallback to cached calendar | `httpx.AsyncClient(timeout=3.0)` catches exception; returns `False` safely | **PASS** |
+| **Daily circuit breaker halts intraday trading** | Liquidates intraday positions; preserves swing holdings | Swing positions skipped; intraday positions flattened; intraday orders cancelled | **PASS** |
+| **Server restarts overnight with daily bars in memory** | Daily bars restored from SQLite checkpoint into `DailyBarStore` | Checkpoint deserializes and appends all daily bars into store | **PASS** |
+| **Multiple staged symbols with staggered bar arrivals** | Each symbol executed on its own 09:30 open bar | Stale prior-session close price used for symbols whose open bar has not arrived | **FAIL (Finding 1)** |
+| **Multi-day E2E Replay Test (`test_swing_multiday_replay.py`)** | 100% passing tests across E2E suite | Fails on outdated unanchored stop assertion | **FAIL (Finding 2)** |
 
 ---
 
-### [MAJOR] Finding 4: Bracket Target Invariant Hazard on Entry Slippage
-- **Location**: `backend/app/core/bracket.py:206-215`
-- **Code**:
-  ```python
-  bracket.target_1_price = (
-      round(bracket.target_1_override, 2)
-      if bracket.target_1_override is not None
-      else round(bracket.entry_price + direction * self.default_target_1_r * bracket.r_distance, 2)
-  )
-  ```
-- **Analysis & Impact**:
-  If a strategy calculates `take_profit_1 = round(bar.close + 0.8 * risk, 2)` and the market entry order experiences positive slippage such that `fill_price >= take_profit_1`, the bracket sets `target_1_price` at or below the entry fill price. For a LONG position, this results in submitting a limit sell order below the current market price, resulting in an immediate fill below entry.
-- **Required Remediation**:
-  In `activate_bracket_on_fill()`, sanitize `target_1_override` against `fill_price`:
-  ```python
-  if bracket.target_1_override is not None:
-      # Ensure target is strictly in the direction of profit by at least 0.5R
-      min_target_dist = 0.50 * bracket.r_distance
-      if direction * (bracket.target_1_override - fill_price) >= min_target_dist:
-          bracket.target_1_price = round(bracket.target_1_override, 2)
-      else:
-          bracket.target_1_price = round(fill_price + direction * self.default_target_1_r * bracket.r_distance, 2)
-  ```
+## 5. Summary & Recommendation
 
----
+Worker 1's implementation represents a substantial, high-caliber engineering remediation that genuinely tackles the root causes identified in `AUDIT_FINDINGS.md`. There is zero cheating, zero synthetic mock facades, and clean process hygiene.
 
-### [MINOR] Finding 5: Replay Fixture Index Starvation
-- **Location**: `tests/e2e/fixtures/monday_open_session.json`
-- **Analysis & Impact**:
-  The fixture used in `scripts/run_integrated_monday_dry_run.py` does not contain SPY or QQQ bars. As a consequence, `MarketTrendFilter` remains in `MarketTrend.UNKNOWN` for the entire replay. All ORB and Mean Reversion trades are silently starved (0 trades executed), and only TSLA News Momentum trades due to its extreme catalyst bypass. While this proves the fail-closed property, it means the integrated dry run cannot verify ORB or Mean Reversion in execution.
-- **Required Remediation**:
-  Include SPY and QQQ 1-minute bars in `monday_open_session.json`.
+However, because:
+1. Prior-day closing prices can leak into market open executions via `latest_market_prices`, and
+2. `tests/e2e/test_swing_multiday_replay.py` fails on stop-loss verification,
 
----
-
-## 4. Verification Results
-
-| Suite / Command | Total Tests | Passed | Failed | Status | Notes |
-|---|---|---|---|---|---|
-| `pytest backend/tests -v` | 223 | 223 | 0 | **PASS** | Completed in 0.94s |
-| `python3 tests/e2e/runner.py` | 320 | 313 | 7 | **FAIL** | 7 failures in adversarial & bracket tests |
-| `python3 scripts/run_integrated_monday_dry_run.py` | 62 events | 62 | 0 | **PASS** | Exit code 0, but ORB & Mean Reversion starved |
-| Port hygiene check (`lsof -i :8000,8005,8080,3005`) | 4 ports | 4 free | 0 | **PASS** | Zero dangling listeners |
-
----
-
-## 5. Summary Recommendation
-
-Issue verdict: **REQUEST_CHANGES**.  
-Worker 1 must:
-1. Fix the inverted `mean_reversion` logic in `market_filter.py:295-301`.
-2. Remove `abs()` from the staleness calculation in `market_filter.py:185, 191` to enforce strict chronological causality.
-3. Fix the 7 failing tests in `tests/e2e/` to restore 100% test pass rate across the full suite.
-4. Add slippage protection to `activate_bracket_on_fill()` in `bracket.py`.
-5. Add SPY and QQQ bars to `monday_open_session.json`.
+The verdict is **REQUEST_CHANGES**. Remediation of these two findings will bring the codebase to 100% production-ready certification.

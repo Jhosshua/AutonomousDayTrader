@@ -1,9 +1,9 @@
 # Integrated Multi-Day Swing Trading Dry Run Report
 
 **Strategy**: 2-Day Panic Dip (Connors RSI-2)
-**Date Generated**: 2026-09-23T22:46:39.332344+00:00
+**Date Generated**: 2026-09-24T00:59:41.371229+00:00
 **Status**: PASS
-**Simulation Duration**: 0.015 seconds
+**Simulation Duration**: 0.014 seconds
 
 ## Quantitative Rule Certifications
 | Rule | Description | Certified |
@@ -23,8 +23,8 @@
 
 ## Account & Execution Summary
 - **Initial Balance**: $50,000.00
-- **Ending Equity**: $52,953.81
-- **Realized PnL**: +$2,953.81
+- **Ending Equity**: $52,922.72
+- **Realized PnL**: +$2,922.72
 - **Completed Trades**: 2
 - **Open Positions at End**: 0
 
@@ -34,15 +34,17 @@
   {
     "symbol": "LRCX",
     "shares": 36,
-    "price": 720.5,
-    "realized_pnl": 1565.26,
+    "price": 720.35,
+    "slippage": 0.1476,
+    "realized_pnl": 1554.82,
     "reason": "5_SMA_CROSS_CLOSE_719.00_SMA_690.60"
   },
   {
     "symbol": "KLAC",
     "shares": 37,
-    "price": 723.0,
-    "realized_pnl": 2071.24,
+    "price": 722.85,
+    "slippage": 0.1481,
+    "realized_pnl": 2060.51,
     "reason": "5_SMA_CROSS_CLOSE_722.00_SMA_691.20"
   }
 ]
@@ -67,7 +69,7 @@
   "status": "PASS",
   "simulation_only": true,
   "strategy": "2-Day Panic Dip (Connors RSI-2)",
-  "duration_seconds": 0.015,
+  "duration_seconds": 0.014,
   "days_simulated": 6,
   "certified_symbols": [
     "LRCX",
@@ -92,9 +94,9 @@
   },
   "account": {
     "initial_equity": 50000.0,
-    "final_equity": 52953.81,
-    "cash": 27953.81,
-    "realized_pnl": 2953.81,
+    "final_equity": 52922.72,
+    "cash": 27922.72,
+    "realized_pnl": 2922.72,
     "unrealized_pnl": 0.0,
     "open_positions": 0
   },
@@ -102,15 +104,17 @@
     {
       "symbol": "LRCX",
       "shares": 36,
-      "price": 720.5,
-      "realized_pnl": 1565.26,
+      "price": 720.35,
+      "slippage": 0.1476,
+      "realized_pnl": 1554.82,
       "reason": "5_SMA_CROSS_CLOSE_719.00_SMA_690.60"
     },
     {
       "symbol": "KLAC",
       "shares": 37,
-      "price": 723.0,
-      "realized_pnl": 2071.24,
+      "price": 722.85,
+      "slippage": 0.1481,
+      "realized_pnl": 2060.51,
       "reason": "5_SMA_CROSS_CLOSE_722.00_SMA_691.20"
     }
   ],

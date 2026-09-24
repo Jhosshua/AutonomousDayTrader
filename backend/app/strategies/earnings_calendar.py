@@ -67,12 +67,16 @@ class EarningsCalendar:
         self,
         seed_path: Optional[str] = None,
         remote_url: Optional[str] = None,
+        cache_path: Optional[str] = None,
     ) -> None:
         self.remote_url: Optional[str] = remote_url
+        self.cache_path: Optional[str] = cache_path
         self._events: Dict[str, List[EarningsEvent]] = {}
 
         if seed_path:
             self.load_seed_file(seed_path)
+        if cache_path and Path(cache_path).is_file():
+            self.load_seed_file(cache_path)
 
     def load_seed_file(self, seed_path: str) -> int:
         """Load seed JSON fixture.
@@ -191,7 +195,7 @@ class EarningsCalendar:
                 # If report date is within calendar days, enforce safe-side blackout for upcoming events
                 diff_days = (ev.report_date - as_of_dt.date()).days
                 max_days = 4 if as_of_dt.weekday() == 4 else 2
-                if 0 <= diff_days <= max_days:
+                if 0 < diff_days <= max_days:
                     return True
 
         else:
@@ -243,8 +247,25 @@ class EarningsCalendar:
 
         return False
 
+    def save_cache_file(self, file_path: Optional[str] = None) -> None:
+        """Atomically persist current earnings calendar to a local JSON cache file."""
+        target = file_path or self.cache_path
+        if not target:
+            return
+        path = Path(target)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_suffix(".tmp")
+        serialized = {
+            sym: [ev.to_dict() for ev in events]
+            for sym, events in self._events.items()
+        }
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(serialized, f, indent=2)
+        tmp_path.replace(path)
+        log.info(f"Durable earnings calendar saved to {path} ({len(self._events)} symbols)")
+
     async def refresh_from_remote(self) -> bool:
-        """Attempt to refresh earnings calendar from remote provider.
+        """Attempt to refresh earnings calendar from remote provider using non-blocking async HTTP.
         
         Graceful fallback invariant:
         Any exception, timeout, or missing URL is logged and safely returns False
@@ -254,19 +275,31 @@ class EarningsCalendar:
             return False
 
         try:
-            import urllib.request
-            # Short timeout to prevent event loop starvation
-            req = urllib.request.Request(self.remote_url, headers={"User-Agent": "AutonomousDayTrader"})
-            with urllib.request.urlopen(req, timeout=2.0) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+            import httpx
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(
+                    self.remote_url,
+                    headers={"User-Agent": "AutonomousDayTrader/1.0"},
+                )
+                if resp.status_code != 200:
+                    log.warning(f"Remote earnings provider returned HTTP {resp.status_code}")
+                    return False
+                data = resp.json()
+                count = 0
                 if isinstance(data, dict):
                     for sym, evs in data.items():
                         for item in evs:
+                            if "symbol" not in item:
+                                item["symbol"] = sym
                             self.add_event(EarningsEvent.from_dict(item))
+                            count += 1
                 elif isinstance(data, list):
                     for item in data:
                         self.add_event(EarningsEvent.from_dict(item))
-                log.info(f"Successfully refreshed earnings calendar from {self.remote_url}")
+                        count += 1
+                log.info(f"Successfully refreshed {count} earnings events from {self.remote_url}")
+                if self.cache_path:
+                    self.save_cache_file(self.cache_path)
                 return True
         except Exception as exc:
             log.warning(f"Remote earnings refresh failed ({exc}); continuing with cached seed calendar")

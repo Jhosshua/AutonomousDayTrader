@@ -218,9 +218,9 @@ class TestSwingMultiDayReplay:
         expected_shares = int(math.floor(25000.0 / lrcx_open_price))
         assert lrcx_pos.shares == expected_shares
 
-        # Rule 6 check: stop loss established at open - 2.5 * ATR
+        # Rule 6 check: stop loss established at realized fill price - 2.5 * ATR
         daily_atr = eval_day1["staged_entries"][0]["daily_atr"]
-        expected_stop = round(lrcx_open_price - 2.5 * daily_atr, 2)
+        expected_stop = round(lrcx_pos.avg_entry_price - 2.5 * daily_atr, 2)
         assert lrcx_pos.stop_loss_price == expected_stop
 
         # Intraday flattening simulation: Add an INTRADAY position on SPY

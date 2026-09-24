@@ -154,7 +154,7 @@ async def run_integrated_swing_dry_run(report_path: Path, verbose: bool = False)
     assert lrcx_pos.arm == TradingArm.SWING
     expected_shares_lrcx = int(math.floor(25000.0 / lrcx_open_p))
     assert lrcx_pos.shares == expected_shares_lrcx
-    expected_stop_lrcx = round(lrcx_open_p - 2.5 * staged_lrcx["daily_atr"], 2)
+    expected_stop_lrcx = round(lrcx_pos.avg_entry_price - 2.5 * staged_lrcx["daily_atr"], 2)
     assert lrcx_pos.stop_loss_price == expected_stop_lrcx
     events_log.append({
         "day": 2,
@@ -162,10 +162,10 @@ async def run_integrated_swing_dry_run(report_path: Path, verbose: bool = False)
         "action": "FILLED_BUY",
         "symbol": "LRCX",
         "shares": lrcx_pos.shares,
-        "price": lrcx_open_p,
+        "price": lrcx_pos.avg_entry_price,
         "stop": expected_stop_lrcx,
     })
-    log.info(f"Day 2: Filled LRCX {lrcx_pos.shares} shares @ ${lrcx_open_p:,.2f} | Emergency Stop: ${expected_stop_lrcx:,.2f}")
+    log.info(f"Day 2: Filled LRCX {lrcx_pos.shares} shares @ ${lrcx_pos.avg_entry_price:,.2f} | Emergency Stop: ${expected_stop_lrcx:,.2f}")
 
     # Simulate simultaneous INTRADAY trade on NVDA
     runtime.account.apply_fill(

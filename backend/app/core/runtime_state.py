@@ -39,6 +39,7 @@ def capture_runtime_state(
     ledger_revision: int,
     swing_staged_orders: Optional[List[Any]] = None,
     swing_reserved_symbols: Optional[Set[str]] = None,
+    daily_bar_store: Optional[Any] = None,
 ) -> Dict[str, Any]:
 
     """Return a complete JSON-safe recovery checkpoint."""
@@ -128,6 +129,10 @@ def capture_runtime_state(
         "ledger_revision": ledger_revision,
         "swing_staged_orders": [o.to_dict() if hasattr(o, "to_dict") else o for o in (swing_staged_orders or [])],
         "swing_reserved_symbols": list(swing_reserved_symbols or []),
+        "daily_bars": {
+            sym: [b.to_dict() if hasattr(b, "to_dict") else b for b in bars]
+            for sym, bars in (daily_bar_store.get_all_bars() if hasattr(daily_bar_store, "get_all_bars") else getattr(daily_bar_store, "_bars", {})).items()
+        } if daily_bar_store is not None else {},
     }
 
     encoded = encode_runtime_value(state)
@@ -154,6 +159,7 @@ def restore_runtime_state(
     recent_news: list[Dict[str, Any]],
     swing_staged_order_manager: Optional[Any] = None,
     swing_reserved_symbols: Optional[Set[str]] = None,
+    daily_bar_store: Optional[Any] = None,
 ) -> Dict[str, Any]:
 
     """Restore a checkpoint into already-wired singleton components."""
@@ -226,6 +232,13 @@ def restore_runtime_state(
     if swing_reserved_symbols is not None:
         swing_reserved_symbols.clear()
         swing_reserved_symbols.update(decoded.get("swing_reserved_symbols", []))
+    if daily_bar_store is not None and "daily_bars" in decoded:
+        raw_daily_bars = decoded.get("daily_bars", {})
+        from backend.app.strategies.swing_indicators import DailyBar
+        for sym, bar_dicts in raw_daily_bars.items():
+            for b_dict in bar_dicts:
+                bar_obj = DailyBar.from_dict(b_dict) if isinstance(b_dict, dict) else b_dict
+                daily_bar_store.append_bar(bar_obj)
 
     validate_runtime_state(account, engine, bracket_manager)
 

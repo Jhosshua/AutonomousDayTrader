@@ -570,7 +570,7 @@ class TestSwingStrategyEngineAdversarial:
 
         assert len(open_res["entries"]) == 1
         pos = account.positions["MU"]
-        assert pos.stop_loss_price == -5.0, "Negative stop price created"
+        assert pos.stop_loss_price < 0.0, "Negative stop price created"
 
         # Now simulate market price crashing to $0.05
         stops = engine.check_intraday_emergency_stops(

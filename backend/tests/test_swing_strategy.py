@@ -221,8 +221,8 @@ class TestSwingStrategyEngineExecution:
         assert pos.arm == TradingArm.SWING
         assert pos.strategy_id == "swing_panic_dip"
 
-        # Emergency Stop check: 800.0 - 2.5 * 5.0 = 787.50
-        assert pos.stop_loss_price == 787.50
+        # Emergency Stop check: P_fill - 2.5 * Daily_ATR (anchored to realized fill price)
+        assert pos.stop_loss_price == round(pos.avg_entry_price - 2.5 * 5.0, 2)
         assert pos.entry_atr == 5.00
 
     def test_concurrency_cap_max_2_positions(self, setup_engine):

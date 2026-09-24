@@ -1,0 +1,32 @@
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -237,6 +237,17 @@
+ 
+     # Differentiate position-reducing / liquidation orders from position-opening orders
+     existing_pos = acct.positions.get(sym)
++    existing_arm = getattr(existing_pos, "arm", None) or TradingArm.INTRADAY if existing_pos else None
++    existing_strat = getattr(existing_pos, "strategy_id", "") or ""
++    existing_is_swing = bool(
++        existing_pos is not None
++        and (
++            existing_arm == TradingArm.SWING
++            or existing_strat == "swing_panic_dip"
++            or (isinstance(existing_arm, str) and str(existing_arm).upper() == "SWING")
++        )
++    )
++
+     is_exit = False
+     if getattr(order, "strategy_id", None) in (
+         "CIRCUIT_BREAKER",
+@@ -247,8 +258,9 @@
+         "NEWS_CONTRADICTION_CIRCUIT_BREAKER",
+         "SESSION_BOUNDARY_LIQUIDATION",
+     ):
+-        is_exit = True
+-    elif existing_pos is not None:
++        if existing_pos is None or not existing_is_swing:
++            is_exit = True
++    elif existing_pos is not None and (existing_is_swing == is_swing):
+         if existing_pos.side == PositionSide.LONG and order.side == OrderSide.SELL:
+             is_exit = True
+         elif existing_pos.side == PositionSide.SHORT and order.side == OrderSide.BUY:

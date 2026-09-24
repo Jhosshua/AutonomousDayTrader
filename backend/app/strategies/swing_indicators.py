@@ -528,6 +528,10 @@ class DailyBarStore:
         """Return all tracked symbols."""
         return sorted(list(self._bars.keys()))
 
+    def get_all_bars(self) -> Dict[str, List[DailyBar]]:
+        """Return a copy of all stored bars by symbol."""
+        return {sym: list(bars) for sym, bars in self._bars.items()}
+
     def clear(self) -> None:
         """Clear all stored bars."""
         self._bars.clear()

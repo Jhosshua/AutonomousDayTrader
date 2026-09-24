@@ -56,6 +56,8 @@ export interface Position {
   chart_points?: ChartPoint[];
   cost_basis?: number;
   realized_pnl?: number;
+  entry_atr?: number | null;
+  entry_date?: string | null;
 }
 
 export interface AuditRecord {
@@ -187,9 +189,10 @@ export interface SwingPosition {
   stop_loss: number;
   stop_loss_price: number;
   atr_14: number;
+  entry_atr?: number | null;
   atr_stop_distance: number;
   atr_stop_pct: number;
-  entry_date: string;
+  entry_date?: string | null;
   holding_days: number;
   max_holding_days: number;
   holding_progress: string;

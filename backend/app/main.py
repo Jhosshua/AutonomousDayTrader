@@ -4,7 +4,7 @@ FastAPI Core Trading Engine API Server & Real-Time WebSocket Streaming (Port 800
 from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 import hashlib
 import json
 import logging
@@ -90,6 +90,7 @@ strategy_map: Dict[str, Strategy] = {s.strategy_id: s for s in strategies}
 
 # Real-time symbol market price cache for pre-trade risk valuation
 latest_market_prices: Dict[str, float] = {}
+today_open_prices: Dict[str, float] = {}
 market_history: Dict[str, List[Dict[str, Any]]] = {}
 entry_order_to_bracket: Dict[str, str] = {}
 bracket_realized_pnl: Dict[str, float] = {}
@@ -237,6 +238,17 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
     # Differentiate position-reducing / liquidation orders from position-opening orders
     existing_pos = acct.positions.get(sym)
+    existing_arm = getattr(existing_pos, "arm", None) or TradingArm.INTRADAY if existing_pos else None
+    existing_strat = getattr(existing_pos, "strategy_id", "") or ""
+    existing_is_swing = bool(
+        existing_pos is not None
+        and (
+            existing_arm == TradingArm.SWING
+            or existing_strat == "swing_panic_dip"
+            or (isinstance(existing_arm, str) and str(existing_arm).upper() == "SWING")
+        )
+    )
+
     is_exit = False
     if getattr(order, "strategy_id", None) in (
         "CIRCUIT_BREAKER",
@@ -247,8 +259,9 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
         "NEWS_CONTRADICTION_CIRCUIT_BREAKER",
         "SESSION_BOUNDARY_LIQUIDATION",
     ):
-        is_exit = True
-    elif existing_pos is not None:
+        if existing_pos is None or not existing_is_swing:
+            is_exit = True
+    elif existing_pos is not None and (existing_is_swing == is_swing):
         if existing_pos.side == PositionSide.LONG and order.side == OrderSide.SELL:
             is_exit = True
         elif existing_pos.side == PositionSide.SHORT and order.side == OrderSide.BUY:
@@ -346,7 +359,11 @@ engine = ExecutionEngine(account=account, risk_validator=pre_trade_risk_validato
 # Swing Trading Infrastructure & Engine
 daily_bar_store = DailyBarStore(seed_path=settings.DAILY_BARS_SEED_PATH)
 daily_bar_aggregator = DailyBarAggregator(store=daily_bar_store)
-earnings_calendar = EarningsCalendar(seed_path=settings.EARNINGS_CALENDAR_SEED_PATH)
+earnings_calendar = EarningsCalendar(
+    seed_path=settings.EARNINGS_CALENDAR_SEED_PATH,
+    remote_url=settings.EARNINGS_CALENDAR_REMOTE_URL,
+    cache_path=getattr(settings, "EARNINGS_CALENDAR_CACHE_PATH", None),
+)
 swing_staged_order_manager = SwingStagedOrderManager()
 swing_strategy_engine = SwingStrategyEngine(
     account=account,
@@ -410,6 +427,7 @@ def _capture_checkpoint() -> Dict[str, Any]:
         ledger_revision=ledger_revision,
         swing_staged_orders=swing_staged_order_manager.get_staged_orders(),
         swing_reserved_symbols=swing_reserved_symbols,
+        daily_bar_store=daily_bar_store,
     )
 
 
@@ -535,6 +553,7 @@ def _restore_checkpoint() -> bool:
         recent_news=recent_news,
         swing_staged_order_manager=swing_staged_order_manager,
         swing_reserved_symbols=swing_reserved_symbols,
+        daily_bar_store=daily_bar_store,
     )
 
     last_session_date = restored["last_session_date"]
@@ -873,16 +892,19 @@ def _flatten_symbol(sym: str, price: float, timestamp: datetime) -> List[Any]:
 
 
 def _trip_circuit_breaker(timestamp: datetime) -> None:
-    """Halt trading and liquidate all open positions after a daily-loss breach."""
+    """Halt trading and liquidate all open intraday positions after a daily-loss breach. Swing positions are strictly exempt."""
     account.status = account.status.__class__.CIRCUIT_HALTED
-    engine.cancel_all_orders("CIRCUIT_BREAKER_HALT")
+    engine.cancel_all_orders("CIRCUIT_BREAKER_HALT", arm=TradingArm.INTRADAY)
     _release_dead_entry_brackets()
     for sym, pos in list(account.positions.items()):
+        if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
+            continue
         side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
         bracket_id = bracket_manager.symbol_to_bracket.get(sym)
         liq_order = engine.create_order(
             symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
             strategy_id="CIRCUIT_BREAKER", parent_order_id=bracket_id,
+            arm=TradingArm.INTRADAY,
         )
         engine.submit_order(liq_order.id)
         liq_fills = _flatten_symbol(sym, pos.market_price, timestamp)
@@ -1012,12 +1034,39 @@ def _check_session_boundary(now_dt: datetime) -> None:
     engine.prune_session_state()
     market_history.clear()
     recent_news.clear()
+    today_open_prices.clear()
+    latest_market_prices.clear()
     if state_store is not None:
         state_store.wal_checkpoint("PASSIVE")
     _checkpoint_runtime(
         "SESSION_BOUNDARY",
         (boundary_event_key, "SESSION_BOUNDARY") if boundary_event_key else None,
     )
+
+
+def _expire_stale_staged_swing_orders(current_time: datetime) -> None:
+    """Purge unexecuted staged swing orders past 09:45 ET so they never maroon or execute days later."""
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+    et_dt = current_time.astimezone(ET_TZ)
+    et_t = et_dt.time()
+    if time(9, 45, 0) <= et_t < time(16, 0, 0):
+        staged = swing_staged_order_manager.get_staged_orders()
+        for order in staged:
+            created = getattr(order, "created_at", None)
+            if created:
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if (current_time - created).total_seconds() < 60:
+                    continue
+            log.warning(
+                "Expiring unexecuted staged swing order %s (%s %s) past 09:45 ET open window",
+                order.order_id,
+                order.action,
+                order.symbol,
+            )
+            swing_staged_order_manager.remove_staged_order(order.order_id)
+            release_symbol_for_swing(order.symbol)
 
 
 _last_broadcast_time: float = 0.0
@@ -1291,11 +1340,24 @@ async def handle_bar_event(bar: BarEvent) -> None:
     bar_sym = bar.symbol.upper()
     bar_et = bar.timestamp.astimezone(ET_TZ) if bar.timestamp.tzinfo else bar.timestamp
 
-    # 09:30 ET Market Open Execution for Staged Swing Orders
-    # Execute open orders strictly for this symbol when THAT symbol's 09:30 open bar arrives
-    if bar_et.time().hour == 9 and bar_et.time().minute == 30:
+    bar_t = bar_et.time()
+
+    # 09:30 ET Market Open Execution Window for Staged Swing Orders (09:30:00 - 09:45:00 ET tolerance)
+    # Allows delayed, illiquid, or 09:31+ bars to execute reliably without marooning staged orders
+    if bar_t.hour == 9 and 30 <= bar_t.minute <= 45:
+        if bar_sym not in today_open_prices and bar.open > 0:
+            today_open_prices[bar_sym] = bar.open
         if swing_staged_order_manager.is_staged_for_entry(bar_sym) or swing_staged_order_manager.is_staged_for_exit(bar_sym):
-            swing_strategy_engine.execute_market_open({bar_sym: bar.open}, bar.timestamp)
+            open_price_map = {bar_sym: bar.open}
+            for stg_ent in swing_staged_order_manager.get_staged_entries():
+                if stg_ent.symbol in today_open_prices and stg_ent.symbol not in open_price_map:
+                    open_price_map[stg_ent.symbol] = today_open_prices[stg_ent.symbol]
+            for stg_ext in swing_staged_order_manager.get_staged_exits():
+                if stg_ext.symbol in today_open_prices and stg_ext.symbol not in open_price_map:
+                    open_price_map[stg_ext.symbol] = today_open_prices[stg_ext.symbol]
+            swing_strategy_engine.execute_market_open(open_price_map, bar.timestamp)
+    elif (bar_t.hour == 9 and bar_t.minute > 45) or (10 <= bar_t.hour < 16):
+        _expire_stale_staged_swing_orders(bar.timestamp)
 
     # Swing Data Aggregation & Real-Time Emergency Stop Check
     # Evaluated after execute_market_open so new positions are monitored on their opening candle
@@ -1621,6 +1683,7 @@ async def _runtime_clock_loop() -> None:
             now_dt = flattening_engine.clock.now()
             _check_session_boundary(now_dt)
             adaptation_engine.update_clock(now_dt)
+            _expire_stale_staged_swing_orders(now_dt)
             for strat in strategies:
                 try:
                     strat.on_time_tick(now_dt)
@@ -1676,6 +1739,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     pending_processed_events.clear()
     inflight_event_keys.clear()
     latest_market_prices.clear()
+    today_open_prices.clear()
     for _feed in feed_last_event:
         feed_last_event[_feed] = None
     market_history.clear()

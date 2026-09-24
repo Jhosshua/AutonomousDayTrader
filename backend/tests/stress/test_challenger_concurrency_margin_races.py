@@ -144,8 +144,8 @@ class Test0930ConcurrencyRaces:
         open_time = datetime(2026, 9, 23, 9, 30, 0, tzinfo=ET_TZ)
         open_prices = {"MU": 100.0, "LRCX": 500.0, "AAPL": 150.0, "TSLA": 200.0, "NVDA": 120.0}
 
-        # Execute 09:30 market open for swing
-        swing_res = swing_engine.execute_market_open(open_prices, open_time)
+        # Execute 09:30 market open for swing (exact margin model)
+        swing_res = swing_engine.execute_market_open(open_prices, open_time, apply_slippage=False)
         assert len(swing_res["entries"]) == 2
         assert len(swing_res["errors"]) == 0
 
