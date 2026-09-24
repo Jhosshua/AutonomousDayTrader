@@ -533,3 +533,31 @@ def test_decisions_are_optional_in_checkpoint_and_round_trip():
     restored = DecisionLog()
     restored.load_state(restore_runtime_state(payload, **restore_kw(_components()))["decisions"])
     assert restored.summary("orb")["blocked_by_reason"] == {"RISK": 1}
+
+
+def test_restore_keeps_daily_loss_baseline_at_todays_starting_equity():
+    """The $1,500 breaker measures from risk.config.starting_equity. It was not saved, so every
+    restart reset it to the $50,000 default: observed 2026-09-24, account day start $49,798.32
+    but breaker measured from $50,000 (limit $202 too strict; after gains it would be too loose)."""
+    account, engine, brackets, risk, flattening, adaptation, strategies = _components()
+    account.daily_starting_equity = 49798.32
+    risk.reset_daily_metrics(49798.32)
+    payload = json.loads(json.dumps(capture_runtime_state(
+        account=account, engine=engine, bracket_manager=brackets, risk_engine=risk,
+        flattening_engine=flattening, adaptation_engine=adaptation, strategies=strategies,
+        entry_order_to_bracket={}, bracket_realized_pnl={}, completed_brackets_recorded=set(),
+        latest_market_prices={}, market_history={}, recent_news=[], last_session_date=None,
+        last_vix_print=None, ledger_revision=1,
+    )))
+    c = _components()
+    assert c[3].config.starting_equity == 50000.0  # fresh process default
+    restore_runtime_state(
+        payload, account=c[0], engine=c[1], bracket_manager=c[2], risk_engine=c[3],
+        flattening_engine=c[4], adaptation_engine=c[5], strategies=c[6], entry_order_to_bracket={},
+        bracket_realized_pnl={}, completed_brackets_recorded=set(), latest_market_prices={},
+        market_history={}, recent_news=[],
+    )
+    assert c[3].config.starting_equity == 49798.32
+    # Equity $49,895.02 is a gain on the day, so no drawdown against the restored baseline.
+    c[3].evaluate_account_state(49895.02, 49895.02, 0.0, 0.0, datetime(2026, 9, 24, 18, 20, tzinfo=timezone.utc))
+    assert c[3].current_drawdown_dollars == 0.0

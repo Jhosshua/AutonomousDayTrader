@@ -320,3 +320,13 @@ right. Run the mutation check.
 - **What did not work**: Assuming the existing Flatten All / swing buttons were correct because they had tests. Codex, attacking the UI plan, found that FLATTEN_ALL reported swing holdings as "flattened" when the order was rejected, "sell at next open" was deleted a minute later, and the swing stop could be loosened.
 - **What worked instead**: Have Codex read the backend code the UI calls, not just the UI plan.
 - **Note for next time**: Before relabeling a button in plain words, verify the button does what the new words promise.
+
+## 2026-09-24: "the counters drifted" was a 7-day list read as today
+- **What did not work**: I told the user the strategy counters disagreed with the ledger (ORB 0 trades vs an ORB -$112.04 trade). The ledger call used the default `range=7d`, and those two trades were from 2026-09-22.
+- **What worked instead**: Check `session_date` on every row before comparing a "today" number with a list.
+- **Note for next time**: `/api/trades` defaults to 7 days. Always pass `range=today` when checking today.
+
+## 2026-09-24: loss breaker baseline was not saved across restarts
+- **What did not work**: `risk_state` in the checkpoint saved status, peak, and drawdown, but not `config.starting_equity`, the number the $1,500 breaker subtracts from. After a restart it reverted to the $50,000 code default.
+- **What worked instead**: On restore, set `risk_engine.config.starting_equity = account.daily_starting_equity`.
+- **Note for next time**: After a restart, compare `/health` `risk.drawdown_dollars` with the account's `daily_starting_equity - equity`. If they differ, the breaker baseline is wrong.

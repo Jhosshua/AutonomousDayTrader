@@ -401,10 +401,11 @@ Plan: `PLAN_2026_09_24_operator_windows.md` (Codex attacked it: 27 findings, tri
   - B5 `strategy_window` returns `ranges` and `trading_day` for the hours bar.
   - B6 REST `/api/account` now returns `daily_pnl`/`daily_pnl_pct` from the same `_daily_pnl_fields()` as the WS broadcast.
 - **Decisions**:
-  - Strategy cards show per-strategy results from the durable ledger, not `strategy.trades_count/daily_pnl`. Why: on 09-24 the counters showed ORB 0 trades while the ledger had ORB -$112.04. Rejected: trusting the counters.
+  - Strategy cards show per-strategy results from the durable ledger, not `strategy.trades_count/daily_pnl`. Why: the ledger survives restarts and is the source of record. CORRECTION (same day): the "counters drifted" reason was WRONG. The ORB -$112.04 and Big News -$68.30 trades were from 2026-09-22; the 7-day trade list mixed them in. The counters were right.
   - The balance chart is "Finished trades today" (cumulative realized P&L), not a balance history. Why: no timestamped equity series exists; drawing one would be invented data.
   - "Stop everything" became "Close all quick trades now". Why: the endpoint never halted anything and cannot touch swing holdings. Rejected: adding a durable halt (out of scope, not asked).
   - Fonts via `@fontsource` npm, not `next/font/google`. Why: Docker build must not depend on Google at build time.
 - **Tests**: backend 843 passed; `verify_ui_redesign.py` 52/52 (Playwright route + WS mocks from real API snapshots: idle, busy, >100 trades, recovered session, breaker, feed down, reconnecting, reduced motion, all 6 action payloads); `verify_ui.mjs` passes.
-- **Open**: why the strategy counters drifted from the ledger is still unexplained (display no longer depends on them). `/api/trades?range=today` filters by entry session_date, so a trade closed today but entered yesterday is not in "today".
+- **Post-deploy bug found and fixed (B7)**: the $1,500 daily loss breaker measures from `risk_engine.config.starting_equity`, which was not in the checkpoint, so every restart re-armed it against the $50,000 default instead of today's opening equity (live after the 14:13 ET restart: day start $49,798.32, breaker baseline $50,000, $202 too strict; after a winning streak it would allow more than $1,500 of loss). Fix in `restore_runtime_state`; test `test_restore_keeps_daily_loss_baseline_at_todays_starting_equity`.
+- **Open**: `/api/trades?range=today` filters by entry session_date, so a trade closed today but entered yesterday is not in "today".
 - **Next session priorities**: find the counter drift root cause; watch the first full session on the new UI.

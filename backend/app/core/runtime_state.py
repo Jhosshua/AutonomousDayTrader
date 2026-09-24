@@ -210,6 +210,10 @@ def restore_runtime_state(
             risk_engine.symbol_sectors = merged
         else:
             setattr(risk_engine, name, value)
+    # The daily loss breaker measures from config.starting_equity, which is not in the risk
+    # snapshot. Without this, every restart re-armed it against the code default ($50,000)
+    # instead of today's real opening equity.
+    risk_engine.config.starting_equity = account.daily_starting_equity
     for name, value in decoded["flattening"].items():
         setattr(flattening_engine, name, value)
     for name, value in decoded["adaptation"].items():
