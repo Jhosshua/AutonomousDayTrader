@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time as dtime, timezone
 from enum import Enum
 import math
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, Any, Dict, List, Optional, Tuple, Union
 import zoneinfo
 
 from pydantic import BaseModel, Field
@@ -148,6 +148,7 @@ class MarketTrendFilter:
         self.spy_state = IndexState(symbol="SPY")
         self.qqq_state = IndexState(symbol="QQQ")
         self.last_session_date = session_date
+        self._last_bar_ts: Dict[str, datetime] = {}
 
     def on_bar(self, bar: BarEvent) -> None:
         """Ingest bar update for SPY or QQQ."""
@@ -169,6 +170,14 @@ class MarketTrendFilter:
         # Discard pre-market bars from regular-session anchored VWAP
         if bar_dt.time() < dtime(9, 30):
             return
+
+        # A minute already folded in (e.g. by a REST rebuild) must not be counted twice.
+        seen = getattr(self, "_last_bar_ts", None)
+        if seen is None:
+            seen = self._last_bar_ts = {}
+        if sym in seen and ts <= seen[sym]:
+            return
+        seen[sym] = ts
 
         if sym == "SPY":
             self.spy_state.update_bar(bar)

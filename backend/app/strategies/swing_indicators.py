@@ -558,12 +558,15 @@ class DailyBarAggregator:
         self._current_session_date: Optional[date] = None
         # {symbol: {minute_start_utc: (open, high, low, close, volume)}}
         self._minutes: Dict[str, Dict[datetime, Tuple[float, float, float, float, int]]] = {}
+        # Minutes that came from the live stream (REST backfill may not overwrite these).
+        self._live: Dict[str, set] = {}
 
     @staticmethod
     def _session_minute(bar: BarEvent) -> Optional[Tuple[datetime, date]]:
         ts = bar.timestamp if bar.timestamp.tzinfo else bar.timestamp.replace(tzinfo=_ET)
         bar_et = ts.astimezone(_ET)
-        if not (_RTH_OPEN <= bar_et.time() < _RTH_CLOSE):
+        from backend.app.core.trading_windows import session_close
+        if not (_RTH_OPEN <= bar_et.time() < session_close(bar_et.date())):
             return None
         return ts, bar_et.date()
 
@@ -603,10 +606,15 @@ class DailyBarAggregator:
         for k in [k for k in per if k.astimezone(_ET).date() != session_date]:
             del per[k]
         per[ts] = (bar.open, bar.high, bar.low, bar.close, int(bar.volume))
+        live = self._live.setdefault(sym, set())
+        for k in [k for k in live if k not in per]:
+            live.discard(k)
+        live.add(ts)
         self._rebuild(sym, session_date)
 
     def merge_backfill(self, bars: Sequence[BarEvent]) -> int:
-        """Fill missing minutes from REST history. Never overwrites a minute already seen live."""
+        """Fill missing minutes from REST history. Never overwrites a minute seen live; may
+        refresh a minute that an earlier backfill supplied (REST corrections)."""
         added = 0
         touched: Dict[str, date] = {}
         for bar in bars:
@@ -616,14 +624,18 @@ class DailyBarAggregator:
             ts, session_date = placed
             sym = bar.symbol.upper()
             per = self._minutes.setdefault(sym, {})
-            if ts in per:
+            if ts in self._live.get(sym, ()):
                 continue
+            if ts not in per:
+                added += 1
             per[ts] = (bar.open, bar.high, bar.low, bar.close, int(bar.volume))
             touched[sym] = session_date
-            added += 1
         for sym, session_date in touched.items():
             self._rebuild(sym, session_date)
         return added
+
+    def has_minute(self, symbol: str, minute_utc: datetime) -> bool:
+        return minute_utc in (self._minutes.get(symbol.upper()) or {})
 
     def coverage(self, symbol: str, session_date: date) -> int:
         """Number of regular-session minutes held for symbol on session_date."""
@@ -649,6 +661,7 @@ class DailyBarAggregator:
         self.store.append_bar(finalized_bar)
         self._in_flight.pop(sym, None)
         self._minutes.pop(sym, None)
+        self._live.pop(sym, None)
         return finalized_bar
 
     def finalize_all(self, session_date: date) -> List[DailyBar]:
@@ -668,4 +681,5 @@ class DailyBarAggregator:
         """Clear all in-flight accumulators."""
         self._in_flight.clear()
         self._minutes.clear()
+        self._live.clear()
         self._current_session_date = None

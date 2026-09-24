@@ -1,5 +1,5 @@
 """Operator card windows. Expected hours are written out independently of the gate code."""
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -21,14 +21,16 @@ EXPECTED = {
 
 
 def _at(h, m, day=24):
-    return datetime(2026, 9, day, h, m, tzinfo=ET)  # 2026-09-24 is a Thursday
+    """Wall-clock moment the bar that STARTS at h:m reaches the bot (one minute later)."""
+    return datetime(2026, 9, day, h, m, tzinfo=ET) + timedelta(minutes=1)  # 2026-09-24 is a Thursday
 
 
 @pytest.mark.parametrize("sid", list(EXPECTED))
 def test_every_minute_matches_documented_hours(sid):
     for minute in range(8 * 60, 17 * 60):
         now = _at(minute // 60, minute % 60)
-        want = any(a <= now.time() < b for a, b in EXPECTED[sid])
+        bar_start = (now - timedelta(minutes=1)).time()
+        want = any(a <= bar_start < b for a, b in EXPECTED[sid])
         w = strategy_window(sid, now, GATE, market_trend="BULLISH")
         assert w["in_hours"] is want, (sid, now.time())
         assert w["can_open_now"] is want, (sid, now.time())
@@ -47,21 +49,21 @@ def test_labels_and_next_change():
 
 
 def test_weekend_holiday_and_friday_rollover():
-    sat = strategy_window("news_momentum", _at(10, 30, day=26), GATE, market_trend="BULLISH")
+    sat = strategy_window("news_momentum", _at(10, 30, day=26), GATE, market_trend="BULLISH")  # Saturday
     assert sat["state"] == "MARKET_CLOSED" and not sat["can_open_now"]
     assert sat["next_change_at"] == "2026-09-28T09:30:00-04:00"
     fri = strategy_window("orb", _at(16, 30, day=25), GATE)
     assert fri["next_change_at"] == "2026-09-28T09:30:00-04:00"
-    thanksgiving = strategy_window("orb", datetime(2026, 11, 26, 10, 0, tzinfo=ET), GATE)
+    thanksgiving = strategy_window("orb", datetime(2026, 11, 26, 10, 1, tzinfo=ET), GATE)
     assert thanksgiving["state"] == "MARKET_CLOSED"
-    half = strategy_window("orb", datetime(2026, 11, 27, 10, 0, tzinfo=ET), GATE, market_trend="BULLISH")
+    half = strategy_window("orb", datetime(2026, 11, 27, 10, 1, tzinfo=ET), GATE, market_trend="BULLISH")
     assert any("Early market close" in n for n in half["notes"])
 
 
 def test_utc_input_and_dst():
     # 14:00 UTC on a summer day is 10:00 ET; in January it is 09:00 ET (pre-open).
-    summer = strategy_window("mean_reversion", datetime(2026, 9, 24, 14, 0, tzinfo=timezone.utc), GATE, market_trend="NEUTRAL")
-    winter = strategy_window("mean_reversion", datetime(2027, 1, 12, 14, 0, tzinfo=timezone.utc), GATE, market_trend="NEUTRAL")
+    summer = strategy_window("mean_reversion", datetime(2026, 9, 24, 14, 1, tzinfo=timezone.utc), GATE, market_trend="NEUTRAL")
+    winter = strategy_window("mean_reversion", datetime(2027, 1, 12, 14, 1, tzinfo=timezone.utc), GATE, market_trend="NEUTRAL")
     assert summer["can_open_now"] is True
     assert winter["in_hours"] is False
 
@@ -106,7 +108,18 @@ def test_decision_log_counts_and_state_roundtrip():
     assert finished["orb"]["SUBMITTED"] == 1 and other.summary("orb")["signals_today"] == 0
 
 
-def test_unknown_market_blocks_news_too_but_names_the_exception():
+def test_unknown_market_limits_news_to_extreme_catalysts():
     w = strategy_window("news_momentum", _at(10, 15), GATE, market_trend="UNKNOWN")
-    assert w["can_open_now"] is False and w["state"] == "BLOCKED"
-    assert "Market direction unknown: only extreme news can trade." in w["blockers"]
+    assert w["can_open_now"] is True and w["state"] == "LIMITED"
+    assert any("only extreme news" in x for x in w["limits"])
+    flat = strategy_window("orb", _at(10, 15), GATE, market_trend="NEUTRAL")
+    assert flat["state"] == "LIMITED" and "2.2x" in flat["limits"][0]
+
+
+def test_card_flips_with_the_gate_not_before_it():
+    """At 11:30:05 the 11:29 bar is still being judged inside ORB hours; the card must agree."""
+    w = strategy_window("orb", datetime(2026, 9, 24, 11, 30, 5, tzinfo=ET), GATE, market_trend="BULLISH")
+    assert w["in_hours"] is True
+    assert GATE("orb", "TREND_CONTINUATION") is True
+    w = strategy_window("orb", datetime(2026, 9, 24, 11, 31, 5, tzinfo=ET), GATE, market_trend="BULLISH")
+    assert w["in_hours"] is False and w["state"] == "DONE_FOR_DAY"

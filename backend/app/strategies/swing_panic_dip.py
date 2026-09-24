@@ -312,6 +312,7 @@ class SwingStrategyEngine:
         )
 
         self.last_close_data_note = data_note
+        self.last_close_entries_withheld = not allow_new_entries
         if not allow_new_entries:
             log.warning(f"16:00 Swing Close Scan: new entries withheld ({data_note}); exits still evaluated")
             available_slots = 0
@@ -984,6 +985,7 @@ class SwingStrategyEngine:
             "last_scan_time": self.audit_log[-1]["timestamp"] if self.audit_log else None,
             "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
             "last_close_data_note": getattr(self, "last_close_data_note", None),
+            "last_close_entries_withheld": bool(getattr(self, "last_close_entries_withheld", False)),
         }
 
     def reset(self) -> None:

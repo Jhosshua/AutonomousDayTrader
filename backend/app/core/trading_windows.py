@@ -31,12 +31,24 @@ PHASES: List[Tuple[dtime, dtime, str]] = [
     (dtime(15, 45), dtime(16, 0), "EOD_FLATTEN"),
 ]
 
+GATE_LAG_SEC = 60
+
 STRATEGY_NOTES = {
     "orb": "Morning only. Needs the first 5 minutes to set the range.",
     "vwap_pullback": "Sits out the midday chop.",
     "news_momentum": "Rare by design: needs very strong news plus a volume spike.",
     "mean_reversion": "Sits out the opening half hour.",
 }
+
+
+def session_close(d: date) -> dtime:
+    """Regular-session close for d (13:00 on NYSE early-close days)."""
+    return dtime(13, 0) if d in NYSE_EARLY_CLOSES else dtime(16, 0)
+
+
+def session_minutes(d: date) -> int:
+    c = session_close(d)
+    return (c.hour * 60 + c.minute) - (9 * 60 + 30)
 
 
 def is_trading_day(d: date) -> bool:
@@ -89,14 +101,15 @@ def market_direction_text(strategy_id: str, trend: str) -> str:
             "news_momentum": "Market is flat: only on a stock trading at 2.2x+ normal volume.",
             "vwap_pullback": "Market is flat: blocked until the market picks a direction.",
         }.get(strategy_id, "Market is flat.")
+    extreme = " Extreme news can go either way." if strategy_id == "news_momentum" else ""
     if t == "BULLISH":
         if strategy_id == "mean_reversion":
             return "Market is rising: buys only (no shorting into the rally)."
-        return "Market is rising: buys only."
+        return "Market is rising: buys only." + extreme
     if t == "BEARISH":
         if strategy_id == "mean_reversion":
             return "Market is falling: shorts only (no buying falling stocks)."
-        return "Market is falling: shorts only."
+        return "Market is falling: shorts only." + extreme
     return f"Market direction {t}."
 
 
@@ -113,7 +126,10 @@ def strategy_window(
     positions_full: bool = False,
     vix_stale: bool = False,
 ) -> Dict[str, Any]:
-    now_et = (now if now.tzinfo else now.replace(tzinfo=ET)).astimezone(ET)
+    shown_at = (now if now.tzinfo else now.replace(tzinfo=ET)).astimezone(ET)
+    # The entry gate judges each 1-minute bar by its START time, and that bar reaches the bot
+    # about a minute later. Judge the schedule one minute back so the card flips with the gate.
+    now_et = shown_at - timedelta(seconds=GATE_LAG_SEC)
     today = now_et.date()
     t = now_et.time()
     ranges = schedule_ranges(strategy_id, permitted)
@@ -168,16 +184,24 @@ def strategy_window(
     if positions_full:
         blockers.append("Maximum open positions reached.")
     market_text = market_direction_text(strategy_id, market_trend)
-    if in_hours and (market_trend or "UNKNOWN").upper() == "UNKNOWN":
-        blockers.append(
-            "Market direction unknown: only extreme news can trade."
-            if strategy_id == "news_momentum" else "Market direction unknown."
-        )
-    if in_hours and (market_trend or "").upper() == "NEUTRAL" and strategy_id == "vwap_pullback":
-        blockers.append("Market is flat.")
+    trend_u = (market_trend or "UNKNOWN").upper()
+    # Limits: the entry gate still admits some trades (mirrors MarketTrendFilter exceptions).
+    limits: List[str] = []
+    if in_hours and trend_u == "UNKNOWN":
+        if strategy_id == "news_momentum":
+            limits.append("Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade.")
+        else:
+            blockers.append("Market direction unknown.")
+    if in_hours and trend_u == "NEUTRAL":
+        if strategy_id == "vwap_pullback":
+            blockers.append("Market is flat.")
+        elif strategy_id in ("orb", "news_momentum"):
+            limits.append("Market is flat: only stocks trading at 2.2x+ normal volume.")
 
     can_open = in_hours and not blockers
-    if can_open:
+    if can_open and limits:
+        state, headline = "LIMITED", "Can trade, with limits"
+    elif can_open:
         state, headline = "CAN_TRADE", "Can open trades now"
     elif in_hours:
         state, headline = "BLOCKED", "Blocked right now"
@@ -207,7 +231,8 @@ def strategy_window(
         "schedule_text": schedule_text,
         "next_change_at": next_change.isoformat() if next_change else None,
         "blockers": blockers,
+        "limits": limits,
         "market_text": market_text,
         "notes": notes,
-        "evaluated_at": now_et.isoformat(timespec="seconds"),
+        "evaluated_at": shown_at.isoformat(timespec="seconds"),
     }

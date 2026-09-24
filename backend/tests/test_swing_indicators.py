@@ -389,3 +389,27 @@ def test_bmo_report_exits_before_the_report_not_after():
     cal2.add_event(EarningsEvent.from_dict({"symbol": "MU", "report_date": "2026-09-30", "report_time": "amc"}))
     assert cal2.has_earnings_tomorrow("MU", date(2026, 9, 28)) is False
     assert cal2.has_earnings_tomorrow("MU", date(2026, 9, 29)) is True
+
+
+def test_backfill_can_correct_its_own_minutes_but_not_live_ones():
+    from backend.app.strategies.swing_indicators import DailyBarAggregator, DailyBarStore
+    agg = DailyBarAggregator(DailyBarStore())
+    t0 = datetime(2026, 9, 24, 13, 30, tzinfo=timezone.utc)
+    agg.merge_backfill([BarEvent("MU", 1.0, 1.0, 1.0, 1.0, 1, t0)])
+    agg.merge_backfill([BarEvent("MU", 2.0, 2.0, 2.0, 2.0, 2, t0)])       # REST correction applies
+    assert agg.get_in_flight_bar("MU").close == 2.0
+    agg.on_minute_bar(BarEvent("MU", 3.0, 3.0, 3.0, 3.0, 3, t0))          # live wins
+    agg.merge_backfill([BarEvent("MU", 4.0, 4.0, 4.0, 4.0, 4, t0)])
+    assert agg.get_in_flight_bar("MU").close == 3.0
+
+
+def test_market_filter_ignores_a_minute_it_already_counted():
+    from backend.app.core.market_filter import MarketTrendFilter
+    f1, f2 = MarketTrendFilter(), MarketTrendFilter()
+    t0 = datetime(2026, 9, 24, 13, 30, tzinfo=timezone.utc)
+    bars = [BarEvent(s, 100 + i, 101 + i, 99 + i, 100.5 + i, 1000, t0.replace(minute=30 + i)) for i in range(20) for s in ("SPY", "QQQ")]
+    for b in bars:
+        f1.on_bar(b); f2.on_bar(b)
+    f2.on_bar(bars[-1]); f2.on_bar(bars[-2])                               # REST/live overlap
+    asof = t0.replace(minute=50)
+    assert f1.get_trend_snapshot(asof).model_dump(exclude={"timestamp"}) == f2.get_trend_snapshot(asof).model_dump(exclude={"timestamp"})

@@ -75,6 +75,13 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
             CAN TRADE
           </span>
         );
+      case "LIMITED":
+        return (
+          <span className={`${base} bg-apple-green/10 text-apple-green border-apple-green/25`} data-testid="window-badge">
+            <span className="w-1.5 h-1.5 rounded-full bg-apple-green" />
+            LIMITED
+          </span>
+        );
       case "BLOCKED":
         return (
           <span className={`${base} bg-apple-orange/15 text-apple-orange border-apple-orange/30`} data-testid="window-badge">
@@ -182,7 +189,15 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
               ))}
             </ul>
           )}
-          {!win.blockers.some((b) => b.startsWith("Market direction unknown")) && (
+          {(win.limits ?? []).length > 0 && (
+            <ul className="text-neutral-300 space-y-0.5">
+              {(win.limits ?? []).map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+          )}
+          {!win.blockers.some((b) => b.startsWith("Market direction unknown")) &&
+            !(win.limits ?? []).some((l) => l.startsWith("Market direction unknown")) && (
             <p className="text-neutral-400">{win.market_text}</p>
           )}
           {win.notes.map((n) => (

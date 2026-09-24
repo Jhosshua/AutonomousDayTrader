@@ -28,6 +28,7 @@ export interface StrategyWindow {
   schedule_text: string;
   next_change_at: string | null;
   blockers: string[];
+  limits?: string[];
   market_text: string;
   notes: string[];
   evaluated_at: string;
@@ -246,6 +247,7 @@ export interface SwingEngineState {
   last_scan_time: string | null;
   schedule_text?: string;
   last_close_data_note?: string | null;
+  last_close_entries_withheld?: boolean;
 }
 
 export interface TradingState {

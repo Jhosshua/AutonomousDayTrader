@@ -60,6 +60,8 @@ class DecisionLog:
         when: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         when = when or datetime.now(ET)
+        if self.session_date is None:
+            self.session_date = when.astimezone(ET).date().isoformat()
         self._seq += 1
         side_txt = str(side).split(".")[-1].upper()
         rec = {

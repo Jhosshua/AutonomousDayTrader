@@ -45,7 +45,7 @@ from backend.app.strategies.mean_reversion import MeanReversionStrategy
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
 from backend.app.core.decisions import decision_log, classify_adaptation_reason
-from backend.app.core.trading_windows import is_trading_day, strategy_window
+from backend.app.core.trading_windows import is_trading_day, session_close, session_minutes, strategy_window
 from backend.app.strategies.earnings_calendar import EarningsCalendar
 from backend.app.strategies.swing_panic_dip import (
     SwingStrategyEngine,
@@ -1754,7 +1754,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
 # SPY/QQQ market-direction filter. Never routes history through the trading
 # handler (no fills, no signals).
 # ---------------------------------------------------------------------------
-SWING_MIN_COVERAGE = 385  # of 390 regular-session minutes
+SWING_COVERAGE_SLACK = 5  # minutes a full session may miss (thin prints)
 
 
 def _relay_backfill_enabled() -> bool:
@@ -1766,7 +1766,7 @@ async def _fetch_session_minutes(symbols: List[str], session_date: date, deadlin
     import httpx
 
     start = datetime.combine(session_date, time(9, 30), ET_TZ).astimezone(timezone.utc)
-    end = min(datetime.combine(session_date, time(16, 0), ET_TZ), datetime.now(ET_TZ)).astimezone(timezone.utc)
+    end = min(datetime.combine(session_date, session_close(session_date), ET_TZ), datetime.now(ET_TZ)).astimezone(timezone.utc)
     if end <= start:
         return []
     base = settings.RELAY_HTTP_URL.rstrip("/")
@@ -1821,10 +1821,30 @@ def _rebuild_market_filter(rest_bars: List[BarEvent]) -> None:
     adaptation_engine.market_filter = fresh
 
 
+def _last_closed_session(now_et: datetime) -> date:
+    d = now_et.date()
+    if is_trading_day(d) and now_et.time() >= session_close(d):
+        return d
+    d -= timedelta(days=1)
+    while not is_trading_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
 async def _startup_backfill() -> None:
-    """After a restart during the session, repair today's swing minutes and the market filter."""
+    """After a restart: finish a close scan that never completed, else repair today's minutes."""
     now_et = datetime.now(ET_TZ)
-    if not is_trading_day(now_et.date()) or now_et.time() < time(9, 31):
+    in_session = is_trading_day(now_et.date()) and time(9, 30) <= now_et.time() < session_close(now_et.date())
+    if not in_session:
+        # The close scan runs off the trading loop; a restart during it (or after 16:00 before it
+        # ran) would otherwise skip that day's swing exits and entries for good.
+        closed = _last_closed_session(now_et)
+        bench = daily_bar_store.get_latest_bar(settings.SWING_BENCHMARK)
+        if bench is None or bench.date < closed:
+            log.warning("Close scan for %s never completed; running it now", closed)
+            await _swing_close_with_backfill(closed, max_wait_sec=30.0)
+        return
+    if now_et.time() < time(9, 31):
         return
     session_date = now_et.date()
     symbols = sorted(set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK, "SPY", "QQQ"})
@@ -1858,13 +1878,21 @@ async def _swing_close_with_backfill(eval_date: date, max_wait_sec: float = 120.
         except Exception as exc:
             note = f"REST backfill failed: {exc}"
             log.warning("Swing close backfill attempt failed: %s", exc)
-        short = {s: daily_bar_aggregator.coverage(s, eval_date) for s in swing_set}
-        short = {s: n for s, n in short.items() if n < SWING_MIN_COVERAGE}
+        need = session_minutes(eval_date) - SWING_COVERAGE_SLACK
+        last_minute = (datetime.combine(eval_date, session_close(eval_date), ET_TZ) - timedelta(minutes=1)).astimezone(timezone.utc)
+        short = {}
+        for sym in swing_set:
+            n = daily_bar_aggregator.coverage(sym, eval_date)
+            if n < need or not daily_bar_aggregator.has_minute(sym, last_minute):
+                short[sym] = n
         if not short or loop.time() >= give_up:
             break
         await asyncio.sleep(retry_sec)
     if short:
-        note = f"Incomplete minute data at close {short} (need {SWING_MIN_COVERAGE}/390)"
+        note = (
+            f"Incomplete minute data at close {short} "
+            f"(need {session_minutes(eval_date) - SWING_COVERAGE_SLACK}/{session_minutes(eval_date)} incl. the final minute)"
+        )
     daily_bar_aggregator.finalize_all(eval_date)
     swing_strategy_engine.evaluate_market_close(eval_date, allow_new_entries=not short, data_note=note)
     log.info("Swing close processed for %s; data note: %s", eval_date, note)
