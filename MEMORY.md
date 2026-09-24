@@ -2,6 +2,13 @@
 
 ## Decisions
 
+### 2026-09-24 (live watch): two production bugs fixed during market hours
+- **ORB and VWAP crashed on every bar in production** (`'OpeningRangeBreakoutStrategy' object has no attribute 'min_clv'`, `'VWAPPullbackStrategy' ... 'target_1_r'`). Cause: `restore_runtime_state` did `strategy.__dict__.clear()` then loaded the saved dict, so any setting added after the checkpoint was written vanished, and retuned values (news volume 2.0x) silently went back to old saved values. Explains the 0-trade session on 09-23. Fix: constructor tuning params always come from code; runtime memory (symbol_states etc.) still restores. Test: `test_restore_from_older_checkpoint_keeps_current_strategy_settings` (fails on old code).
+- **Swing seed `daily_bars_seed.json` was fabricated.** Real 09-22 closes vs seed: QQQ 747.46 vs 467.21, MU 1096.16 vs 39.56, KLAC 188.32 vs 1178.16. Rebuilt from real Alpaca SIP adjusted daily bars via the relay `/data` proxy with `scripts/build_daily_bars_seed.py` (265 bars, ends 2026-09-23). Restore now skips checkpoint daily bars on or before the seed's last date, so the fake bars saved in the prod checkpoint cannot come back; live-aggregated bars after the seed still survive. Test: `test_restore_does_not_let_checkpoint_bars_override_the_seed`.
+- Rejected: a "seed looks continuous" test. It passed on the fake data too (smooth synthetic series), so it proved nothing.
+- Known gap, not fixed: the in-flight daily bar is not checkpointed, so any intraday restart loses that day's open/high/low before the restart (09-24 bar starts at 09:50 ET). Close is right; ATR is slightly understated for that day.
+- `earnings_calendar.json` dates were not verified against a real source.
+
 ### 2026-09-24 (Milestone 10): Deep Forensic Audit, Hardened Swing Execution, Concurrent Multi-Day Simulation & Production Cloud Deployment
 - **Forensic Audit & Remediation Scope**:
   An independent forensic audit identified 10 core defects and 3 Gate 1 integrity findings across the Swing Trading Engine, shared-capital accounting, and cross-arm risk arbitration:

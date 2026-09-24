@@ -290,3 +290,13 @@ right. Run the mutation check.
 - **What worked instead**: Writing the failing test from the observed live numbers FIRST (entry $223.9502, peak $224.13, stop ending at 0.127%), then letting it stay red until the actual root cause was fixed. The test refused the partial fix.
 - **Note for next time**: Anchor the test in the observed production numbers before touching code. A test written after a plausible fix tends to agree with it.
 
+
+## 2026-09-24: Checkpoint restore wiped new strategy attributes
+- What did not work: `__dict__.clear()` + `update(saved)` on restore. Every code change that added a strategy setting crashed that strategy in prod after the next restart, and tests never saw it because they always restore a checkpoint written by the same code.
+- What worked: keep constructor params from code, restore only the rest. Test with a checkpoint that is missing a key.
+- Note for next time: after any deploy, grep live Railway logs for `error on bar`. Health was green the whole time the strategies were crashing.
+
+## 2026-09-24: Fabricated swing seed data
+- What did not work: an agent-generated `daily_bars_seed.json`. Prices were invented (MU $39 vs real $1096).
+- What worked: rebuild from Alpaca via relay `/data/v2/stocks/bars` (`scripts/build_daily_bars_seed.py`).
+- Note for next time: spot-check any price fixture against one real quote before trusting it.

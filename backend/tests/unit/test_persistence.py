@@ -472,3 +472,39 @@ def test_restore_from_older_checkpoint_keeps_current_strategy_settings():
     ts = datetime(2026, 9, 22, 14, 1, tzinfo=timezone.utc)
     for s in fresh:
         s.on_bar(BarEvent("AAPL", 100.5, 101.5, 100.4, 101.4, 50000, ts))
+
+
+def test_restore_does_not_let_checkpoint_bars_override_the_seed(tmp_path):
+    """2026-09-24: the old fabricated seed lived on in the checkpoint; restoring it
+    must not overwrite the corrected seed, but live bars after the seed must survive."""
+    from datetime import date
+    from backend.app.strategies.swing_indicators import DailyBar, DailyBarStore
+
+    old_store = DailyBarStore()
+    old_store.append_bar(DailyBar("MU", date(2026, 9, 22), 41.0, 41.3, 39.3, 39.56, 100))
+    old_store.append_bar(DailyBar("MU", date(2026, 9, 24), 1060.0, 1070.0, 1040.0, 1053.5, 100))
+    account, engine, brackets, risk, flattening, adaptation, strategies = _components()
+    payload = capture_runtime_state(
+        account=account, engine=engine, bracket_manager=brackets, risk_engine=risk,
+        flattening_engine=flattening, adaptation_engine=adaptation, strategies=strategies,
+        entry_order_to_bracket={}, bracket_realized_pnl={}, completed_brackets_recorded=set(),
+        latest_market_prices={}, market_history={}, recent_news=[], last_session_date=None,
+        last_vix_print=None, ledger_revision=1, daily_bar_store=old_store,
+    )
+    seed = tmp_path / "seed.json"
+    seed.write_text(json.dumps({"MU": [
+        {"date": "2026-09-22", "open": 1050.0, "high": 1100.0, "low": 1040.0, "close": 1096.16, "volume": 1},
+        {"date": "2026-09-23", "open": 1090.0, "high": 1095.0, "low": 1060.0, "close": 1071.88, "volume": 1},
+    ]}))
+    new_store = DailyBarStore(seed_path=str(seed))
+    restored = _components()
+    restore_runtime_state(
+        payload, account=restored[0], engine=restored[1], bracket_manager=restored[2],
+        risk_engine=restored[3], flattening_engine=restored[4], adaptation_engine=restored[5],
+        strategies=restored[6], entry_order_to_bracket={}, bracket_realized_pnl={},
+        completed_brackets_recorded=set(), latest_market_prices={}, market_history={},
+        recent_news=[], daily_bar_store=new_store,
+    )
+    closes = {b.date.isoformat(): b.close for b in new_store.get_all_bars()["MU"]}
+    assert closes == {"2026-09-22": 1096.16, "2026-09-23": 1071.88, "2026-09-24": 1053.5}
+

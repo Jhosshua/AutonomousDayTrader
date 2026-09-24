@@ -242,8 +242,13 @@ def restore_runtime_state(
         raw_daily_bars = decoded.get("daily_bars", {})
         from backend.app.strategies.swing_indicators import DailyBar
         for sym, bar_dicts in raw_daily_bars.items():
+            # The seed file is the source of truth for its date range; the checkpoint
+            # only contributes live-aggregated bars after the seed ends.
+            seed_last = daily_bar_store.get_latest_bar(sym)
             for b_dict in bar_dicts:
                 bar_obj = DailyBar.from_dict(b_dict) if isinstance(b_dict, dict) else b_dict
+                if seed_last is not None and bar_obj.date <= seed_last.date:
+                    continue
                 daily_bar_store.append_bar(bar_obj)
 
     validate_runtime_state(account, engine, bracket_manager)
