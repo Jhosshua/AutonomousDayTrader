@@ -300,3 +300,8 @@ right. Run the mutation check.
 - What did not work: an agent-generated `daily_bars_seed.json`. Prices were invented (MU $39 vs real $1096).
 - What worked: rebuild from Alpaca via relay `/data/v2/stocks/bars` (`scripts/build_daily_bars_seed.py`).
 - Note for next time: spot-check any price fixture against one real quote before trusting it.
+
+## 2026-09-24: Local UI screenshots showed no cards
+- What did not work: running the local backend on a spare port (8765). The exported UI hardcodes ws://127.0.0.1:8005 for localhost, so it never got data.
+- What worked: run the isolated local server on 8005 (ENV=development PERSISTENCE_ENABLED=false START_RELAY_CLIENTS=false), then kill it.
+- Note for next time: `from datetime import time` in main.py shadows the time module; use `import time as _time_mod`.

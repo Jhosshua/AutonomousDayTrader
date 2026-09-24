@@ -41,6 +41,7 @@ Stress Tests Covered:
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, time as dtime, timedelta, timezone
 import math
 import uuid
@@ -706,10 +707,10 @@ def test_adv_sentiment_burst_100_headlines_throughput():
         for i in range(100)
     ]
 
-    start = asyncio.get_event_loop().time()
+    start = time.perf_counter()
     for ev in events:
         strat.on_news(ev)
-    elapsed = asyncio.get_event_loop().time() - start
+    elapsed = time.perf_counter() - start
 
     assert elapsed < 0.20, f"Processing 100 headlines took too long: {elapsed:.3f}s"
     # Verify pending catalysts populated across symbols

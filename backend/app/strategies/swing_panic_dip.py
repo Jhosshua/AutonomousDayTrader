@@ -254,7 +254,7 @@ class SwingStrategyEngine:
             or getattr(pos, "strategy_id", "") == "swing_panic_dip"
         }
 
-    def evaluate_market_close(self, session_date: date) -> Dict[str, Any]:
+    def evaluate_market_close(self, session_date: date, allow_new_entries: bool = True, data_note: Optional[str] = None) -> Dict[str, Any]:
         """Perform 16:00 ET close evaluation on finalized daily bars.
         
         Zero lookahead guarantee: Operates only on bars with date <= session_date.
@@ -310,6 +310,11 @@ class SwingStrategyEngine:
             f"16:00 Swing Close Scan: {len(active_positions)} active, {len(exiting_symbols)} exiting, "
             f"{len(existing_staged_symbols)} already staged, {available_slots} available slots"
         )
+
+        self.last_close_data_note = data_note
+        if not allow_new_entries:
+            log.warning(f"16:00 Swing Close Scan: new entries withheld ({data_note}); exits still evaluated")
+            available_slots = 0
 
         if available_slots > 0:
             qqq_bars = self.bar_store.get_bars(self.benchmark, as_of=session_date)
@@ -977,6 +982,8 @@ class SwingStrategyEngine:
             "candidates": self.get_candidate_status(as_of=today),
             "positions": positions_list,
             "last_scan_time": self.audit_log[-1]["timestamp"] if self.audit_log else None,
+            "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+            "last_close_data_note": getattr(self, "last_close_data_note", None),
         }
 
     def reset(self) -> None:

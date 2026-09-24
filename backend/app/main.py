@@ -3,6 +3,7 @@ FastAPI Core Trading Engine API Server & Real-Time WebSocket Streaming (Port 800
 """
 from __future__ import annotations
 import asyncio
+import time as _time_mod
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta, timezone
 import hashlib
@@ -43,6 +44,8 @@ from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
+from backend.app.core.decisions import decision_log, classify_adaptation_reason
+from backend.app.core.trading_windows import is_trading_day, strategy_window
 from backend.app.strategies.earnings_calendar import EarningsCalendar
 from backend.app.strategies.swing_panic_dip import (
     SwingStrategyEngine,
@@ -428,6 +431,7 @@ def _capture_checkpoint() -> Dict[str, Any]:
         swing_staged_orders=swing_staged_order_manager.get_staged_orders(),
         swing_reserved_symbols=swing_reserved_symbols,
         daily_bar_store=daily_bar_store,
+        decisions=decision_log.to_state(),
     )
 
 
@@ -558,6 +562,7 @@ def _restore_checkpoint() -> bool:
 
     last_session_date = restored["last_session_date"]
     last_vix_print = restored["last_vix_print"]
+    decision_log.load_state(restored.get("decisions"))
     persistence_revision = revision
     ledger_revision = max(restored["ledger_revision"], state_store.trade_count())
     persistence_healthy = True
@@ -778,6 +783,9 @@ def _session_summary(session_day: Any, source: str = "SYSTEM") -> Dict[str, Any]
             strategy.strategy_id: {
                 "trades_count": strategy.trades_count,
                 "realized_pnl": strategy.daily_pnl,
+                "signals": decision_log.summary(strategy.strategy_id)["signals_today"],
+                "orders": decision_log.summary(strategy.strategy_id)["orders_today"],
+                "blocked_by_reason": decision_log.summary(strategy.strategy_id)["blocked_by_reason"],
             }
             for strategy in strategies
         },
@@ -997,6 +1005,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
     if previous_session_date is not None:
         summary = _session_summary(previous_session_date)
         pending_session_summaries[summary["session_date"]] = summary
+    decision_log.reset_for_session(session_date.isoformat() if hasattr(session_date, "isoformat") else str(session_date))
     last_session_date = session_date
     market_filter.reset_session(session_date)
     daily_bar_aggregator.reset_for_new_session()
@@ -1128,7 +1137,7 @@ async def broadcast_ui_state(force: bool = False) -> None:
             "daily_starting_equity": account.daily_starting_equity,
         },
         "market_context": adaptation_engine.get_market_context(),
-        "strategies": [s.to_dict() for s in strategies],
+        "strategies": _strategy_cards(),
         "primary_position": primary_pos,
         "all_positions": [_serialize_position(symbol, include_chart=False) for symbol in active_position_symbols],
         "positions_count": len(account.positions),
@@ -1168,6 +1177,61 @@ async def broadcast_ui_state(force: bool = False) -> None:
             ui_clients.discard(ws)
 
 
+def _risk_reason_text(preview: Any) -> str:
+    for attr in ("rejection_reason", "reason", "reasons", "violations"):
+        val = getattr(preview, attr, None)
+        if val:
+            return str(val)
+    return "risk check failed"
+
+
+def _record_decision(signal: SignalEvent, outcome: str, detail: str) -> None:
+    try:
+        decision_log.record(
+            strategy_id=signal.strategy_id,
+            symbol=signal.symbol,
+            side=str(getattr(signal.side, "value", signal.side)),
+            price=signal.entry_price,
+            outcome=outcome,
+            detail=detail,
+            when=signal.timestamp if getattr(signal, "timestamp", None) else None,
+        )
+    except Exception:
+        log.exception("Decision log write failed")
+
+
+def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    """Strategy state plus live trading window, blockers and today's decision counts."""
+    now = now or datetime.now(timezone.utc)
+    try:
+        trend = market_filter.get_current_trend(now)[0].value
+    except Exception:
+        trend = "UNKNOWN"
+    try:
+        _syms, _sectors, committed_count, _notional = _get_effective_committed_portfolio(account, arm=TradingArm.INTRADAY)
+    except Exception:
+        committed_count = len(account.positions)
+    vix_stale = bool(last_vix_print is not None and (getattr(last_vix_print, "is_stale", False) or getattr(last_vix_print, "is_fallback", False)))
+    cards = []
+    for s in strategies:
+        card = s.to_dict()
+        card["window"] = strategy_window(
+            s.strategy_id,
+            now,
+            adaptation_engine.is_strategy_permitted,
+            operator_status=card.get("status", "ACTIVE"),
+            market_trend=trend,
+            breaker_halted=risk_engine.status != BreakerStatus.ARMED,
+            entry_lockout=flattening_engine.current_phase != FlatteningPhase.NORMAL_TRADING,
+            persistence_halted=state_store is not None and not persistence_healthy,
+            positions_full=committed_count >= adaptation_engine.max_concurrent_positions,
+            vix_stale=vix_stale,
+        )
+        card["decisions"] = decision_log.summary(s.strategy_id)
+        cards.append(card)
+    return cards
+
+
 async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] = None) -> None:
     """Evaluate and route strategy signals through adaptation and risk engines."""
     sym = signal.symbol.upper()
@@ -1196,6 +1260,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 
     # 2. Position-opening entry signal
     if signal.entry_price <= 0:
+        _record_decision(signal, "BAD_PRICE", f"entry_price={signal.entry_price}")
         return
 
     # Reject duplicate entries: a working entry order or live bracket for this
@@ -1212,10 +1277,12 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
                 "Rejecting duplicate entry signal for %s: bracket %s already %s",
                 sym, existing_bracket_id, existing_bracket.status.value,
             )
+            _record_decision(signal, "DUPLICATE", f"bracket {existing_bracket.status.value}")
             return
     for working in engine.working_orders.values():
         if working.symbol == sym and working.id in entry_order_to_bracket:
             log.warning("Rejecting duplicate entry signal for %s: entry order %s still working", sym, working.id)
+            _record_decision(signal, "DUPLICATE", "entry order still working")
             return
 
     latest_market_prices[sym] = signal.entry_price if bar is None else bar.close
@@ -1231,6 +1298,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         is_symbol_active=is_active,
     )
     if not approved or qty <= 0:
+        _record_decision(signal, classify_adaptation_reason(reason) if not approved else "SIZING", reason)
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         return
@@ -1259,11 +1327,13 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     )
 
     if not risk_preview.approved:
+        _record_decision(signal, "RISK", _risk_reason_text(risk_preview))
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         return
     qty = min(qty, risk_preview.authorized_qty)
     if qty <= 0:
+        _record_decision(signal, "SIZING", "risk engine authorized 0 shares")
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         return
@@ -1283,6 +1353,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     )
     submitted = engine.submit_order(order.id)
     if submitted.status.value == "ACCEPTED":
+        _record_decision(signal, "SUBMITTED", f"{side.value} {qty} {sym} order {submitted.id}")
         bracket = bracket_manager.create_bracket(
             bracket_id=f"brk_{submitted.id}",
             symbol=sym,
@@ -1303,6 +1374,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         log.warning("Entry order %s rejected by execution engine: %s", submitted.id, submitted.reject_reason)
+        _record_decision(signal, "ENGINE_REJECT", str(submitted.reject_reason))
 
 
 # Event Bus Handlers
@@ -1384,6 +1456,10 @@ async def handle_bar_event(bar: BarEvent) -> None:
 
     if collected_signals:
         arbitrated = adaptation_engine.arbitrate_signals(collected_signals)
+        kept = {id(sig) for sig in arbitrated}
+        for sig in collected_signals:
+            if id(sig) not in kept and sig.entry_price > 0:
+                _record_decision(sig, "ARBITRATION_LOST", "A higher-priority strategy signalled the same stock on this bar")
         for sig in arbitrated:
             await execute_strategy_signal(sig)
 
@@ -1658,8 +1734,14 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
 
     if directive.phase == FlatteningPhase.MARKET_CLOSED:
         eval_date = directive.timestamp.astimezone(ET_TZ).date() if directive.timestamp.tzinfo else directive.timestamp.date()
-        daily_bar_aggregator.finalize_all(eval_date)
-        swing_strategy_engine.evaluate_market_close(eval_date)
+        if _relay_backfill_enabled():
+            # Repair the day's minutes from REST before finalizing; runs off the trading loop.
+            task = asyncio.create_task(_swing_close_with_backfill(eval_date), name="SwingCloseBackfill")
+            runtime_tasks.add(task)
+            task.add_done_callback(runtime_tasks.discard)
+        else:
+            daily_bar_aggregator.finalize_all(eval_date)
+            swing_strategy_engine.evaluate_market_close(eval_date)
 
     _checkpoint_runtime(
         f"FLATTENING_{directive.phase.value}",
@@ -1667,8 +1749,133 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Relay REST backfill: repairs restart gaps in swing daily bars and the
+# SPY/QQQ market-direction filter. Never routes history through the trading
+# handler (no fills, no signals).
+# ---------------------------------------------------------------------------
+SWING_MIN_COVERAGE = 385  # of 390 regular-session minutes
+
+
+def _relay_backfill_enabled() -> bool:
+    return bool(settings.START_RELAY_CLIENTS and settings.RELAY_TOKEN and not simulation_mode)
+
+
+async def _fetch_session_minutes(symbols: List[str], session_date: date, deadline_sec: float = 20.0) -> List[BarEvent]:
+    """Regular-session 1-min SIP bars for session_date up to now, following pagination."""
+    import httpx
+
+    start = datetime.combine(session_date, time(9, 30), ET_TZ).astimezone(timezone.utc)
+    end = min(datetime.combine(session_date, time(16, 0), ET_TZ), datetime.now(ET_TZ)).astimezone(timezone.utc)
+    if end <= start:
+        return []
+    base = settings.RELAY_HTTP_URL.rstrip("/")
+    out: List[BarEvent] = []
+    page: Optional[str] = None
+    loop = asyncio.get_running_loop()
+    t_end = loop.time() + deadline_sec
+    async with httpx.AsyncClient(headers={"X-Relay-Token": settings.RELAY_TOKEN}, timeout=8.0) as client:
+        while True:
+            if loop.time() > t_end:
+                raise TimeoutError("relay backfill deadline exceeded")
+            params = {
+                "symbols": ",".join(sorted(set(symbols))),
+                "timeframe": "1Min",
+                "start": start.isoformat().replace("+00:00", "Z"),
+                "end": end.isoformat().replace("+00:00", "Z"),
+                "feed": "sip",
+                "limit": "10000",
+            }
+            if page:
+                params["page_token"] = page
+            resp = await client.get(f"{base}/data/v2/stocks/bars", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            for sym, rows in (data.get("bars") or {}).items():
+                for r in rows:
+                    out.append(BarEvent(
+                        sym.upper(), float(r["o"]), float(r["h"]), float(r["l"]), float(r["c"]), int(r["v"]),
+                        datetime.fromisoformat(str(r["t"]).replace("Z", "+00:00")), r.get("n"), r.get("vw"),
+                    ))
+            page = data.get("next_page_token")
+            if not page:
+                break
+    return out
+
+
+def _rebuild_market_filter(rest_bars: List[BarEvent]) -> None:
+    """Build a fresh SPY/QQQ filter from REST history + live bars already seen, then swap it in."""
+    global market_filter
+    fresh = MarketTrendFilter()
+    merged: Dict[Tuple[str, datetime], BarEvent] = {}
+    for b in rest_bars:
+        if b.symbol in ("SPY", "QQQ"):
+            merged[(b.symbol, b.timestamp)] = b
+    for sym in ("SPY", "QQQ"):
+        for row in market_history.get(sym, []):
+            ts = datetime.fromisoformat(row["time"])
+            merged[(sym, ts)] = BarEvent(sym, row["open"], row["high"], row["low"], row["close"], int(row["volume"]), ts)
+    for key in sorted(merged, key=lambda k: (k[1], k[0])):
+        fresh.on_bar(merged[key])
+    market_filter = fresh
+    adaptation_engine.market_filter = fresh
+
+
+async def _startup_backfill() -> None:
+    """After a restart during the session, repair today's swing minutes and the market filter."""
+    now_et = datetime.now(ET_TZ)
+    if not is_trading_day(now_et.date()) or now_et.time() < time(9, 31):
+        return
+    session_date = now_et.date()
+    symbols = sorted(set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK, "SPY", "QQQ"})
+    try:
+        bars = await _fetch_session_minutes(symbols, session_date)
+    except Exception as exc:
+        log.warning("Startup backfill failed, continuing with live data only: %s", exc)
+        return
+    swing_set = set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK}
+    added = daily_bar_aggregator.merge_backfill([b for b in bars if b.symbol in swing_set])
+    if now_et.time() < time(16, 0):
+        _rebuild_market_filter(bars)
+    log.info(
+        "Startup backfill: %d REST minutes, %d swing minutes added; coverage %s; market trend now %s",
+        len(bars), added,
+        {s: daily_bar_aggregator.coverage(s, session_date) for s in sorted(swing_set)},
+        market_filter.get_current_trend(datetime.now(timezone.utc))[0].value,
+    )
+    await broadcast_ui_state(force=True)
+
+
+async def _swing_close_with_backfill(eval_date: date, max_wait_sec: float = 120.0, retry_sec: float = 15.0) -> None:
+    swing_set = sorted(set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK})
+    loop = asyncio.get_running_loop()
+    give_up = loop.time() + max_wait_sec
+    note: Optional[str] = None
+    while True:
+        try:
+            bars = await _fetch_session_minutes(swing_set, eval_date)
+            daily_bar_aggregator.merge_backfill(bars)
+        except Exception as exc:
+            note = f"REST backfill failed: {exc}"
+            log.warning("Swing close backfill attempt failed: %s", exc)
+        short = {s: daily_bar_aggregator.coverage(s, eval_date) for s in swing_set}
+        short = {s: n for s, n in short.items() if n < SWING_MIN_COVERAGE}
+        if not short or loop.time() >= give_up:
+            break
+        await asyncio.sleep(retry_sec)
+    if short:
+        note = f"Incomplete minute data at close {short} (need {SWING_MIN_COVERAGE}/390)"
+    daily_bar_aggregator.finalize_all(eval_date)
+    swing_strategy_engine.evaluate_market_close(eval_date, allow_new_entries=not short, data_note=note)
+    log.info("Swing close processed for %s; data note: %s", eval_date, note)
+    _checkpoint_runtime("SWING_CLOSE_EVALUATION")
+    await broadcast_ui_state(force=True)
+
+
+
 async def _runtime_clock_loop() -> None:
     """Keep EOD controls alive even when a market-data bar is delayed or absent."""
+    last_clock_broadcast = 0.0
     while True:
         try:
             if pending_processed_events:
@@ -1692,6 +1899,10 @@ async def _runtime_clock_loop() -> None:
             directive = flattening_engine.check_time_tick()
             if directive:
                 await handle_flattening_directive(directive)
+            # Cards must flip at window boundaries even when no bar arrives.
+            if ui_clients and _time_mod.monotonic() - last_clock_broadcast >= 10.0:
+                last_clock_broadcast = _time_mod.monotonic()
+                await broadcast_ui_state(force=True)
             await asyncio.sleep(1.0)
         except asyncio.CancelledError:
             break
@@ -1753,6 +1964,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     swing_strategy_engine.reset()
     daily_bar_aggregator.reset_for_new_session()
     swing_reserved_symbols.clear()
+    decision_log.reset_for_session(None)
 
 
 def set_simulation_mode(enabled: bool) -> None:
@@ -1821,6 +2033,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await stock_ws_client.start()
         await news_ws_client.start()
         await vix_client.start()
+        if _relay_backfill_enabled():
+            bf = asyncio.create_task(_startup_backfill(), name="StartupBackfill")
+            runtime_tasks.add(bf)
+            bf.add_done_callback(runtime_tasks.discard)
 
     # The runtime clock drives EOD flattening and session resets even without relay clients
     clock_task = asyncio.create_task(_runtime_clock_loop(), name="TradingRuntimeClock")
@@ -2022,8 +2238,19 @@ async def get_positions() -> Dict[str, Any]:
 
 @app.get("/api/strategies")
 async def get_strategies() -> List[Dict[str, Any]]:
-    """Active strategies state and performance statistics."""
-    return [s.to_dict() for s in strategies]
+    """Strategies with live trading window, blockers and today's decision counts."""
+    return _strategy_cards()
+
+
+@app.get("/api/decisions")
+async def get_decisions(limit: int = 50, strategy: Optional[str] = None) -> Dict[str, Any]:
+    """Every signal the strategies raised today and what the bot decided (newest first)."""
+    limit = max(1, min(int(limit), 300))
+    return {
+        "session_date": decision_log.session_date,
+        "summary": {s.strategy_id: decision_log.summary(s.strategy_id) for s in strategies},
+        "items": decision_log.recent(limit, strategy),
+    }
 
 
 @app.get("/api/market-context")

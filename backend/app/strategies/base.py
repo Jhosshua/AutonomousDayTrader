@@ -298,7 +298,9 @@ class Strategy(ABC):
         self.losses_count = 0
         self.win_rate = 0.0
         self._trade_pnls.clear()
-        self.status = StrategyStatus.ACTIVE
+        # An operator pause is deliberate and survives the new session; cooldowns expire.
+        if self.status != StrategyStatus.PAUSED:
+            self.status = StrategyStatus.ACTIVE
 
     def pause(self) -> None:
         """Pause strategy execution."""

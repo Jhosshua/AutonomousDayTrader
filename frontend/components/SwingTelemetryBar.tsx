@@ -96,6 +96,12 @@ export default function SwingTelemetryBar({ swingState }: SwingTelemetryBarProps
           </div>
         </div>
       </div>
+      <p className="mt-2 text-[11px] text-neutral-400 leading-snug" data-testid="swing-schedule">
+        {swingState?.schedule_text ?? "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open."}
+        {swingState?.last_close_data_note ? (
+          <span className="block text-apple-orange mt-0.5">Last close: {swingState.last_close_data_note}. No new swing buys that night.</span>
+        ) : null}
+      </p>
     </section>
   );
 }

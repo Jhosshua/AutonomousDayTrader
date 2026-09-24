@@ -295,7 +295,7 @@ class TestSeedFixturesAndAggregator:
         # Minute 1 (09:30)
         aggregator.on_minute_bar(BarEvent(
             symbol="AMD",
-            timestamp=datetime(2026, 9, 23, 9, 30, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 9, 23, 13, 30, tzinfo=timezone.utc),
             open=150.0,
             high=151.0,
             low=149.5,
@@ -306,7 +306,7 @@ class TestSeedFixturesAndAggregator:
         # Minute 2 (09:31)
         aggregator.on_minute_bar(BarEvent(
             symbol="AMD",
-            timestamp=datetime(2026, 9, 23, 9, 31, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 9, 23, 13, 31, tzinfo=timezone.utc),
             open=150.5,
             high=152.0,  # New high
             low=150.0,
@@ -317,7 +317,7 @@ class TestSeedFixturesAndAggregator:
         # Minute 3 (09:32)
         aggregator.on_minute_bar(BarEvent(
             symbol="AMD",
-            timestamp=datetime(2026, 9, 23, 9, 32, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 9, 23, 13, 32, tzinfo=timezone.utc),
             open=151.8,
             high=151.9,
             low=148.0,  # New low
@@ -345,3 +345,47 @@ class TestSeedFixturesAndAggregator:
         stored_bar = store.get_latest_bar("AMD")
         assert stored_bar is not None
         assert stored_bar.close == 149.0
+
+
+def test_aggregator_ignores_extended_hours_and_duplicate_minutes():
+    """Pre-market/after-hours bars must not set the daily open/high/low; replayed minutes must not double count."""
+    from datetime import date as _date
+    from backend.app.strategies.swing_indicators import DailyBarAggregator, DailyBarStore
+    agg = DailyBarAggregator(DailyBarStore())
+    mk = lambda h, m, o, hi, lo, c, v: BarEvent("AMD", o, hi, lo, c, v, datetime(2026, 9, 24, h, m, tzinfo=timezone.utc))
+    agg.on_minute_bar(mk(12, 0, 700.0, 710.0, 690.0, 705.0, 1000))   # 08:00 ET pre-market
+    agg.on_minute_bar(mk(13, 30, 610.0, 612.0, 609.0, 611.0, 500))   # 09:30 ET open
+    agg.on_minute_bar(mk(13, 30, 610.0, 612.0, 609.0, 611.0, 500))   # duplicate replay
+    agg.on_minute_bar(mk(19, 59, 611.0, 615.0, 605.0, 614.0, 300))   # 15:59 ET
+    agg.on_minute_bar(mk(20, 30, 650.0, 660.0, 600.0, 655.0, 900))   # 16:30 ET after-hours
+    bar = agg.get_in_flight_bar("AMD")
+    assert (bar.date, bar.open, bar.high, bar.low, bar.close, bar.volume) == (_date(2026, 9, 24), 610.0, 615.0, 605.0, 614.0, 800)
+
+
+def test_backfill_fills_gaps_without_overwriting_live_minutes():
+    from datetime import date as _date
+    from backend.app.strategies.swing_indicators import DailyBarAggregator, DailyBarStore
+    agg = DailyBarAggregator(DailyBarStore())
+    mk = lambda m, c, v: BarEvent("MU", c, c + 1, c - 1, c, v, datetime(2026, 9, 24, 13, 30 + m, tzinfo=timezone.utc))
+    agg.on_minute_bar(mk(5, 105.0, 10))          # live minute 09:35
+    added = agg.merge_backfill([mk(m, 100.0 + m, 1) for m in range(0, 10)])
+    assert added == 9                            # 09:35 kept from live
+    assert agg.coverage("MU", _date(2026, 9, 24)) == 10
+    bar = agg.get_in_flight_bar("MU")
+    assert (bar.open, bar.close, bar.volume) == (100.0, 109.0, 19)
+    agg.on_minute_bar(mk(9, 120.0, 5))           # live correction of 09:39 wins
+    assert agg.get_in_flight_bar("MU").close == 120.0
+
+
+def test_bmo_report_exits_before_the_report_not_after():
+    """GS reports Tue 2026-10-13 before the open. Holding exits fill at the next 09:30 open, so the
+    Friday 10-09 close must flag the exit (sell Mon 10-12), not the Monday close (sell after the report)."""
+    from backend.app.strategies.earnings_calendar import EarningsCalendar, EarningsEvent
+    cal = EarningsCalendar()
+    cal.add_event(EarningsEvent.from_dict({"symbol": "GS", "report_date": "2026-10-13", "report_time": "bmo"}))
+    assert cal.has_earnings_tomorrow("GS", date(2026, 10, 8)) is False
+    assert cal.has_earnings_tomorrow("GS", date(2026, 10, 9)) is True
+    cal2 = EarningsCalendar()
+    cal2.add_event(EarningsEvent.from_dict({"symbol": "MU", "report_date": "2026-09-30", "report_time": "amc"}))
+    assert cal2.has_earnings_tomorrow("MU", date(2026, 9, 28)) is False
+    assert cal2.has_earnings_tomorrow("MU", date(2026, 9, 29)) is True

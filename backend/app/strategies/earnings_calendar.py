@@ -238,11 +238,19 @@ class EarningsCalendar:
         else:
             next_trading_day = as_of_date + timedelta(days=1)
 
+        # The exit fills at the next 09:30 open. A before-open (BMO) report on the trading day
+        # AFTER that would already be out by the following open, so it must exit one day earlier.
+        day_after_next = next_trading_day + timedelta(days=1)
+        while day_after_next.weekday() >= 5:
+            day_after_next += timedelta(days=1)
+
         for ev in events:
             if ev.report_date == next_trading_day:
                 return True
             # Also catch standard 1-day calendar delta
             if (ev.report_date - as_of_date).days == 1:
+                return True
+            if ev.report_time == "bmo" and ev.report_date == day_after_next:
                 return True
 
         return False

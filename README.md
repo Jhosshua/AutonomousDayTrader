@@ -150,6 +150,8 @@ cd frontend && npm run dev
 
 ### Production Deployment
 
+Operator reporting: each strategy card shows its trading hours, whether it can open a trade right now and why not, and today's signal counts. `GET /api/decisions` lists every signal and the decision made; `GET /api/strategies` includes the `window` and `decisions` blocks.
+
 Live Railway dashboard: https://autonomousdaytrader-production.up.railway.app
 
 The Railway service `AutonomousDayTrader` is connected to the GitHub repo `Jhosshua/AutonomousDayTrader` (`main` branch) with an automatic deployment trigger: every push to `main` rebuilds and redeploys production. No manual `railway up` is needed. `scripts/deploy_and_push.sh` wraps this flow with test/build gates and a post-push `/health` verification.

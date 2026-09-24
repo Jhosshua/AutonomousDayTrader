@@ -46,7 +46,7 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
           border: "hover:border-indigo-500/40",
           accentColor: "text-indigo-400",
           icon: <Activity className="w-6 h-6 text-indigo-400" />,
-          tagline: "2.5-Sigma Exhaustion Fades",
+          tagline: "1.65-Sigma Exhaustion Fades",
         };
       default:
         return {
@@ -60,6 +60,41 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
   };
 
   const theme = getStrategyTheme(strategy.id);
+  const win = strategy.window;
+  const dec = strategy.decisions;
+
+  // Operator view: can this strategy open a trade right now? Idle states are neutral, never red.
+  const getWindowBadge = () => {
+    if (!win) return getStatusBadge(strategy.status);
+    const base = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider border";
+    switch (win.state) {
+      case "CAN_TRADE":
+        return (
+          <span className={`${base} bg-apple-green/15 text-apple-green border-apple-green/30`} data-testid="window-badge">
+            <span className="w-1.5 h-1.5 rounded-full bg-apple-green animate-pulse" />
+            CAN TRADE
+          </span>
+        );
+      case "BLOCKED":
+        return (
+          <span className={`${base} bg-apple-orange/15 text-apple-orange border-apple-orange/30`} data-testid="window-badge">
+            BLOCKED NOW
+          </span>
+        );
+      case "PAUSED":
+        return (
+          <span className={`${base} bg-apple-orange/15 text-apple-orange border-apple-orange/30`} data-testid="window-badge">
+            PAUSED
+          </span>
+        );
+      default:
+        return (
+          <span className={`${base} bg-neutral-800 text-neutral-300 border-white/10`} data-testid="window-badge">
+            {win.headline.toUpperCase()}
+          </span>
+        );
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status?.toUpperCase()) {
@@ -118,7 +153,7 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
           <div className="p-2 rounded-xl bg-black/40 backdrop-blur-md border border-white/10">
             {theme.icon}
           </div>
-          {getStatusBadge(strategy.status)}
+          {getWindowBadge()}
         </div>
 
         <div>
@@ -131,6 +166,36 @@ export default function StrategyCard({ strategy, onSelect, isSelected }: Strateg
           <p className="text-[11px] text-white/60 line-clamp-1">{theme.tagline}</p>
         </div>
       </div>
+
+      {/* Trading window: when this strategy may open trades, and what blocks it now */}
+      {win && (
+        <div className="mb-3 space-y-1 text-[11px] leading-snug" data-testid="strategy-window">
+          <p className="text-white font-semibold">{win.headline}</p>
+          <p className="text-neutral-400">
+            Hours: <span className="text-neutral-200">{win.hours}</span>
+          </p>
+          <p className="text-neutral-400">{win.schedule_text}</p>
+          {win.blockers.length > 0 && (
+            <ul className="text-apple-orange space-y-0.5">
+              {win.blockers.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+          )}
+          {!win.blockers.some((b) => b.startsWith("Market direction unknown")) && (
+            <p className="text-neutral-400">{win.market_text}</p>
+          )}
+          {win.notes.map((n) => (
+            <p key={n} className="text-neutral-500">{n}</p>
+          ))}
+          {dec && (
+            <p className="text-neutral-400" data-testid="strategy-decisions">
+              Today: {dec.signals_today} signal{dec.signals_today === 1 ? "" : "s"}, {dec.orders_today} sent
+              {dec.blocked_today > 0 && dec.top_block_text ? `, ${dec.blocked_today} blocked (mostly: ${dec.top_block_text.toLowerCase()})` : ""}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Performance Metrics Row */}
       <div className="space-y-2">

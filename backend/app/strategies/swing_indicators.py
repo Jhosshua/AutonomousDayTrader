@@ -18,13 +18,18 @@ Daily bars are finalized at 16:00 ET close before signal qualification.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, time as dtime
+from zoneinfo import ZoneInfo
 import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from backend.app.models.events import BarEvent
+
+_ET = ZoneInfo("America/New_York")
+_RTH_OPEN = dtime(9, 30)
+_RTH_CLOSE = dtime(16, 0)
 
 log = logging.getLogger(__name__)
 
@@ -538,48 +543,91 @@ class DailyBarStore:
 
 
 class DailyBarAggregator:
-    """Aggregates intraday 1-minute BarEvent frames into a finalized daily bar at 16:00 ET close."""
+    """Aggregates intraday 1-minute BarEvent frames into a finalized daily bar at 16:00 ET close.
+
+    Minutes are stored individually (merge by minute) so a restart gap can be filled from the
+    relay's REST history without double counting or losing live corrections.
+    """
+
+    FULL_SESSION_MINUTES = 390
 
     def __init__(self, store: DailyBarStore) -> None:
         self.store: DailyBarStore = store
         # In-flight daily bars keyed by symbol: {symbol: DailyBar}
         self._in_flight: Dict[str, DailyBar] = {}
         self._current_session_date: Optional[date] = None
+        # {symbol: {minute_start_utc: (open, high, low, close, volume)}}
+        self._minutes: Dict[str, Dict[datetime, Tuple[float, float, float, float, int]]] = {}
+
+    @staticmethod
+    def _session_minute(bar: BarEvent) -> Optional[Tuple[datetime, date]]:
+        ts = bar.timestamp if bar.timestamp.tzinfo else bar.timestamp.replace(tzinfo=_ET)
+        bar_et = ts.astimezone(_ET)
+        if not (_RTH_OPEN <= bar_et.time() < _RTH_CLOSE):
+            return None
+        return ts, bar_et.date()
+
+    def _rebuild(self, sym: str, session_date: date) -> None:
+        mins = self._minutes.get(sym) or {}
+        keys = sorted(k for k in mins if k.astimezone(_ET).date() == session_date)
+        if not keys:
+            return
+        o = mins[keys[0]][0]
+        c = mins[keys[-1]][3]
+        self._in_flight[sym] = DailyBar(
+            symbol=sym,
+            date=session_date,
+            open=o,
+            high=max(mins[k][1] for k in keys),
+            low=min(mins[k][2] for k in keys),
+            close=c,
+            volume=sum(int(mins[k][4]) for k in keys),
+            finalized=False,
+        )
 
     def on_minute_bar(self, bar: BarEvent) -> None:
-        """Ingest a 1-minute bar to update today's running in-flight daily bar."""
+        """Ingest a live 1-minute bar (regular session only, dated by the ET session).
+
+        Pre-market and after-hours bars would otherwise set the daily open/high/low.
+        A live bar for a minute already stored replaces it (latest correction wins).
+        """
+        placed = self._session_minute(bar)
+        if placed is None:
+            return
+        ts, session_date = placed
         sym = bar.symbol.upper()
-        bar_date = bar.timestamp.date()
+        if self._current_session_date is None or session_date != self._current_session_date:
+            self._current_session_date = session_date
+        per = self._minutes.setdefault(sym, {})
+        # Drop minutes from an older session for this symbol.
+        for k in [k for k in per if k.astimezone(_ET).date() != session_date]:
+            del per[k]
+        per[ts] = (bar.open, bar.high, bar.low, bar.close, int(bar.volume))
+        self._rebuild(sym, session_date)
 
-        # Rollover check
-        if self._current_session_date is None or bar_date != self._current_session_date:
-            self._current_session_date = bar_date
+    def merge_backfill(self, bars: Sequence[BarEvent]) -> int:
+        """Fill missing minutes from REST history. Never overwrites a minute already seen live."""
+        added = 0
+        touched: Dict[str, date] = {}
+        for bar in bars:
+            placed = self._session_minute(bar)
+            if placed is None:
+                continue
+            ts, session_date = placed
+            sym = bar.symbol.upper()
+            per = self._minutes.setdefault(sym, {})
+            if ts in per:
+                continue
+            per[ts] = (bar.open, bar.high, bar.low, bar.close, int(bar.volume))
+            touched[sym] = session_date
+            added += 1
+        for sym, session_date in touched.items():
+            self._rebuild(sym, session_date)
+        return added
 
-        if sym not in self._in_flight or self._in_flight[sym].date != bar_date:
-            # First bar of the session: Open is set
-            self._in_flight[sym] = DailyBar(
-                symbol=sym,
-                date=bar_date,
-                open=bar.open,
-                high=bar.high,
-                low=bar.low,
-                close=bar.close,
-                volume=bar.volume,
-                finalized=False,
-            )
-        else:
-            # Update running high, low, close, volume
-            current = self._in_flight[sym]
-            self._in_flight[sym] = DailyBar(
-                symbol=sym,
-                date=bar_date,
-                open=current.open,
-                high=max(current.high, bar.high),
-                low=min(current.low, bar.low),
-                close=bar.close,
-                volume=current.volume + bar.volume,
-                finalized=False,
-            )
+    def coverage(self, symbol: str, session_date: date) -> int:
+        """Number of regular-session minutes held for symbol on session_date."""
+        return sum(1 for k in (self._minutes.get(symbol.upper()) or {}) if k.astimezone(_ET).date() == session_date)
 
     def finalize_daily_bar(self, symbol: str, session_date: date) -> Optional[DailyBar]:
         """Finalize today's bar for symbol at 16:00 ET close and commit to store."""
@@ -600,6 +648,7 @@ class DailyBarAggregator:
         )
         self.store.append_bar(finalized_bar)
         self._in_flight.pop(sym, None)
+        self._minutes.pop(sym, None)
         return finalized_bar
 
     def finalize_all(self, session_date: date) -> List[DailyBar]:
@@ -618,4 +667,5 @@ class DailyBarAggregator:
     def reset_for_new_session(self) -> None:
         """Clear all in-flight accumulators."""
         self._in_flight.clear()
+        self._minutes.clear()
         self._current_session_date = None

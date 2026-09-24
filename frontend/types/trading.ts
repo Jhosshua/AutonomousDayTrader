@@ -19,10 +19,35 @@ export interface MarketContext {
   sizing_multiplier?: number;
 }
 
+export interface StrategyWindow {
+  state: "CAN_TRADE" | "BLOCKED" | "WAITING" | "DONE_FOR_DAY" | "MARKET_CLOSED" | "PAUSED" | string;
+  headline: string;
+  can_open_now: boolean;
+  in_hours: boolean;
+  hours: string;
+  schedule_text: string;
+  next_change_at: string | null;
+  blockers: string[];
+  market_text: string;
+  notes: string[];
+  evaluated_at: string;
+}
+
+export interface StrategyDecisionSummary {
+  signals_today: number;
+  orders_today: number;
+  blocked_today: number;
+  top_block_reason: string | null;
+  top_block_text: string | null;
+  blocked_by_reason: Record<string, number>;
+}
+
 export interface StrategyState {
   id: string;
   name: string;
   status: string;
+  window?: StrategyWindow;
+  decisions?: StrategyDecisionSummary;
   daily_pnl: number;
   win_rate: number;
   trades_count: number;
@@ -219,6 +244,8 @@ export interface SwingEngineState {
   candidates: SwingCandidate[];
   positions: SwingPosition[];
   last_scan_time: string | null;
+  schedule_text?: string;
+  last_close_data_note?: string | null;
 }
 
 export interface TradingState {

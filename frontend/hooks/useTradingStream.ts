@@ -274,6 +274,19 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
         try {
           const { httpBase } = getResolvedEndpoints();
 
+          // Poll strategies so the cards' trading windows stay current
+          try {
+            const stRes = await fetch(`${httpBase}/api/strategies`);
+            if (stRes.ok) {
+              const stData = await stRes.json();
+              if (Array.isArray(stData)) {
+                setState((prev) => ({ ...prev, strategies: stData }));
+              }
+            }
+          } catch {
+            // Ignore strategies poll error
+          }
+
           // Poll account state
           try {
             const accRes = await fetch(`${httpBase}/api/account`);

@@ -355,7 +355,7 @@ class TestDailyBarStorePersistenceRestart:
                     low=p - 1.0,
                     close=p + 1.0,
                     volume=50000,
-                    timestamp=datetime(2026, 9, 23, 9, 31, tzinfo=timezone.utc),
+                    timestamp=datetime(2026, 9, 23, 13, 31, tzinfo=timezone.utc),
                 )
                 aggregator.on_minute_bar(b)
                 fin_bar = aggregator.finalize_daily_bar(sym, d2)

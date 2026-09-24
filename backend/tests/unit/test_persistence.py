@@ -508,3 +508,28 @@ def test_restore_does_not_let_checkpoint_bars_override_the_seed(tmp_path):
     closes = {b.date.isoformat(): b.close for b in new_store.get_all_bars()["MU"]}
     assert closes == {"2026-09-22": 1096.16, "2026-09-23": 1071.88, "2026-09-24": 1053.5}
 
+
+
+def test_decisions_are_optional_in_checkpoint_and_round_trip():
+    from backend.app.core.decisions import DecisionLog
+    account, engine, brackets, risk, flattening, adaptation, strategies = _components()
+    common = dict(
+        account=account, engine=engine, bracket_manager=brackets, risk_engine=risk,
+        flattening_engine=flattening, adaptation_engine=adaptation, strategies=strategies,
+        entry_order_to_bracket={}, bracket_realized_pnl={}, completed_brackets_recorded=set(),
+        latest_market_prices={}, market_history={}, recent_news=[], last_session_date=None,
+        last_vix_print=None, ledger_revision=1,
+    )
+    restore_kw = lambda c: dict(
+        account=c[0], engine=c[1], bracket_manager=c[2], risk_engine=c[3], flattening_engine=c[4],
+        adaptation_engine=c[5], strategies=c[6], entry_order_to_bracket={}, bracket_realized_pnl={},
+        completed_brackets_recorded=set(), latest_market_prices={}, market_history={}, recent_news=[],
+    )
+    # Old checkpoint (no key) still restores.
+    assert restore_runtime_state(capture_runtime_state(**common), **restore_kw(_components()))["decisions"] is None
+    log = DecisionLog()
+    log.record("orb", "AAPL", "BUY", 1.0, "RISK", "x", datetime(2026, 9, 24, 14, 0, tzinfo=timezone.utc))
+    payload = json.loads(json.dumps(capture_runtime_state(**common, decisions=log.to_state())))
+    restored = DecisionLog()
+    restored.load_state(restore_runtime_state(payload, **restore_kw(_components()))["decisions"])
+    assert restored.summary("orb")["blocked_by_reason"] == {"RISK": 1}
