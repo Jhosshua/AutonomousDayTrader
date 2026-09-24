@@ -8,6 +8,7 @@
 - Rejected: a "seed looks continuous" test. It passed on the fake data too (smooth synthetic series), so it proved nothing.
 - Known gap, not fixed: the in-flight daily bar is not checkpointed, so any intraday restart loses that day's open/high/low before the restart (09-24 bar starts at 09:50 ET). Close is right; ATR is slightly understated for that day.
 - `earnings_calendar.json` dates were not verified against a real source.
+- **Replay check of all strategies (09-24)**: replayed the real 09-23 session (4,692 1-min SIP bars, 86 news items) through `backend.app.main` with the fixed code: VWAP 9 trades +$244, Mean Reversion 3 trades +$227, ORB 1 signal (blocked by index trend filter), News Momentum 0 signals (best headline sentiment 0.59 vs 0.60 threshold). Prod had 0 trades that day because of the restore bug. Hour gates verified working (e.g. VWAP denied in MIDDAY_CHOP). The market trend filter blocks more signals than the hour gates do. Swing rules over the real seed: 22 qualifying setups in the last ~65 sessions, mostly July. Strategy cards show ACTIVE all day because `status` only means "not paused"; they do not show the hour windows. Rejected signals are not logged anywhere.
 
 ### 2026-09-24 (Milestone 10): Deep Forensic Audit, Hardened Swing Execution, Concurrent Multi-Day Simulation & Production Cloud Deployment
 - **Forensic Audit & Remediation Scope**:
