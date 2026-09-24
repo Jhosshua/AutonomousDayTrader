@@ -1054,13 +1054,16 @@ def _check_session_boundary(now_dt: datetime) -> None:
 
 
 def _expire_stale_staged_swing_orders(current_time: datetime) -> None:
-    """Purge unexecuted staged swing orders past 09:45 ET so they never maroon or execute days later."""
+    """Purge unexecuted staged swing ENTRY orders past 09:45 ET so a failed open-execution never
+    marooons or fires days later (B3). Staged EXITS are deliberately excluded: an operator can
+    stage "sell at next open" at any time of day, and it must survive until the *next* 09:30 ET
+    open regardless of how long that is from now."""
     if current_time.tzinfo is None:
         current_time = current_time.replace(tzinfo=timezone.utc)
     et_dt = current_time.astimezone(ET_TZ)
     et_t = et_dt.time()
     if time(9, 45, 0) <= et_t < time(16, 0, 0):
-        staged = swing_staged_order_manager.get_staged_orders()
+        staged = swing_staged_order_manager.get_staged_entries()
         for order in staged:
             created = getattr(order, "created_at", None)
             if created:
@@ -1095,6 +1098,16 @@ def _sanitize_for_json(val: Any) -> Any:
     return val
 
 
+def _daily_pnl_fields(equity: float) -> Tuple[float, float]:
+    """Single formula for daily_pnl / daily_pnl_pct (percent points), shared by the WS broadcast
+    and REST /api/account so the two transports can never disagree (B6)."""
+    daily_pnl = round(equity - account.daily_starting_equity, 2)
+    daily_pnl_pct = round(
+        (daily_pnl / account.daily_starting_equity) * 100.0, 2
+    ) if account.daily_starting_equity else 0.0
+    return daily_pnl, daily_pnl_pct
+
+
 async def broadcast_ui_state(force: bool = False) -> None:
     """Broadcast current system state to connected mobile trading UI clients with throttling and timeout protection."""
     global _last_broadcast_time
@@ -1115,10 +1128,7 @@ async def broadcast_ui_state(force: bool = False) -> None:
     active_position_symbols = list(account.positions.keys())
     primary_pos = _serialize_position(active_position_symbols[0], include_chart=True) if active_position_symbols else None
 
-    daily_pnl = round(snapshot.equity - account.daily_starting_equity, 2)
-    daily_pnl_pct = round(
-        (daily_pnl / account.daily_starting_equity) * 100.0, 2
-    ) if account.daily_starting_equity else 0.0
+    daily_pnl, daily_pnl_pct = _daily_pnl_fields(snapshot.equity)
 
     payload = {
         "type": "STATE_UPDATE",
@@ -2239,8 +2249,12 @@ async def get_health() -> Dict[str, Any]:
 
 @app.get("/api/account")
 async def get_account_state() -> Dict[str, Any]:
-    """Current paper trading account state."""
+    """Current paper trading account state.
+
+    B6: `daily_pnl`/`daily_pnl_pct` use the exact same formula as the WS broadcast
+    (`_daily_pnl_fields`) so the REST snapshot and the WS payload can never disagree."""
     snap = account.get_snapshot()
+    daily_pnl, daily_pnl_pct = _daily_pnl_fields(snap.equity)
     return {
         "cash": snap.cash,
         "equity": snap.equity,
@@ -2250,6 +2264,8 @@ async def get_account_state() -> Dict[str, Any]:
         "realized_pnl": snap.realized_pnl,
         "unrealized_pnl": snap.unrealized_pnl,
         "fees_paid": snap.fees_paid,
+        "daily_pnl": daily_pnl,
+        "daily_pnl_pct": daily_pnl_pct,
         "daily_drawdown_dollars": snap.daily_drawdown_dollars,
         "daily_drawdown_pct": snap.daily_drawdown_pct,
         "is_circuit_broken": snap.is_circuit_broken,
@@ -2474,19 +2490,42 @@ class FlattenRequest(BaseModel):
     symbol: Optional[str] = None
 
 
+def _is_swing_arm(obj: Any) -> bool:
+    """True when a position/order/bracket belongs to the swing (multi-day) arm."""
+    return bool(
+        obj is not None
+        and (getattr(obj, "arm", None) == TradingArm.SWING or getattr(obj, "strategy_id", "") == "swing_panic_dip")
+    )
+
+
 async def _execute_manual_flatten(
     target_symbols: List[str], now_dt: datetime, event_key: Optional[str]
 ) -> Dict[str, Any]:
-    flattened = []
+    """Flatten (close) requested symbols. INTRADAY only: swing holdings are never touched by this
+    path (B1) and the per-symbol outcome is reported truthfully instead of assumed."""
+    flattened: List[str] = []
+    skipped: List[Dict[str, str]] = []
+    rejected: List[Dict[str, str]] = []
 
     for sym in target_symbols:
-        # Cancel all working orders in engine.working_orders for this symbol
-        working_for_sym = [oid for oid, o in list(engine.working_orders.items()) if o.symbol == sym]
+        pos = account.positions.get(sym)
+        if _is_swing_arm(pos):
+            skipped.append({"symbol": sym, "reason": "SWING_HOLDING: use the slow-trades exit actions instead"})
+            continue
+
+        # Cancel only INTRADAY working orders for this symbol; swing orders are untouched.
+        working_for_sym = [
+            oid for oid, o in list(engine.working_orders.items())
+            if o.symbol == sym and not _is_swing_arm(o)
+        ]
         for oid in working_for_sym:
             engine.cancel_order(oid, reason="MANUAL_FLATTEN")
 
         bracket_id = bracket_manager.symbol_to_bracket.get(sym)
-        if bracket_id:
+        bracket = bracket_manager.brackets.get(bracket_id) if bracket_id else None
+        if bracket_id and _is_swing_arm(bracket):
+            bracket_id = None  # never cancel/attach a swing bracket from the intraday flatten path
+        elif bracket_id:
             cancel_dir = bracket_manager.cancel_bracket_for_flattening(sym, reason="MANUAL_FLATTEN")
             if cancel_dir and cancel_dir.orders_to_cancel:
                 for oid in cancel_dir.orders_to_cancel:
@@ -2494,16 +2533,27 @@ async def _execute_manual_flatten(
                         engine.cancel_order(oid, reason="MANUAL_FLATTEN")
             bracket_manager.cancel_pending_entry_bracket(sym)
 
-        pos = account.positions.get(sym)
-        if pos:
-            side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
-            order = engine.create_order(
-                symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
-                strategy_id="MANUAL_FLATTEN", parent_order_id=bracket_id,
-            )
-            engine.submit_order(order.id)
-            fills = _flatten_symbol(sym, pos.market_price, now_dt)
-            _reconcile_fills(fills)
+        if pos is None:
+            # No open position for this symbol; any pending working orders/brackets were
+            # already cancelled above. Nothing further to report.
+            continue
+
+        side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
+        order = engine.create_order(
+            symbol=sym, side=side, order_type=OrderType.MARKET, qty=pos.shares,
+            strategy_id="MANUAL_FLATTEN", parent_order_id=bracket_id,
+        )
+        submitted = engine.submit_order(order.id)
+        if submitted.status.value != "ACCEPTED":
+            rejected.append({"symbol": sym, "reason": submitted.reject_reason or "ORDER_REJECTED"})
+            continue
+
+        fills = _flatten_symbol(sym, pos.market_price, now_dt)
+        _reconcile_fills(fills)
+
+        if sym in account.positions:
+            rejected.append({"symbol": sym, "reason": "LIQUIDATION_INCOMPLETE: position is still open"})
+        else:
             flattened.append(sym)
 
     _checkpoint_runtime(
@@ -2511,27 +2561,37 @@ async def _execute_manual_flatten(
         (event_key, "MANUAL_FLATTEN") if event_key else None,
     )
     await broadcast_ui_state(force=True)
-    return {"flattened": flattened, "remaining_positions": len(account.positions)}
+    return {
+        "flattened": flattened,
+        "skipped": skipped,
+        "rejected": rejected,
+        "remaining_positions": len(account.positions),
+    }
 
 
 @app.post("/api/flatten")
 async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]:
-    """Manually flatten a position or all open positions."""
+    """Manually flatten a position or all open INTRADAY positions. Swing (multi-day) holdings
+    are never included here; they close only via the swing exit actions (B1)."""
     now_dt = datetime.now(timezone.utc)
     if req and req.symbol:
         target_symbols = [req.symbol.upper()]
     else:
+        # Include swing symbols here too: _execute_manual_flatten skips them itself and
+        # reports them in "skipped" so the UI/caller sees the true outcome for every
+        # symbol that was in play, rather than having them silently disappear.
         target_symbols = sorted(
-            list(
-                set(account.positions.keys())
-                | {o.symbol.upper() for o in engine.working_orders.values()}
-                | {s.upper() for s in bracket_manager.symbol_to_bracket.keys()}
-            )
+            set(account.positions.keys())
+            | {o.symbol.upper() for o in engine.working_orders.values()}
+            | {s.upper() for s in bracket_manager.symbol_to_bracket.keys()}
         )
     payload = {"target_symbols": target_symbols, "timestamp": now_dt}
     should_process, event_key = _begin_durable_event("MANUAL_FLATTEN", payload)
     if not should_process:
-        return {"flattened": [], "remaining_positions": len(account.positions), "duplicate": True}
+        return {
+            "flattened": [], "skipped": [], "rejected": [],
+            "remaining_positions": len(account.positions), "duplicate": True,
+        }
     return await _execute_manual_flatten(target_symbols, now_dt, event_key)
 
 
@@ -2572,31 +2632,10 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                                 engine.working_orders[oid].stop_price = mod.get("new_stop_price", new_stop)
                     _checkpoint_runtime("MANUAL_TIGHTEN_STOP")
                     await broadcast_ui_state(force=True)
-                elif action == "SWING_EXIT_NEXT_OPEN":
+                elif action in ("SWING_EXIT_NEXT_OPEN", "SWING_EXIT_IMMEDIATE", "SWING_TIGHTEN_STOP"):
                     sym = msg.get("symbol", "").upper()
-                    staged = swing_strategy_engine.stage_manual_exit_next_open(sym)
-                    if staged:
-                        log.info("WebSocket processed SWING_EXIT_NEXT_OPEN for %s", sym)
-                    _checkpoint_runtime("SWING_MANUAL_EXIT_NEXT_OPEN")
-                    await broadcast_ui_state(force=True)
-                elif action == "SWING_EXIT_IMMEDIATE":
-                    sym = msg.get("symbol", "").upper()
-                    exit_res = swing_strategy_engine.execute_immediate_exit(sym)
-                    if exit_res:
-                        log.info("WebSocket processed SWING_EXIT_IMMEDIATE for %s", sym)
-                    _checkpoint_runtime("SWING_MANUAL_EXIT_IMMEDIATE")
-                    await broadcast_ui_state(force=True)
-                elif action == "SWING_TIGHTEN_STOP":
-                    sym = msg.get("symbol", "").upper()
-                    try:
-                        new_stop = float(msg.get("new_stop", 0.0))
-                    except (TypeError, ValueError):
-                        new_stop = 0.0
-                    success = swing_strategy_engine.tighten_stop(sym, new_stop)
-                    if success:
-                        log.info("WebSocket processed SWING_TIGHTEN_STOP for %s to %s", sym, new_stop)
-                    _checkpoint_runtime("SWING_MANUAL_TIGHTEN_STOP")
-                    await broadcast_ui_state(force=True)
+                    new_stop = msg.get("new_stop")
+                    await _execute_swing_action(action, sym, new_stop)
             except Exception as e:
                 log.error(f"Error handling UI action: {e}")
     except WebSocketDisconnect:
@@ -2617,26 +2656,56 @@ class SwingActionRequest(BaseModel):
     new_stop: Optional[float] = None
 
 
-@app.post("/api/swing/action")
-async def post_swing_action(req: SwingActionRequest) -> Dict[str, Any]:
-    """Execute operator action for the swing trading engine."""
-    sym = req.symbol.upper()
-    act = req.action.upper()
+_SWING_ACTIONS = (
+    "EXIT_NEXT_OPEN", "SWING_EXIT_NEXT_OPEN",
+    "EXIT_IMMEDIATE", "SWING_EXIT_IMMEDIATE",
+    "TIGHTEN_STOP", "SWING_TIGHTEN_STOP",
+)
+
+
+async def _execute_swing_action(action: str, sym: str, new_stop: Optional[float]) -> Dict[str, Any]:
+    """Single implementation for an operator swing (multi-day) action. The WS handler and the
+    REST /api/swing/action endpoint both call this so they checkpoint identically (B4) instead of
+    the REST path silently skipping persistence."""
+    act = action.upper()
     if act in ("EXIT_NEXT_OPEN", "SWING_EXIT_NEXT_OPEN"):
         staged = swing_strategy_engine.stage_manual_exit_next_open(sym)
-        await broadcast_ui_state(force=True)
-        return {"status": "ok", "action": "SWING_EXIT_NEXT_OPEN", "symbol": sym, "staged": staged is not None}
+        if staged:
+            log.info("Processed SWING_EXIT_NEXT_OPEN for %s", sym)
+        _checkpoint_runtime("SWING_MANUAL_EXIT_NEXT_OPEN")
+        result: Dict[str, Any] = {"action": "SWING_EXIT_NEXT_OPEN", "symbol": sym, "staged": staged is not None}
     elif act in ("EXIT_IMMEDIATE", "SWING_EXIT_IMMEDIATE"):
         exit_res = swing_strategy_engine.execute_immediate_exit(sym)
-        await broadcast_ui_state(force=True)
-        return {"status": "ok", "action": "SWING_EXIT_IMMEDIATE", "symbol": sym, "result": exit_res}
+        if exit_res:
+            log.info("Processed SWING_EXIT_IMMEDIATE for %s", sym)
+        _checkpoint_runtime("SWING_MANUAL_EXIT_IMMEDIATE")
+        result = {"action": "SWING_EXIT_IMMEDIATE", "symbol": sym, "result": exit_res}
     elif act in ("TIGHTEN_STOP", "SWING_TIGHTEN_STOP"):
-        new_stop = req.new_stop or 0.0
-        success = swing_strategy_engine.tighten_stop(sym, new_stop)
-        await broadcast_ui_state(force=True)
-        return {"status": "ok", "action": "SWING_TIGHTEN_STOP", "symbol": sym, "success": success}
+        try:
+            new_stop_f = float(new_stop) if new_stop is not None else 0.0
+        except (TypeError, ValueError):
+            new_stop_f = 0.0
+        success = swing_strategy_engine.tighten_stop(sym, new_stop_f)
+        if success:
+            log.info("Processed SWING_TIGHTEN_STOP for %s to %s", sym, new_stop_f)
+        _checkpoint_runtime("SWING_MANUAL_TIGHTEN_STOP")
+        result = {"action": "SWING_TIGHTEN_STOP", "symbol": sym, "success": success}
     else:
+        raise ValueError(f"Unknown swing action {action}")
+    await broadcast_ui_state(force=True)
+    return result
+
+
+@app.post("/api/swing/action")
+async def post_swing_action(req: SwingActionRequest) -> Dict[str, Any]:
+    """Execute operator action for the swing trading engine (shares one implementation with the
+    WS handler, B4, so a REST action is checkpointed exactly like a WS action)."""
+    sym = req.symbol.upper()
+    act = req.action.upper()
+    if act not in _SWING_ACTIONS:
         raise HTTPException(status_code=400, detail=f"Unknown swing action {req.action}")
+    result = await _execute_swing_action(act, sym, req.new_stop)
+    return {"status": "ok", **result}
 
 
 

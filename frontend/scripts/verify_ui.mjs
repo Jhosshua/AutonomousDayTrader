@@ -4,9 +4,9 @@ import assert from "node:assert";
 
 const FRONTEND_DIR = path.resolve(import.meta.dirname, "..");
 
-console.log("🔍 Verifying Mobile Trading UI Architecture...");
+console.log("🔍 Verifying plain-language dashboard architecture (2026-09-24 redesign)...");
 
-// 1. Verify file inventory
+// 1. Verify file inventory (post-redesign contract).
 const requiredFiles = [
   "package.json",
   "tsconfig.json",
@@ -16,17 +16,23 @@ const requiredFiles = [
   "app/page.tsx",
   "app/globals.css",
   "types/trading.ts",
+  "lib/plain.ts",
+  "lib/apiBase.ts",
   "hooks/useTradingStream.ts",
-  "components/AmbientBackground.tsx",
+  "hooks/useTodayLedger.ts",
+  "hooks/useActionButton.ts",
+  "hooks/useHealthLimits.ts",
   "components/Header.tsx",
+  "components/BalanceCard.tsx",
+  "components/RightNowCard.tsx",
+  "components/SegmentedModeToggle.tsx",
   "components/StrategyCard.tsx",
   "components/StrategyCarousel.tsx",
-  "components/ActivePositionTray.tsx",
-  "components/LiveChart.tsx",
-  "components/ManualControls.tsx",
+  "components/HoldingNow.tsx",
+  "components/RecentTrades.tsx",
+  "components/SafetyCard.tsx",
   "components/ExecutionLog.tsx",
   "components/TradeHistory.tsx",
-  "components/SegmentedModeToggle.tsx",
   "components/SwingTelemetryBar.tsx",
   "components/SwingCandidateWatchlist.tsx",
   "components/ActiveSwingPositionsTable.tsx",
@@ -40,82 +46,115 @@ for (const file of requiredFiles) {
   console.log(`  ✅ Verified ${file} (${content.length} bytes)`);
 }
 
-// 2. Verify design tokens in tailwind.config.js and globals.css
+// 1b. The old dark-theme-only components must be gone (nothing imports them any more).
+const deletedFiles = [
+  "components/AmbientBackground.tsx",
+  "components/ActivePositionTray.tsx",
+  "components/LiveChart.tsx",
+  "components/ManualControls.tsx",
+];
+for (const file of deletedFiles) {
+  assert(!fs.existsSync(path.join(FRONTEND_DIR, file)), `Old dark-theme component should be deleted: ${file}`);
+}
+console.log("  ✅ Verified old dark-theme-only components were removed");
+
+// 2. Verify the new "muted palette" light theme tokens in tailwind.config.js and globals.css.
 const tailwindConfig = fs.readFileSync(path.join(FRONTEND_DIR, "tailwind.config.js"), "utf8");
-assert(tailwindConfig.includes("#000000"), "Missing true obsidian black token in tailwind config");
-assert(tailwindConfig.includes("#0a0a0c"), "Missing elevated obsidian surface token in tailwind config");
-assert(tailwindConfig.includes("#30d158"), "Missing Apple green token in tailwind config");
-assert(tailwindConfig.includes("#ff453a"), "Missing Apple red token in tailwind config");
-console.log("  ✅ Verified Tailwind design tokens and color palette");
+for (const token of ["#F7F3EC", "#1D1A33", "#5D5A73", "#2E3244", "#2F6B4C", "#8F4424"]) {
+  assert(tailwindConfig.includes(token), `Missing light-theme token ${token} in tailwind config`);
+}
+console.log("  ✅ Verified light 'muted palette' design tokens in tailwind.config.js");
 
 const globalsCss = fs.readFileSync(path.join(FRONTEND_DIR, "app/globals.css"), "utf8");
-assert(globalsCss.includes("backdrop-filter: blur(24px)"), "Missing glassmorphism blur in globals.css");
+assert(globalsCss.includes("prefers-reduced-motion"), "Missing prefers-reduced-motion block in globals.css (F14)");
+assert(globalsCss.includes("@keyframes breathe"), "Missing breathe keyframe in globals.css");
+assert(globalsCss.includes("@keyframes drift"), "Missing drift keyframe in globals.css");
 assert(globalsCss.includes("tabular-nums"), "Missing tabular-nums utility in globals.css");
-console.log("  ✅ Verified CSS glassmorphism & typographic rules");
+console.log("  ✅ Verified reduced-motion block and mockup-matched keyframes");
 
-// 3. Verify spring physics specifications in ActivePositionTray.tsx
-const activeTray = fs.readFileSync(path.join(FRONTEND_DIR, "components/ActivePositionTray.tsx"), "utf8");
-assert(activeTray.includes("stiffness: 350"), "Missing stiffness: 350 in ActivePositionTray spring config");
-assert(activeTray.includes("damping: 32"), "Missing damping: 32 in ActivePositionTray spring config");
-assert(activeTray.includes("onFlattenPosition"), "Missing onFlattenPosition in ActivePositionTray");
-assert(activeTray.includes("onTightenStop"), "Missing onTightenStop in ActivePositionTray");
-console.log("  ✅ Verified tactile spring physics (stiffness: 350, damping: 32)");
+// 3. Fonts: @fontsource npm packages, never next/font/google (F15).
+const pkgJson = JSON.parse(fs.readFileSync(path.join(FRONTEND_DIR, "package.json"), "utf8"));
+assert(pkgJson.dependencies["@fontsource/fraunces"], "Missing @fontsource/fraunces dependency (F15)");
+assert(pkgJson.dependencies["@fontsource/instrument-sans"], "Missing @fontsource/instrument-sans dependency (F15)");
+const layout = fs.readFileSync(path.join(FRONTEND_DIR, "app/layout.tsx"), "utf8");
+assert(layout.includes("@fontsource/fraunces"), "layout.tsx must import @fontsource/fraunces");
+assert(layout.includes("@fontsource/instrument-sans"), "layout.tsx must import @fontsource/instrument-sans");
+assert(!layout.includes('from "next/font'), "layout.tsx must NOT import from next/font (F15)");
+assert(!/maximumScale\s*:/.test(layout), "layout.tsx must not set a maximumScale value (F16)");
+assert(!/userScalable\s*:/.test(layout), "layout.tsx must not set a userScalable value (F16)");
+console.log("  ✅ Verified offline-safe fonts (F15) and pinch-zoom left enabled (F16)");
 
-// 4. Verify WebSocket URL and actions in useTradingStream.ts
+// 4. Verify WebSocket URL and action payloads in useTradingStream.ts are UNCHANGED.
 const streamHook = fs.readFileSync(path.join(FRONTEND_DIR, "hooks/useTradingStream.ts"), "utf8");
 assert(streamHook.includes("ws://127.0.0.1:8005/ws/ui"), "Missing default ws://127.0.0.1:8005/ws/ui in hook");
-assert(streamHook.includes("FLATTEN_POSITION"), "Missing FLATTEN_POSITION action handling");
-assert(streamHook.includes("FLATTEN_ALL"), "Missing FLATTEN_ALL action handling");
-assert(streamHook.includes("TIGHTEN_STOP"), "Missing TIGHTEN_STOP action handling");
-assert(streamHook.includes("SWING_EXIT_NEXT_OPEN"), "Missing SWING_EXIT_NEXT_OPEN action handling");
-assert(streamHook.includes("SWING_EXIT_IMMEDIATE"), "Missing SWING_EXIT_IMMEDIATE action handling");
-assert(streamHook.includes("SWING_TIGHTEN_STOP"), "Missing SWING_TIGHTEN_STOP action handling");
-console.log("  ✅ Verified WebSocket client actions & port 8005 synchronization (including swing actions)");
+for (const action of [
+  "FLATTEN_POSITION",
+  "FLATTEN_ALL",
+  "TIGHTEN_STOP",
+  "SWING_EXIT_NEXT_OPEN",
+  "SWING_EXIT_IMMEDIATE",
+  "SWING_TIGHTEN_STOP",
+]) {
+  assert(streamHook.includes(action), `Missing ${action} action handling in useTradingStream.ts`);
+}
+console.log("  ✅ Verified WebSocket action payloads are unchanged (port 8005, all 6 actions)");
 
-// 5. Verify 4 strategies in StrategyCarousel.tsx & StrategyCard.tsx
-const carousel = fs.readFileSync(path.join(FRONTEND_DIR, "components/StrategyCarousel.tsx"), "utf8");
+// 5. Never use window.confirm/alert/prompt anywhere in components/hooks/app.
+const scannedDirs = ["app", "components", "hooks", "lib"];
+for (const dir of scannedDirs) {
+  const full = path.join(FRONTEND_DIR, dir);
+  if (!fs.existsSync(full)) continue;
+  for (const file of fs.readdirSync(full)) {
+    if (!file.endsWith(".ts") && !file.endsWith(".tsx")) continue;
+    const content = fs.readFileSync(path.join(full, file), "utf8");
+    assert(!/window\.(confirm|alert|prompt)\(/.test(content), `${dir}/${file} must not use window.confirm/alert/prompt`);
+  }
+}
+console.log("  ✅ Verified no window.confirm/alert/prompt usage");
+
+// 6. Verify data-testids are present on their equivalent new elements (rule 6 of the plan).
+const testidLocations = {
+  "risk-telemetry": "components/SafetyCard.tsx",
+  "segmented-mode-toggle": "components/SegmentedModeToggle.tsx",
+  "mode-tab-intraday": "components/SegmentedModeToggle.tsx",
+  "mode-tab-swing": "components/SegmentedModeToggle.tsx",
+  "strategy-window": "components/StrategyCard.tsx",
+  "strategy-decisions": "components/StrategyCard.tsx",
+  "window-badge": "components/StrategyCard.tsx",
+  "swing-telemetry": "components/SwingTelemetryBar.tsx",
+  "swing-candidate-watchlist": "components/SwingCandidateWatchlist.tsx",
+  "swing-schedule": "components/SwingTelemetryBar.tsx",
+  "active-swing-positions": "components/ActiveSwingPositionsTable.tsx",
+};
+for (const [testid, file] of Object.entries(testidLocations)) {
+  const content = fs.readFileSync(path.join(FRONTEND_DIR, file), "utf8");
+  assert(content.includes(`data-testid="${testid}"`), `Missing data-testid="${testid}" in ${file}`);
+}
+console.log("  ✅ Verified all required data-testids are present on their new elements");
+
+// 7. Verify all 4 strategy ids are themed in lib/plain.ts and referenced by StrategyCard.tsx.
+const plainLib = fs.readFileSync(path.join(FRONTEND_DIR, "lib/plain.ts"), "utf8");
+for (const id of ["orb", "vwap_pullback", "news_momentum", "mean_reversion"]) {
+  assert(plainLib.includes(`${id}:`), `Missing strategy theme for ${id} in lib/plain.ts`);
+}
 const card = fs.readFileSync(path.join(FRONTEND_DIR, "components/StrategyCard.tsx"), "utf8");
-assert(card.includes("orb"), "Missing ORB strategy styling");
-assert(card.includes("vwap_pullback"), "Missing VWAP Pullback strategy styling");
-assert(card.includes("news_momentum"), "Missing News Momentum strategy styling");
-assert(card.includes("mean_reversion"), "Missing Mean Reversion strategy styling");
-console.log("  ✅ Verified all 4 strategy cards (ORB, VWAP, News, Mean Reversion)");
+assert(card.includes("strategyTheme"), "StrategyCard.tsx must use strategyTheme() from lib/plain.ts");
+console.log("  ✅ Verified all 4 strategy themes (Morning Breakout, Ride the Trend, Big News, Snap Back)");
 
-// 6. Verify Swing UI Components specifications
-const modeToggle = fs.readFileSync(path.join(FRONTEND_DIR, "components/SegmentedModeToggle.tsx"), "utf8");
-assert(modeToggle.includes("Intraday Day Trader"), "Missing Intraday mode label");
-assert(modeToggle.includes("Swing Mean-Reversion"), "Missing Swing mode label");
-assert(modeToggle.includes("layoutId"), "Missing Framer Motion layoutId for fluid sliding pill");
+// 8. Verify plain-language copy replaced jargon in the swing and safety components (F10).
+const safetyCard = fs.readFileSync(path.join(FRONTEND_DIR, "components/SafetyCard.tsx"), "utf8");
+assert(safetyCard.includes("Close all quick trades now"), "SafetyCard must use the B1 button copy 'Close all quick trades now'");
+assert(!safetyCard.includes("Stop everything"), "SafetyCard must not use the old 'Stop everything' copy (B1 changed the semantics)");
+console.log("  ✅ Verified B1 button copy change (never 'stop everything')");
 
-const swingTelemetry = fs.readFileSync(path.join(FRONTEND_DIR, "components/SwingTelemetryBar.tsx"), "utf8");
-assert(swingTelemetry.includes("2-Day Panic Dip"), "Missing 2-Day Panic Dip strategy title");
-assert(swingTelemetry.includes("OVERNIGHT EXEMPT"), "Missing OVERNIGHT EXEMPT badge");
-assert(swingTelemetry.includes("Slot Utilization"), "Missing Slot Utilization telemetry");
+// 9. Verify no horizontal-scroll-risk full-bleed elements remain from the old design.
+const globals = globalsCss;
+assert(globals.includes("overflow-x: hidden"), "globals.css must keep overflow-x: hidden on body");
+console.log("  ✅ Verified overflow-x guard on body");
 
-const candidateWatchlist = fs.readFileSync(path.join(FRONTEND_DIR, "components/SwingCandidateWatchlist.tsx"), "utf8");
-assert(candidateWatchlist.includes("LRCX"), "Missing LRCX candidate symbol");
-assert(candidateWatchlist.includes("KLAC"), "Missing KLAC candidate symbol");
-assert(candidateWatchlist.includes("MU"), "Missing MU candidate symbol");
-assert(candidateWatchlist.includes("AMD"), "Missing AMD candidate symbol");
-assert(candidateWatchlist.includes("GS"), "Missing GS candidate symbol");
-assert(candidateWatchlist.includes("Rule 1: 200 SMA"), "Missing 200 SMA floor check");
-assert(candidateWatchlist.includes("Rule 2: 60d RS vs QQQ"), "Missing 60d RS check");
-assert(candidateWatchlist.includes("Rule 3: RSI(2) Dip"), "Missing RSI(2) dip check");
-assert(candidateWatchlist.includes("Rule 4: Earnings"), "Missing Earnings check");
-
-const activeSwingTable = fs.readFileSync(path.join(FRONTEND_DIR, "components/ActiveSwingPositionsTable.tsx"), "utf8");
-assert(activeSwingTable.includes("2.5x ATR Hard Stop"), "Missing 2.5x ATR stop line");
-assert(activeSwingTable.includes("Holding Day Counter"), "Missing visual holding day counter");
-assert(activeSwingTable.includes("Exit Rule Triggers"), "Missing exit rule triggers");
-assert(activeSwingTable.includes("safeFixed"), "Missing safeFixed in ActiveSwingPositionsTable");
-assert(activeSwingTable.includes("safeLocale"), "Missing safeLocale in ActiveSwingPositionsTable");
-assert(activeSwingTable.includes("Entry ATR"), "Missing Entry ATR in ActiveSwingPositionsTable");
-console.log("  ✅ Verified Swing Trading UI components (SegmentedToggle, Telemetry, Watchlist, ActiveTable with safe formatting)");
-
-// 7. Verify safe UI port 3005 in package.json
-const pkgJson = JSON.parse(fs.readFileSync(path.join(FRONTEND_DIR, "package.json"), "utf8"));
+// 10. Verify safe UI port 3005 in package.json (unchanged infra contract).
 assert(pkgJson.scripts.dev.includes("3005"), "dev script must run on safe port 3005");
 assert(pkgJson.scripts.start.includes("3005"), "start script must run on safe port 3005");
 console.log("  ✅ Verified UI safe port 3005 allocation (avoiding host port 3000 collision)");
 
-console.log("\n🎉 All Trading UI architectural checks PASSED!");
+console.log("\n🎉 All plain-language dashboard architectural checks PASSED!");

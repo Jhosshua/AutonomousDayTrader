@@ -390,3 +390,21 @@ Plan: `PLAN_2026_09_24_operator_windows.md` (Codex attacked it: 27 findings, tri
 - **In progress**: None (Milestone 10 certified and deployed).
 - **Next session priorities**: Observe live market open session behavior with dual-arm execution and durable persistence.
 
+
+### 2026-09-24 (Milestone 11): Plain-language dashboard redesign + 6 operator-action bug fixes
+- **Worked on**: User found the dark dashboard overwhelming and full of jargon. Designed on a canvas (https://claude.ai/artifact/WsrJnzoVVnyLRckDDLLobz), user rejected the first bright palette as jarring and approved a muted one. Plan `PLAN_2026_09_24_plain_language_ui.md` was attacked by Codex (1 P0 + 28 P1, all accepted), built by a Sonnet subagent, reviewed and fixed by Claude, deployed mid-session.
+- **Completed**: New light dashboard (mockups in `docs/ui_redesign_2026_09_24/`). Backend fixes, each with a red-then-green test in `backend/tests/test_revision1_bug_fixes.py`:
+  - B1 FLATTEN_ALL / FLATTEN_POSITION used to send orders for SWING holdings (rejected by risk) and still report them as "flattened". Now intraday only; response has `flattened`/`skipped`/`rejected`.
+  - B2 swing SET stop could LOWER the stop. Now requires `current < new < market`.
+  - B3 "Sell at next open" staged exits were purged ~60 s later by the 09:45 stale-order sweep. Sweep now purges staged ENTRIES only.
+  - B4 REST `/api/swing/action` did not checkpoint; now shares `_execute_swing_action` with the WS path.
+  - B5 `strategy_window` returns `ranges` and `trading_day` for the hours bar.
+  - B6 REST `/api/account` now returns `daily_pnl`/`daily_pnl_pct` from the same `_daily_pnl_fields()` as the WS broadcast.
+- **Decisions**:
+  - Strategy cards show per-strategy results from the durable ledger, not `strategy.trades_count/daily_pnl`. Why: on 09-24 the counters showed ORB 0 trades while the ledger had ORB -$112.04. Rejected: trusting the counters.
+  - The balance chart is "Finished trades today" (cumulative realized P&L), not a balance history. Why: no timestamped equity series exists; drawing one would be invented data.
+  - "Stop everything" became "Close all quick trades now". Why: the endpoint never halted anything and cannot touch swing holdings. Rejected: adding a durable halt (out of scope, not asked).
+  - Fonts via `@fontsource` npm, not `next/font/google`. Why: Docker build must not depend on Google at build time.
+- **Tests**: backend 843 passed; `verify_ui_redesign.py` 52/52 (Playwright route + WS mocks from real API snapshots: idle, busy, >100 trades, recovered session, breaker, feed down, reconnecting, reduced motion, all 6 action payloads); `verify_ui.mjs` passes.
+- **Open**: why the strategy counters drifted from the ledger is still unexplained (display no longer depends on them). `/api/trades?range=today` filters by entry session_date, so a trade closed today but entered yesterday is not in "today".
+- **Next session priorities**: find the counter drift root cause; watch the first full session on the new UI.

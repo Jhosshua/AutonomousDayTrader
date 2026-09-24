@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Day Trader, phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#F7F3EC;font-family:'Instrument Sans',system-ui,sans-serif;color:#1D1A33}
+a{color:#4A5190}a:hover{color:#353B70}
+button{font-family:inherit;cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes draw{from{stroke-dashoffset:900}to{stroke-dashoffset:0}}
+@keyframes ping{0%{transform:scale(1);opacity:.55}100%{transform:scale(2.8);opacity:0}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-20px) scale(1.15)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-30px,20px) scale(.92)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
+.draw{stroke-dasharray:900;animation:draw 2s cubic-bezier(.4,0,.2,1) .35s both}
+.ping{animation:ping 1.8s ease-out infinite}
+.grow{transform-origin:left center;animation:grow 1.1s cubic-bezier(.2,.7,.2,1) .4s both}
+.breathe{animation:breathe 2.4s ease-in-out infinite}
+.fadein{animation:fadein .5s ease both}
+.drift{animation:drift 14s ease-in-out infinite}
+.drift2{animation:drift2 17s ease-in-out infinite}
+.bob{animation:bob 3.2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.rise,.draw,.ping,.grow,.breathe,.fadein,.drift,.drift2,.bob{animation:none}}
+</style>
+</helmet>
+<div style="{{rootStyle}}">
+<div class="drift" style="position: absolute; top: -180px; left: -160px; width: 420px; height: 420px; border-radius: 50%; background: #F3E1CF; filter: blur(80px); opacity: 0.8"></div>
+<div class="drift2" style="position: absolute; top: -120px; right: -200px; width: 420px; height: 420px; border-radius: 50%; background: #E2E1F1; filter: blur(90px); opacity: 0.85"></div>
+
+<header class="rise" style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="display: flex; align-items: center; gap: 10px">
+<div class="bob" style="width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(135deg, #D98B5F, #C47A88 55%, #8189C4); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 18px -8px rgba(46,50,68,.3)">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="11" rx="3"></rect><path d="M12 8V4"></path><circle cx="12" cy="3.5" r="1"></circle><circle cx="9" cy="13" r="1.2"></circle><circle cx="15" cy="13" r="1.2"></circle></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 1px">
+<div style="font-family: Fraunces, Georgia, serif; font-size: 21px; font-weight: 600">Day Trader</div>
+<div style="font-size: 13px; color: #5D5A73">Pretend money, practice account</div>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: rgba(255,255,255,0.85); border: 1px solid #EFE4D2; font-size: 13px; font-weight: 600; color: #3F7D5C">
+<span style="position: relative; width: 9px; height: 9px; display: inline-block">
+<span class="ping" style="position: absolute; inset: 0; border-radius: 50%; background: #5E9A7A"></span>
+<span style="position: absolute; inset: 0; border-radius: 50%; background: #5E9A7A"></span>
+</span>
+Running
+</div>
+</header>
+
+<section class="rise" style="position: relative; animation-delay: 80ms; background: #FFFFFF; border: 1px solid #EFE4D2; border-radius: 26px; padding: 22px 20px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 14px; color: #5D5A73">Your balance</div>
+<div style="font-family: Fraunces, Georgia, serif; font-size: 46px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums">$49,881.33</div>
+<div style="align-self: flex-start; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #F6E3DA; color: #A6522F; font-size: 14px; font-weight: 600">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"></path><path d="M6 13l6 6 6-6"></path></svg>
+Down $118.69 today
+</div>
+<div style="position: relative; height: 112px; margin-top: 4px">
+<svg width="100%" height="104" viewBox="0 0 560 150" preserveAspectRatio="none" aria-label="Chart of today's balance: started at $50,000, now $119 lower">
+<defs>
+<linearGradient id="mLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6E9C82"></stop><stop offset="0.25" stop-color="#8189C4"></stop><stop offset="0.45" stop-color="#C47A88"></stop></linearGradient>
+<linearGradient id="mFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8189C4" stop-opacity="0.3"></stop><stop offset="1" stop-color="#C47A88" stop-opacity="0"></stop></linearGradient>
+</defs>
+<polygon class="fadein" style="animation-delay: 1.2s" points="0,34 36,34 36,75 52,75 52,53 90,53 90,26 115,26 115,94 129,94 129,76 174,76 174,112 218,112 218,58 234,58 234,92 253,92 253,106 253,150 0,150" fill="url(#mFill)"></polygon>
+<line x1="0" y1="34" x2="560" y2="34" stroke="#CFC6B3" stroke-width="2" stroke-dasharray="6 7"></line>
+<polyline class="draw" points="0,34 36,34 36,75 52,75 52,53 90,53 90,26 115,26 115,94 129,94 129,76 174,76 174,112 218,112 218,58 234,58 234,92 253,92 253,106" fill="none" stroke="url(#mLine)" stroke-width="4.5" stroke-linejoin="round"></polyline>
+<line x1="253" y1="106" x2="560" y2="106" stroke="#CFC6B3" stroke-width="2" stroke-dasharray="3 8"></line>
+<circle cx="253" cy="106" r="10" fill="#C47A88"></circle>
+</svg>
+<div style="position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; font-size: 12px; color: #5D5A73"><span>9:30 AM</span><span style="color: #7A3343; font-weight: 600">Now 12:26</span><span>4:00 PM</span></div>
+</div>
+</section>
+
+<section class="rise" style="position: relative; overflow: hidden; animation-delay: 160ms; background: #2E3244; color: #FFFFFF; border-radius: 26px; padding: 22px 20px; display: flex; flex-direction: column; gap: 16px">
+<div class="drift" style="position: absolute; top: -100px; right: -80px; width: 240px; height: 240px; border-radius: 50%; background: {{orbA}}; filter: blur(70px); opacity: 0.55"></div>
+<div class="drift2" style="position: absolute; bottom: -110px; left: -60px; width: 260px; height: 260px; border-radius: 50%; background: {{orbB}}; filter: blur(70px); opacity: 0.45"></div>
+<div style="position: relative; font-size: 14px; color: #C9CCD9">Right now</div>
+<div style="position: relative; font-family: Fraunces, Georgia, serif; font-size: 24px; line-height: 1.25">{{nowText}}</div>
+<div style="position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<div style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #C9CCD9">Trades</span><span style="font-size: 23px; font-weight: 600; color: #F2C9A0">8</span></div>
+<div style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #C9CCD9">Won / lost</span><span style="font-size: 23px; font-weight: 600"><span style="color: #A9D3BC">4</span> / <span style="color: #E8B09E">4</span></span><div style="height: 5px; border-radius: 3px; background: #E8B09E; overflow: hidden"><div class="grow" style="width: 50%; height: 100%; background: #A9D3BC"></div></div></div>
+<div style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #C9CCD9">Sells all in</span><span style="font-size: 23px; font-weight: 600; color: #BCCBEA">3h 29m</span></div>
+</div>
+</section>
+
+<nav class="rise" style="position: relative; animation-delay: 220ms; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 5px; border-radius: 999px; background: rgba(255,255,255,0.8); border: 1px solid #EFE4D2">
+<button onClick="{{goToday}}" style="{{todayTabStyle}}">Quick trades</button>
+<button onClick="{{goSlow}}" style="{{slowTabStyle}}">Slow trades</button>
+</nav>
+
+<sc-if value="{{isToday}}" hint-placeholder-val="{{ true }}">
+<div class="fadein" style="position: relative; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 0">
+<h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 25px; font-weight: 600">The 4 ways it trades</h2>
+<div style="font-size: 14px; color: #5D5A73">Colored bar = hours it may trade. Dark line = now.</div>
+</div>
+<sc-for list="{{playbooks}}" as="p" hint-placeholder-count="4">
+<article class="rise" style="{{p.cardStyle}}">
+<div style="{{p.bandStyle}}">
+<div class="bob" style="flex-shrink: 0; width: 46px; height: 46px; border-radius: 15px; background: {{p.bar}}; border: 0; display: flex; align-items: center; justify-content: center">
+<sc-if value="{{p.isOrb}}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18h18"></path><path d="M7 18a5 5 0 0 1 10 0"></path><path d="M12 6v3"></path><path d="M4.9 10.9l2 2"></path><path d="M19.1 10.9l-2 2"></path></svg></sc-if>
+<sc-if value="{{p.isVwap}}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2 5-1"></path><path d="M2 17c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2 5-1"></path><path d="M16 5l4 0 0 4"></path><path d="M13 8l7-3"></path></svg></sc-if>
+<sc-if value="{{p.isNews}}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"></path></svg></sc-if>
+<sc-if value="{{p.isSnap}}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h11a5 5 0 0 1 0 10H8"></path><path d="M8 3L4 7l4 4"></path></svg></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0; flex-grow: 1">
+<h3 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 22px; font-weight: 600; color: {{p.ink}}">{{p.name}}</h3>
+<span style="{{p.chipStyle}}"><span style="{{p.dotStyle}}"></span>{{p.status}}</span>
+</div>
+</div>
+<div style="padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 14px">
+<p style="margin: 0; font-size: 15px; line-height: 1.45; color: #3E3A57">{{p.what}}</p>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<div style="{{p.trackStyle}}">
+<sc-for list="{{p.segs}}" as="s" hint-placeholder-count="1"><div class="grow" style="{{s.style}}"></div></sc-for>
+<div class="breathe" style="position: absolute; left: 45.1%; top: -5px; width: 3px; height: 22px; background: #1D1A33; border-radius: 2px"></div>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 12px; color: #5D5A73"><span>9:30</span><span>noon</span><span>4 PM</span></div>
+</div>
+<div style="{{p.todayStyle}}"><span>{{p.today}}</span><span style="{{p.pnlStyle}}">{{p.pnl}}</span></div>
+</div>
+</article>
+</sc-for>
+
+<section class="rise" style="background: #FFFFFF; border: 1px solid #EFE4D2; border-radius: 24px; padding: 20px; display: flex; flex-direction: column">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px">
+<h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 23px; font-weight: 600">What it did today</h2>
+<a href="#" style="font-size: 14px; font-weight: 600">See all</a>
+</div>
+<sc-for list="{{trades}}" as="t" hint-placeholder-count="6">
+<div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid #F5EEE2">
+<div style="{{t.iconStyle}}">{{t.arrow}}</div>
+<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0">
+<div style="font-size: 15px; font-weight: 600">{{t.company}} <span style="font-size: 12px; font-weight: 500; color: #5D5A73">{{t.time}}</span></div>
+<div><span style="{{t.tagStyle}}">{{t.book}}</span></div>
+</div>
+<div style="{{t.resStyle}}">{{t.result}}</div>
+</div>
+</sc-for>
+</section>
+
+<section class="rise" style="background: #E9EFE8; border: 1px solid #D5E2D6; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="width: 36px; height: 36px; border-radius: 12px; background: #3F7D5C; display: flex; align-items: center; justify-content: center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path><path d="M9 12l2 2 4-4"></path></svg>
+</div>
+<h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 23px; font-weight: 600">Safety rules</h2>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 14px"><span>Daily loss limit used</span><span style="font-weight: 600">$119 of $1,500</span></div>
+<div style="height: 12px; border-radius: 6px; background: rgba(255,255,255,0.85); overflow: hidden"><div class="grow" style="width: 7.9%; height: 100%; background: linear-gradient(90deg, #5E9A7A, #E3B77F); border-radius: 6px"></div></div>
+<div style="font-size: 14px; line-height: 1.45; color: #2F5A4B">Hit $1,500 and it stops for the day. Quick trades are always sold by 3:55 PM. It risks about $500 per trade.</div>
+<button style="min-height: 52px; border-radius: 16px; border: 0; background: #A9553A; color: #FFFFFF; font-size: 16px; font-weight: 600; box-shadow: 0 10px 22px -12px rgba(169,85,58,.45)">Stop everything and sell now</button>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{isSlow}}" hint-placeholder-val="{{ false }}">
+<div class="fadein" style="position: relative; display: flex; flex-direction: column; gap: 16px">
+<section class="rise" style="background: #E7E8F2; border: 1px solid #D9DCEB; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 14px; color: #4A5190; font-weight: 600">How slow trades work</div>
+<div style="font-family: Fraunces, Georgia, serif; font-size: 22px; line-height: 1.3; color: #2E3244">It buys strong companies right after a sudden 2-day drop, then sells when they bounce back. Usually within a week.</div>
+</section>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<div class="rise" style="border: 1.5px dashed #A3A8D3; background: rgba(238,234,255,0.6); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 13px; color: #3E4478; font-weight: 600">Spot 1</span><span style="font-size: 17px; font-weight: 600">Empty</span><span style="font-size: 13px; color: #5D5A73">up to $25,000</span></div>
+<div class="rise" style="animation-delay: 60ms; border: 1.5px dashed #A3A8D3; background: rgba(238,234,255,0.6); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 13px; color: #3E4478; font-weight: 600">Spot 2</span><span style="font-size: 17px; font-weight: 600">Empty</span><span style="font-size: 13px; color: #5D5A73">up to $25,000</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 0">
+<h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-size: 25px; font-weight: 600">Companies it is watching</h2>
+<div style="font-size: 14px; color: #5D5A73">It buys only when all 4 checks turn green.</div>
+</div>
+<sc-for list="{{candidates}}" as="c" hint-placeholder-count="4">
+<article class="rise" style="{{c.cardStyle}}">
+<div style="{{c.bandStyle}}"></div>
+<div style="padding: 0 20px 20px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-family: Fraunces, Georgia, serif; font-size: 21px; font-weight: 600">{{c.company}}</span><span style="font-size: 13px; color: #5D5A73">{{c.ticker}} · {{c.price}}</span></div>
+<span style="{{c.scoreStyle}}">{{c.passed}} of 4</span>
+</div>
+<div style="height: 8px; border-radius: 4px; background: #F3ECDF; overflow: hidden"><div class="grow" style="{{c.barStyle}}"></div></div>
+<sc-for list="{{c.checks}}" as="k" hint-placeholder-count="4">
+<div style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.4">
+<span style="{{k.iconStyle}}">{{k.mark}}</span>
+<span style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 600">{{k.label}}</span><span style="color: #5D5A73">{{k.detail}}</span></span>
+</div>
+</sc-for>
+</div>
+</article>
+</sc-for>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startTab":{"editor":"enum","options":["today","slow"],"default":"today"},"rootHeight":{"editor":null,"default":3420},"$preview":{"width":390,"height":3420}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: null }; }
+  renderVals() {
+    var tab = this.state.tab || this.props.startTab || 'today';
+    var hgt = this.props.rootHeight || 3420;
+    var hue = {
+      orb: { band: '#F4E0CF', ink: '#7A3E1D', tint: '#FAF0E6', bar: '#D98B5F', track: '#F2E3D5' },
+      vwap: { band: '#DCE8DE', ink: '#2F5A45', tint: '#EDF3EE', bar: '#6E9C82', track: '#DDE9E0' },
+      news: { band: '#F1DDDF', ink: '#7A3343', tint: '#F7EBED', bar: '#C47A88', track: '#EFDFE2' },
+      snap: { band: '#E0E1F0', ink: '#3E4478', tint: '#EEEFF7', bar: '#8189C4', track: '#E2E3F1' }
+    };
+    var mk = function (o, i) {
+      var h = hue[o.id];
+      var rest = o.tone === 'rest';
+      var pnlColor = o.pnlSign > 0 ? '#3F7D5C' : (o.pnlSign < 0 ? '#A6522F' : '#5D5A73');
+      return Object.assign({}, o, {
+        ink: h.ink, bar: h.bar, isOrb: o.id === 'orb', isVwap: o.id === 'vwap', isNews: o.id === 'news', isSnap: o.id === 'snap',
+        cardStyle: 'animation-delay: ' + (260 + i * 80) + 'ms; background: #FFFFFF; border: 1px solid #EFE4D2; border-radius: 24px; overflow: hidden; display: flex; flex-direction: column',
+        bandStyle: 'background: ' + h.band + '; padding: 16px 18px; display: flex; align-items: center; gap: 14px' + (rest ? '; filter: saturate(0.55) brightness(1.03)' : ''),
+        chipStyle: 'align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 600; background: #FFFFFF; color: ' + h.ink,
+        dotStyle: 'width: 8px; height: 8px; border-radius: 50%; background: ' + (rest ? '#A7A2B8' : h.bar) + (o.tone === 'live' ? '; animation: breathe 2.4s ease-in-out infinite' : ''),
+        trackStyle: 'position: relative; height: 12px; border-radius: 6px; background: ' + h.track,
+        todayStyle: 'display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.4; color: #3E3A57; padding: 12px 14px; border-radius: 14px; background: ' + h.tint,
+        pnlStyle: 'flex-shrink: 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: ' + pnlColor,
+        segs: o.segs.map(function (s) { return { style: 'position: absolute; top: 0; bottom: 0; left: ' + s[0] + '%; width: ' + s[1] + '%; border-radius: 6px; background: ' + h.bar + (rest ? '; opacity: 0.5' : '') }; })
+      });
+    };
+    var playbooks = [
+      { id: 'orb', name: 'Morning Breakout', tone: 'rest', status: 'Done for today', pnl: '-$112.04', pnlSign: -1, what: 'Watches the first few minutes of the day. If a stock then shoots past that range, it jumps in.', segs: [[0, 30.8]], today: '1 trade today. Back tomorrow 9:30 AM.' },
+      { id: 'vwap', name: 'Ride the Trend', tone: 'wait', status: 'Back at 2:00 PM', pnl: '+$82.99', pnlSign: 1, what: 'When a stock moves steadily one way, it waits for a small dip, then joins the ride.', segs: [[0, 30.8], [69.2, 26.9]], today: '6 trades today. Skips the slow midday.' },
+      { id: 'news', name: 'Big News', tone: 'live', status: 'Watching now', pnl: '-$68.30', pnlSign: -1, what: 'Jumps in when a company gets very big news and lots of people rush to trade it.', segs: [[0, 96.2]], today: '1 trade today. Rare on purpose.' },
+      { id: 'snap', name: 'Snap Back', tone: 'live', status: 'Watching now', pnl: '$0', pnlSign: 0, what: 'Bets that a stock that ran too far, too fast will bounce back a little.', segs: [[7.7, 88.5]], today: 'Skipped 7 chances. Market is rising, so buys only.' }
+    ].map(mk);
+    var names = { orb: 'Morning Breakout', vwap: 'Ride the Trend', news: 'Big News', snap: 'Snap Back' };
+    var tr = function (time, company, dir, won, amt, book) {
+      var up = dir === 'rise';
+      var h = hue[book];
+      return {
+        time: time, company: company, arrow: up ? '↑' : '↓', book: names[book] + (up ? ' · bet up' : ' · bet down'),
+        result: (won ? '+$' : '-$') + amt,
+        iconStyle: 'width: 40px; height: 40px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; color: ' + h.ink + '; background: ' + h.track,
+        tagStyle: 'font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: ' + h.tint + '; color: ' + h.ink,
+        resStyle: 'font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 5px 10px; border-radius: 999px; background: ' + (won ? '#E4EFE7' : '#F6E6DE') + '; color: ' + (won ? '#3F7D5C' : '#A6522F')
+      };
+    };
+    var trades = [
+      tr('12:13 PM', 'Apple', 'fall', false, '57.37', 'vwap'),
+      tr('12:02 PM', 'AMD', 'fall', true, '89.35', 'vwap'),
+      tr('11:31 AM', 'Palantir', 'fall', false, '59.92', 'vwap'),
+      tr('11:00 AM', 'Nvidia', 'fall', true, '29.55', 'vwap'),
+      tr('10:50 AM', 'Apple', 'fall', false, '112.04', 'orb'),
+      tr('10:33 AM', 'Palantir', 'rise', true, '44.30', 'vwap')
+    ];
+    var ck = function (ok, label, detail) {
+      return { mark: ok ? '✓' : '·', label: label, detail: detail, iconStyle: 'flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: ' + (ok ? '#5E9A7A' : '#F3ECDF') + '; color: ' + (ok ? '#FFFFFF' : '#5D5A73') };
+    };
+    var bands = ['linear-gradient(90deg, #8FB8A0, #7E9CC8)', 'linear-gradient(90deg, #7E9CC8, #8189C4)', 'linear-gradient(90deg, #8189C4, #A884B5)', 'linear-gradient(90deg, #A884B5, #D8A0A8)'];
+    var cand = function (company, ticker, price, checks, i) {
+      var n = checks.filter(function (c) { return c.mark === '✓'; }).length;
+      return { company: company, ticker: ticker, price: price, checks: checks, passed: n,
+        cardStyle: 'animation-delay: ' + (120 + i * 80) + 'ms; background: #FFFFFF; border: 1px solid #EFE4D2; border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; gap: 18px',
+        bandStyle: 'height: 10px; background: ' + bands[i],
+        scoreStyle: 'font-size: 14px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: ' + (n >= 3 ? '#E4EFE7' : '#EEEFF7') + '; color: ' + (n >= 3 ? '#3F7D5C' : '#3E4478'),
+        barStyle: 'height: 100%; border-radius: 4px; background: linear-gradient(90deg, #5E9A7A, #7E9CC8); width: ' + (n * 25) + '%' };
+    };
+    var candidates = [
+      cand('AMD', 'AMD', '$614.61', [ck(true, 'Long-term uptrend', 'Yes, well above its usual price'), ck(true, 'Beating the market', 'Up 13.9% vs market 2.5% (2 months)'), ck(false, 'Had a sudden drop', 'Not yet, it is still climbing'), ck(true, 'No earnings report soon', 'Next one Oct 27')], 0),
+      cand('Micron', 'MU', '$1,071.88', [ck(true, 'Long-term uptrend', 'Yes'), ck(false, 'Beating the market', 'Down 6.4% vs market up 2.5%'), ck(false, 'Had a sudden drop', 'Not yet'), ck(true, 'No earnings report soon', 'Next one Sep 30')], 1),
+      cand('Lam Research', 'LRCX', '$307.28', [ck(true, 'Long-term uptrend', 'Yes'), ck(false, 'Beating the market', 'Down 25.1% vs market up 2.5%'), ck(false, 'Had a sudden drop', 'Not yet'), ck(true, 'No earnings report soon', 'Next one Oct 21')], 2),
+      cand('KLA', 'KLAC', '$187.86', [ck(true, 'Long-term uptrend', 'Yes'), ck(false, 'Beating the market', 'Down 32.4% vs market up 2.5%'), ck(false, 'Had a sudden drop', 'Not yet'), ck(true, 'No earnings report soon', 'Next one Oct 29')], 3)
+    ];
+    var tabStyle = function (on) {
+      return 'min-height: 44px; border-radius: 999px; font-size: 15px; font-weight: 600; border: 0; transition: all .25s ease; background: ' + (on ? '#2E3244' : 'transparent') + '; color: ' + (on ? '#FFFFFF' : '#3E3A57') + (on ? '; box-shadow: 0 8px 18px -10px rgba(46,50,68,.45)' : '');
+    };
+    var self = this;
+    var slow = tab === 'slow';
+    return {
+      rootStyle: 'position: relative; overflow: hidden; width: 390px; height: ' + hgt + 'px; box-sizing: border-box; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px; background: #F7F3EC',
+      nowText: slow ? 'Slow trades: waiting for a good dip. Nothing to buy today.' : 'Two playbooks are watching for a chance. One rests until 2:00 PM.',
+      orbA: slow ? '#7E9CC8' : '#C47A88', orbB: slow ? '#8189C4' : '#6E9C82',
+      playbooks: playbooks, trades: trades, candidates: candidates,
+      isToday: !slow, isSlow: slow,
+      todayTabStyle: tabStyle(!slow), slowTabStyle: tabStyle(slow),
+      goToday: function () { self.setState({ tab: 'today' }); },
+      goSlow: function () { self.setState({ tab: 'slow' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

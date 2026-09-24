@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 """scripts/verify_visual_qa.py
-Visual QA Automation Suite for AutonomousDayTrader Next.js UI.
+Visual QA smoke test for the plain-language redesign (PLAN_2026_09_24_plain_language_ui.md).
 
-Audits desktop (1440x900) and mobile (390x844) viewports:
-1. Validates Next.js production build (`frontend/out`).
-2. Spawns safe export server on port 3005.
-3. Tests both Desktop (1440x900) and Mobile (390x844) viewports:
-   - Header & Portfolio Equity metrics
-   - SegmentedModeToggle ("Intraday Day Trader" <-> "Swing Mean-Reversion")
-   - Intraday Mode: Risk Telemetry & 4 Strategy Cards
-   - Swing Mode: SwingTelemetryBar, ActiveSwingPositionsTable, SwingCandidateWatchlist (5 certified stocks)
-   - Layout integrity: Zero horizontal overflow (`document.body.scrollWidth <= window.innerWidth`)
-   - Interactive toggle transitions
-4. Enforces strict port hygiene (terminates server and confirms port 3005 clean).
+This script spawns the static export with NO backend attached, so per F7 (never render synthetic
+zeroed data before a real snapshot) the page can only show the "Connecting to the robot..."
+loading skeleton. What this script checks, at Desktop (1440x900) and Mobile (390x844):
+1. The static export builds and serves.
+2. The loading skeleton renders with no horizontal overflow and no console errors.
+3. Strict port hygiene (server terminated, port 3005 liberated afterward).
+
+Full interactive coverage against realistic mocked API data (strategy cards, tabs, holding-now
+actions, safety card confirm flow, swing candidates, >100-trade pagination, reduced-motion, etc.)
+lives in `scripts/verify_ui_redesign.py`, which is the suite of record for that coverage.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import signal
@@ -65,7 +63,6 @@ def run_visual_audit() -> Dict[str, Any]:
     if not check_port_free(PORT):
         raise RuntimeError(f"Port {PORT} is already occupied. Ensure clean port state before visual QA.")
 
-    # 1. Start export server
     log.info(f"Starting Next.js export server on port {PORT}...")
     server_proc = subprocess.Popen(
         ["node", "scripts/serve_export.mjs", "--port", str(PORT)],
@@ -76,7 +73,6 @@ def run_visual_audit() -> Dict[str, Any]:
         preexec_fn=os.setsid,
     )
 
-    # Wait for server ready
     ready = False
     start_t = time.time()
     while time.time() - start_t < 10.0:
@@ -113,78 +109,26 @@ def run_visual_audit() -> Dict[str, Any]:
 
                 page.goto(BASE_URL, wait_until="networkidle", timeout=10000)
 
-                # 1. Check Header elements
-                page.wait_for_selector("text=Portfolio Equity", timeout=5000)
-                equity_visible = page.is_visible("text=Portfolio Equity")
-                log.info(f"  Header Portfolio Equity: {'VISIBLE' if equity_visible else 'MISSING'}")
+                # 1. The plain-language brand and F7 loading skeleton must render.
+                page.wait_for_selector("text=Day Trader", timeout=5000)
+                brand_visible = page.is_visible("text=Day Trader")
+                connecting_visible = page.is_visible("text=Connecting to the robot")
+                log.info(f"  Brand visible: {brand_visible}; loading skeleton visible: {connecting_visible}")
 
-                # 2. Check Segmented Mode Toggle
-                toggle_visible = page.is_visible("button:has-text('Intraday Day Trader')")
-                swing_button_visible = page.is_visible("button:has-text('Swing Mean-Reversion')")
-                log.info(f"  SegmentedModeToggle (Intraday & Swing buttons): {toggle_visible and swing_button_visible}")
-
-                # 3. Check Intraday View Components
-                telemetry_visible = page.is_visible("[data-testid='risk-telemetry']")
-                carousel_visible = page.is_visible("text=Trading Strategies")
-                log.info(f"  Intraday Telemetry & Carousel: {telemetry_visible and carousel_visible}")
-
-                # 4. Check Horizontal Overflow in Intraday Mode
-                overflow_intraday = page.evaluate("() => document.body.scrollWidth > window.innerWidth")
-                log.info(f"  Intraday Horizontal Overflow: {'DETECTED (FAIL)' if overflow_intraday else 'NONE (PASS)'}")
-                assert not overflow_intraday, f"Horizontal overflow detected in Intraday mode on {vp['name']}"
-
-                # 5. Switch to Swing Mode
-                log.info("  Clicking 'Swing Mean-Reversion' toggle button...")
-                page.click("button:has-text('Swing Mean-Reversion')")
-                page.wait_for_timeout(400)  # Allow spring physics animation to settle
-
-                # 6. Check Swing Components
-                swing_telemetry_visible = page.is_visible("text=2-Day Panic Dip")
-                overnight_exempt_badge = page.is_visible("text=OVERNIGHT EXEMPT")
-                watchlist_visible = page.is_visible("text=Swing Candidates")
-                table_visible = page.is_visible("text=Active Swing Positions")
-
-                # Check all 5 certified candidates are rendered
-                candidates_found = []
-                # Scroll down to ensure watchlist section is in view
-                page.evaluate("() => window.scrollTo(0, document.body.scrollHeight / 2)")
-                page.wait_for_timeout(300)
-                for sym in ["LRCX", "KLAC", "MU", "AMD", "GS"]:
-                    # On mobile, cards are in .sm:hidden; on desktop in .sm:block
-                    selector = f".sm\\:hidden :text('{sym}')" if vp["is_mobile"] else f".sm\\:block :text('{sym}')"
-                    if page.locator(selector).count() > 0:
-                        candidates_found.append(sym)
-                    elif page.locator(f":text('{sym}')").count() > 0:
-                        candidates_found.append(sym)
-                log.info(f"  Swing Mode: Telemetry ({swing_telemetry_visible}), Badge ({overnight_exempt_badge}), Table ({table_visible})")
-                log.info(f"  Certified Candidates rendered ({len(candidates_found)}/5): {', '.join(candidates_found)}")
-
-                # 7. Check Horizontal Overflow in Swing Mode
-                overflow_swing = page.evaluate("() => document.body.scrollWidth > window.innerWidth")
-                log.info(f"  Swing Mode Horizontal Overflow: {'DETECTED (FAIL)' if overflow_swing else 'NONE (PASS)'}")
-                assert not overflow_swing, f"Horizontal overflow detected in Swing mode on {vp['name']}"
-
-                # 8. Switch back to Intraday Mode
-                page.click("button:has-text('Intraday Day Trader')")
-                page.wait_for_timeout(400)
-                intraday_restored = page.is_visible("[data-testid='risk-telemetry']")
-                log.info(f"  Returned to Intraday Mode: {intraday_restored}")
+                # 2. Horizontal overflow check.
+                overflow = page.evaluate("() => document.body.scrollWidth > window.innerWidth")
+                log.info(f"  Horizontal Overflow: {'DETECTED (FAIL)' if overflow else 'NONE (PASS)'}")
+                assert not overflow, f"Horizontal overflow detected on {vp['name']}"
 
                 audit_results.append({
                     "viewport": vp["name"],
                     "width": vp["width"],
                     "height": vp["height"],
-                    "header_visible": equity_visible,
-                    "segmented_toggle_functional": toggle_visible and swing_button_visible,
-                    "intraday_view_clean": telemetry_visible and carousel_visible,
-                    "intraday_no_overflow": not overflow_intraday,
-                    "swing_telemetry_visible": swing_telemetry_visible,
-                    "swing_overnight_exempt_badge": overnight_exempt_badge,
-                    "swing_positions_table_visible": table_visible,
-                    "swing_watchlist_rendered": len(candidates_found) == 5,
-                    "swing_no_overflow": not overflow_swing,
+                    "brand_visible": brand_visible,
+                    "loading_skeleton_visible": connecting_visible,
+                    "no_overflow": not overflow,
                     "console_errors_count": len(console_errors),
-                    "status": "PASS",
+                    "status": "PASS" if brand_visible and not overflow else "FAIL",
                 })
                 context.close()
 
@@ -202,7 +146,6 @@ def run_visual_audit() -> Dict[str, Any]:
                 pass
         time.sleep(0.5)
 
-    # Post-check port hygiene
     is_free = check_port_free(PORT)
     log.info(f"Port {PORT} hygiene check: {'LIBERATED (PASS)' if is_free else 'OCCUPIED (FAIL)'}")
 
@@ -218,16 +161,13 @@ def main() -> int:
     try:
         summary = run_visual_audit()
         print("\n" + "=" * 70)
-        print(" 🎨 VISUAL QA AUDIT SUMMARY (DESKTOP & MOBILE)")
+        print(" VISUAL QA SMOKE TEST SUMMARY (DESKTOP & MOBILE, no backend)")
         print("=" * 70)
         print(f" Overall Status:      {summary['status']}")
         for v in summary["viewports_tested"]:
-            print(f" Viewport:            {v['viewport']}")
-            print(f"   - Header & Toggle:  PASS")
-            print(f"   - Intraday Layout:  PASS (Overflow: 0px)")
-            print(f"   - Swing Mode & UI:  PASS (5/5 Candidates, Table & Badge Visible)")
-            print(f"   - Swing Layout:     PASS (Overflow: 0px)")
+            print(f" Viewport:            {v['viewport']}  -> {v['status']}")
         print(f" Port 3005 Hygiene:   {'LIBERATED (CLEAN)' if summary['port_3005_liberated'] else 'DIRTY'}")
+        print(" Interactive/mocked-data coverage: see scripts/verify_ui_redesign.py")
         print("=" * 70)
         return 0 if summary["status"] == "PASS" else 1
     except Exception as e:

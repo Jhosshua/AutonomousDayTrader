@@ -102,10 +102,20 @@ const INITIAL_STATE: TradingState = {
   lastUpdated: new Date(),
 };
 
+/** F7: connection banner states. "stale" means the WS is technically open but no update has
+ * landed in a while (>30s) — the numbers on screen may be old, distinct from "reconnecting"
+ * (the socket itself is down). */
+export type ConnectionState = "live" | "reconnecting" | "stale";
+const STALE_AFTER_MS = 30000;
+
 export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
   const [state, setState] = useState<TradingState>(INITIAL_STATE);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  // F7: true only once a real snapshot (WS message or successful REST poll) has arrived, so
+  // callers can render a loading skeleton instead of the synthetic zeroed INITIAL_STATE.
+  const [hasReceivedData, setHasReceivedData] = useState<boolean>(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>("reconnecting");
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -166,6 +176,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
         try {
           const payload = JSON.parse(event.data);
           if (payload.type === "STATE_UPDATE" || payload.account) {
+            setHasReceivedData(true);
             setState((prev) => {
               // Merge incoming backend strategies with default visual assets if needed
               const mergedStrategies = (payload.strategies && payload.strategies.length > 0)
@@ -292,6 +303,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
             const accRes = await fetch(`${httpBase}/api/account`);
             if (accRes.ok) {
               const accData = await accRes.json();
+              setHasReceivedData(true);
               setState((prev) => ({
                 ...prev,
                 account: {
@@ -299,8 +311,11 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                   equity: accData.equity ?? prev.account.equity,
                   cash: accData.cash ?? prev.account.cash,
                   buying_power: accData.buying_power ?? prev.account.buying_power,
-                  daily_pnl: (accData.realized_pnl ?? 0) + (accData.unrealized_pnl ?? 0),
-                  daily_pnl_pct: accData.equity > 0 ? ((accData.realized_pnl ?? 0) + (accData.unrealized_pnl ?? 0)) / accData.equity : 0,
+                  // B6: read the same daily_pnl/daily_pnl_pct the backend computes for the WS
+                  // broadcast (see _daily_pnl_fields in main.py) instead of re-deriving a
+                  // different number here, so REST-fallback and live WS never disagree.
+                  daily_pnl: accData.daily_pnl ?? prev.account.daily_pnl,
+                  daily_pnl_pct: accData.daily_pnl_pct ?? prev.account.daily_pnl_pct,
                   daily_drawdown: accData.daily_drawdown_dollars ?? prev.account.daily_drawdown,
                   daily_drawdown_pct: accData.daily_drawdown_pct ?? prev.account.daily_drawdown_pct,
                   is_circuit_broken: accData.is_circuit_broken ?? prev.account.is_circuit_broken,
@@ -397,6 +412,21 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     };
   }, [connect, getResolvedEndpoints]);
 
+  // F7: derive live / reconnecting / stale every few seconds from isConnected + lastUpdated age.
+  useEffect(() => {
+    const tick = () => {
+      if (!isConnected) {
+        setConnectionState("reconnecting");
+        return;
+      }
+      const ageMs = Date.now() - state.lastUpdated.getTime();
+      setConnectionState(ageMs > STALE_AFTER_MS ? "stale" : "live");
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => clearInterval(id);
+  }, [isConnected, state.lastUpdated]);
+
   const sendAction = useCallback((payload: Record<string, any>): boolean => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(payload));
@@ -459,6 +489,8 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
   return {
     state,
     isConnected,
+    hasReceivedData,
+    connectionState,
     lastError,
     flattenPosition,
     flattenAll,

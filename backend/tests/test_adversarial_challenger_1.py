@@ -583,8 +583,12 @@ class TestSwingStrategyEngineAdversarial:
             "Empirically confirmed: Negative stop_price <= 0.0 completely disables emergency stop protection!"
         )
 
-    def test_tighten_stop_allows_widening_stop(self):
-        """DEFECT PROBE: tighten_stop does NOT prevent widening the stop loss."""
+    def test_tighten_stop_rejects_widening_stop(self):
+        """B2 fix (2026-09-24): tighten_stop now rejects widening the stop loss.
+
+        This used to be a DEFECT PROBE documenting that tighten_stop allowed widening the stop
+        without any check. That defect is fixed: SwingStrategyEngine.tighten_stop now requires
+        `current_stop < proposed < market_price` and rejects loosening."""
         account = PaperTradingAccount(initial_cash=50000.0)
         exec_engine = ExecutionEngine(account=account)
         engine = SwingStrategyEngine(account=account, execution_engine=exec_engine)
@@ -601,9 +605,9 @@ class TestSwingStrategyEngineAdversarial:
         )
         account.positions["GS"] = pos
 
-        # Operator calls tighten_stop with 90.0 (WIDENING the stop by $5!)
+        # Operator calls tighten_stop with 90.0 (would WIDEN the stop by $5) -> rejected.
         success = engine.tighten_stop("GS", 90.0)
-        assert success is True
-        assert pos.stop_loss_price == 90.0, (
-            "Confirmed: tighten_stop allows widening stop from 95.0 to 90.0 without check"
+        assert success is False
+        assert pos.stop_loss_price == 95.0, (
+            "tighten_stop must reject widening the stop from 95.0 to 90.0"
         )

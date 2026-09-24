@@ -222,12 +222,18 @@ def strategy_window(
     if today in NYSE_EARLY_CLOSES:
         notes.append("Early market close today (1:00 PM).")
 
+    # B5: plain 24h ET string ranges for the frontend hours bar, independent of whether
+    # today happens to be a trading day (the schedule itself never changes on weekends/holidays).
+    ranges_out: List[List[str]] = [[a.strftime("%H:%M"), b.strftime("%H:%M")] for a, b in ranges]
+
     return {
         "state": state,
         "headline": headline,
         "can_open_now": can_open,
         "in_hours": in_hours,
         "hours": hours_label,
+        "ranges": ranges_out,
+        "trading_day": trading_day,
         "schedule_text": schedule_text,
         "next_change_at": next_change.isoformat() if next_change else None,
         "blockers": blockers,

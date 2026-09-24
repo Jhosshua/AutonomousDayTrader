@@ -20,11 +20,15 @@ export interface MarketContext {
 }
 
 export interface StrategyWindow {
-  state: "CAN_TRADE" | "BLOCKED" | "WAITING" | "DONE_FOR_DAY" | "MARKET_CLOSED" | "PAUSED" | string;
+  state: "CAN_TRADE" | "LIMITED" | "BLOCKED" | "WAITING" | "DONE_FOR_DAY" | "MARKET_CLOSED" | "PAUSED" | string;
   headline: string;
   can_open_now: boolean;
   in_hours: boolean;
   hours: string;
+  /** B5: ["HH:MM","HH:MM"] ET pairs describing the trading schedule (present regardless of trading_day). */
+  ranges?: [string, string][];
+  /** B5: false on weekends/holidays; ranges still describe the schedule. */
+  trading_day?: boolean;
   schedule_text: string;
   next_change_at: string | null;
   blockers: string[];
@@ -75,7 +79,8 @@ export interface Position {
   market_value: number;
   unrealized_pnl: number;
   unrealized_pnl_pct: number;
-  stop_loss?: number;
+  /** F1: nullable; a position can be open with no protective exit set yet. */
+  stop_loss?: number | null;
   take_profit_1?: number;
   take_profit_2?: number;
   strategy_id?: string;
@@ -177,6 +182,8 @@ export interface NewsItem {
 
 export interface SwingCandidate {
   symbol: string;
+  /** F11: the data date this scan is based on (never invent a value when missing). */
+  date?: string | null;
   price: number;
   close: number;
   sma_200: number;

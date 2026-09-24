@@ -13,8 +13,8 @@ develop-eggs/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -67,3 +67,6 @@ Thumbs.db
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
+
+# Local QA screenshot output (scripts/verify_visual_qa_live.py)
+.local_qa_screenshots/

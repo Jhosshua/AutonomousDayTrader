@@ -1,262 +1,141 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Zap, Activity, Flame, Waves, Trophy, ArrowUpRight } from "lucide-react";
+import { Sunrise, Waves, Zap, Undo2 } from "lucide-react";
 import { StrategyState } from "@/types/trading";
+import {
+  StrategyLedgerAgg,
+  etMinutesOfDay,
+  formatSignedMoney,
+  isWithinSession,
+  rangesToSegments,
+  sessionPct,
+  strategyNoteLine,
+  strategyTheme,
+  windowToChip,
+} from "@/lib/plain";
+
+const ICONS: Record<string, typeof Sunrise> = {
+  orb: Sunrise,
+  vwap_pullback: Waves,
+  news_momentum: Zap,
+  mean_reversion: Undo2,
+};
 
 interface StrategyCardProps {
   strategy: StrategyState;
-  onSelect?: (strategy: StrategyState) => void;
-  isSelected?: boolean;
+  ledgerAgg?: StrategyLedgerAgg;
+  showPro: boolean;
+  delayMs?: number;
 }
 
-export default function StrategyCard({ strategy, onSelect, isSelected }: StrategyCardProps) {
-  const isPositive = strategy.daily_pnl >= 0;
+const CHIP_STYLES: Record<string, { bg: string; fg: string }> = {
+  sage: { bg: "#FFFFFF", fg: "#2F5A45" },
+  lavender: { bg: "#FFFFFF", fg: "#3E4478" },
+  grey: { bg: "#FFFFFF", fg: "#5D5A73" },
+  terracotta: { bg: "#FFFFFF", fg: "#8F4424" },
+};
 
-  // Custom theme gradient and icon per strategy
-  const getStrategyTheme = (id: string) => {
-    switch (id) {
-      case "orb":
-        return {
-          gradient: "from-amber-500/30 via-orange-600/20 to-emerald-500/30",
-          border: "hover:border-amber-500/40",
-          accentColor: "text-amber-400",
-          icon: <Flame className="w-6 h-6 text-amber-400" />,
-          tagline: "Morning Volatility Breakouts",
-        };
-      case "vwap_pullback":
-        return {
-          gradient: "from-cyan-500/30 via-blue-600/20 to-indigo-500/30",
-          border: "hover:border-cyan-500/40",
-          accentColor: "text-cyan-400",
-          icon: <Waves className="w-6 h-6 text-cyan-400" />,
-          tagline: "Anchored VWAP Continuation",
-        };
-      case "news_momentum":
-        return {
-          gradient: "from-fuchsia-500/30 via-purple-600/20 to-pink-500/30",
-          border: "hover:border-fuchsia-500/40",
-          accentColor: "text-fuchsia-400",
-          icon: <Zap className="w-6 h-6 text-fuchsia-400" />,
-          tagline: "Benzinga Sentiment Catalysts",
-        };
-      case "mean_reversion":
-        return {
-          gradient: "from-indigo-500/30 via-violet-600/20 to-teal-500/30",
-          border: "hover:border-indigo-500/40",
-          accentColor: "text-indigo-400",
-          icon: <Activity className="w-6 h-6 text-indigo-400" />,
-          tagline: "1.65-Sigma Exhaustion Fades",
-        };
-      default:
-        return {
-          gradient: "from-neutral-700/30 via-neutral-800/20 to-neutral-900/30",
-          border: "hover:border-white/20",
-          accentColor: "text-neutral-400",
-          icon: <Activity className="w-6 h-6 text-neutral-400" />,
-          tagline: "Algorithmic Execution",
-        };
-    }
-  };
-
-  const theme = getStrategyTheme(strategy.id);
+export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0 }: StrategyCardProps) {
+  const theme = strategyTheme(strategy.id, strategy.name);
+  const Icon = ICONS[strategy.id] || Waves;
   const win = strategy.window;
-  const dec = strategy.decisions;
+  const chip = windowToChip(win);
+  const chipStyle = CHIP_STYLES[chip.tone] || CHIP_STYLES.grey;
+  const resting = win?.state === "DONE_FOR_DAY" || win?.state === "PAUSED" || win?.state === "MARKET_CLOSED";
 
-  // Operator view: can this strategy open a trade right now? Idle states are neutral, never red.
-  const getWindowBadge = () => {
-    if (!win) return getStatusBadge(strategy.status);
-    const base = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider border";
-    switch (win.state) {
-      case "CAN_TRADE":
-        return (
-          <span className={`${base} bg-apple-green/15 text-apple-green border-apple-green/30`} data-testid="window-badge">
-            <span className="w-1.5 h-1.5 rounded-full bg-apple-green animate-pulse" />
-            CAN TRADE
-          </span>
-        );
-      case "LIMITED":
-        return (
-          <span className={`${base} bg-apple-green/10 text-apple-green border-apple-green/25`} data-testid="window-badge">
-            <span className="w-1.5 h-1.5 rounded-full bg-apple-green" />
-            LIMITED
-          </span>
-        );
-      case "BLOCKED":
-        return (
-          <span className={`${base} bg-apple-orange/15 text-apple-orange border-apple-orange/30`} data-testid="window-badge">
-            BLOCKED NOW
-          </span>
-        );
-      case "PAUSED":
-        return (
-          <span className={`${base} bg-apple-orange/15 text-apple-orange border-apple-orange/30`} data-testid="window-badge">
-            PAUSED
-          </span>
-        );
-      default:
-        return (
-          <span className={`${base} bg-neutral-800 text-neutral-300 border-white/10`} data-testid="window-badge">
-            {win.headline.toUpperCase()}
-          </span>
-        );
-    }
-  };
+  const segments = rangesToSegments(win?.ranges);
+  const nowMin = etMinutesOfDay();
+  const showNow = (win?.trading_day ?? true) && isWithinSession(nowMin);
+  const nowLeft = sessionPct(nowMin);
 
-  const getStatusBadge = (status: string) => {
-    switch (status?.toUpperCase()) {
-      case "ACTIVE":
-      case "LIVE":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-apple-green/15 text-apple-green border border-apple-green/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-apple-green animate-pulse" />
-            LIVE
-          </span>
-        );
-      case "ARMED":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-apple-orange/15 text-apple-orange border border-apple-orange/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-apple-orange" />
-            ARMED
-          </span>
-        );
-      case "STANDBY":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-apple-purple/15 text-apple-purple border border-apple-purple/30">
-            STANDBY
-          </span>
-        );
-      case "COOLDOWN":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-neutral-800 text-neutral-400 border border-white/10">
-            COOLDOWN
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-neutral-800 text-neutral-400 border border-white/10">
-            {status}
-          </span>
-        );
-    }
-  };
+  const pnl = ledgerAgg?.realized_pnl ?? strategy.daily_pnl ?? 0;
+  const tradesCount = ledgerAgg?.trades_count ?? strategy.trades_count ?? 0;
+  const pnlColor = pnl > 0 ? "#2F6B4C" : pnl < 0 ? "#8F4424" : "#5D5A73";
+
+  // F9: an early-close day note must surface even when there's already a signals/orders lead.
+  const earlyCloseNote = win?.notes?.find((n) => n.toLowerCase().includes("early"));
+  const note = strategyNoteLine(
+    strategy.decisions,
+    earlyCloseNote ? `${win?.market_text ?? ""} ${earlyCloseNote}`.trim() : win?.market_text,
+    win?.notes?.[0]
+  );
 
   return (
-    <motion.div
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      whileTap={{ scale: 0.97 }}
-      onClick={() => onSelect?.(strategy)}
-      className={`relative cursor-pointer flex-shrink-0 w-64 md:w-72 rounded-3xl p-4 transition-all duration-300 backdrop-blur-xl border ${
-        isSelected
-          ? "bg-white/[0.08] border-white/30 shadow-2xl shadow-apple-purple/20 ring-1 ring-white/20"
-          : "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06]"
-      } ${theme.border}`}
+    <article
+      className="rise hover-card flex min-h-[380px] sm:min-h-[420px] flex-col overflow-hidden rounded-[26px] border border-line bg-white"
+      style={{ animationDelay: `${delayMs}ms` }}
     >
-      {/* Top Strategy Visual Banner */}
       <div
-        className={`relative w-full aspect-[16/10] rounded-2xl overflow-hidden bg-gradient-to-br ${theme.gradient} p-3 flex flex-col justify-between border border-white/[0.08] shadow-inner mb-3`}
+        className="flex flex-col gap-4 px-5 py-5"
+        style={{ background: theme.band, filter: resting ? "saturate(0.55) brightness(1.03)" : undefined }}
       >
-        <div className="flex items-center justify-between">
-          <div className="p-2 rounded-xl bg-black/40 backdrop-blur-md border border-white/10">
-            {theme.icon}
+        <div className="flex items-start justify-between">
+          <div className="bob flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl" style={{ background: theme.bar }}>
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" strokeWidth={1.9} aria-hidden="true" />
           </div>
-          {getWindowBadge()}
-        </div>
-
-        <div>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/70 block">
-            Trading Strategy
-          </span>
-          <h3 className="text-base font-bold text-white tracking-tight leading-tight">
-            {strategy.name}
-          </h3>
-          <p className="text-[11px] text-white/60 line-clamp-1">{theme.tagline}</p>
-        </div>
-      </div>
-
-      {/* Trading window: when this strategy may open trades, and what blocks it now */}
-      {win && (
-        <div className="mb-3 space-y-1 text-[11px] leading-snug" data-testid="strategy-window">
-          <p className="text-white font-semibold">{win.headline}</p>
-          <p className="text-neutral-400">
-            Hours: <span className="text-neutral-200">{win.hours}</span>
-          </p>
-          <p className="text-neutral-400">{win.schedule_text}</p>
-          {win.blockers.length > 0 && (
-            <ul className="text-apple-orange space-y-0.5">
-              {win.blockers.map((b) => (
-                <li key={b}>{b}</li>
-              ))}
-            </ul>
-          )}
-          {(win.limits ?? []).length > 0 && (
-            <ul className="text-neutral-300 space-y-0.5">
-              {(win.limits ?? []).map((l) => (
-                <li key={l}>{l}</li>
-              ))}
-            </ul>
-          )}
-          {!win.blockers.some((b) => b.startsWith("Market direction unknown")) &&
-            !(win.limits ?? []).some((l) => l.startsWith("Market direction unknown")) && (
-            <p className="text-neutral-400">{win.market_text}</p>
-          )}
-          {win.notes.map((n) => (
-            <p key={n} className="text-neutral-500">{n}</p>
-          ))}
-          {dec && (
-            <p className="text-neutral-400" data-testid="strategy-decisions">
-              Today: {dec.signals_today} signal{dec.signals_today === 1 ? "" : "s"}, {dec.orders_today} sent
-              {dec.blocked_today > 0 && dec.top_block_text ? `, ${dec.blocked_today} blocked (mostly: ${dec.top_block_text.toLowerCase()})` : ""}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Performance Metrics Row */}
-      <div className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="text-xs text-neutral-400">Today&apos;s PnL</span>
           <span
-            className={`text-sm font-bold num-tabular ${
-              isPositive ? "text-apple-green" : "text-apple-red"
-            }`}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
+            style={{ background: chipStyle.bg, color: chipStyle.fg }}
+            data-testid="window-badge"
           >
-            {isPositive ? "+" : ""}${strategy.daily_pnl.toFixed(2)}
+            <span
+              className={chip.breathing ? "breathe inline-block h-2 w-2 rounded-full" : "inline-block h-2 w-2 rounded-full"}
+              style={{ background: resting ? "#A7A2B8" : theme.bar }}
+            />
+            {chip.label}
           </span>
         </div>
+        <h3 className="font-display text-xl sm:text-2xl font-semibold" style={{ color: theme.ink }}>
+          {theme.name}
+        </h3>
+      </div>
 
-        <div className="grid grid-cols-3 gap-1 pt-2 border-t border-white/[0.06] text-center">
-          <div className="bg-white/[0.02] py-1 px-1.5 rounded-lg">
-            <span className="text-[10px] text-neutral-400 block">Win Rate</span>
-            <span className="text-xs font-semibold text-neutral-200 num-tabular">
-              {(strategy.win_rate * 100).toFixed(1)}%
+      <div className="flex flex-grow flex-col gap-4 px-5 py-5">
+        {showPro && (
+          <div className="flex flex-col gap-1 self-start rounded-lg px-2.5 py-1.5 text-xs font-semibold" style={{ background: theme.tint, color: theme.ink }}>
+            <span>Pro name: {strategy.name}</span>
+            <span className="font-normal">
+              Win rate: {ledgerAgg ? `${Math.round((ledgerAgg.wins / Math.max(1, ledgerAgg.trades_count)) * 100)}%` : `${Math.round((strategy.win_rate ?? 0) * 100)}%`}
             </span>
+            {win?.blockers && win.blockers.length > 0 && <span className="font-normal">Blocked by: {win.blockers.join(", ")}</span>}
           </div>
+        )}
+        <p className="text-sm leading-relaxed text-[#3E3A57]">{theme.what}</p>
 
-          <div className="bg-white/[0.02] py-1 px-1.5 rounded-lg">
-            <span className="text-[10px] text-neutral-400 block">Trades</span>
-            <span className="text-xs font-semibold text-neutral-200 num-tabular">
-              {strategy.trades_count}
-            </span>
+        <div className="mt-auto flex flex-col gap-1.5" data-testid="strategy-window">
+          <div className="relative h-3 rounded-full" style={{ background: theme.track }}>
+            {segments.map((seg, i) => (
+              <div
+                key={i}
+                className="grow absolute inset-y-0 rounded-md"
+                style={{ left: `${seg.left}%`, width: `${seg.width}%`, background: theme.bar, opacity: resting ? 0.5 : 1 }}
+              />
+            ))}
+            {showNow && (
+              <div
+                className="breathe absolute -top-1 h-5 w-[3px] rounded-sm"
+                style={{ left: `${nowLeft}%`, background: "#1D1A33" }}
+              />
+            )}
           </div>
-
-          <div className="bg-white/[0.02] py-1 px-1.5 rounded-lg">
-            <span className="text-[10px] text-neutral-400 block flex items-center justify-center gap-0.5">
-              <Trophy className="w-2.5 h-2.5 text-amber-400" />
-              Sharpe
-            </span>
-            <span className="text-xs font-semibold text-neutral-200 num-tabular">
-              {strategy.sharpe == null ? "—" : strategy.sharpe.toFixed(2)}
-            </span>
+          <div className="flex justify-between text-xs text-muted">
+            <span>9:30</span>
+            <span>noon</span>
+            <span>4 PM</span>
           </div>
         </div>
-      </div>
 
-      {/* Footer subtle action */}
-      <div className="mt-3 pt-2 border-t border-white/[0.04] flex items-center justify-between text-[11px] text-neutral-400">
-        <span className="text-[10px]">Tap for inspector</span>
-        <ArrowUpRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+        <div
+          className="flex items-start justify-between gap-3 rounded-2xl px-3.5 py-3 text-sm leading-snug text-[#3E3A57]"
+          style={{ background: theme.tint }}
+          data-testid="strategy-decisions"
+        >
+          <span>{note}</span>
+          <span className="flex-shrink-0 tabular-nums text-base font-bold" style={{ color: pnlColor }}>
+            {tradesCount > 0 ? formatSignedMoney(pnl) : "$0"}
+          </span>
+        </div>
       </div>
-    </motion.div>
+    </article>
   );
 }

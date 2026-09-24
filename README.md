@@ -1,6 +1,6 @@
 # AutonomousDayTrader 🚀📈
 
-> Intraday paper-trading system for US equities connected downstream to **AlpacaRelay**, operating on a virtual **$50,000** account across four dynamically adapted strategies with a **fluid obsidian mobile-first** UI.
+> Intraday paper-trading system for US equities connected downstream to **AlpacaRelay**, operating on a virtual **$50,000** account across four dynamically adapted strategies with a **plain-language, light, mobile-first** dashboard anyone can read.
 
 ---
 
@@ -45,7 +45,7 @@
                   ┌────────────────────────────────────────────────────────┐
                   │          Mobile-First Trading UI (Port 3005)           │
                   │  - Next.js 15 / React 19 / Tailwind CSS / Framer Motion│
-                  │  - Obsidian Dark Theme & Dynamic Momentum Gradient Blur│
+                  │  - Plain-language light theme (no trading jargon)      │
                   │  - Trading Strategy Performance Cards                  │
                   │  - "Active Position" Expandable Bottom Drawer & Live   │
                   └────────────────────────────────────────────────────────┘
@@ -86,15 +86,19 @@ An autonomous multi-day swing engine operating across 5 certified liquid high-be
   - Swing positions are explicitly tagged `arm=TradingArm.SWING` and strictly exempt from the 15:45–15:58 ET intraday auto-flattening engine and session sweeps.
   - Shares the $50,000 virtual paper trading account pool with intraday day trading without margin collision or double-spending.
   - Symbol-level mutual exclusion prevents concurrent intraday and swing trades on the same symbol (e.g. `AMD`).
-- **Unified Obsidian Dark Operator Interface**:
-  - Fluid segmented toggle between "Intraday Day Trader" and "Swing Mean-Reversion".
-  - Real-time `SwingTelemetryBar`, `SwingCandidateWatchlist`, and `ActiveSwingPositionsTable` with ATR stop loss meters, holding day counters, and manual operator overrides.
+- **Operator Interface (Slow trades tab)**:
+  - Tab toggle "Quick trades (same day)" / "Slow trades (a few days)".
+  - Spots shown as held / buying at next open / free; each watched company shows 4 plain checks (pass, fail, or unknown when data is missing); held positions show "Day N of 5", safety exit, and Sell at next open / Raise safety exit / Sell now.
 
-### 4. Mobile-First Trading UI
-- **Design System**: Obsidian dark palette (`#000000`), backdrop glassmorphism (`backdrop-blur-xl`), animated background gradient mesh dynamically tinted by portfolio momentum (green for profit, red for drawdown, violet for neutral).
-- **Segmented Mode Navigation**: Framer Motion sliding pill toggle between Intraday Day Trading and Swing Trading views with position count badges.
-- **Trading Strategies Carousel**: Horizontal carousel showcasing the 4 intraday strategies with strategy banners, live daily PnL, win rate badges, and active state indicators.
-- **"Active Position" Expandable Drawer**: Docked mini-tray displaying the primary active position; spring-physics gesture expansion (`stiffness: 350, damping: 32`) reveals live ticker candlestick charts, bracket orders, and manual intervention controls (Quick Flatten, Tighten Stop).
+### 4. Plain-Language Dashboard (redesigned 2026-09-24)
+Written for someone who knows nothing about stocks. Approved mockups: `docs/ui_redesign_2026_09_24/`. Plan and Codex attack: `PLAN_2026_09_24_plain_language_ui.md`.
+- **Look**: light cream ground, one muted color per strategy (Morning Breakout apricot, Ride the Trend sage, Big News rose, Snap Back lavender) used on its card, hours bar, and trade tags. Fonts Fraunces + Instrument Sans via `@fontsource` (no network needed at build).
+- **Top**: live balance, "Finished trades today" step chart (cumulative realized P&L, not a balance history), and a "Right now" sentence.
+- **Strategy cards**: plain name, one-line explanation, status chip from `window.state`, trading-hours bar from `window.ranges` with a now marker, and today's result from the durable ledger (`/api/trades?range=today`, all pages). Strategy counters are NOT used for display.
+- **Holding now**: each open quick trade with "Sell now"/"Close trade" and "Move safety exit to my buy price" (enabled only when it improves protection). Every action has confirm, sending, done, and "didn't go through" states.
+- **Safety card**: daily loss limit from `/health` `limits`, closing time, and "Close all quick trades now" (intraday only; swing holdings are skipped and reported).
+- **Show pro words**: toggle reveals technical names, win rate, and the raw execution audit log.
+- Always visible warnings: price feed down, saving problems, daily loss limit hit, reconnecting.
 - **Sub-Second Streaming**: Bi-directional WebSocket synchronization over Port 8005 with zero page reloads.
 
 ---

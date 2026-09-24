@@ -1,7 +1,7 @@
 # Project: AutonomousDayTrader
 
 ## Architecture
-AutonomousDayTrader is a local intraday paper-trading system for US equities connected downstream to AlpacaRelay, operating on a $50,000 virtual account. It features four dynamically adapted trading strategies, institutional risk guardrails, a fluid obsidian mobile-first web interface, real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
+AutonomousDayTrader is a local intraday paper-trading system for US equities connected downstream to AlpacaRelay, operating on a $50,000 virtual account. It features four dynamically adapted trading strategies, institutional risk guardrails, a plain-language light mobile-first dashboard (redesigned 2026-09-24), real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
 
 ```
                   ┌────────────────────────────────────────────────────────┐
@@ -42,7 +42,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
                   ┌────────────────────────────────────────────────────────┐
                   │          Mobile-First Trading UI (Port 3005)           │
                   │  - Next.js 15 / React 19 / Tailwind CSS / Framer Motion│
-                  │  - Obsidian Dark Theme & Dynamic Momentum Gradient Blur│
+                  │  - Plain-language light theme (no trading jargon)      │
                   │  - Trading Strategy Performance Cards                  │
                   │  - "Active Position" Expandable Bottom Drawer & Live   │
                   └────────────────────────────────────────────────────────┘
@@ -64,7 +64,7 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 | F11 | Strategy 4: Mean Reversion | 1-min bar $Z$-score $\ge 1.65$, volume climax $>1.30\times$, upper/lower wick rejection $\ge 0.30$, 20-SMA mean reversion active in `NEUTRAL` regimes without fighting runaway trends | M2 | ORIGINAL_REQUEST §R2 |
 | F12 | Dynamic VIX Adaptation | Self-adaptation across 4 regimes (Low, Normal, Elevated, Crisis) with invariant dollar risk scaling and dynamic stop widths | M2 | ORIGINAL_REQUEST §R2 |
 | F13 | Time-of-Day Dynamics | 5 intraday execution regimes: Pre-market (08:00–09:30), Open Flush (09:30–10:00), Trend (10:00–11:30), Chop (11:30–14:00), Power Hour (15:00–16:00) | M2 | ORIGINAL_REQUEST §R2 |
-| F14 | Obsidian Dark UI Aesthetic | Obsidian dark palette (`#000000`), dynamic glassmorphism (`backdrop-blur-xl`), animated background gradient blur tinted by portfolio momentum | M3 | ORIGINAL_REQUEST §R3 |
+| F14 | Plain-language UI (replaced Obsidian dark on 2026-09-24) | Light muted palette, one color per strategy, no jargon, pro-words toggle; see `PLAN_2026_09_24_plain_language_ui.md` | M3 | User request 2026-09-24 |
 | F15 | Trading Strategy Cards | Carousel/grid presenting 4 strategies, live PnL, win rate, Sharpe, active status badges | M3 | ORIGINAL_REQUEST §R3 |
 | F16 | "Active Position" Bottom Tray | Docked mini-tray showing active primary trade; spring physics expansion to full modal with live ticker chart, bracket lines, manual controls | M3 | ORIGINAL_REQUEST §R3 |
 | F17 | Real-Time UI WebSocket Streaming | High-throughput sub-second state sync from backend (Port 8005) to UI (Port 3005) with zero full-page reloads | M3 | ORIGINAL_REQUEST §R3 |
@@ -221,15 +221,15 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 │   ├── package.json              # Next.js 15, Tailwind CSS 3, Framer Motion, Lucide icons
 │   ├── tsconfig.json
 │   ├── app/
-│   │   ├── layout.tsx            # Obsidian dark theme & viewport metadata
+│   │   ├── layout.tsx            # Light theme, fonts, viewport (zoom allowed)
 │   │   ├── page.tsx              # Main dashboard view
-│   │   └── globals.css           # Glassmorphism utilities & dynamic blurs
+│   │   └── globals.css           # Palette, animations, reduced-motion block
 │   ├── components/
 │   │   ├── Header.tsx            # Portfolio status & momentum glow indicator
 │   │   ├── AmbientBackground.tsx # Momentum-tinted background gradient blur
 │   │   ├── StrategyCarousel.tsx  # Trading Strategy cards
 │   │   ├── StrategyCard.tsx      # Individual strategy performance card
-│   │   ├── ActivePositionTray.tsx# Collapsible/expandable active position bottom tray
+│   │   ├── HoldingNow.tsx        # Open quick trades with Sell now / move safety exit (replaced ActivePositionTray)
 │   │   ├── LiveChart.tsx         # Real-time ticker candlestick/line chart & brackets
 │   │   ├── ManualControls.tsx    # Quick Flatten and Tighten Stop buttons
 │   │   └── ExecutionLog.tsx      # Audit trail of fills and circuit alerts

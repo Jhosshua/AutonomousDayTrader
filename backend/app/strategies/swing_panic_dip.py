@@ -886,20 +886,29 @@ class SwingStrategyEngine:
             return None
 
     def tighten_stop(self, symbol: str, new_stop: float) -> bool:
-        """Adjust the emergency stop price for an active swing position."""
+        """Adjust the emergency stop price for an active swing position.
+
+        B2: reject unless finite and `current_stop < new_stop < market_price`. Both transports
+        (WS SWING_TIGHTEN_STOP and REST /api/swing/action) call this single implementation."""
         sym = symbol.upper()
         active = self.get_active_swing_positions()
         pos = active.get(sym)
         if not pos:
             log.warning(f"Cannot tighten stop for {sym}: no active swing position found")
             return False
-        if new_stop <= 0:
+        if not math.isfinite(new_stop) or new_stop <= 0:
             log.warning(f"Cannot tighten stop for {sym}: invalid stop price {new_stop}")
             return False
-        if pos.market_price > 0 and new_stop >= pos.market_price:
-            log.warning(f"Cannot tighten stop for {sym}: stop {new_stop} >= market price {pos.market_price}")
+        current_stop = getattr(pos, "stop_loss_price", None)
+        if current_stop is not None and not (current_stop < new_stop):
+            log.warning(
+                f"Cannot tighten stop for {sym}: proposed {new_stop} is not tighter than current stop {current_stop}"
+            )
             return False
-        old_stop = getattr(pos, "stop_loss_price", None)
+        if pos.market_price > 0 and not (new_stop < pos.market_price):
+            log.warning(f"Cannot tighten stop for {sym}: stop {new_stop} must be below market price {pos.market_price}")
+            return False
+        old_stop = current_stop
         pos.stop_loss_price = round(new_stop, 2)
         log.info(f"Tightened swing stop for {sym}: {old_stop} -> {pos.stop_loss_price}")
         return True

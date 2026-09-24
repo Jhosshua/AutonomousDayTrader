@@ -305,3 +305,18 @@ right. Run the mutation check.
 - What did not work: running the local backend on a spare port (8765). The exported UI hardcodes ws://127.0.0.1:8005 for localhost, so it never got data.
 - What worked: run the isolated local server on 8005 (ENV=development PERSISTENCE_ENABLED=false START_RELAY_CLIENTS=false), then kill it.
 - Note for next time: `from datetime import time` in main.py shadows the time module; use `import time as _time_mod`.
+
+## 2026-09-24: a bare `lib/` in .gitignore hid frontend/lib
+- **What did not work**: The Python-template `.gitignore` had `lib/` (meant for a venv). It silently ignored the new `frontend/lib/plain.ts`, so a push would have shipped a dashboard missing its helpers and the Railway build would fail.
+- **What worked instead**: Anchor it: `/lib/`, `/lib64/`.
+- **Note for next time**: After adding a new folder, run `git status` and confirm the files show as untracked, not missing.
+
+## 2026-09-24: chart "start" line drawn at a fixed height
+- **What did not work**: The finished-trades chart drew its dashed zero line at y=75 (the middle) while the data was scaled min..max, so the line pointed at the wrong value. The builder's 52 automated checks all passed; only looking at the screenshot caught it.
+- **What worked instead**: Draw the reference line at `yFor(0)`.
+- **Note for next time**: For any chart, look at the rendered picture and ask "is this line where the number says it is?". Also, in Playwright Python a routed WebSocket uses `ws.on_message(...)`, not `ws.on("message", ...)` (that silently does nothing).
+
+## 2026-09-24: a plan review found real bugs in existing operator buttons
+- **What did not work**: Assuming the existing Flatten All / swing buttons were correct because they had tests. Codex, attacking the UI plan, found that FLATTEN_ALL reported swing holdings as "flattened" when the order was rejected, "sell at next open" was deleted a minute later, and the swing stop could be loosened.
+- **What worked instead**: Have Codex read the backend code the UI calls, not just the UI plan.
+- **Note for next time**: Before relabeling a button in plain words, verify the button does what the new words promise.
