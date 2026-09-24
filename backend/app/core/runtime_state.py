@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import inspect
 import math
 from typing import Any, Dict, Iterable, Optional
 
@@ -214,8 +215,13 @@ def restore_runtime_state(
     if set(decoded["strategies"]) != set(strategy_map):
         raise PersistenceError("Persisted strategy set does not match this deployment")
     for strategy_id, strategy_state in decoded["strategies"].items():
-        strategy_map[strategy_id].__dict__.clear()
-        strategy_map[strategy_id].__dict__.update(strategy_state)
+        strategy = strategy_map[strategy_id]
+        # Tuning parameters always come from the deployed code, never from an older
+        # checkpoint; attributes added since the checkpoint keep their fresh defaults.
+        tuning = set(inspect.signature(type(strategy).__init__).parameters) - {"self"}
+        keep = {k: v for k, v in strategy.__dict__.items() if k in tuning or k not in strategy_state}
+        strategy.__dict__.update(strategy_state)
+        strategy.__dict__.update(keep)
 
     latest_market_prices.clear()
     latest_market_prices.update(decoded["market"]["latest_market_prices"])

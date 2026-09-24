@@ -416,3 +416,59 @@ async def test_production_refuses_optional_or_disabled_persistence(monkeypatch):
     with pytest.raises(PersistenceError, match="requires PERSISTENCE_ENABLED=true and PERSISTENCE_REQUIRED=true"):
         async with main.lifespan(main.app):
             pass
+
+
+def test_restore_from_older_checkpoint_keeps_current_strategy_settings():
+    """2026-09-24 prod incident: a checkpoint written before min_clv/target_1_r existed
+    wiped them on restore, so ORB and VWAP raised AttributeError on every bar."""
+    account, engine, brackets, risk, flattening, adaptation, strategies, entry, bracket = _active_position_runtime()
+    payload = capture_runtime_state(
+        account=account, engine=engine, bracket_manager=brackets, risk_engine=risk,
+        flattening_engine=flattening, adaptation_engine=adaptation, strategies=strategies,
+        entry_order_to_bracket={}, bracket_realized_pnl={bracket.bracket_id: 0.0},
+        completed_brackets_recorded=set(), latest_market_prices={"AAPL": 100.0},
+        market_history={}, recent_news=[], last_session_date=None, last_vix_print=None,
+        ledger_revision=1,
+    )
+    # Simulate an older release's checkpoint: missing new attrs, stale tuning values.
+    old = json.loads(json.dumps(payload))
+    strat = old["strategies"]
+    orb_key = next(k for k in strat if "orb" in k)
+    vwap_key = next(k for k in strat if "vwap" in k)
+    news_key = next(k for k in strat if "news" in k)
+
+    def _fields(entry):
+        return entry.get("fields", entry.get("value", entry)) if isinstance(entry, dict) else entry
+
+    def _drop(d, name):
+        # Checkpoint encoding may wrap dicts; remove the key wherever it sits.
+        if isinstance(d, dict):
+            d.pop(name, None)
+            for v in d.values():
+                if isinstance(v, dict) and name in v:
+                    v.pop(name, None)
+
+    _drop(strat[orb_key], "min_clv")
+    _drop(strat[vwap_key], "target_1_r")
+    news_state = strat[news_key]
+    blob = json.dumps(news_state).replace('"volume_surge_multiplier": 2.0', '"volume_surge_multiplier": 3.5')
+    strat[news_key] = json.loads(blob)
+    assert "min_clv" not in json.dumps(strat[orb_key])
+
+    _, _, _, _, _, _, fresh = restored = _components()
+    restore_runtime_state(
+        old, account=restored[0], engine=restored[1], bracket_manager=restored[2],
+        risk_engine=restored[3], flattening_engine=restored[4], adaptation_engine=restored[5],
+        strategies=fresh, entry_order_to_bracket={}, bracket_realized_pnl={},
+        completed_brackets_recorded=set(), latest_market_prices={}, market_history={},
+        recent_news=[],
+    )
+    orb, vwap, news, _mr = fresh
+    assert orb.min_clv == 0.65
+    assert vwap.target_1_r == 0.80
+    assert news.volume_surge_multiplier == 2.00
+    # Runtime memory is still restored.
+    assert orb.symbol_states["AAPL"].all_bars
+    ts = datetime(2026, 9, 22, 14, 1, tzinfo=timezone.utc)
+    for s in fresh:
+        s.on_bar(BarEvent("AAPL", 100.5, 101.5, 100.4, 101.4, 50000, ts))
