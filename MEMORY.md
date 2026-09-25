@@ -2,6 +2,12 @@
 
 ## Decisions
 
+### 2026-09-25: plan to record backtest data (not built)
+- Plan: `PLAN_2026_09_25_backtest_tracking.md`. Goal: after enough real paper trades, tune knobs from saved data. Today trade rows drop stop/R/targets, no MFE/MAE, blocked signals kept only last 300, no knob/market snapshot, swing trades never reach `completed_trades`.
+- Codex attacked it: revise before building (2 P0, 13 P1). P0s verified: research writes must stay OUT of the checkpoint transaction (a failed save locks out entries, `main.py:648`), and enrichment must not be able to break `_record_completed_bracket`/OR15 closing. Also: never pass `bar` into `execute_strategy_signal` (triggers extra `process_bar`).
+- Rejected: signal rows inside `save_checkpoint`; first-touch scorer as a P&L backtest; claiming the signal table can tune ORB/MR internal filters (they reject before emitting).
+- Revised order: M1 trade row v2, M2 MFE/MAE by exposure, M3 signal table, M4 swing round trips.
+
 ### 2026-09-25: TSLA OR15 fixed paper strategy
 
 - User explicitly overrode the source's shadow-only phase: enabled one-share Alpaca paper routing immediately. The source was found under `megacap_intraday_edge_lab` (requested `..._1ab` was absent) and frozen byte-for-byte in `docs/tsla_or15/SOURCE_EXECUTION_PLAN.md` with SHA-256 `1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd`.
