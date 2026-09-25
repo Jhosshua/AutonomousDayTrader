@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import os
+import uuid
 import sys
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
@@ -564,7 +565,9 @@ def _research_committed_count() -> int:
 
 # Observation only: research rows go to their own SQLite file through a
 # background queue, never through the trading checkpoint transaction.
-research_recorder = ResearchRecorder(_research_db_path())
+research_recorder = ResearchRecorder(
+    _research_db_path(), forbidden_paths=(settings.STATE_DB_PATH, settings.STATE_BACKUP_PATH)
+)
 research_tracker = ResearchTracker(
     research_recorder,
     bracket_manager=bracket_manager,
@@ -577,6 +580,9 @@ research_tracker = ResearchTracker(
     swing_staged_order_manager=swing_staged_order_manager,
     execution_mode=_execution_mode,
     committed_count=_research_committed_count,
+    vix_print=lambda: last_vix_print,
+    order_lookup=lambda order_id: engine.orders.get(order_id),
+    run_id=os.environ.get("RESEARCH_RUN_ID") or uuid.uuid4().hex[:8],
 )
 
 
@@ -1129,6 +1135,9 @@ def _reconcile_fills(fills: List[Any]) -> None:
             order.id, fill.price, fill.qty, fill.timestamp
         )
         _apply_bracket_directive(child_bracket_id, directive)
+        if settings.RESEARCH_ENABLED and directive.bracket_status.value == "TARGET_1_HIT":
+            research_safe(research_tracker.note_stop_change, child_bracket_id, fill.timestamp,
+                          f"breakeven_after_{_child_type.value}", recorder=research_recorder)
         if directive.bracket_status.value.startswith("COMPLETED"):
             _record_completed_bracket(child_bracket_id)
 
@@ -1916,6 +1925,10 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
             oid = mod["order_id"]
             if oid in engine.working_orders:
                 engine.working_orders[oid].stop_price = mod["new_stop_price"]
+        if settings.RESEARCH_ENABLED:
+            research_safe(research_tracker.note_stop_change,
+                          bracket_manager.symbol_to_bracket.get(bar.symbol.upper(), ""), bar.timestamp,
+                          "trailing_atr", recorder=research_recorder)
 
     _checkpoint_runtime("BAR_EVENT", (event_key, "BAR") if event_key else None)
     or15_controller.tick(now if simulation_mode else or15_now())
@@ -3195,6 +3208,10 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                             oid = mod.get("order_id")
                             if oid and oid in engine.working_orders:
                                 engine.working_orders[oid].stop_price = mod.get("new_stop_price", new_stop)
+                        if settings.RESEARCH_ENABLED:
+                            research_safe(research_tracker.note_stop_change,
+                                          bracket_manager.symbol_to_bracket.get(sym, ""),
+                                          datetime.now(timezone.utc), "operator_tighten", recorder=research_recorder)
                     _checkpoint_runtime("MANUAL_TIGHTEN_STOP")
                     await broadcast_ui_state(force=True)
                 elif action in ("SWING_EXIT_NEXT_OPEN", "SWING_EXIT_IMMEDIATE", "SWING_TIGHTEN_STOP"):

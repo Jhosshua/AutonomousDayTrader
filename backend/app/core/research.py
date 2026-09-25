@@ -32,6 +32,9 @@ RECORD_VERSION = 2
 MAX_PAYLOAD_BYTES = 64_000
 MAX_STOP_HISTORY = 50
 MEMORY_KEEP = 500
+MAX_DB_BYTES = 1_000_000_000      # stop writing research at 1 GB
+MIN_FREE_BYTES = 500_000_000      # never let research eat the trading volume's last 500 MB
+SPACE_CHECK_EVERY = 200
 
 
 def json_safe(value: Any, depth: int = 0) -> Any:
@@ -103,8 +106,13 @@ class ResearchRecorder:
         "signals": "research_signals",
     }
 
-    def __init__(self, path: Optional[str] = None, max_queue: int = 5000) -> None:
+    def __init__(self, path: Optional[str] = None, max_queue: int = 5000,
+                 forbidden_paths: Tuple[str, ...] = ()) -> None:
         self.path: Optional[Path] = Path(path).expanduser().resolve() if path else None
+        self._counter_lock = threading.Lock()
+        self._fail_logged = 0
+        self._space_ok = True
+        self._writes_since_check = 0
         self.queued = 0
         self.written = 0
         self.dropped = 0
@@ -117,6 +125,11 @@ class ResearchRecorder:
         self._read_lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._reader: Optional[sqlite3.Connection] = None
+        if self.path is not None and any(
+            self.path == Path(p).expanduser().resolve() for p in forbidden_paths if p
+        ):
+            self._fail(ValueError("research path equals the trading state database; research disk disabled"))
+            self.path = None
         if self.path is not None:
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,6 +187,14 @@ class ResearchRecorder:
                 except queue.Empty:
                     break
             try:
+                self._writes_since_check += len(batch)
+                if self._writes_since_check >= SPACE_CHECK_EVERY or not self._space_ok:
+                    self._writes_since_check = 0
+                    self._space_ok = self._space_available()
+                if not self._space_ok:
+                    self._count("dropped", len(batch))
+                    self.last_error = "research store full or volume low on space; rows dropped"
+                    continue
                 if conn is None:
                     conn = self._connect()
                 with conn:
@@ -185,10 +206,10 @@ class ResearchRecorder:
                             (row_id, session_date, strategy_id, kind,
                              datetime.now(timezone.utc).isoformat(), payload),
                         )
-                        self.written += cur.rowcount
+                        self._count("written", cur.rowcount)
             except Exception as exc:
                 self._fail(exc)
-                self.dropped += len(batch)
+                self._count("dropped", len(batch))
                 try:
                     if conn is not None:
                         conn.close()
@@ -199,14 +220,34 @@ class ResearchRecorder:
                 for _ in batch:
                     self._queue.task_done()
 
+    def _count(self, name: str, n: int = 1) -> None:
+        with self._counter_lock:
+            setattr(self, name, getattr(self, name) + n)
+
+    def _space_available(self) -> bool:
+        import shutil
+        try:
+            size = sum(
+                p.stat().st_size for p in self.path.parent.glob(self.path.name + "*") if p.is_file()
+            )
+            free = shutil.disk_usage(self.path.parent).free
+        except Exception:
+            return True
+        return size < MAX_DB_BYTES and free > MIN_FREE_BYTES
+
     def _fail(self, exc: BaseException) -> None:
-        self.errors += 1
+        self._count("errors")
         self.last_error = f"{type(exc).__name__}: {exc}"
-        log.warning("Research recorder error (trading unaffected): %s", self.last_error)
+        # Log the first few, then every 500th, so a repeating failure cannot flood logs.
+        self._fail_logged += 1
+        if self._fail_logged <= 5 or self._fail_logged % 500 == 0:
+            log.warning("Research recorder error #%d (trading unaffected): %s", self._fail_logged, self.last_error)
 
     # ----------------------------------------------------------------- write
     def record(self, kind: str, row_id: str, row: Dict[str, Any]) -> bool:
-        """Queue one row. Never blocks; returns False when the row was dropped."""
+        """Queue one row. Never blocks; returns False when the row was dropped.
+
+        The stored (possibly trimmed) row is ``self.recent[kind][-1]``."""
         table = self.TABLES[kind]
         row = json_safe(row)
         row.setdefault("record_version", RECORD_VERSION)
@@ -225,10 +266,10 @@ class ResearchRecorder:
                 table, row_id, str(row.get("session_date") or ""), str(row.get("strategy_id") or ""),
                 str(row.get("kind") or kind), payload,
             ))
-            self.queued += 1
+            self._count("queued")
             return True
         except queue.Full:
-            self.dropped += 1
+            self._count("dropped")
             self.last_error = "queue full"
             return False
 
@@ -300,10 +341,25 @@ def safe(fn: Callable[..., Any], *args: Any, recorder: Optional[ResearchRecorder
 # Excursion tracking (max favourable / adverse price while shares are held)
 # --------------------------------------------------------------------------
 
+_ET = None
+
+
+def _et_date(ts: datetime) -> Any:
+    global _ET
+    if _ET is None:
+        from zoneinfo import ZoneInfo
+        _ET = ZoneInfo("America/New_York")
+    return ts.astimezone(_ET).date()
+
+
 def new_excursion() -> Dict[str, Any]:
     return {
         "high": None, "low": None, "high_at": None, "low_at": None,
         "first_bar": None, "last_bar": None, "bars": 0, "max_gap_min": 0,
+        # Extremes before the most recent bar, so the exit-minute bar can be
+        # set aside as an ambiguous boundary (it holds prices after the exit).
+        "prev": None,
+        "last_bar_high": None, "last_bar_low": None,
     }
 
 
@@ -313,12 +369,15 @@ def fold_bar(exc: Dict[str, Any], ts: datetime, high: float, low: float) -> None
     if last is not None:
         if ts <= last:
             return  # duplicate or out-of-order bar
-        gap = int(round((ts - last).total_seconds() / 60.0)) - 1
-        exc["max_gap_min"] = max(int(exc.get("max_gap_min") or 0), gap)
+        if _et_date(ts) == _et_date(last):  # overnight/weekend gaps are not missing data
+            gap = int(round((ts - last).total_seconds() / 60.0)) - 1
+            exc["max_gap_min"] = max(int(exc.get("max_gap_min") or 0), gap)
+    exc["prev"] = {k: exc.get(k) for k in ("high", "low", "high_at", "low_at", "last_bar", "bars")}
     if exc.get("first_bar") is None:
         exc["first_bar"] = ts_iso
     exc["last_bar"] = ts_iso
     exc["bars"] = int(exc.get("bars") or 0) + 1
+    exc["last_bar_high"], exc["last_bar_low"] = float(high), float(low)
     if exc.get("high") is None or high > exc["high"]:
         exc["high"], exc["high_at"] = float(high), ts_iso
     if exc.get("low") is None or low < exc["low"]:
@@ -328,18 +387,33 @@ def fold_bar(exc: Dict[str, Any], ts: datetime, high: float, low: float) -> None
 def fold_price(exc: Dict[str, Any], price: float, ts: Any) -> None:
     if price is None or price <= 0:
         return
-    if exc.get("high") is None or price > exc["high"]:
-        exc["high"], exc["high_at"] = float(price), iso(ts)
-    if exc.get("low") is None or price < exc["low"]:
-        exc["low"], exc["low_at"] = float(price), iso(ts)
+    for target in (exc, exc.get("prev")):
+        if not target:
+            continue
+        if target.get("high") is None or price > target["high"]:
+            target["high"], target["high_at"] = float(price), iso(ts)
+        if target.get("low") is None or price < target["low"]:
+            target["low"], target["low_at"] = float(price), iso(ts)
 
 
 def excursion_summary(
     exc: Dict[str, Any], side: str, avg_entry: float, risk_per_share: Optional[float],
     entry_at: Optional[datetime], exit_at: Optional[datetime], started_with_trade: bool,
+    session_gaps_only: bool = False,
 ) -> Dict[str, Any]:
-    """MFE/MAE in dollars per share and in R, with an honest coverage verdict."""
+    """MFE/MAE in dollars per share and in R, with an honest coverage verdict.
+
+    Whole minutes strictly between the entry minute and the exit minute are
+    counted, plus every fill price. The exit-minute bar is reported separately
+    (``exit_bar_high/low``) because part of it can come after the exit.
+    """
     long = side.upper() in ("LONG", "BUY")
+    exc = dict(exc)
+    exit_bar = None
+    last = parse_ts(exc.get("last_bar"))
+    if exit_at is not None and last is not None and last >= minute_floor(exit_at) and exc.get("prev"):
+        exit_bar = {"start": exc.get("last_bar"), "high": exc.get("last_bar_high"), "low": exc.get("last_bar_low")}
+        exc.update(exc["prev"])
     high, low = exc.get("high"), exc.get("low")
     mfe = mae = None
     if high is not None and low is not None and avg_entry:
@@ -347,21 +421,28 @@ def excursion_summary(
         mae = (avg_entry - low) if long else (high - avg_entry)
         mfe, mae = max(0.0, mfe), max(0.0, mae)
     first, last = parse_ts(exc.get("first_bar")), parse_ts(exc.get("last_bar"))
-    complete = bool(started_with_trade and exc.get("bars"))
     notes: List[str] = []
+    complete = bool(started_with_trade)
     if not started_with_trade:
         notes.append("tracking started after entry (restart from older checkpoint or deploy)")
-    if entry_at is not None and first is not None and first > minute_floor(entry_at) + timedelta(minutes=1):
-        complete = False
-        notes.append("missing bars right after entry")
-    if exit_at is not None and last is not None and last < minute_floor(exit_at):
-        complete = False
-        notes.append("missing bars before exit")
+    if entry_at is not None and exit_at is not None:
+        whole_minutes = (minute_floor(exit_at) - minute_floor(entry_at)).total_seconds() / 60.0 - 1
+        if whole_minutes >= 1:
+            if first is None or last is None:
+                complete = False
+                notes.append("no whole bar between entry and exit minutes")
+            else:
+                if first > minute_floor(entry_at) + timedelta(minutes=1):
+                    complete = False
+                    notes.append("missing bars right after entry")
+                if last < minute_floor(exit_at) - timedelta(minutes=1) and not session_gaps_only:
+                    complete = False
+                    notes.append("missing bars before exit")
+        else:
+            notes.append("entry and exit within two minutes; fills only")
     if int(exc.get("max_gap_min") or 0) > 1:
         complete = False
-        notes.append(f"gap of {exc.get('max_gap_min')} minutes between bars")
-    if not exc.get("bars"):
-        notes.append("no whole bar after entry; fills only")
+        notes.append(f"gap of {exc.get('max_gap_min')} minutes between bars in one session")
     return {
         "mfe_per_share": rnd(mfe), "mae_per_share": rnd(mae),
         "mfe_r": rnd(mfe / risk_per_share, 3) if mfe is not None and risk_per_share else None,
@@ -372,12 +453,14 @@ def excursion_summary(
         "mae_at": exc.get("low_at") if long else exc.get("high_at"),
         "bars": int(exc.get("bars") or 0),
         "max_gap_min": int(exc.get("max_gap_min") or 0),
+        "exit_bar_high": rnd((exit_bar or {}).get("high")),
+        "exit_bar_low": rnd((exit_bar or {}).get("low")),
         "coverage_complete": complete,
         "coverage_notes": notes,
         "method": (
-            "1-minute bar high/low from the first bar that starts after the entry-fill minute "
-            "through the bar in which the final exit happened (that bar can include prices after "
-            "the exit), plus every fill price. Censored at the actual exit: it cannot show what a "
-            "wider stop or farther target would have done after the trade closed."
+            "1-minute bar highs/lows for every whole minute strictly between the entry minute and "
+            "the exit minute, plus every fill price. The exit-minute bar is set aside in "
+            "exit_bar_high/low because part of it can come after the exit. Censored at the actual "
+            "exit: it cannot show what a wider stop or farther target would have done afterwards."
         ),
     }

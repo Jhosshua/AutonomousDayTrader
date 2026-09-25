@@ -106,7 +106,8 @@ async def test_closed_trade_row_has_r_excursion_stops_and_exit_intent(rt, side):
     roles = [f["role"] for f in row["exit_fills"]]
     assert "TAKE_PROFIT_1" in roles and "STOP_LOSS" in roles
     stop_fill = next(f for f in row["exit_fills"] if f["role"] == "STOP_LOSS")
-    assert stop_fill["stop_regime"] == "moved_stop_after_target_1"
+    assert stop_fill["stop_regime"] == "breakeven_stop"
+    assert stop_fill["stop_set_by"] == "breakeven_after_TAKE_PROFIT_1"
     assert row["stops"]["adapted_stop"] is not None
     assert row["stops"]["structural_stop"] is not None
     assert row["signal"]["features"]["volume_ratio"] == 3.2
@@ -164,12 +165,13 @@ async def test_checkpoint_carries_open_trade_research_and_restores(rt):
     await rt.execute_strategy_signal(_signal())
     await rt.handle_bar_event(_bar(1, 100.0, 100.05, 99.95, 100.0))
     await rt.handle_bar_event(_bar(2, 100.0, 100.3, 99.7, 100.1))
-    state = rt.research_tracker.to_state()
-    raw = json.dumps(state, allow_nan=False)
+    raw = rt.research_tracker.to_state()
+    assert isinstance(raw, str), "checkpoint carries research as one opaque JSON string"
+    state = json.loads(raw)
     bid = rt.bracket_manager.symbol_to_bracket["AAPL"]
     assert state["brackets"][bid]["excursion"]["bars"] == 1
     rt.research_tracker.state = {"brackets": {}, "swing": {}}
-    rt.research_tracker.load_state(json.loads(raw))
+    rt.research_tracker.load_state(raw)
     assert rt.research_tracker.state["brackets"][bid]["excursion"]["high"] >= 100.3
     # capture_runtime_state carries it as an optional top-level key.
     from backend.app.core.runtime_state import capture_runtime_state  # noqa: F401
@@ -186,7 +188,7 @@ def test_state_with_nan_is_json_safe_and_oversize_is_omitted(monkeypatch):
         committed_count=lambda: 0,
     )
     tracker.state["brackets"]["b"] = {"x": float("nan"), "t": T0}
-    out = tracker.to_state()
+    out = json.loads(tracker.to_state())
     assert out["brackets"]["b"] == {"x": None, "t": T0.isoformat()}
     monkeypatch.setattr(rtmod, "MAX_STATE_BYTES", 10)
     assert tracker.to_state() is None and rec.errors == 1
@@ -232,10 +234,10 @@ def test_excursion_coverage_flags_gaps_and_late_starts():
     fold_bar(exc, T0 + timedelta(minutes=1), 101.0, 99.5)
     fold_bar(exc, T0 + timedelta(minutes=1), 150.0, 10.0)  # duplicate bar ignored
     fold_bar(exc, T0 + timedelta(minutes=4), 102.0, 99.0)  # 2-minute gap
-    s = excursion_summary(exc, "LONG", 100.0, 1.0, T0, T0 + timedelta(minutes=4), True)
+    s = excursion_summary(exc, "LONG", 100.0, 1.0, T0, T0 + timedelta(minutes=5), True)
     assert s["mfe_r"] == 2.0 and s["mae_r"] == 1.0
     assert s["coverage_complete"] is False and any("gap" in n for n in s["coverage_notes"])
-    s2 = excursion_summary(exc, "SHORT", 100.0, 1.0, T0, T0 + timedelta(minutes=4), False)
+    s2 = excursion_summary(exc, "SHORT", 100.0, 1.0, T0, T0 + timedelta(minutes=5), False)
     assert s2["mfe_r"] == 1.0 and s2["mae_r"] == 2.0 and s2["coverage_complete"] is False
 
 
@@ -305,7 +307,7 @@ def test_swing_round_trip_is_recorded_across_days():
     assert row["kind"] == "SWING" and row["complete"]
     assert row["result"]["realized_r"] == pytest.approx(60.0 / 100.0)  # $60 on $10/share x 10 risk
     assert row["excursion"]["mfe_r"] == pytest.approx(0.8) and row["excursion"]["mae_r"] == pytest.approx(0.3)
-    assert row["exit_fills"][0]["exit_intent"] == "TARGET_REACHED"
+    assert row["exit_fills"][0]["exit_intent"] == "staged: TARGET_REACHED"
     assert row["exit_fills"][0]["fill_ts_source"] == "alpaca_filled_at"
     assert "MU" not in tracker.state["swing"]
     assert row["fees_known"] is False
@@ -320,3 +322,82 @@ async def test_research_api_serves_rows(rt):
         await rt.get_research_rows("bogus", since=None, limit=10, after=None)
     with pytest.raises(Exception):
         await rt.get_research_rows("trades", since="yesterday", limit=10, after=None)
+
+
+def test_signal_features_are_not_a_constructor_field_so_rollback_can_restore():
+    from backend.app.core.persistence import encode_runtime_value
+    sig = _signal()
+    encoded = encode_runtime_value(sig)
+    assert "features" not in encoded["fields"], "old code rebuilds with cls(**fields)"
+    assert encoded["post_fields"]["features"]["volume_ratio"] == 3.2
+
+
+def test_research_path_equal_to_trading_db_is_refused(tmp_path):
+    db = tmp_path / "trading_state.sqlite3"
+    rec = ResearchRecorder(str(db), forbidden_paths=(str(db),))
+    assert rec.path is None and rec.errors == 1
+    assert not db.exists()
+
+
+def test_quote_and_flatten_exits_count_as_complete_coverage():
+    exc = new_excursion()
+    entry = T0 + timedelta(seconds=5)          # entry fill booked at 10:00
+    for m in range(1, 6):                      # whole bars 10:01..10:05
+        fold_bar(exc, T0 + timedelta(minutes=m), 100.0 + m * 0.1, 99.9)
+    quote_exit = T0 + timedelta(minutes=6, seconds=20)   # stop hit by a quote mid 10:06
+    s = excursion_summary(exc, "LONG", 100.0, 1.0, entry, quote_exit, True)
+    assert s["coverage_complete"] is True, s["coverage_notes"]
+    # Bar-triggered exit: the 10:06 bar was folded before the fill; it is set aside.
+    fold_bar(exc, T0 + timedelta(minutes=6), 105.0, 90.0)
+    s2 = excursion_summary(exc, "LONG", 100.0, 1.0, entry, T0 + timedelta(minutes=6), True)
+    assert s2["coverage_complete"] is True
+    assert s2["mfe_r"] == pytest.approx(0.5) and s2["exit_bar_high"] == 105.0
+
+
+def test_swing_overnight_gap_is_not_missing_data():
+    exc = new_excursion()
+    day1 = datetime(2026, 9, 21, 19, 58, tzinfo=timezone.utc)  # 15:58 ET
+    fold_bar(exc, day1, 101, 99)
+    fold_bar(exc, day1 + timedelta(minutes=1), 101, 99)
+    fold_bar(exc, datetime(2026, 9, 22, 13, 30, tzinfo=timezone.utc), 102, 100)  # next open
+    assert exc["max_gap_min"] == 0
+
+
+@pytest.mark.asyncio
+async def test_market_filter_snapshot_uses_signal_time_not_wall_clock(rt):
+    for m in range(0, 20):
+        ts = T0 - timedelta(minutes=20 - m)
+        for sym, px in (("SPY", 500 + m * 0.2), ("QQQ", 480 + m * 0.2)):
+            rt.market_filter.on_bar(BarEvent(sym, px, px + 0.1, px - 0.1, px + 0.05, 1_000_000, ts))
+    sig = _signal()
+    row = rt.research_tracker.record_signal(sig, "TEST", "x", {})
+    mf = row["context"]["market_filter"]
+    assert mf["overall_trend"] != "UNKNOWN", mf.get("reason")
+    assert row["context"]["market_filter_verdict"]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_cancelled_entry_gets_a_final_signal_outcome(rt):
+    await rt.execute_strategy_signal(_signal())
+    bid = rt.bracket_manager.symbol_to_bracket["AAPL"]
+    entry_id = bid[4:]
+    rt.engine.cancel_order(entry_id, reason="TEST_BROKER_REFUSED")
+    rt._release_dead_entry_brackets()
+    rt.research_tracker.prune(T0 + timedelta(minutes=1))
+    finals = [r for r in rt.research_recorder.recent["signals"] if r.get("kind") == "SIGNAL_FINAL"]
+    assert finals and finals[-1]["outcome"] == "ENTRY_NOT_FILLED"
+    assert finals[-1]["signal_id"].endswith("|BUY|" + T0.isoformat())
+    assert finals[-1]["strategy_id"] == "news_momentum"
+    assert bid not in rt.research_tracker.state["brackets"]
+
+
+def test_repeated_replays_do_not_collide(rt):
+    sig = _signal()
+    a = rt.research_tracker.record_signal(sig, "TEST", "x", {})
+    old = rt.research_tracker.run_id
+    rt.research_tracker.run_id = "otherrun"
+    try:
+        b = rt.research_tracker.record_signal(sig, "TEST", "x", {})
+    finally:
+        rt.research_tracker.run_id = old
+    assert a["row_id"] != b["row_id"] and a["row_id"].startswith("replay[")

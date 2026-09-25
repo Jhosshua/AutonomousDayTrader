@@ -58,6 +58,9 @@ class ResearchTracker:
         swing_staged_order_manager: Any,
         execution_mode: Callable[[], str],
         committed_count: Callable[[], int],
+        vix_print: Callable[[], Any] = lambda: None,
+        order_lookup: Callable[[str], Any] = lambda _oid: None,
+        run_id: str = "",
         swing_strategy_id: str = "swing_panic_dip",
         or15_strategy_id: str = "tsla_or15_retest",
     ) -> None:
@@ -74,21 +77,30 @@ class ResearchTracker:
         self.committed_count = committed_count
         self.swing_id = swing_strategy_id
         self.or15_id = or15_strategy_id
+        self.vix_print = vix_print
+        self.order_lookup = order_lookup
+        self.run_id = run_id
+        # Latest SUBMITTED signal row per (strategy, symbol): links OR15 trades,
+        # whose brackets are created by their own controller.
+        self.last_submitted: Dict[str, Dict[str, Any]] = {}
         # Open-trade research state. Small, JSON-safe, checkpointed.
         self.state: Dict[str, Dict[str, Any]] = {"brackets": {}, "swing": {}}
 
     # ------------------------------------------------------------ checkpoint
-    def to_state(self) -> Optional[Dict[str, Any]]:
-        """JSON-safe copy for the checkpoint; None (omitted) if oversized."""
+    def to_state(self) -> Optional[str]:
+        """The checkpoint carries research state as ONE JSON string, so nothing in it
+        can be type-decoded (or break) during the trading restore. None if oversized."""
         import json
-        safe_state = json_safe(self.state)
-        raw = json.dumps(safe_state, allow_nan=False, separators=(",", ":"))
+        raw = json.dumps(json_safe(self.state), allow_nan=False, separators=(",", ":"))
         if len(raw) > MAX_STATE_BYTES:
             self.recorder._fail(RuntimeError(f"research state {len(raw)} bytes; omitted from checkpoint"))
             return None
-        return safe_state
+        return raw
 
     def load_state(self, state: Any) -> None:
+        import json
+        if isinstance(state, str):
+            state = json.loads(state)
         if isinstance(state, dict):
             self.state = {
                 "brackets": dict(state.get("brackets") or {}),
@@ -100,7 +112,13 @@ class ResearchTracker:
     def code_revision() -> str:
         return (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or os.environ.get("GIT_COMMIT_SHA") or "unknown")[:40]
 
-    def context(self, strategy_id: Optional[str], symbol: Optional[str], asof: Optional[datetime]) -> Dict[str, Any]:
+    def mode_tag(self) -> str:
+        """Row-id namespace. Replays get their own run id so repeated replays never collide."""
+        mode = self.execution_mode()
+        return f"{mode}[{self.run_id}]" if mode == "replay" and self.run_id else mode
+
+    def context(self, strategy_id: Optional[str], symbol: Optional[str], asof: Optional[datetime],
+                signal: Any = None) -> Dict[str, Any]:
         """Settings + market snapshot. Each part fails independently."""
         ctx: Dict[str, Any] = {
             "execution_mode": self.execution_mode(),
@@ -115,7 +133,9 @@ class ResearchTracker:
                 ctx[name] = {"error": f"{type(exc).__name__}: {exc}"}
 
         strat = self.strategy_map.get(strategy_id or "")
-        if strat is not None and hasattr(strat, "tuning_params"):
+        if strategy_id == self.or15_id:
+            ctx["strategy_params"] = {"note": "fixed OR15 protocol; see tsla_or15_implementation_sha256 in the session summary"}
+        elif strat is not None and hasattr(strat, "tuning_params"):
             part("strategy_params", strat.tuning_params)
         ae = self.adaptation_engine
         part("adaptation", lambda: {
@@ -124,13 +144,15 @@ class ResearchTracker:
             "sizing_multiplier": rnd(getattr(ae, "current_sizing_multiplier", None), 3),
             "stop_multiplier": rnd(getattr(ae, "current_stop_multiplier", None), 3),
             "time_phase": _enum(getattr(ae, "current_time_phase", None)),
-            "vix_updated_at": iso(getattr(ae, "last_update", None)),
             "max_concurrent_positions": getattr(ae, "max_concurrent_positions", None),
             "base_risk_pct": getattr(ae, "base_risk_pct", None),
             "max_alloc_pct": getattr(ae, "max_alloc_pct", None),
         })
-        # Admission reads the filter at wall-clock time, so the snapshot does too.
-        part("market_filter", lambda: self._market_snapshot())
+        part("vix_print", lambda: self._vix_print())
+        # Admission judges the index filter at the signal's bar time; so does this.
+        part("market_filter", lambda: self._market_snapshot(asof or datetime.now(timezone.utc)))
+        if signal is not None:
+            part("market_filter_verdict", lambda: self._filter_verdict(signal))
         part("risk", lambda: {
             "equity": rnd(self.account.equity, 2),
             "day_start_equity": rnd(self.account.daily_starting_equity, 2),
@@ -144,10 +166,31 @@ class ResearchTracker:
             part("time", lambda: self._time_parts(asof))
         return ctx
 
-    def _market_snapshot(self) -> Dict[str, Any]:
-        snap = self.market_filter().get_trend_snapshot(datetime.now(timezone.utc))
+    def _market_snapshot(self, asof: datetime) -> Dict[str, Any]:
+        snap = self.market_filter().get_trend_snapshot(asof)
         data = snap.model_dump() if hasattr(snap, "model_dump") else vars(snap)
         return json_safe(data)
+
+    def _filter_verdict(self, signal: Any) -> Dict[str, Any]:
+        """The same (read-only) question admission asks, with the same inputs."""
+        permitted, reason = self.market_filter().is_signal_permitted(
+            strategy_id=signal.strategy_id, side=signal.side, symbol=signal.symbol,
+            asof=signal.timestamp, catalyst_sentiment=getattr(signal, "catalyst_sentiment", None),
+            volume_surge=getattr(signal, "volume_surge", None), rvol=getattr(signal, "rvol", None),
+        )
+        return {"permitted": bool(permitted), "reason": str(reason)[:300],
+                "applied_in_admission": getattr(self.adaptation_engine, "market_filter", None) is not None}
+
+    def _vix_print(self) -> Optional[Dict[str, Any]]:
+        vp = self.vix_print()
+        if vp is None:
+            return None
+        return {
+            "value": rnd(getattr(vp, "value", None), 3),
+            "received_at": iso(getattr(vp, "received_at", None)),
+            "is_stale": bool(getattr(vp, "is_stale", False)),
+            "is_fallback": bool(getattr(vp, "is_fallback", False)),
+        }
 
     @staticmethod
     def _time_parts(asof: datetime) -> Dict[str, Any]:
@@ -162,7 +205,7 @@ class ResearchTracker:
     # --------------------------------------------------------------- signals
     def signal_id(self, signal: Any) -> str:
         side = str(_enum(signal.side)).upper()
-        return f"{self.execution_mode()}:{signal.strategy_id}|{signal.symbol.upper()}|{side}|{iso(signal.timestamp)}"
+        return f"{self.mode_tag()}:{signal.strategy_id}|{signal.symbol.upper()}|{side}|{iso(signal.timestamp)}"
 
     @staticmethod
     def signal_dict(signal: Any) -> Dict[str, Any]:
@@ -189,7 +232,7 @@ class ResearchTracker:
         ts = signal.timestamp if isinstance(signal.timestamp, datetime) else None
         session = (ts.astimezone(ET).date().isoformat() if ts else datetime.now(ET).date().isoformat())
         row_id = self.signal_id(signal)
-        ctx = self.context(signal.strategy_id, signal.symbol, ts)
+        ctx = self.context(signal.strategy_id, signal.symbol, ts, signal=signal)
         row = {
             "row_id": row_id,
             "kind": "SIGNAL",
@@ -208,11 +251,15 @@ class ResearchTracker:
             ),
         }
         self.recorder.record("signals", row_id, row)
-        return row
+        stored = self.recorder.recent["signals"][-1]  # trimmed copy if the row was oversized
+        if outcome == "SUBMITTED":
+            self.last_submitted[f"{signal.strategy_id}|{signal.symbol.upper()}"] = stored
+        return stored
 
     def open_bracket(self, bracket: Any, signal_row: Optional[Dict[str, Any]], order: Any) -> None:
         """Remember the research view of a new bracket (signal, stages, context)."""
         self.state["brackets"][bracket.bracket_id] = {
+            "strategy_id": bracket.strategy_id,
             "signal_id": (signal_row or {}).get("row_id"),
             "signal": (signal_row or {}).get("signal"),
             "stages": (signal_row or {}).get("stages"),
@@ -235,6 +282,7 @@ class ResearchTracker:
         if rs is None:
             bracket = self.bracket_manager.brackets.get(bracket_id)
             rs = {
+                "strategy_id": getattr(bracket, "strategy_id", None),
                 "signal_id": None, "signal": None, "stages": None, "context": None,
                 "created_at": iso(getattr(bracket, "created_at", None)),
                 "created_entry_price": rnd(getattr(bracket, "entry_price", None)),
@@ -246,7 +294,12 @@ class ResearchTracker:
                 "late_start_reason": None if started else "no research state for this bracket (opened before recording, or state omitted)",
             }
             if bracket is not None and getattr(bracket, "strategy_id", None) == self.or15_id:
-                rs["context"] = self.context(self.or15_id, getattr(bracket, "symbol", None), None)
+                linked = self.last_submitted.get(f"{self.or15_id}|{bracket.symbol}")
+                if linked and started:
+                    rs.update(signal_id=linked.get("row_id"), signal=linked.get("signal"),
+                              stages=linked.get("stages"), context=linked.get("context"))
+                else:
+                    rs["context"] = self.context(self.or15_id, getattr(bracket, "symbol", None), None)
             self.state["brackets"][bracket_id] = rs
         return rs
 
@@ -334,6 +387,8 @@ class ResearchTracker:
         if bracket is not None:
             meta["bracket_status_before"] = str(_enum(bracket.status))
             meta["stop_in_force"] = rnd(bracket.current_stop_price)
+            hist = rs.get("stop_history") or []
+            meta["stop_set_by"] = hist[-1][3] if hist and hist[-1][1] == meta["stop_in_force"] else "unrecorded"
             meta["remaining_qty_before"] = int(bracket.remaining_qty)
         if len(rs["fills"]) < MAX_FILLS_PER_TRADE:
             rs["fills"].append(meta)
@@ -344,31 +399,39 @@ class ResearchTracker:
         """Fold this bar into every open trade on its symbol. Call BEFORE fills are processed."""
         sym = bar.symbol.upper()
         for bracket_id, rs in list(self.state["brackets"].items()):
-            bracket = self.bracket_manager.brackets.get(bracket_id)
-            if bracket is None:
-                continue
-            if bracket.symbol != sym:
-                continue
-            entry_fills = [f for f in rs["fills"] if f.get("role") == "ENTRY"]
-            if not entry_fills:
-                continue
-            status = str(_enum(bracket.status))
-            if status not in ("ACTIVE", "TARGET_1_HIT"):
-                continue
-            first_entry = min(parse_ts(f["fill_ts"]) for f in entry_fills)
-            if bar.timestamp >= minute_floor(first_entry) + timedelta(minutes=1):
-                fold_bar(rs["excursion"], bar.timestamp, bar.high, bar.low)
-            self._note_stop(rs, bracket, bar.timestamp, "bar")
+            try:
+                bracket = self.bracket_manager.brackets.get(bracket_id)
+                if bracket is None or bracket.symbol != sym:
+                    continue
+                entry_times = [parse_ts(f.get("fill_ts")) for f in rs["fills"] if f.get("role") == "ENTRY"]
+                entry_times = [t for t in entry_times if t is not None]
+                if not entry_times:
+                    continue
+                if str(_enum(bracket.status)) not in ("ACTIVE", "TARGET_1_HIT"):
+                    continue
+                if bar.timestamp >= minute_floor(min(entry_times)) + timedelta(minutes=1):
+                    fold_bar(rs["excursion"], bar.timestamp, bar.high, bar.low)
+                self._note_stop(rs, bracket, bar.timestamp, "observed_on_bar")
+            except Exception as exc:  # one bad entry must not stop the others
+                self.recorder._fail(exc)
         acc = self.state["swing"].get(sym)
         if acc and acc.get("entry_fills"):
-            first_entry = min(parse_ts(f["fill_ts"]) for f in acc["entry_fills"])
-            if bar.timestamp >= minute_floor(first_entry) + timedelta(minutes=1):
+            entry_times = [t for t in (parse_ts(f.get("fill_ts")) for f in acc["entry_fills"]) if t is not None]
+            if entry_times and bar.timestamp >= minute_floor(min(entry_times)) + timedelta(minutes=1):
                 fold_bar(acc["excursion"], bar.timestamp, bar.high, bar.low)
             if acc.get("stop") is None:
                 pos = self.account.positions.get(sym)
                 stop = getattr(pos, "stop_loss_price", None) if pos is not None else None
                 if stop:
                     acc["stop"] = rnd(stop)
+                    acc["stop_source"] = "position stop"
+
+    def note_stop_change(self, bracket_id: str, ts: Any, why: str) -> None:
+        """Called where the bot moves a stop (breakeven ratchet, trailing, operator)."""
+        rs = self.state["brackets"].get(bracket_id)
+        bracket = self.bracket_manager.brackets.get(bracket_id)
+        if rs is not None and bracket is not None:
+            self._note_stop(rs, bracket, ts, why)
 
     def _note_stop(self, rs: Dict[str, Any], bracket: Any, ts: Any, why: str) -> None:
         hist = rs["stop_history"]
@@ -379,20 +442,49 @@ class ResearchTracker:
             hist.pop(1)  # keep the first entry (initial stop)
         hist.append([iso(ts), stop, str(_enum(bracket.status)), why])
 
+    def _entry_not_filled(self, bracket_id: str, rs: Dict[str, Any], why: str) -> None:
+        """A SUBMITTED signal whose entry never filled gets a final-outcome row."""
+        if not rs.get("signal_id"):
+            return
+        order = self.order_lookup(rs.get("entry_order_id") or "")
+        row_id = f"{rs['signal_id']}|final"
+        self.recorder.record("signals", row_id, {
+            "row_id": row_id,
+            "kind": "SIGNAL_FINAL",
+            "session_date": (rs.get("signal") or {}).get("timestamp", "")[:10] or datetime.now(ET).date().isoformat(),
+            "strategy_id": rs.get("strategy_id") or "unknown",
+            "signal_id": rs["signal_id"],
+            "outcome": "ENTRY_NOT_FILLED",
+            "detail": why,
+            "order_status": str(_enum(getattr(order, "status", None))) if order is not None else None,
+            "order_reject_reason": str(getattr(order, "reject_reason", None))[:300] if order is not None else None,
+            "bracket_id": bracket_id,
+            "execution_mode": self.execution_mode(),
+        })
+
     def prune(self, now: datetime) -> None:
-        """Drop state for brackets that never filled (cancelled/rejected entries)."""
+        """Drop state for brackets that never filled (cancelled/rejected entries) or were orphaned."""
         for bracket_id, rs in list(self.state["brackets"].items()):
             bracket = self.bracket_manager.brackets.get(bracket_id)
             has_fills = bool(rs.get("fills"))
+            created = parse_ts(rs.get("created_at"))
             if bracket is None and not has_fills:
+                self._entry_not_filled(bracket_id, rs, "bracket removed before any fill")
                 self.state["brackets"].pop(bracket_id, None)
                 continue
             if bracket is not None and str(_enum(bracket.status)) == "CANCELLED" and not has_fills:
+                self._entry_not_filled(bracket_id, rs, "entry cancelled or refused before any fill")
                 self.state["brackets"].pop(bracket_id, None)
                 continue
-            created = parse_ts(rs.get("created_at"))
             if not has_fills and created is not None and now - created > timedelta(hours=STALE_UNFILLED_HOURS):
+                self._entry_not_filled(bracket_id, rs, "no fill within 24 hours")
                 self.state["brackets"].pop(bracket_id, None)
+                continue
+            if bracket is None and has_fills:
+                # Dropped by session rollover without a completion row: keep 1 hour, then release.
+                last = max((t for t in (parse_ts(f.get("fill_ts")) for f in rs["fills"]) if t), default=created)
+                if last is None or now - last > timedelta(hours=1):
+                    self.state["brackets"].pop(bracket_id, None)
                 continue
             # A finished bracket normally leaves via complete_bracket; anything
             # left behind (e.g. a fill that arrived after completion) is dropped.
@@ -411,7 +503,7 @@ class ResearchTracker:
                 "late_start_reason": "no research state for this bracket (opened before recording, or state omitted)",
             }
         mode = self.execution_mode()
-        row_id = f"{mode}:{bracket_id}"
+        row_id = f"{self.mode_tag()}:{bracket_id}"
         base = {
             "row_id": row_id,
             "kind": "OR15" if bracket is not None and bracket.strategy_id == self.or15_id else "INTRADAY",
@@ -440,7 +532,14 @@ class ResearchTracker:
         long = bracket.side == "LONG"
         direction = 1.0 if long else -1.0
         stop_at_entry = rs.get("created_stop") if rs.get("created_stop") is not None else bracket.initial_stop_price
-        rps = abs(avg_entry - stop_at_entry) if avg_entry is not None and stop_at_entry is not None else None
+        rps = None
+        stop_beyond_fill = False
+        if avg_entry is not None and stop_at_entry is not None:
+            signed = direction * (avg_entry - stop_at_entry)
+            if signed > 0:
+                rps = signed
+            else:
+                stop_beyond_fill = True  # filled at/through the stop: R is undefined
         initial_risk = rps * entry_qty if rps and entry_qty else None
         pnl = float(trade.get("realized_pnl") or 0.0)
 
@@ -469,7 +568,14 @@ class ResearchTracker:
                 return None
             if abs(float(s) - float(initial_stop)) < 1e-6:
                 return "initial_stop"
-            return "moved_stop_after_target_1" if meta.get("bracket_status_before") == "TARGET_1_HIT" else "moved_stop"
+            by = str(meta.get("stop_set_by") or "")
+            if by.startswith("breakeven"):
+                return "breakeven_stop"
+            if by.startswith("trail"):
+                return "trailing_stop"
+            if by.startswith("operator"):
+                return "operator_stop"
+            return "moved_stop_cause_unrecorded"
 
         exits = []
         for meta in exit_fill_meta:
@@ -520,6 +626,7 @@ class ResearchTracker:
             },
             "risk": {
                 "risk_per_share_at_fill": rnd(rps),
+                "stop_beyond_fill": stop_beyond_fill,
                 "initial_risk_dollars": rnd(initial_risk, 2),
                 "entry_slippage_vs_signal": rnd(entry_slip),
                 "entry_slippage_r": rnd(entry_slip / rps, 3) if entry_slip is not None and rps else None,
@@ -598,7 +705,9 @@ class ResearchTracker:
             acc["entry_fills"].append(meta)
         else:
             staged = self._staged(sym, "SELL")
-            meta["exit_intent"] = getattr(staged, "reason", None) if staged is not None else "UNSTAGED (emergency stop or operator)"
+            meta["exit_intent"] = (f"staged: {getattr(staged, 'reason', None)}" if staged is not None
+                                   else "UNSTAGED (emergency stop or operator)")
+            meta["exit_intent_note"] = "staged label read at fill time; an emergency exit while a staged exit exists shows the staged label"
             pos = self.account.positions.get(sym)
             meta["stop_in_force"] = rnd(getattr(pos, "stop_loss_price", None)) if pos is not None else acc.get("stop")
             acc["exit_fills"].append(meta)
@@ -616,17 +725,22 @@ class ResearchTracker:
         avg_entry = sum(f["qty"] * f["price"] for f in entries) / eq if eq else None
         avg_exit = sum(f["qty"] * f["price"] for f in exits) / xq if xq else None
         pnl = sum(float(f.get("realized_pnl") or 0.0) for f in exits)
-        stop = acc.get("stop")
+        stop, stop_source = acc.get("stop"), acc.get("stop_source")
         if stop is None:
             stop = next((f.get("stop_in_force") for f in exits if f.get("stop_in_force")), None)
+            stop_source = "position stop at exit" if stop is not None else None
+        if stop is None and (acc.get("scan") or {}).get("stop_loss_price"):
+            stop, stop_source = rnd(acc["scan"]["stop_loss_price"]), "staged scan stop"
+        if stop is None and acc.get("entry_atr") and avg_entry:
+            stop, stop_source = rnd(avg_entry - 2.5 * acc["entry_atr"]), "fill - 2.5 x entry ATR (rule 6)"
         rps = (avg_entry - stop) if avg_entry is not None and stop is not None and avg_entry > stop else None
         entry_at = min((parse_ts(f["fill_ts"]) for f in entries), default=None)
         exit_at = max((parse_ts(f["fill_ts"]) for f in exits), default=None)
         exc = excursion_summary(acc["excursion"], "LONG", avg_entry or 0.0, rps, entry_at, exit_at,
-                                bool(acc.get("started_with_trade")))
+                                bool(acc.get("started_with_trade")), session_gaps_only=True)
         exc["coverage_notes"].append("swing holds overnight; only regular-session minute bars are seen")
         session = entry_at.astimezone(ET).date().isoformat() if entry_at else datetime.now(ET).date().isoformat()
-        row_id = f"{mode}:{acc['round_trip_id']}"
+        row_id = f"{self.mode_tag()}:{acc['round_trip_id']}"
         row = {
             "row_id": row_id,
             "kind": "SWING",
@@ -642,8 +756,9 @@ class ResearchTracker:
             "closed_at": iso(exit_at),
             "hold_days": rnd((exit_at - entry_at).total_seconds() / 86400.0, 3) if entry_at and exit_at else None,
             "scan": acc.get("scan"),
+            "context_note": "context captured at the entry fill (09:30), not at the 16:00 scan that decided it",
             "entry_atr": acc.get("entry_atr"),
-            "stops": {"stop_at_entry": rnd(stop)},
+            "stops": {"stop_at_entry": rnd(stop), "stop_source": stop_source},
             "risk": {"risk_per_share_at_fill": rnd(rps), "initial_risk_dollars": rnd(rps * eq, 2) if rps and eq else None},
             "quantities": {"entry_filled_qty": eq, "exited_qty": xq, "balanced": eq == xq},
             "prices": {"avg_entry": rnd(avg_entry), "avg_exit": rnd(avg_exit)},

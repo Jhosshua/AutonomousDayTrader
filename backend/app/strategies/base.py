@@ -49,7 +49,9 @@ class SignalEvent:
     target_2_is_r_fallback: bool = False
     # Research only: the values the strategy used to decide (never read by
     # trading code). Recorded with the signal for later backtesting.
-    features: Dict[str, Any] = field(default_factory=dict)
+    # init=False keeps it out of the checkpoint's constructor fields, so a
+    # checkpoint written by this code still restores on the previous release.
+    features: Dict[str, Any] = field(default_factory=dict, init=False, compare=False, repr=False)
 
     def __post_init__(self):
         if isinstance(self.side, str):
