@@ -2480,6 +2480,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     swing_reserved_symbols.clear()
     decision_log.reset_for_session(None)
     research_tracker.state = {"brackets": {}, "swing": {}}
+    research_tracker.last_submitted.clear()
 
 
 def set_simulation_mode(enabled: bool) -> None:

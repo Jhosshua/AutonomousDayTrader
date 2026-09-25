@@ -295,7 +295,10 @@ class ResearchTracker:
             }
             if bracket is not None and getattr(bracket, "strategy_id", None) == self.or15_id:
                 linked = self.last_submitted.get(f"{self.or15_id}|{bracket.symbol}")
-                if linked and started:
+                created = getattr(bracket, "created_at", None)
+                same_day = bool(linked and created is not None
+                                and linked.get("session_date") == (created if created.tzinfo else created.replace(tzinfo=timezone.utc)).astimezone(ET).date().isoformat())
+                if linked and started and same_day:
                     rs.update(signal_id=linked.get("row_id"), signal=linked.get("signal"),
                               stages=linked.get("stages"), context=linked.get("context"))
                 else:
@@ -451,7 +454,7 @@ class ResearchTracker:
         self.recorder.record("signals", row_id, {
             "row_id": row_id,
             "kind": "SIGNAL_FINAL",
-            "session_date": (rs.get("signal") or {}).get("timestamp", "")[:10] or datetime.now(ET).date().isoformat(),
+            "session_date": str((rs.get("signal") or {}).get("timestamp") or "")[:10] or datetime.now(ET).date().isoformat(),
             "strategy_id": rs.get("strategy_id") or "unknown",
             "signal_id": rs["signal_id"],
             "outcome": "ENTRY_NOT_FILLED",
@@ -465,33 +468,40 @@ class ResearchTracker:
     def prune(self, now: datetime) -> None:
         """Drop state for brackets that never filled (cancelled/rejected entries) or were orphaned."""
         for bracket_id, rs in list(self.state["brackets"].items()):
-            bracket = self.bracket_manager.brackets.get(bracket_id)
-            has_fills = bool(rs.get("fills"))
-            created = parse_ts(rs.get("created_at"))
-            if bracket is None and not has_fills:
-                self._entry_not_filled(bracket_id, rs, "bracket removed before any fill")
+            try:
+                self._prune_one(bracket_id, rs, now)
+            except Exception as exc:  # one bad entry must not stop the others
+                self.recorder._fail(exc)
                 self.state["brackets"].pop(bracket_id, None)
-                continue
-            if bracket is not None and str(_enum(bracket.status)) == "CANCELLED" and not has_fills:
-                self._entry_not_filled(bracket_id, rs, "entry cancelled or refused before any fill")
+
+    def _prune_one(self, bracket_id: str, rs: Dict[str, Any], now: datetime) -> None:
+        bracket = self.bracket_manager.brackets.get(bracket_id)
+        has_fills = bool(rs.get("fills"))
+        created = parse_ts(rs.get("created_at"))
+        if bracket is None and not has_fills:
+            self._entry_not_filled(bracket_id, rs, "bracket removed before any fill")
+            self.state["brackets"].pop(bracket_id, None)
+            return
+        if bracket is not None and str(_enum(bracket.status)) == "CANCELLED" and not has_fills:
+            self._entry_not_filled(bracket_id, rs, "entry cancelled or refused before any fill")
+            self.state["brackets"].pop(bracket_id, None)
+            return
+        if not has_fills and created is not None and now - created > timedelta(hours=STALE_UNFILLED_HOURS):
+            self._entry_not_filled(bracket_id, rs, "no fill within 24 hours")
+            self.state["brackets"].pop(bracket_id, None)
+            return
+        if bracket is None and has_fills:
+            # Dropped by session rollover without a completion row: keep 1 hour, then release.
+            last = max((t for t in (parse_ts(f.get("fill_ts")) for f in rs["fills"]) if t), default=created)
+            if last is None or now - last > timedelta(hours=1):
                 self.state["brackets"].pop(bracket_id, None)
-                continue
-            if not has_fills and created is not None and now - created > timedelta(hours=STALE_UNFILLED_HOURS):
-                self._entry_not_filled(bracket_id, rs, "no fill within 24 hours")
+            return
+        # A finished bracket normally leaves via complete_bracket; anything
+        # left behind (e.g. a fill that arrived after completion) is dropped.
+        if bracket is not None and str(_enum(bracket.status)) in ("COMPLETED_PROFIT", "COMPLETED_STOP", "COMPLETED_FLATTEN", "CANCELLED"):
+            last = max((parse_ts(f.get("fill_ts")) for f in rs.get("fills", []) if f.get("fill_ts")), default=created)
+            if last is not None and now - last > timedelta(hours=1):
                 self.state["brackets"].pop(bracket_id, None)
-                continue
-            if bracket is None and has_fills:
-                # Dropped by session rollover without a completion row: keep 1 hour, then release.
-                last = max((t for t in (parse_ts(f.get("fill_ts")) for f in rs["fills"]) if t), default=created)
-                if last is None or now - last > timedelta(hours=1):
-                    self.state["brackets"].pop(bracket_id, None)
-                continue
-            # A finished bracket normally leaves via complete_bracket; anything
-            # left behind (e.g. a fill that arrived after completion) is dropped.
-            if bracket is not None and str(_enum(bracket.status)) in ("COMPLETED_PROFIT", "COMPLETED_STOP", "COMPLETED_FLATTEN", "CANCELLED"):
-                last = max((parse_ts(f.get("fill_ts")) for f in rs.get("fills", []) if f.get("fill_ts")), default=created)
-                if last is not None and now - last > timedelta(hours=1):
-                    self.state["brackets"].pop(bracket_id, None)
 
     # ------------------------------------------------------- trade completion
     def complete_bracket(self, bracket_id: str, trade: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:

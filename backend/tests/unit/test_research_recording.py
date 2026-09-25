@@ -401,3 +401,57 @@ def test_repeated_replays_do_not_collide(rt):
     finally:
         rt.research_tracker.run_id = old
     assert a["row_id"] != b["row_id"] and a["row_id"].startswith("replay[")
+
+
+def test_swing_coverage_flags_a_missing_day_and_a_short_day():
+    exc = new_excursion()
+    entry = datetime(2026, 9, 21, 13, 30, tzinfo=timezone.utc)   # Mon 09:30 ET
+    t = entry + timedelta(minutes=1)
+    while t < datetime(2026, 9, 21, 20, 0, tzinfo=timezone.utc):  # full Monday
+        fold_bar(exc, t, 101, 99)
+        t += timedelta(minutes=1)
+    # Tuesday: nothing. Wednesday: exit at the open.
+    exit_at = datetime(2026, 9, 23, 13, 30, 5, tzinfo=timezone.utc)
+    s = excursion_summary(exc, "LONG", 100.0, 1.0, entry, exit_at, True, session_gaps_only=True)
+    assert s["coverage_complete"] is False
+    assert any("2026-09-22 no bars" in n for n in s["coverage_notes"]), s["coverage_notes"]
+    # Only Monday to Tuesday open with Monday complete: complete.
+    s2 = excursion_summary(exc, "LONG", 100.0, 1.0, entry, datetime(2026, 9, 22, 13, 30, 5, tzinfo=timezone.utc),
+                           True, session_gaps_only=True)
+    assert s2["coverage_complete"] is True, s2["coverage_notes"]
+
+
+def test_bars_folded_after_a_late_booked_exit_are_flagged():
+    exc = new_excursion()
+    for m in range(1, 8):
+        fold_bar(exc, T0 + timedelta(minutes=m), 100.5 if m < 5 else 103.0, 99.8)
+    s = excursion_summary(exc, "LONG", 100.0, 1.0, T0, T0 + timedelta(minutes=5, seconds=30), True)
+    assert s["coverage_complete"] is False
+    assert any("after the exit" in n for n in s["coverage_notes"])
+
+
+def test_or15_does_not_link_yesterdays_signal(rt):
+    from types import SimpleNamespace as NS
+    tr = rt.research_tracker
+    tr.last_submitted["tsla_or15_retest|TSLA"] = {"row_id": "old", "session_date": "2026-09-23"}
+    rt.bracket_manager.brackets["brk_or15"] = NS(strategy_id="tsla_or15_retest", symbol="TSLA",
+                                                 created_at=T0, entry_price=400.0, initial_stop_price=398.0, total_qty=1)
+    try:
+        rs = tr._entry_for("brk_or15", started=True)
+        assert rs["signal_id"] is None
+        tr.state["brackets"].pop("brk_or15")
+        tr.last_submitted["tsla_or15_retest|TSLA"] = {"row_id": "today", "session_date": "2026-09-24"}
+        assert tr._entry_for("brk_or15", started=True)["signal_id"] == "today"
+    finally:
+        rt.bracket_manager.brackets.pop("brk_or15", None)
+    rt.reset_runtime_state()
+    assert not tr.last_submitted
+
+
+def test_one_bad_entry_does_not_stop_pruning(rt):
+    tr = rt.research_tracker
+    tr.state["brackets"]["bad"] = {"fills": [], "signal_id": "s", "signal": {"timestamp": None},
+                                   "created_at": "not a time", "entry_order_id": None}
+    tr.state["brackets"]["gone"] = {"fills": [], "signal_id": None, "created_at": None}
+    tr.prune(T0)
+    assert "gone" not in tr.state["brackets"] and "bad" not in tr.state["brackets"]

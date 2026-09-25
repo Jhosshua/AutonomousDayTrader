@@ -360,6 +360,8 @@ def new_excursion() -> Dict[str, Any]:
         # set aside as an ambiguous boundary (it holds prices after the exit).
         "prev": None,
         "last_bar_high": None, "last_bar_low": None,
+        # ET date -> [first bar start, last bar start] (swing multi-day coverage)
+        "days": {},
     }
 
 
@@ -373,6 +375,12 @@ def fold_bar(exc: Dict[str, Any], ts: datetime, high: float, low: float) -> None
             gap = int(round((ts - last).total_seconds() / 60.0)) - 1
             exc["max_gap_min"] = max(int(exc.get("max_gap_min") or 0), gap)
     exc["prev"] = {k: exc.get(k) for k in ("high", "low", "high_at", "low_at", "last_bar", "bars")}
+    days = exc.setdefault("days", {})
+    day_key = _et_date(ts).isoformat()
+    if day_key in days:
+        days[day_key][1] = ts_iso
+    elif len(days) < 60:
+        days[day_key] = [ts_iso, ts_iso]
     if exc.get("first_bar") is None:
         exc["first_bar"] = ts_iso
     exc["last_bar"] = ts_iso
@@ -394,6 +402,32 @@ def fold_price(exc: Dict[str, Any], price: float, ts: Any) -> None:
             target["high"], target["high_at"] = float(price), iso(ts)
         if target.get("low") is None or price < target["low"]:
             target["low"], target["low_at"] = float(price), iso(ts)
+
+
+def _missing_session_days(days: Dict[str, Any], entry_at: datetime, exit_at: datetime) -> List[str]:
+    """Trading days between entry and exit whose bars do not reach both session ends."""
+    from backend.app.core.trading_windows import is_trading_day, session_close
+    global _ET
+    _et_date(entry_at)  # initialises _ET
+    out: List[str] = []
+    d, end = _et_date(entry_at), _et_date(exit_at)
+    while d <= end and len(out) < 60:
+        if is_trading_day(d):
+            open_et = datetime(d.year, d.month, d.day, 9, 30, tzinfo=_ET)
+            close_t = session_close(d)
+            last_minute = datetime(d.year, d.month, d.day, close_t.hour, close_t.minute, tzinfo=_ET) - timedelta(minutes=1)
+            want_first = (minute_floor(entry_at) + timedelta(minutes=1)) if d == _et_date(entry_at) else open_et
+            want_last = (minute_floor(exit_at) - timedelta(minutes=1)) if d == _et_date(exit_at) else last_minute
+            if want_last >= want_first:
+                got = days.get(d.isoformat())
+                if not got:
+                    out.append(f"{d.isoformat()} no bars")
+                else:
+                    first, last = parse_ts(got[0]), parse_ts(got[1])
+                    if first > want_first + timedelta(minutes=1) or last < want_last:
+                        out.append(f"{d.isoformat()} partial")
+        d += timedelta(days=1)
+    return out
 
 
 def excursion_summary(
@@ -440,6 +474,14 @@ def excursion_summary(
                     notes.append("missing bars before exit")
         else:
             notes.append("entry and exit within two minutes; fills only")
+    if exit_at is not None and last is not None and last >= minute_floor(exit_at):
+        complete = False
+        notes.append("bars after the exit were folded (exit booked late)")
+    if session_gaps_only and entry_at is not None and exit_at is not None:
+        missing = _missing_session_days(exc.get("days") or {}, entry_at, exit_at)
+        if missing:
+            complete = False
+            notes.append("incomplete sessions: " + ", ".join(missing[:10]))
     if int(exc.get("max_gap_min") or 0) > 1:
         complete = False
         notes.append(f"gap of {exc.get('max_gap_min')} minutes between bars in one session")
