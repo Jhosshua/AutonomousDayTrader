@@ -148,6 +148,9 @@ class ExecutionEngine:
         # or (reason, hard, retry_sec) to refuse before anything reaches Alpaca.
         self.broker_gate: Optional[Callable[["Order", bool], Optional[Tuple[str, bool, float]]]] = None
         self._broker_retry_after: Dict[str, float] = {}
+        # Observation-only hooks called after every booked fill (research
+        # recording). A listener failure is logged and never affects the fill.
+        self.fill_listeners: List[Callable[["Order", "Fill"], None]] = []
 
     # Seconds before an order the broker did not fill is tried again.
     BROKER_RETRY_SEC: float = 5.0
@@ -778,6 +781,11 @@ class ExecutionEngine:
                 fill_qty=qty, fill_price=price, fee=fee
             )
 
+        for listener in list(self.fill_listeners):
+            try:
+                listener(order, fill)
+            except Exception:
+                log.exception("Fill listener failed (fill unaffected)")
         return fill
 
     def _record_audit(

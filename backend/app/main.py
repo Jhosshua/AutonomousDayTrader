@@ -52,6 +52,8 @@ from backend.app.core.or15_execution import OR15ExecutionController
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
 from backend.app.core.decisions import decision_log, classify_adaptation_reason
+from backend.app.core.research import ResearchRecorder, safe as research_safe
+from backend.app.core.research_tracker import ResearchTracker
 from backend.app.core.trading_windows import is_trading_day, session_close, session_minutes, strategy_window
 from backend.app.strategies.earnings_calendar import EarningsCalendar
 from backend.app.strategies.swing_panic_dip import (
@@ -538,6 +540,52 @@ earnings_calendar = EarningsCalendar(
     cache_path=getattr(settings, "EARNINGS_CALENDAR_CACHE_PATH", None),
 )
 swing_staged_order_manager = SwingStagedOrderManager()
+
+
+def _research_db_path() -> Optional[str]:
+    if not settings.RESEARCH_ENABLED:
+        return None
+    if settings.RESEARCH_DB_PATH:
+        return settings.RESEARCH_DB_PATH
+    if settings.PERSISTENCE_ENABLED:
+        return str(Path(settings.STATE_DB_PATH).expanduser().parent / "research.sqlite3")
+    return None
+
+
+def _execution_mode() -> str:
+    if simulation_mode:
+        return "replay"
+    return "alpaca_paper" if engine.broker is not None else "simulated"
+
+
+def _research_committed_count() -> int:
+    return _get_effective_committed_portfolio(account, arm=TradingArm.INTRADAY)[2]
+
+
+# Observation only: research rows go to their own SQLite file through a
+# background queue, never through the trading checkpoint transaction.
+research_recorder = ResearchRecorder(_research_db_path())
+research_tracker = ResearchTracker(
+    research_recorder,
+    bracket_manager=bracket_manager,
+    entry_order_to_bracket=entry_order_to_bracket,
+    account=account,
+    adaptation_engine=adaptation_engine,
+    market_filter=lambda: market_filter,
+    risk_engine=risk_engine,
+    strategy_map=strategy_map,
+    swing_staged_order_manager=swing_staged_order_manager,
+    execution_mode=_execution_mode,
+    committed_count=_research_committed_count,
+)
+
+
+def _research_on_fill(order: Any, fill: Any) -> None:
+    if settings.RESEARCH_ENABLED:
+        research_safe(research_tracker.on_fill, order, fill, engine.broker is not None, recorder=research_recorder)
+
+
+engine.fill_listeners.append(_research_on_fill)
 swing_strategy_engine = SwingStrategyEngine(
     account=account,
     execution_engine=engine,
@@ -602,6 +650,7 @@ def _capture_checkpoint() -> Dict[str, Any]:
         swing_reserved_symbols=swing_reserved_symbols,
         daily_bar_store=daily_bar_store,
         decisions=decision_log.to_state(),
+        research=research_safe(research_tracker.to_state, recorder=research_recorder),
         swing_scan={
             "last_scan": swing_strategy_engine.audit_log[-1] if swing_strategy_engine.audit_log else None,
             "last_close_data_note": getattr(swing_strategy_engine, "last_close_data_note", None),
@@ -738,6 +787,7 @@ def _restore_checkpoint() -> bool:
     last_session_date = restored["last_session_date"]
     last_vix_print = restored["last_vix_print"]
     decision_log.load_state(restored.get("decisions"))
+    research_safe(research_tracker.load_state, restored.get("research"), recorder=research_recorder)
     swing_scan = restored.get("swing_scan") or {}
     if swing_scan.get("last_scan"):
         swing_strategy_engine.audit_log[:] = [swing_scan["last_scan"]]
@@ -997,6 +1047,10 @@ def _record_completed_bracket(bracket_id: str) -> None:
             or15_controller.completed(trade)
         pending_trade_records[trade["trade_id"]] = trade
     bracket_realized_pnl.pop(bracket_id, None)
+    # Research row last, after every lifecycle step above has already run, so a
+    # failure here can never lose the ledger row or block OR15 closing.
+    if settings.RESEARCH_ENABLED:
+        research_safe(research_tracker.complete_bracket, bracket_id, trade, recorder=research_recorder)
 
 
 def _record_exit_fill(order: Any, fill: Any) -> bool:
@@ -1048,6 +1102,8 @@ def _reconcile_fills(fills: List[Any]) -> None:
                             bracket.symbol, actual_reward_r, mean_reversion_strategy.min_rr_ratio,
                         )
                 _apply_bracket_directive(bracket_id, directive)
+                if settings.RESEARCH_ENABLED:
+                    research_safe(research_tracker.on_activation, bracket_id, recorder=research_recorder)
                 # A partial entry is cancelled after protecting the filled shares;
                 # otherwise the remaining parent quantity has no matching bracket size.
                 if order.status.value == "PARTIALLY_FILLED":
@@ -1425,7 +1481,13 @@ def _risk_reason_text(preview: Any) -> str:
     return "risk check failed"
 
 
-def _record_decision(signal: SignalEvent, outcome: str, detail: str) -> None:
+def _record_decision(
+    signal: SignalEvent, outcome: str, detail: str, stages: Optional[Dict[str, Any]] = None
+) -> Optional[Dict[str, Any]]:
+    """Log a signal outcome for the dashboard, plus a research row (observation only)."""
+    row = None
+    if settings.RESEARCH_ENABLED:
+        row = research_safe(research_tracker.record_signal, signal, outcome, detail, stages, recorder=research_recorder)
     try:
         decision_log.record(
             strategy_id=signal.strategy_id,
@@ -1438,6 +1500,7 @@ def _record_decision(signal: SignalEvent, outcome: str, detail: str) -> None:
         )
     except Exception:
         log.exception("Decision log write failed")
+    return row
 
 
 def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
@@ -1562,8 +1625,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         return
 
     # 2. Position-opening entry signal
+    # Research only: what each admission stage decided (never read by trading code).
+    stages: Dict[str, Any] = {"decision_wall_at": datetime.now(timezone.utc).isoformat()}
     if signal.entry_price <= 0:
-        _record_decision(signal, "BAD_PRICE", f"entry_price={signal.entry_price}")
+        _record_decision(signal, "BAD_PRICE", f"entry_price={signal.entry_price}", stages)
         return
 
     # Reject duplicate entries: a working entry order or live bracket for this
@@ -1580,19 +1645,26 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
                 "Rejecting duplicate entry signal for %s: bracket %s already %s",
                 sym, existing_bracket_id, existing_bracket.status.value,
             )
-            _record_decision(signal, "DUPLICATE", f"bracket {existing_bracket.status.value}")
+            _record_decision(signal, "DUPLICATE", f"bracket {existing_bracket.status.value}", stages)
             return
     for working in engine.working_orders.values():
         if working.symbol == sym and working.id in entry_order_to_bracket:
             log.warning("Rejecting duplicate entry signal for %s: entry order %s still working", sym, working.id)
-            _record_decision(signal, "DUPLICATE", "entry order still working")
+            _record_decision(signal, "DUPLICATE", "entry order still working", stages)
             return
 
     latest_market_prices[sym] = signal.entry_price if bar is None else bar.close
     adapted_stop = adaptation_engine.calculate_adapted_stop(signal)
     target_1_override, target_2_override, target_error = _intraday_target_overrides(signal, adapted_stop)
+    stages.update(
+        adapted_stop=adapted_stop,
+        stop_multiplier=getattr(adaptation_engine, "current_stop_multiplier", None),
+        target_1_override=target_1_override,
+        target_2_override=target_2_override,
+        target_error=target_error,
+    )
     if target_error:
-        _record_decision(signal, "RISK", target_error)
+        _record_decision(signal, "RISK", target_error, stages)
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         return
@@ -1607,8 +1679,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         is_symbol_active=is_active,
         stop_loss_price=adapted_stop,
     )
+    stages.update(admission_approved=approved, admission_reason=reason, admission_qty=qty,
+                  committed_positions=committed_count)
     if not approved or qty <= 0:
-        _record_decision(signal, classify_adaptation_reason(reason) if not approved else "SIZING", reason)
+        _record_decision(signal, classify_adaptation_reason(reason) if not approved else "SIZING", reason, stages)
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         return
@@ -1635,14 +1709,16 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         strategy_id=signal.strategy_id,
     )
 
+    stages.update(risk_approved=bool(risk_preview.approved),
+                  risk_authorized_qty=getattr(risk_preview, "authorized_qty", None))
     if not risk_preview.approved:
-        _record_decision(signal, "RISK", _risk_reason_text(risk_preview))
+        _record_decision(signal, "RISK", _risk_reason_text(risk_preview), stages)
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         return
     qty = min(qty, risk_preview.authorized_qty)
     if qty <= 0:
-        _record_decision(signal, "SIZING", "risk engine authorized 0 shares")
+        _record_decision(signal, "SIZING", "risk engine authorized 0 shares", stages)
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         return
@@ -1662,7 +1738,8 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     )
     submitted = engine.submit_order(order.id)
     if submitted.status.value == "ACCEPTED":
-        _record_decision(signal, "SUBMITTED", f"{side.value} {qty} {sym} order {submitted.id}")
+        stages.update(final_qty=qty, order_id=submitted.id, bracket_id=f"brk_{submitted.id}")
+        signal_row = _record_decision(signal, "SUBMITTED", f"{side.value} {qty} {sym} order {submitted.id}", stages)
         ratio_strategy = {
             "orb": orb_strategy,
             "news_momentum": news_strategy,
@@ -1684,6 +1761,8 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             min_target_1_r=0.50 if signal.strategy_id == "vwap_pullback" else None,
         )
         entry_order_to_bracket[submitted.id] = bracket.bracket_id
+        if settings.RESEARCH_ENABLED:
+            research_safe(research_tracker.open_bracket, bracket, signal_row, submitted, recorder=research_recorder)
         if bar:
             fills = engine.process_bar(bar.symbol, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.timestamp)
             _reconcile_fills(fills)
@@ -1691,7 +1770,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         if signal.strategy_id == "orb":
             orb_strategy.notify_signal_rejected(sym)
         log.warning("Entry order %s rejected by execution engine: %s", submitted.id, submitted.reject_reason)
-        _record_decision(signal, "ENGINE_REJECT", str(submitted.reject_reason))
+        _record_decision(signal, "ENGINE_REJECT", str(submitted.reject_reason), stages)
 
 
 # Event Bus Handlers
@@ -1792,6 +1871,12 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
                     orb_strategy.notify_signal_rejected(sig.symbol)
         for sig in arbitrated:
             await execute_strategy_signal(sig)
+
+    # Research excursion tracking, before this bar's fills are processed so the
+    # exit bar is still counted for the trade it closes.
+    if settings.RESEARCH_ENABLED:
+        research_safe(research_tracker.on_bar, bar, recorder=research_recorder)
+        research_safe(research_tracker.prune, bar.timestamp, recorder=research_recorder)
 
     fills = engine.process_bar(
         symbol=bar.symbol,
@@ -2381,6 +2466,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     daily_bar_aggregator.reset_for_new_session()
     swing_reserved_symbols.clear()
     decision_log.reset_for_session(None)
+    research_tracker.state = {"brackets": {}, "swing": {}}
 
 
 def set_simulation_mode(enabled: bool) -> None:
@@ -2529,6 +2615,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await asyncio.sleep(0.5 * (attempt + 1))
     if state_store is not None and not checkpoint_saved:
         log.critical("Final durable checkpoint failed after all shutdown retries")
+    research_safe(research_recorder.flush, 3.0, recorder=research_recorder)
     stock_ws_client = None
     news_ws_client = None
     vix_client = None
@@ -2600,6 +2687,7 @@ async def get_health() -> Dict[str, Any]:
             "mock": settings.MOCK_PORT,
         },
         "relay": relay_statuses,
+        "research": research_recorder.health(),
         "broker": _broker_health(),
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
@@ -2733,6 +2821,36 @@ async def get_market_context() -> Dict[str, Any]:
 async def get_audit_log(limit: int = 50) -> List[Dict[str, Any]]:
     """Recent execution and order audit trail."""
     return [r.__dict__ for r in reversed(engine.audit_log[-limit:])]
+
+
+@app.get("/api/research/{kind}")
+async def get_research_rows(
+    kind: str,
+    since: Optional[str] = None,
+    limit: int = 200,
+    after: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Research export: `trades` (closed trades with R, MFE/MAE, stops, context) or
+    `signals` (every emitted signal with its outcome). Page with `after` = next_after."""
+    if kind not in ("trades", "signals"):
+        raise HTTPException(status_code=404, detail="kind must be trades or signals")
+    if since is not None:
+        try:
+            date.fromisoformat(since)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="since must be YYYY-MM-DD") from exc
+    try:
+        rows = await asyncio.to_thread(research_recorder.list, kind, since, limit, after)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"research store unavailable: {exc}") from exc
+    last = rows[-1] if rows else None
+    return {
+        "kind": kind,
+        "count": len(rows),
+        "rows": rows,
+        "next_after": f"{last.get('session_date')}|{last.get('row_id')}" if last and len(rows) >= max(1, min(limit, 1000)) else None,
+        "research": research_recorder.health(),
+    }
 
 
 @app.get("/api/trades")

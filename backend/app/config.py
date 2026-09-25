@@ -59,6 +59,14 @@ class Settings(BaseSettings):
         default=".data/trading_state.sqlite3",
         description="SQLite ledger path; production must point this at a durable mounted volume"
     )
+    RESEARCH_ENABLED: bool = Field(
+        default=True,
+        description="Record research rows (signals, trade details) for later backtesting; observation only"
+    )
+    RESEARCH_DB_PATH: str = Field(
+        default="",
+        description="Research SQLite path. Empty = research.sqlite3 next to STATE_DB_PATH when persistence is on, else memory only"
+    )
     STATE_BACKUP_PATH: str = Field(
         default="",
         description="Optional same-volume hot backup created at session boundaries and shutdown"

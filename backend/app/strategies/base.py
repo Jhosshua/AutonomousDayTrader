@@ -13,6 +13,14 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from backend.app.models.events import BarEvent, QuoteEvent, NewsEvent, VixPrint, OrderSide, OrderType
 
 
+def attach_features(signal: "SignalEvent", build: Any) -> None:
+    """Attach research features; a failure here must never drop the signal."""
+    try:
+        signal.features = build()
+    except Exception as exc:  # research only
+        signal.features = {"error": f"{type(exc).__name__}: {exc}"}
+
+
 class StrategyStatus(str, Enum):
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
@@ -39,6 +47,9 @@ class SignalEvent:
     catalyst_sentiment: Optional[float] = None
     target_1_is_r_fallback: bool = False
     target_2_is_r_fallback: bool = False
+    # Research only: the values the strategy used to decide (never read by
+    # trading code). Recorded with the signal for later backtesting.
+    features: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.side, str):
@@ -246,6 +257,25 @@ class Strategy(ABC):
         self.losses_count: int = 0
         self.win_rate: float = 0.0
         self._trade_pnls: List[float] = []
+
+    _NON_TUNING_ATTRS = frozenset({
+        "strategy_id", "name", "status", "daily_pnl", "trades_count", "wins_count",
+        "losses_count", "win_rate", "sharpe",
+    })
+
+    def tuning_params(self) -> Dict[str, Any]:
+        """The scalar knob values this strategy is running with (research snapshot).
+
+        Scalars only, so runtime memory (per-symbol state dicts, bar lists) and
+        performance counters never leak in.
+        """
+        out: Dict[str, Any] = {}
+        for key, value in vars(self).items():
+            if key.startswith("_") or key in self._NON_TUNING_ATTRS:
+                continue
+            if isinstance(value, bool) or isinstance(value, (int, float, str)):
+                out[key] = value
+        return out
 
     @abstractmethod
     def on_bar(self, bar: BarEvent) -> List[SignalEvent]:

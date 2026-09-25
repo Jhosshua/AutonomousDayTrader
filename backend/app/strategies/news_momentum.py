@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from backend.app.config import settings
 from backend.app.models.events import BarEvent, NewsEvent, OrderSide, OrderType
 from backend.app.strategies.base import (
+    attach_features,
     Strategy,
     SignalEvent,
     StrategyStatus,
@@ -312,6 +313,16 @@ class NewsMomentumStrategy(Strategy):
             sig.catalyst_sentiment = cat.sentiment
             sig.volume_surge = vol_ratio
             sig.rvol = vol_ratio
+            attach_features(sig, lambda: {
+                "headline": cat.headline[:160],
+                "catalyst_at": cat.timestamp.isoformat() if cat.timestamp else None,
+                "catalyst_age_sec": round(now_ts - cat.timestamp.timestamp(), 1),
+                "sentiment": cat.sentiment,
+                "volume_ratio": round(vol_ratio, 4), "volume_sma20": round(sma20_vol, 2),
+                "volume_baseline_bars": len(recent_volumes),
+                "structural_stop": round(bar.low - 0.02, 4), "raw_stop_distance": round(raw_dist, 4),
+                "floored_stop_distance": round(risk, 4),
+            })
             signals.append(sig)
             self.monitored_positions[sym] = "LONG"
 
@@ -342,6 +353,16 @@ class NewsMomentumStrategy(Strategy):
             sig.catalyst_sentiment = cat.sentiment
             sig.volume_surge = vol_ratio
             sig.rvol = vol_ratio
+            attach_features(sig, lambda: {
+                "headline": cat.headline[:160],
+                "catalyst_at": cat.timestamp.isoformat() if cat.timestamp else None,
+                "catalyst_age_sec": round(now_ts - cat.timestamp.timestamp(), 1),
+                "sentiment": cat.sentiment,
+                "volume_ratio": round(vol_ratio, 4), "volume_sma20": round(sma20_vol, 2),
+                "volume_baseline_bars": len(recent_volumes),
+                "structural_stop": round(bar.high + 0.02, 4), "raw_stop_distance": round(raw_dist, 4),
+                "floored_stop_distance": round(risk, 4),
+            })
             signals.append(sig)
             self.monitored_positions[sym] = "SHORT"
 

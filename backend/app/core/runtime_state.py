@@ -43,6 +43,7 @@ def capture_runtime_state(
     daily_bar_store: Optional[Any] = None,
     decisions: Optional[Dict[str, Any]] = None,
     swing_scan: Optional[Dict[str, Any]] = None,
+    research: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 
     """Return a complete JSON-safe recovery checkpoint."""
@@ -143,6 +144,9 @@ def capture_runtime_state(
         state["decisions"] = decisions
     if swing_scan is not None:
         state["swing_scan"] = swing_scan
+    if research is not None:
+        # Optional key: open-trade research state (JSON-safe, size-capped).
+        state["research"] = research
     encoded = encode_runtime_value(state)
     if not isinstance(encoded, dict):
         raise PersistenceError("Encoded runtime checkpoint is not an object")
@@ -277,6 +281,7 @@ def restore_runtime_state(
         "ledger_revision": int(decoded.get("ledger_revision", 0)),
         "decisions": decoded.get("decisions"),
         "swing_scan": decoded.get("swing_scan"),
+        "research": decoded.get("research"),
     }
 
 

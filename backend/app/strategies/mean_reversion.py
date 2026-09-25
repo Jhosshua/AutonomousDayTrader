@@ -12,6 +12,7 @@ import zoneinfo
 
 from backend.app.models.events import BarEvent, OrderSide, OrderType
 from backend.app.strategies.base import (
+    attach_features,
     Strategy,
     SignalEvent,
     StrategyStatus,
@@ -189,6 +190,14 @@ class MeanReversionStrategy(Strategy):
                             timestamp=bar.timestamp,
                         )
                     )
+                    attach_features(signals[-1], lambda: {
+                        "z": round(z, 4), "mean": round(mean, 4), "std": round(std, 4),
+                        "rsi": rsi, "volume_ratio": round(vol_ratio, 4), "volume_sma": round(sma_vol, 2),
+                        "wick_ratio": round(upper_wick / candle_range, 4), "atr": round(atr, 4),
+                        "structural_stop": raw_stop, "raw_stop_distance": round(raw_dist, 4),
+                        "floored_stop_distance": round(risk, 4),
+                        "structural_rr": round(reward / risk, 4) if risk > 0 else None,
+                    })
                     state.last_signal_time = bar.timestamp
 
         # 2. Long Exhaustion Fade (Oversold extreme: Z <= -2.00, RSI <= 30, Lower Wick >= 35%)
@@ -221,6 +230,14 @@ class MeanReversionStrategy(Strategy):
                             timestamp=bar.timestamp,
                         )
                     )
+                    attach_features(signals[-1], lambda: {
+                        "z": round(z, 4), "mean": round(mean, 4), "std": round(std, 4),
+                        "rsi": rsi, "volume_ratio": round(vol_ratio, 4), "volume_sma": round(sma_vol, 2),
+                        "wick_ratio": round(lower_wick / candle_range, 4), "atr": round(atr, 4),
+                        "structural_stop": raw_stop, "raw_stop_distance": round(raw_dist, 4),
+                        "floored_stop_distance": round(risk, 4),
+                        "structural_rr": round(reward / risk, 4) if risk > 0 else None,
+                    })
                     state.last_signal_time = bar.timestamp
 
         return signals

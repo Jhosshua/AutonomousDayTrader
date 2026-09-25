@@ -11,6 +11,7 @@ import zoneinfo
 
 from backend.app.models.events import BarEvent, OrderSide, OrderType
 from backend.app.strategies.base import (
+    attach_features,
     Strategy,
     SignalEvent,
     StrategyStatus,
@@ -181,6 +182,21 @@ class VWAPPullbackStrategy(Strategy):
                         target_2_is_r_fallback=fallback_2,
                     )
                 )
+                attach_features(signals[-1], lambda: {
+                    "vwap": round(vwap, 4), "std": round(std, 4),
+                    "ema_fast": round(ema_fast, 4), "ema_slow": round(ema_slow, 4),
+                    "tested_zone_this_bar": bool(tested_zone),
+                    "prior_bar_in_zone": bool(state.in_pullback_zone),
+                    "wick_ratio": round(lower_wick / candle_range, 4),
+                    "volume_ratio": round(bar.volume / sma10_vol, 4),
+                    "volume_sma10": round(sma10_vol, 2),
+                    "volume_confirmed": bool(volume_confirmed),
+                    "structural_stop": round(vwap - (0.50 * std), 4),
+                    "raw_stop_distance": round(raw_risk, 4),
+                    "floored_stop_distance": round(risk, 4),
+                    "zone_band_std": [-0.2, 0.3], "wick_min": 0.30, "volume_min_ratio": 1.20,
+                    "stop_band_std": 0.50, "target_bands_std": [1.0, 2.0],
+                })
                 state.in_pullback_zone = False
                 state.last_signal_timestamp = bar.timestamp
             elif tested_zone:
@@ -228,6 +244,21 @@ class VWAPPullbackStrategy(Strategy):
                         target_2_is_r_fallback=fallback_2,
                     )
                 )
+                attach_features(signals[-1], lambda: {
+                    "vwap": round(vwap, 4), "std": round(std, 4),
+                    "ema_fast": round(ema_fast, 4), "ema_slow": round(ema_slow, 4),
+                    "tested_zone_this_bar": bool(tested_zone),
+                    "prior_bar_in_zone": bool(state.in_pullback_zone),
+                    "wick_ratio": round(upper_wick / candle_range, 4),
+                    "volume_ratio": round(bar.volume / sma10_vol, 4),
+                    "volume_sma10": round(sma10_vol, 2),
+                    "volume_confirmed": bool(volume_confirmed),
+                    "structural_stop": round(vwap + (0.50 * std), 4),
+                    "raw_stop_distance": round(raw_risk, 4),
+                    "floored_stop_distance": round(risk, 4),
+                    "zone_band_std": [-0.3, 0.2], "wick_min": 0.30, "volume_min_ratio": 1.20,
+                    "stop_band_std": 0.50, "target_bands_std": [1.0, 2.0],
+                })
                 state.in_pullback_zone = False
                 state.last_signal_timestamp = bar.timestamp
             elif tested_zone:

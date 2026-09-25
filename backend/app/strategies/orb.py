@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import zoneinfo
 
 from backend.app.models.events import BarEvent, OrderSide, OrderType
-from backend.app.strategies.base import Strategy, SignalEvent, StrategyStatus, calculate_atr, resolve_stop
+from backend.app.strategies.base import attach_features, Strategy, SignalEvent, StrategyStatus, calculate_atr, resolve_stop
 
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 
@@ -255,4 +255,21 @@ class OpeningRangeBreakoutStrategy(Strategy):
             timestamp=bar.timestamp,
         )
         sig.rvol = rvol
+        attach_features(sig, lambda: {
+            "range_high": state.range_high,
+            "range_low": state.range_low,
+            "range_midpoint": state.range_midpoint,
+            "range_bars": len(state.opening_bars),
+            "rvol": rvol,
+            "baseline_volume": round(avg_vol, 2),
+            "bar_volume": bar.volume,
+            "clv": round((bar.close - bar.low) / (bar.high - bar.low), 4) if bar.high > bar.low else None,
+            "atr": round(atr, 4),
+            "bar_range_atr": round((bar.high - bar.low) / atr, 4) if atr > 0.001 else None,
+            "extension_atr": round(((bar.close - state.range_high) if sig_type == "BUY" else (state.range_low - bar.close)) / atr, 4) if atr > 0.001 else None,
+            "structural_stop": state.range_midpoint,
+            "raw_stop_distance": round(raw_dist, 4),
+            "floored_stop_distance": round(risk, 4),
+            "stop_floor_applied": risk > raw_dist + 1e-9,
+        })
         return [sig]
