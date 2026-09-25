@@ -263,14 +263,14 @@ AutonomousDayTrader/
 │   │   └── replay/
 │   │       ├── mock_relay.py     # Protocol-accurate AlpacaRelay mock server
 │   │       └── feed_player.py    # Historical & synthetic feed replay player
-│   └── tests/                    # Unit, stress, and mutation test suites (485 tests)
+│   └── tests/                    # Unit, stress, and mutation test suites
 ├── frontend/                     # Mobile Trading UI (Next.js 15 / React 19)
 │   ├── app/                      # App router layout, page, and globals
 │   ├── components/               # Header, Strategy Cards, SegmentedModeToggle, Swing components
 │   ├── hooks/                    # useTradingStream WebSocket client hook
 │   └── scripts/                  # UI verification & streaming stress test scripts
 ├── tests/
-│   └── e2e/                      # Opaque-box E2E test suite (325 tests)
+│   └── e2e/                      # Opaque-box E2E test suite
 ├── scripts/
 │   ├── run_dev.sh                # Local development launcher
 │   ├── run_concurrent_multiday_e2e_dry_run.py # Concurrent Multi-Day E2E dry run (+ $3,056.09 PnL)
