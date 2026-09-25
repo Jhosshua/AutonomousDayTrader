@@ -342,3 +342,13 @@ def test_missing_preceding_minute_prevents_quote_entry(paper):
     assert not x.posts
     r.or15_controller.tick(now + timedelta(seconds=6))
     assert r.tsla_or15_strategy.phase == "SKIPPED"
+
+
+def test_quote_stamped_slightly_ahead_of_host_clock_still_enters(paper):
+    # Exchange timestamps a few hundred ms ahead of the host clock are clock skew,
+    # not stale data; the one daily entry must not be lost to it.
+    r, x, now = paper
+    r.tsla_or15_strategy.last_quote = None
+    r.or15_controller.on_quote(QuoteEvent("TSLA",102,100,"V",102.1,100,"V",now + timedelta(seconds=0.3)))
+    r.or15_controller.tick(now)
+    assert x.posts and x.posts[0]["type"] == "market" and x.qty == 1

@@ -196,3 +196,12 @@ async def test_bulk_flatten_cancels_staged_signal(runtime):
     await r.manual_flatten()
     assert r.tsla_or15_strategy.phase == "SKIPPED"
     assert r.tsla_or15_strategy.reason == "MANUAL_CANCEL"
+
+
+def test_small_clock_skew_does_not_end_session():
+    # Railway bars arrive ~0.05 s after the minute; a host clock a little behind the
+    # exchange makes a complete bar look early. That must not skip the whole day.
+    s = TSLAOR15RetestStrategy()
+    bar = bars(0)[0]
+    s.on_completed_bar(bar, bar.timestamp + timedelta(minutes=1) - timedelta(seconds=0.2))
+    assert s.phase == "BUILDING_RANGE" and len(s.bars["TSLA"]) == 1

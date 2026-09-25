@@ -2,13 +2,13 @@
   "status": "PASS",
   "execution_mode": "offline_raw_open",
   "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
-  "implementation_sha256": "e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c",
+  "implementation_sha256": "999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3",
   "cases": [
     {
       "case": "target",
       "passed": true,
       "trade": {
-        "trade_id": "brk_ord_8d896f5a5866",
+        "trade_id": "brk_ord_6d99a7c18147",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -25,8 +25,8 @@
         "aggregate_only": false,
         "fill_legs": [
           {
-            "fill_id": "fl_c5f8c30325",
-            "order_id": "ord_8d896f5a5866",
+            "fill_id": "fl_fbfbdca8ac",
+            "order_id": "ord_6d99a7c18147",
             "side": "BUY",
             "qty": 1,
             "price": 102,
@@ -35,8 +35,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_dc316effd1",
-            "order_id": "ord_7c5686e544cf",
+            "fill_id": "fl_da18626265",
+            "order_id": "ord_941f63482ddd",
             "side": "SELL",
             "qty": 1,
             "price": 108,
@@ -57,7 +57,7 @@
         "simulator_fees": 0.02,
         "risk_per_share": 3.0,
         "incomplete": false,
-        "implementation_sha256": "e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c"
+        "implementation_sha256": "999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3"
       },
       "session": {
         "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
@@ -121,7 +121,7 @@
           {
             "kind": "ORDER",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_8d896f5a5866",
+            "order_id": "ord_6d99a7c18147",
             "trigger_price": 102,
             "quantity": 1,
             "quote": null
@@ -144,7 +144,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "brk_ord_8d896f5a5866",
+            "trade_id": "brk_ord_6d99a7c18147",
             "exit_reason": "TARGET",
             "gross_pnl": 6.0,
             "normal_cost_pnl": 5.937,
@@ -160,7 +160,7 @@
       "case": "stop",
       "passed": true,
       "trade": {
-        "trade_id": "brk_ord_2d9f4f3ed67a",
+        "trade_id": "brk_ord_a974e9b74e9d",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -177,8 +177,8 @@
         "aggregate_only": false,
         "fill_legs": [
           {
-            "fill_id": "fl_34498a2b15",
-            "order_id": "ord_2d9f4f3ed67a",
+            "fill_id": "fl_66e3fe1ed3",
+            "order_id": "ord_a974e9b74e9d",
             "side": "BUY",
             "qty": 1,
             "price": 102,
@@ -187,8 +187,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_88be132d0d",
-            "order_id": "ord_59aa0bc77ca1",
+            "fill_id": "fl_1b6fe137bb",
+            "order_id": "ord_2e97c5eb2613",
             "side": "SELL",
             "qty": 1,
             "price": 99,
@@ -209,7 +209,7 @@
         "simulator_fees": 0.02,
         "risk_per_share": 3.0,
         "incomplete": false,
-        "implementation_sha256": "e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c"
+        "implementation_sha256": "999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3"
       },
       "session": {
         "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
@@ -273,7 +273,7 @@
           {
             "kind": "ORDER",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_2d9f4f3ed67a",
+            "order_id": "ord_a974e9b74e9d",
             "trigger_price": 102,
             "quantity": 1,
             "quote": null
@@ -296,7 +296,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "brk_ord_2d9f4f3ed67a",
+            "trade_id": "brk_ord_a974e9b74e9d",
             "exit_reason": "STOP",
             "gross_pnl": -3.0,
             "normal_cost_pnl": -3.0603,
@@ -312,7 +312,7 @@
       "case": "both",
       "passed": true,
       "trade": {
-        "trade_id": "brk_ord_8633ddaab28b",
+        "trade_id": "brk_ord_967e1ba36a02",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -329,8 +329,8 @@
         "aggregate_only": false,
         "fill_legs": [
           {
-            "fill_id": "fl_a628c20cb3",
-            "order_id": "ord_8633ddaab28b",
+            "fill_id": "fl_c7c1b81f22",
+            "order_id": "ord_967e1ba36a02",
             "side": "BUY",
             "qty": 1,
             "price": 102,
@@ -339,8 +339,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_87b2236945",
-            "order_id": "ord_6e424e5b50a4",
+            "fill_id": "fl_f8c7848609",
+            "order_id": "ord_6c67f0a3563a",
             "side": "SELL",
             "qty": 1,
             "price": 99,
@@ -361,7 +361,7 @@
         "simulator_fees": 0.02,
         "risk_per_share": 3.0,
         "incomplete": false,
-        "implementation_sha256": "e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c"
+        "implementation_sha256": "999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3"
       },
       "session": {
         "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
@@ -425,7 +425,7 @@
           {
             "kind": "ORDER",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_8633ddaab28b",
+            "order_id": "ord_967e1ba36a02",
             "trigger_price": 102,
             "quantity": 1,
             "quote": null
@@ -448,7 +448,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "brk_ord_8633ddaab28b",
+            "trade_id": "brk_ord_967e1ba36a02",
             "exit_reason": "STOP",
             "gross_pnl": -3.0,
             "normal_cost_pnl": -3.0603,
@@ -464,7 +464,7 @@
       "case": "gap",
       "passed": true,
       "trade": {
-        "trade_id": "brk_ord_6d2013cf7ce7",
+        "trade_id": "brk_ord_8f2a28f14949",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -481,8 +481,8 @@
         "aggregate_only": false,
         "fill_legs": [
           {
-            "fill_id": "fl_726988a153",
-            "order_id": "ord_6d2013cf7ce7",
+            "fill_id": "fl_10b1245d8b",
+            "order_id": "ord_8f2a28f14949",
             "side": "BUY",
             "qty": 1,
             "price": 102,
@@ -491,8 +491,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_ad5e30606b",
-            "order_id": "ord_9101c25c26fa",
+            "fill_id": "fl_9bfd2c4001",
+            "order_id": "ord_34a3d7a0ca30",
             "side": "SELL",
             "qty": 1,
             "price": 97,
@@ -513,7 +513,7 @@
         "simulator_fees": 0.02,
         "risk_per_share": 3.0,
         "incomplete": false,
-        "implementation_sha256": "e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c"
+        "implementation_sha256": "999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3"
       },
       "session": {
         "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
@@ -577,7 +577,7 @@
           {
             "kind": "ORDER",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_6d2013cf7ce7",
+            "order_id": "ord_8f2a28f14949",
             "trigger_price": 102,
             "quantity": 1,
             "quote": null
@@ -600,7 +600,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "brk_ord_6d2013cf7ce7",
+            "trade_id": "brk_ord_8f2a28f14949",
             "exit_reason": "STOP",
             "gross_pnl": -5.0,
             "normal_cost_pnl": -5.0597,
@@ -616,7 +616,7 @@
       "case": "time",
       "passed": true,
       "trade": {
-        "trade_id": "brk_ord_1099eb2c5506",
+        "trade_id": "brk_ord_168f76cce4b4",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -633,8 +633,8 @@
         "aggregate_only": false,
         "fill_legs": [
           {
-            "fill_id": "fl_4e3ad7b03e",
-            "order_id": "ord_1099eb2c5506",
+            "fill_id": "fl_c8fd3ffe5d",
+            "order_id": "ord_168f76cce4b4",
             "side": "BUY",
             "qty": 1,
             "price": 102,
@@ -643,8 +643,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_12687b32fc",
-            "order_id": "ord_a71b3194b14e",
+            "fill_id": "fl_1413926095",
+            "order_id": "ord_27025bb674b0",
             "side": "SELL",
             "qty": 1,
             "price": 104,
@@ -665,7 +665,7 @@
         "simulator_fees": 0.02,
         "risk_per_share": 3.0,
         "incomplete": false,
-        "implementation_sha256": "e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c"
+        "implementation_sha256": "999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3"
       },
       "session": {
         "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
@@ -729,7 +729,7 @@
           {
             "kind": "ORDER",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_1099eb2c5506",
+            "order_id": "ord_168f76cce4b4",
             "trigger_price": 102,
             "quantity": 1,
             "quote": null
@@ -751,7 +751,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T11:48:00-04:00",
-            "trade_id": "brk_ord_1099eb2c5506",
+            "trade_id": "brk_ord_168f76cce4b4",
             "exit_reason": "TIME_LIMIT",
             "gross_pnl": 2.0,
             "normal_cost_pnl": 1.9382,
@@ -767,7 +767,7 @@
       "case": "early_close",
       "passed": true,
       "trade": {
-        "trade_id": "brk_ord_aab30352606a",
+        "trade_id": "brk_ord_320fd4cb0608",
         "session_date": "2026-11-27",
         "symbol": "TSLA",
         "side": "LONG",
@@ -784,8 +784,8 @@
         "aggregate_only": false,
         "fill_legs": [
           {
-            "fill_id": "fl_b8fa25325a",
-            "order_id": "ord_aab30352606a",
+            "fill_id": "fl_14e6c444fe",
+            "order_id": "ord_320fd4cb0608",
             "side": "BUY",
             "qty": 1,
             "price": 102,
@@ -794,8 +794,8 @@
             "timestamp": "2026-11-27T11:32:00-05:00"
           },
           {
-            "fill_id": "fl_dc88834927",
-            "order_id": "ord_69d710d57615",
+            "fill_id": "fl_001873075c",
+            "order_id": "ord_be49bda0ec85",
             "side": "SELL",
             "qty": 1,
             "price": 104,
@@ -816,7 +816,7 @@
         "simulator_fees": 0.02,
         "risk_per_share": 3.0,
         "incomplete": false,
-        "implementation_sha256": "e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c"
+        "implementation_sha256": "999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3"
       },
       "session": {
         "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
@@ -880,7 +880,7 @@
           {
             "kind": "ORDER",
             "at": "2026-11-27T11:32:00-05:00",
-            "order_id": "ord_aab30352606a",
+            "order_id": "ord_320fd4cb0608",
             "trigger_price": 102,
             "quantity": 1,
             "quote": null
@@ -902,7 +902,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-11-27T12:55:00-05:00",
-            "trade_id": "brk_ord_aab30352606a",
+            "trade_id": "brk_ord_320fd4cb0608",
             "exit_reason": "FORCED_FLAT",
             "gross_pnl": 2.0,
             "normal_cost_pnl": 1.9382,

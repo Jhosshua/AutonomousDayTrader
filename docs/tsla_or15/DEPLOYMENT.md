@@ -30,3 +30,7 @@ This report and selected endpoint evidence are committed in a documentation foll
 ## 2026-09-25 evening: implementation hash changed by research recording
 
 Commits 0e6fe3e..6a5ec34 added observation-only research hooks to shared files the OR15 fingerprint covers (`engine.py` fill listeners, `main.py`, `runtime_state.py`). OR15 rules, prices and order flow are unchanged. New implementation hash `e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c`; the OR15 dry run was re-run on this code (6 cases PASS, all flat) and `DRY_RUN_EVIDENCE.json` regenerated. The hash is provenance only; nothing gates trading on it.
+
+## 2026-09-25 evening: audit fix, clock-skew tolerance
+
+Audit of 8a30130. Live measurement from inside the Railway container: relay bars arrive 0.05 to 0.14 s after their minute ends, TSLA quotes 0.05 s or more after their exchange stamp. The code rejected any bar that looked even 1 ms early (`INCOMPLETE_OR_STALE_BAR`, which skips the whole session) and any quote stamped ahead of the host clock (lost entry). A host clock drift above about 50 ms would have silently skipped every day. Now a 0.5 s skew is tolerated (`CLOCK_SKEW_SECONDS`); a bar 1 s early is still rejected. Trading rules unchanged. New implementation hash `999dbc0faa12fa1d1dfba1cc547c942df9c0461a1e35f40ee9b854cc221c6cf3`; OR15 dry run PASS (6 cases, all flat), 963 tests pass.

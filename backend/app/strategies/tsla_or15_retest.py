@@ -22,6 +22,9 @@ SOURCE_SHA256 = "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5c
 BAR_GRACE_SECONDS = 10
 ENTRY_GRACE_SECONDS = 5
 QUOTE_MAX_AGE_SECONDS = 2
+# Host clock vs exchange timestamps. Measured on Railway 2026-09-25: bars arrive
+# 0.05-0.14 s after the minute, so a tiny drift used to make complete data look early.
+CLOCK_SKEW_SECONDS = 0.5
 MINUTE = timedelta(minutes=1)
 
 
@@ -139,7 +142,7 @@ class TSLAOR15RetestStrategy(Strategy):
         if ts.date() != now.date() or ts.date() != self.session_day:
             self.skip("WRONG_SESSION_BAR", now)
             return []
-        if ts.second or ts.microsecond or not 0 <= (now - ts - MINUTE).total_seconds() <= BAR_GRACE_SECONDS:
+        if ts.second or ts.microsecond or not -CLOCK_SKEW_SECONDS <= (now - ts - MINUTE).total_seconds() <= BAR_GRACE_SECONDS:
             self.skip("INCOMPLETE_OR_STALE_BAR", now)
             return []
         values = (bar.open, bar.high, bar.low, bar.close, bar.volume)

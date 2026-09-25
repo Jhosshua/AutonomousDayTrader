@@ -362,3 +362,8 @@ right. Run the mutation check.
 - **What did not work**: `risk_state` in the checkpoint saved status, peak, and drawdown, but not `config.starting_equity`, the number the $1,500 breaker subtracts from. After a restart it reverted to the $50,000 code default.
 - **What worked instead**: On restore, set `risk_engine.config.starting_equity = account.daily_starting_equity`.
 - **Note for next time**: After a restart, compare `/health` `risk.drawdown_dollars` with the account's `daily_starting_equity - equity`. If they differ, the breaker baseline is wrong.
+
+## 2026-09-25: OR15 time checks had zero tolerance for clock skew
+**What did not work:** `0 <= age` on bar completion and quote freshness. Replays feed exact timestamps so every test passed, but a live host clock a few tens of ms behind the exchange makes complete bars look unfinished and skips the day.
+**What worked instead:** measure real arrival lag on the deployed host (relay probe via `railway ssh`), then allow a small skew (0.5 s) below zero.
+**Note for next time:** any freshness check comparing exchange timestamps to the local clock needs a skew bound, and a test with a slightly early/future stamp.

@@ -16,7 +16,7 @@ from backend.app.core.engine import BrokerFillFailed, BracketRole, OrderSide, Or
 from backend.app.models.events import BarEvent, QuoteEvent
 from backend.app.strategies.base import StrategyStatus
 from backend.app.strategies.tsla_or15_retest import (
-    STRATEGY_ID, ENTRY_GRACE_SECONDS, QUOTE_MAX_AGE_SECONDS, session_bounds,
+    STRATEGY_ID, ENTRY_GRACE_SECONDS, QUOTE_MAX_AGE_SECONDS, CLOCK_SKEW_SECONDS, session_bounds,
 )
 
 
@@ -57,7 +57,7 @@ class OR15ExecutionController:
         now = self.r.or15_now()
         q, due = self.s.last_quote, self.s.entry_due
         return bool(due and 0 <= (now - due).total_seconds() <= ENTRY_GRACE_SECONDS
-                    and q and 0 <= (now - q["at"]).total_seconds() <= QUOTE_MAX_AGE_SECONDS)
+                    and q and -CLOCK_SKEW_SECONDS <= (now - q["at"]).total_seconds() <= QUOTE_MAX_AGE_SECONDS)
 
     def on_bar(self, bar: BarEvent, now: datetime) -> None:
         s = self.s
@@ -96,7 +96,7 @@ class OR15ExecutionController:
         if s.phase == "WAITING_ENTRY" and s.entry_due and now >= s.entry_due:
             q = s.last_quote
             preceding_bar = bool(s.bars["TSLA"] and s.bars["TSLA"][-1].timestamp >= s.entry_due - timedelta(minutes=1))
-            if preceding_bar and q and 0 <= (now - q["at"]).total_seconds() <= QUOTE_MAX_AGE_SECONDS:
+            if preceding_bar and q and -CLOCK_SKEW_SECONDS <= (now - q["at"]).total_seconds() <= QUOTE_MAX_AGE_SECONDS:
                 if (now - s.entry_due).total_seconds() <= ENTRY_GRACE_SECONDS:
                     self._enter(q["ask"], now)
         if s.phase == "ENTERING":

@@ -2,6 +2,13 @@
 
 ## Decisions
 
+### 2026-09-25: TSLA OR15 audit, clock-skew tolerance added
+- **What:** bars may look up to 0.5 s early and quotes up to 0.5 s in the future vs the host clock (`CLOCK_SKEW_SECONDS`). Before, any negative age skipped the session or blocked the entry.
+- **Why:** measured on Railway: bars land 0.05-0.14 s after the minute, so a ~50 ms clock drift would have skipped every OR15 day with no error. The Mac clock already read bars 30 ms "early".
+- **Rejected:** a bigger tolerance (a bar 1 s early is still treated as unfinished); dropping the T+1 bar requirement before entry (bars arrive in ~0.1 s, well inside the 5 s window).
+- **Audit also checked, no change:** OCO body matches Alpaca spec; updatedBars are not subscribed (so no false duplicate bars); feed disconnect while holding flattens (design choice); one failed relay /health poll blocks entries for up to 60 s (design choice, fail closed).
+
+
 ### 2026-09-25: research recording BUILT (commits 0e6fe3e, c7eaa3c, d1d0ca6)
 - **What:** signal table + rich trade rows + swing round trips into `research.sqlite3` beside the trading DB; `/api/research/{trades|signals}`; `/health.research`. Observation only: own SQLite file, bounded background queue, every hook in `research_safe`, failures counted not raised.
 - **Why:** the ledger row kept only entry/exit/P&L; knob decisions need stop/R, MFE/MAE, blocked signals and the settings/market state at decision time.
