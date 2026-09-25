@@ -3,7 +3,7 @@
 **Document Version**: 1.0.0  
 **Author**: `test_writer_e2e` (Test Architect & QA Specialist)  
 **Date**: 2026-09-19  
-**Status**: ACTIVE & AUTHORITATIVE  
+**Status**: Historical F1–F21 test-design baseline; current test results are in `PROJECT.md`
 **Target Project**: AutonomousDayTrader (`/Users/mo/AutonomousDayTrader`)  
 
 ---

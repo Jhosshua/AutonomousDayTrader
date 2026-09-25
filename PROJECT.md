@@ -59,7 +59,7 @@ AutonomousDayTrader is an intraday + swing paper-trading system for US equities.
 | F6 | Dynamic Bracket Orders | Multi-tier take-profit brackets with calibrated intraday geometry (Target 1 at 0.80R with 50% scale-out, Target 2 at 1.80R runner or trailing ATR stop locked to TARGET_1_HIT; slippage boundary validation and decremental partial fill tracking) | M1 | ORIGINAL_REQUEST §R1 |
 | F7 | Zero Overnight Flattening | 4-phase protocol: 15:45 entry lockout, 15:50 working order purge, 15:55 market liquidation, 15:58 flat audit before 16:00 ET | M1 | ORIGINAL_REQUEST §R1 |
 | F8 | Strategy 1: ORB | Opening Range Breakout on the first 5 minutes in production (15 minutes configurable), with RVOL $\ge 1.8\times$, midpoint stops, and target brackets | M2 | ORIGINAL_REQUEST §R2 |
-| F9 | Strategy 2: VWAP Pullback | Anchored VWAP from 09:30, standard deviation bands, EMA20 > EMA50 trend filter, bounce confirmation | M2 | ORIGINAL_REQUEST §R2 |
+| F9 | Strategy 2: VWAP Pullback | Anchored VWAP from 09:30, standard deviation bands, EMA20 > EMA50 trend filter after 50 regular-session one-minute closes (first possible entry about 10:20 ET), bounce confirmation | M2 | ORIGINAL_REQUEST §R2 |
 | F10 | Strategy 3: News Momentum | Benzinga news catalyst sentiment trigger with strict regex word boundaries (`\b...`), volume surge $>2.0\times$ validation, news contradiction emergency exit | M2 | ORIGINAL_REQUEST §R2 |
 | F11 | Strategy 4: Mean Reversion | 1-min bar $Z$-score $\ge 1.65$, volume climax $>1.30\times$, upper/lower wick rejection $\ge 0.30$, 20-SMA mean reversion active in `NEUTRAL` regimes without fighting runaway trends | M2 | ORIGINAL_REQUEST §R2 |
 | F12 | Dynamic VIX Adaptation | Self-adaptation across 4 regimes (Low, Normal, Elevated, Crisis) with invariant dollar risk scaling and dynamic stop widths | M2 | ORIGINAL_REQUEST §R2 |
@@ -83,18 +83,19 @@ AutonomousDayTrader is an intraday + swing paper-trading system for US equities.
 | M1 | `engine_ingestion` | AlpacaRelay Ingestion (Stock WS, News WS, REST /vix), $50k Paper Account, Institutional Risk Circuit Breakers, Bracket Orders, Auto-Flattening Engine | None | COMPLETED / DEPLOYED; 272/272 backend unit tests pass, VIX stop clamping & quote break hardened |
 | M2 | `strategies_adaptation` | 4 Dynamic Strategies (ORB, VWAP Pullback, News Momentum, Mean Reversion), VIX Volatility Regime Scaling, Time-of-Day Phase Engine | M1 | COMPLETED / DEPLOYED; MarketTrendFilter active, news momentum strict causality, VWAP volume floor, ORB lockout prevention |
 | M3 | `ui_mobile_streaming` | Mobile Trading UI (Next.js/Tailwind/Framer), Obsidian Glassmorphism, Momentum Gradient Blur, Trading Strategy Cards, "Active Position" Tray, Real-Time WS State Streaming | M1, M2 | COMPLETED / DEPLOYED; Next.js 15.5 export clean, error.tsx boundary, safe formatting, 4Hz broadcast throttle & slow-consumer eviction |
-| M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_READY | COMPLETED / DEPLOYED (320/320 E2E tests, 272/272 backend tests, 63/63 stress & mutation tests pass) |
+| M4 | `integration_e2e_pass` | Integration Track Phase 1: Pass the E2E suite across contracts, adversarial cases, and visual checks | M1, M2, M3, TEST_INFRA | COMPLETED / DEPLOYED (historical 320/320 E2E tests, 272/272 backend tests, 63/63 stress & mutation tests pass) |
 | M5 | `adversarial_monday_dryrun` | Production-path deterministic Monday replay through relay clients, event bus, execution, brackets, and UI serialization | M4 | COMPLETED / DEPLOYED; Integrated dry run verified ($50,308.55 equity, +$308.56 PnL, 184/184 events, 0 errors) |
 | M6 | `delivery_hygiene` | Push upstream, deploy the single-service image, verify remote health/UI, and release local ports | M5 | COMPLETED / DEPLOYED; Full-stack review remediated, multi-agent audit certified (5/5 PASS), Railway production live & healthy, ports clean |
 | M7 | `universe_regime_calibration` | 12-symbol watchlist expansion, multi-sector risk engine (max 2/sector, max 3 total), regime-separated execution (NEUTRAL vs trending), microstructure calibrations (news 2.0x, MR Z=1.65, wick 0.30, vol 1.30x) | M1-M6 | COMPLETED / DEPLOYED; 324/324 backend pytest pass, 320/320 E2E runner pass, integrated dry run pass, Railway deployed healthy |
 | M8 | `round6_adversarial_hardening` | Round 6 adversarial audit, QoS frame priority, causal indicator baselines, pre-trade drawdown & loss budgeting, committed portfolio concurrency, EOD stop preservation, JSON float sanitization | M1-M7 | COMPLETED / DEPLOYED; 355/355 backend pytest pass, 31/31 stress mutations pass, 320/320 E2E pass, dry run pass, Railway deployed healthy |
 | M9 | `swing_engine_integration` | Autonomous "2-Day Panic Dip" (Connors RSI-2) swing engine across 5 certified stocks (`LRCX`, `KLAC`, `MU`, `AMD`, `GS`), $50k shared pool ($25k/slot, max 2), flattening exemption | M1-M8 | COMPLETED / DEPLOYED; 432/432 backend tests, 325/325 E2E runner tests pass, 6-day replay dry run verified |
 | M10 | `forensic_remediation_and_deployment` | Forensic audit remediation (10 core fixes + 3 Gate 1 fixes), 6-day concurrent simulation dry run (+$3,056.09 PnL), desktop/mobile UI visual QA (0px overflow), production cloud deployment to Railway | M1-M9 | COMPLETED / DEPLOYED; 485/485 backend tests, 325/325 E2E runner tests, live Railway health & swing state verified |
+| M11 | `strategy_audit_remediation` | Five-strategy plan fidelity, fill-anchored intraday targets, Swing broker order lifecycle and emergency stop, scan persistence, stale-note cleanup | M1-M10 | IMPLEMENTED / QA PASSED; after-close Railway deployment pending (899 full-suite tests, 321 opaque-box E2E tests, frontend build, integrated 184-event replay, six-day Swing replay) |
 
 ### E2E Testing Track (Parallel)
 | Track | Scope | Outputs | Status |
 |-------|-------|---------|--------|
-| `e2e_testing_track` | Requirement-driven opaque-box test suite, AlpacaRelay mock replay harness, automated test runner | `TEST_INFRA.md`, `tests/e2e/`, `TEST_READY.md` | VERIFIED (318/318 tests pass) |
+| `e2e_testing_track` | Requirement-driven opaque-box test suite, AlpacaRelay mock replay harness, automated test runner | `TEST_INFRA.md`, `tests/e2e/` | VERIFIED (318/318 at the historical 2026-09-20 checkpoint; current result is in the latest audit entry) |
 
 ## Interface Contracts
 
@@ -249,7 +250,6 @@ AutonomousDayTrader is an intraday + swing paper-trading system for US equities.
 │   ├── verify_port_hygiene.sh    # Verify ports freed & zero lingering processes
 │   └── deploy_and_push.sh        # Git commit and push upstream script
 ├── TEST_INFRA.md                 # E2E Test Infrastructure & Coverage Matrix
-├── TEST_READY.md                 # Test Ready publication artifact
 └── README.md                     # Comprehensive system architecture & operational manual
 ```
 
@@ -510,6 +510,3 @@ AutonomousDayTrader underwent an exhaustive forensic audit across both intraday 
 - Live Production URL: `https://autonomousdaytrader-production.up.railway.app`.
 - Remote Health Endpoint: `GET /health` $\to$ HTTP 200 OK (`status: "healthy"`, relay feeds connected, durable SQLite persistence active).
 - Remote Swing State Endpoint: `GET /api/swing/state` $\to$ HTTP 200 OK (telemetry active, 5 candidate stocks evaluated).
-
-
-

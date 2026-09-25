@@ -160,7 +160,7 @@ class MeanReversionStrategy(Strategy):
 
         # 1. Short Exhaustion Fade (Overbought extreme: Z >= 2.00, RSI >= 70, Upper Wick >= 35%)
         if z >= self.z_threshold:
-            has_climax = vol_ratio >= self.volume_climax_multiplier
+            has_climax = vol_ratio > self.volume_climax_multiplier
             has_wick_rejection = (upper_wick / candle_range) >= self.min_wick_ratio
             is_rsi_overbought = rsi >= self.rsi_overbought
 
@@ -193,7 +193,7 @@ class MeanReversionStrategy(Strategy):
 
         # 2. Long Exhaustion Fade (Oversold extreme: Z <= -2.00, RSI <= 30, Lower Wick >= 35%)
         elif z <= -self.z_threshold:
-            has_climax = vol_ratio >= self.volume_climax_multiplier
+            has_climax = vol_ratio > self.volume_climax_multiplier
             has_wick_rejection = (lower_wick / candle_range) >= self.min_wick_ratio
             is_rsi_oversold = rsi <= self.rsi_oversold
 

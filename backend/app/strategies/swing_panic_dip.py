@@ -33,7 +33,8 @@ from typing import Any, Callable, Dict, List, Optional
 from backend.app.core.account import PaperTradingAccount, Position, TradingArm
 from backend.app.core.engine import ExecutionEngine, Order, OrderSide, OrderType
 from backend.app.core.risk import InstitutionalRiskEngine
-from backend.app.models.events import BarEvent
+from backend.app.models.events import BarEvent, OrderState
+from zoneinfo import ZoneInfo
 from backend.app.strategies.earnings_calendar import EarningsCalendar
 from backend.app.strategies.swing_indicators import (
     DailyBarStore,
@@ -52,6 +53,7 @@ log = logging.getLogger(__name__)
 # Certified 5 swing stocks and benchmark
 CERTIFIED_SWING_SYMBOLS: List[str] = ["LRCX", "KLAC", "MU", "AMD", "GS"]
 SWING_BENCHMARK: str = "QQQ"
+ET_TZ = ZoneInfo("America/New_York")
 
 
 @dataclass
@@ -67,6 +69,7 @@ class StagedSwingOrder:
     reason: str
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     stop_loss_price: Optional[float] = None
+    execution_order_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -80,6 +83,7 @@ class StagedSwingOrder:
             "reason": self.reason,
             "created_at": self.created_at.isoformat(),
             "stop_loss_price": round(self.stop_loss_price, 2) if self.stop_loss_price is not None else None,
+            "execution_order_id": self.execution_order_id,
         }
 
     @classmethod
@@ -103,6 +107,7 @@ class StagedSwingOrder:
             reason=d.get("reason", ""),
             created_at=creat_d,
             stop_loss_price=d.get("stop_loss_price"),
+            execution_order_id=d.get("execution_order_id"),
         )
 
 
@@ -301,14 +306,23 @@ class SwingStrategyEngine:
         surviving_positions = {sym for sym in active_positions if sym not in exiting_symbols}
         existing_staged_entries = self.staged_manager.get_staged_entries()
         existing_staged_symbols = {e.symbol for e in existing_staged_entries}
+        unresolved_entry_symbols = {
+            order.symbol for order in self.execution_engine.orders.values()
+            if order.arm == TradingArm.SWING and order.strategy_id == "swing_panic_dip"
+            and order.side == OrderSide.BUY
+            and (order.id in self.execution_engine.working_orders or order.broker_order_id or order.broker_client_id)
+        }
+        committed_entry_symbols = existing_staged_symbols | unresolved_entry_symbols
 
-        # Deduct already staged entries from available slots to enforce strict idempotency
-        available_slots = self.max_concurrent_positions - len(surviving_positions) - len(existing_staged_symbols)
+        # A morning order can remain live at Alpaca after its local 09:45 stage
+        # expires. Reserve its slot until settlement rules out a late fill.
+        available_slots = self.max_concurrent_positions - len(surviving_positions | committed_entry_symbols)
         available_slots = max(0, available_slots)
 
         log.info(
             f"16:00 Swing Close Scan: {len(active_positions)} active, {len(exiting_symbols)} exiting, "
-            f"{len(existing_staged_symbols)} already staged, {available_slots} available slots"
+            f"{len(existing_staged_symbols)} already staged, "
+            f"{len(unresolved_entry_symbols)} unresolved entries, {available_slots} available slots"
         )
 
         self.last_close_data_note = data_note
@@ -325,7 +339,7 @@ class SwingStrategyEngine:
                     break
 
                 # Skip if already held, scheduled to exit at next open, or already staged for entry
-                if sym in active_positions or sym in exiting_symbols or sym in existing_staged_symbols:
+                if sym in active_positions or sym in exiting_symbols or sym in committed_entry_symbols:
                     continue
 
                 # Skip if already staged for entry in manager
@@ -369,6 +383,7 @@ class SwingStrategyEngine:
                     )
                     staged_entries.append(staged_buy)
                     existing_staged_symbols.add(sym)
+                    committed_entry_symbols.add(sym)
                     available_slots -= 1
 
                     # Lock symbol for swing so intraday engine cannot enter tomorrow morning
@@ -384,6 +399,67 @@ class SwingStrategyEngine:
         }
         self.audit_log.append(audit_entry)
         return audit_entry
+
+    def on_entry_fill(self, order: Order, fill: Any) -> Optional[float]:
+        """Apply fill-anchored protection on direct, partial, and late fills."""
+        if order.arm != TradingArm.SWING or order.strategy_id != "swing_panic_dip" or order.side != OrderSide.BUY:
+            return None
+        sym = order.symbol.upper()
+        pos = self.account.positions.get(sym)
+        if pos is None:
+            return None
+        staged = next((s for s in self.staged_manager.get_staged_entries() if s.symbol == sym), None)
+        atr = order.swing_entry_atr or (staged.daily_atr if staged else None) or pos.entry_atr
+        if (atr is None or atr <= 0) and order.estimated_price and order.stop_price:
+            # Older checkpoints may hold an order created before swing_entry_atr
+            # existed. Its estimated-price stop preserves the original ATR gap.
+            inferred = (order.estimated_price - order.stop_price) / self.stop_atr_multiplier
+            if inferred > 0:
+                atr = inferred
+                log.warning("Recovered Swing ATR for %s from the checkpointed entry stop", sym)
+        if atr is None or atr <= 0:
+            log.critical("Swing fill for %s has no ATR; stop metadata needs operator review", sym)
+            return pos.stop_loss_price
+        pos.arm = TradingArm.SWING
+        pos.strategy_id = "swing_panic_dip"
+        pos.entry_atr = atr
+        pos.stop_loss_price = round(pos.avg_entry_price - self.stop_atr_multiplier * atr, 2)
+        opened = order.accepted_at or fill.timestamp
+        if opened.tzinfo is None:
+            opened = opened.replace(tzinfo=timezone.utc)
+        pos.entry_date = opened.astimezone(ET_TZ).date()
+        pos.holding_days = max(1, pos.holding_days)
+        if self.reserve_symbol_cb:
+            self.reserve_symbol_cb(sym)
+        if staged is not None:
+            self.staged_manager.remove_staged_order(staged.order_id)
+        # A partial fill is a valid, smaller swing position. Cancel the local
+        # remainder; settlement still tracks any late Alpaca shares on this id.
+        if order.status == OrderState.PARTIALLY_FILLED and order.id in self.execution_engine.working_orders:
+            self.execution_engine.cancel_order(order.id, reason="SWING_PARTIAL_ENTRY_PROTECTED")
+        return pos.stop_loss_price
+
+    def on_exit_fill(self, order: Order) -> None:
+        """Release a staged exit only when the real position is fully flat."""
+        if order.arm != TradingArm.SWING or order.side != OrderSide.SELL:
+            return
+        if order.symbol not in self.account.positions:
+            for staged in self.staged_manager.get_staged_exits():
+                if staged.symbol == order.symbol:
+                    self.staged_manager.remove_staged_order(staged.order_id)
+            if self.release_symbol_cb:
+                self.release_symbol_cb(order.symbol)
+
+    def _unresolved_exit_order(self, symbol: str) -> Optional[Order]:
+        """Find a Swing sell that might still reach Alpaca before sending another."""
+        for order in reversed(list(self.execution_engine.orders.values())):
+            if (
+                order.symbol == symbol and order.arm == TradingArm.SWING
+                and order.side == OrderSide.SELL
+                and (order.id in self.execution_engine.working_orders or order.broker_order_id or order.broker_client_id)
+            ):
+                return order
+        return None
 
     def execute_market_open(
         self,
@@ -425,16 +501,22 @@ class SwingStrategyEngine:
 
                 shares = pos.shares
                 try:
-                    order_obj = self.execution_engine.create_order(
-                        symbol=sym,
-                        side=OrderSide.SELL,
-                        order_type=OrderType.MARKET,
-                        qty=shares,
-                        estimated_price=open_price,
-                        strategy_id="swing_panic_dip",
-                        arm=TradingArm.SWING,
-                    )
-                    self.execution_engine.submit_order(order_obj.id)
+                    order_obj = self._unresolved_exit_order(sym)
+                    if order_obj is not None and order_obj.id not in self.execution_engine.working_orders:
+                        errors.append(f"Awaiting Alpaca settlement for swing exit {sym}")
+                        continue
+                    if order_obj is None:
+                        order_obj = self.execution_engine.create_order(
+                            symbol=sym,
+                            side=OrderSide.SELL,
+                            order_type=OrderType.MARKET,
+                            qty=shares,
+                            estimated_price=open_price,
+                            strategy_id="swing_panic_dip",
+                            arm=TradingArm.SWING,
+                        )
+                        exit_order.execution_order_id = order_obj.id
+                        self.execution_engine.submit_order(order_obj.id)
 
                     # Realistic exit slippage (adverse downward on sells)
                     if apply_slippage:
@@ -457,11 +539,13 @@ class SwingStrategyEngine:
 
                     fill = self.execution_engine._execute_fill(
                         order=order_obj,
-                        qty=shares,
+                        qty=min(shares, order_obj.remaining_qty),
                         price=fill_price,
                         slippage=slippage,
                         timestamp=open_time,
+                        cancel_on_broker_error=False,
                     )
+                    self.on_exit_fill(order_obj)
                     exits_executed.append({
                         "symbol": sym,
                         "shares": fill.qty,
@@ -491,11 +575,35 @@ class SwingStrategyEngine:
             staged_entries = self.staged_manager.get_staged_entries()
             for entry_order in staged_entries:
                 sym = entry_order.symbol.upper()
-                active_count = len(self.get_active_swing_positions())
+                occupied = set(self.get_active_swing_positions())
+                occupied.update(
+                    o.symbol for o in self.execution_engine.orders.values()
+                    if o.arm == TradingArm.SWING and o.strategy_id == "swing_panic_dip"
+                    and o.side == OrderSide.BUY
+                    and (o.id in self.execution_engine.working_orders or o.broker_order_id or o.broker_client_id)
+                )
+                active_count = len(occupied - {sym})
                 pending_exits = self.staged_manager.get_staged_exits()
 
+                linked = self.execution_engine.orders.get(entry_order.execution_order_id or "")
+                if linked and linked.filled_qty > 0:
+                    # A settlement fill may have arrived between open bars.
+                    if sym in self.account.positions:
+                        self.on_entry_fill(linked, linked.fills[-1])
+                    continue
+                if linked and linked.status not in (OrderState.ACCEPTED, OrderState.PARTIALLY_FILLED):
+                    if linked.broker_order_id or linked.broker_client_id:
+                        errors.append(f"Awaiting Alpaca settlement for {sym}")
+                        continue
+                    if linked.status in (OrderState.REJECTED, OrderState.CANCELLED):
+                        self.staged_manager.remove_staged_order(entry_order.order_id)
+                        if self.release_symbol_cb:
+                            self.release_symbol_cb(sym)
+                        continue
+                    linked = None
+
                 # Defect 2: If active_count >= max_concurrent_positions, check for pending staged exits
-                if active_count >= self.max_concurrent_positions:
+                if active_count >= self.max_concurrent_positions and sym not in occupied:
                     if len(pending_exits) > 0:
                         log.info(
                             f"Concurrency cap reached ({active_count}/{self.max_concurrent_positions}) on {sym}, "
@@ -550,9 +658,10 @@ class SwingStrategyEngine:
                 # Rule 6: Emergency Stop Price = P_fill - 2.5 * Daily_ATR(14)
                 stop_distance = self.stop_atr_multiplier * entry_order.daily_atr
                 stop_price = round(fill_price - stop_distance, 2)
+                order_obj = linked
                 try:
                     # Pre-trade risk validation if risk engine is present
-                    if self.risk_engine:
+                    if self.risk_engine and order_obj is None:
                         active_sec = set(self.risk_engine.symbol_sectors.get(s, "Other") for s in self.account.positions)
                         risk_check = self.risk_engine.evaluate_order_request(
                             symbol=sym,
@@ -579,40 +688,30 @@ class SwingStrategyEngine:
                         qty = risk_check.authorized_qty
 
                     # Create, submit, and execute fill
-                    order_obj = self.execution_engine.create_order(
-                        symbol=sym,
-                        side=OrderSide.BUY,
-                        order_type=OrderType.MARKET,
-                        qty=qty,
-                        stop_price=stop_price,
-                        estimated_price=fill_price,
-                        strategy_id="swing_panic_dip",
-                        arm=TradingArm.SWING,
-                    )
-                    self.execution_engine.submit_order(order_obj.id)
+                    if order_obj is None:
+                        order_obj = self.execution_engine.create_order(
+                            symbol=sym,
+                            side=OrderSide.BUY,
+                            order_type=OrderType.MARKET,
+                            qty=qty,
+                            stop_price=stop_price,
+                            estimated_price=fill_price,
+                            strategy_id="swing_panic_dip",
+                            arm=TradingArm.SWING,
+                        )
+                        order_obj.swing_entry_atr = entry_order.daily_atr
+                        entry_order.execution_order_id = order_obj.id
+                        self.execution_engine.submit_order(order_obj.id)
                     fill = self.execution_engine._execute_fill(
                         order=order_obj,
-                        qty=qty,
+                        qty=order_obj.remaining_qty,
                         price=fill_price,
                         slippage=slippage,
                         timestamp=open_time,
+                        cancel_on_broker_error=False,
                     )
 
-                    # Rule 6: Stop Anchored strictly to realized fill.price
-                    realized_stop_price = round(fill.price - stop_distance, 2)
-
-                    # Explicitly populate swing metadata on position
-                    pos = self.account.positions.get(sym)
-                    if pos:
-                        pos.arm = TradingArm.SWING
-                        pos.strategy_id = "swing_panic_dip"
-                        pos.stop_loss_price = realized_stop_price
-                        pos.entry_atr = entry_order.daily_atr
-                        pos.entry_date = open_time.date() if isinstance(open_time, datetime) else open_time
-                        pos.holding_days = 1  # Day 1 of the swing trade upon fill
-
-                    if self.reserve_symbol_cb:
-                        self.reserve_symbol_cb(sym)
+                    realized_stop_price = self.on_entry_fill(order_obj, fill)
 
                     entries_executed.append({
                         "symbol": sym,
@@ -625,14 +724,21 @@ class SwingStrategyEngine:
                         "daily_atr": entry_order.daily_atr,
                     })
                     log.info(
-                        f"Executed swing ENTRY for {sym}: {fill.qty} shares @ ${fill.price:,.2f} "
-                        f"(stop=${realized_stop_price:,.2f}, ATR=${entry_order.daily_atr:.2f}, slippage=${slippage:.4f})"
+                        "Executed swing ENTRY for %s: %s shares @ $%.2f "
+                        "(stop=%s, ATR=%.2f, slippage=%.4f)",
+                        sym, fill.qty, fill.price, realized_stop_price, entry_order.daily_atr, slippage,
                     )
                 except Exception as e:
                     log.error(f"Error executing swing entry for {sym}: {e}")
                     errors.append(f"Entry error for {sym}: {e}")
-                finally:
-                    self.staged_manager.remove_staged_order(entry_order.order_id)
+                    if order_obj is not None and order_obj.status in (OrderState.REJECTED, OrderState.CANCELLED):
+                        if not order_obj.broker_order_id and (
+                            not order_obj.broker_client_id
+                            or str(order_obj.reject_reason or "").startswith("BROKER_REJECTED")
+                        ):
+                            self.staged_manager.remove_staged_order(entry_order.order_id)
+                            if self.release_symbol_cb:
+                                self.release_symbol_cb(sym)
 
             return {
                 "exits": exits_executed,
@@ -673,15 +779,21 @@ class SwingStrategyEngine:
                     f"(ATR entry stop breached)"
                 )
                 try:
-                    order_obj = self.execution_engine.create_order(
-                        symbol=sym,
-                        side=OrderSide.SELL,
-                        order_type=OrderType.MARKET,
-                        qty=pos.shares,
-                        estimated_price=current_p,
-                        strategy_id="swing_panic_dip",
-                        arm=TradingArm.SWING,
-                    )
+                    order_obj = self._unresolved_exit_order(sym)
+                    if order_obj is not None and order_obj.id not in self.execution_engine.working_orders:
+                        log.warning("Swing stop for %s awaits Alpaca settlement on %s", sym, order_obj.id)
+                        continue
+                    if order_obj is None:
+                        order_obj = self.execution_engine.create_order(
+                            symbol=sym,
+                            side=OrderSide.SELL,
+                            order_type=OrderType.MARKET,
+                            qty=pos.shares,
+                            estimated_price=current_p,
+                            strategy_id="swing_panic_dip",
+                            arm=TradingArm.SWING,
+                        )
+                        self.execution_engine.submit_order(order_obj.id)
                     spread_half = max(0.005, round(current_p * 0.0002, 4))
                     raw_slippage = (
                         self.execution_engine.calculate_slippage(
@@ -696,11 +808,13 @@ class SwingStrategyEngine:
                     fill_price = round(current_p - slippage, 2)
                     fill = self.execution_engine._execute_fill(
                         order=order_obj,
-                        qty=pos.shares,
+                        qty=min(pos.shares, order_obj.remaining_qty),
                         price=fill_price,
                         slippage=slippage,
                         timestamp=timestamp,
+                        cancel_on_broker_error=False,
                     )
+                    self.on_exit_fill(order_obj)
                     stops_triggered.append({
                         "symbol": sym,
                         "shares": fill.qty,
@@ -844,16 +958,21 @@ class SwingStrategyEngine:
             exec_price = 100.0
 
         try:
-            order_obj = self.execution_engine.create_order(
-                symbol=sym,
-                side=OrderSide.SELL,
-                order_type=OrderType.MARKET,
-                qty=pos.shares,
-                estimated_price=exec_price,
-                strategy_id="swing_panic_dip",
-                arm=TradingArm.SWING,
-            )
-            self.execution_engine.submit_order(order_obj.id)
+            order_obj = self._unresolved_exit_order(sym)
+            if order_obj is not None and order_obj.id not in self.execution_engine.working_orders:
+                log.warning("Immediate Swing exit for %s awaits Alpaca settlement", sym)
+                return None
+            if order_obj is None:
+                order_obj = self.execution_engine.create_order(
+                    symbol=sym,
+                    side=OrderSide.SELL,
+                    order_type=OrderType.MARKET,
+                    qty=pos.shares,
+                    estimated_price=exec_price,
+                    strategy_id="swing_panic_dip",
+                    arm=TradingArm.SWING,
+                )
+                self.execution_engine.submit_order(order_obj.id)
             spread_half = max(0.005, round(exec_price * 0.0002, 4))
             raw_slippage = (
                 self.execution_engine.calculate_slippage(
@@ -868,11 +987,13 @@ class SwingStrategyEngine:
             fill_price = round(exec_price - slippage, 2)
             fill = self.execution_engine._execute_fill(
                 order=order_obj,
-                qty=pos.shares,
+                qty=min(pos.shares, order_obj.remaining_qty),
                 price=fill_price,
                 slippage=slippage,
                 timestamp=now_dt,
+                cancel_on_broker_error=False,
             )
+            self.on_exit_fill(order_obj)
             if sym not in self.account.positions:
                 self.staged_manager.remove_for_symbol(sym)
                 if self.release_symbol_cb:
@@ -982,6 +1103,14 @@ class SwingStrategyEngine:
             })
 
         active_count = len(active_positions)
+        committed_symbols = set(active_positions)
+        committed_symbols.update(o.symbol for o in self.staged_manager.get_staged_entries())
+        committed_symbols.update(
+            o.symbol for o in self.execution_engine.orders.values()
+            if o.arm == TradingArm.SWING and o.strategy_id == "swing_panic_dip"
+            and o.side == OrderSide.BUY
+            and (o.id in self.execution_engine.working_orders or o.broker_order_id or o.broker_client_id)
+        )
         status = (
             "ACTIVE"
             if active_count > 0
@@ -995,11 +1124,12 @@ class SwingStrategyEngine:
             "slot_notional": self.slot_notional,
             "max_slots": self.max_concurrent_positions,
             "active_slots_used": active_count,
-            "available_slots": max(0, self.max_concurrent_positions - active_count),
+            "available_slots": max(0, self.max_concurrent_positions - len(committed_symbols)),
             "flattening_exempt": True,
             "candidates": self.get_candidate_status(as_of=today),
             "positions": positions_list,
             "last_scan_time": self.audit_log[-1]["timestamp"] if self.audit_log else None,
+            "last_scan_session_date": self.audit_log[-1]["session_date"] if self.audit_log else None,
             "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
             "last_close_data_note": getattr(self, "last_close_data_note", None),
             "last_close_entries_withheld": bool(getattr(self, "last_close_entries_withheld", False)),

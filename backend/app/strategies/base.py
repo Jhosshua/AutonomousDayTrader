@@ -37,6 +37,8 @@ class SignalEvent:
     rvol: Optional[float] = None
     volume_surge: Optional[float] = None
     catalyst_sentiment: Optional[float] = None
+    target_1_is_r_fallback: bool = False
+    target_2_is_r_fallback: bool = False
 
     def __post_init__(self):
         if isinstance(self.side, str):

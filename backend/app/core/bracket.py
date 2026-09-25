@@ -46,6 +46,9 @@ class BracketOrder(BaseModel):
     target_2_filled: bool = False
     target_1_override: Optional[float] = None
     target_2_override: Optional[float] = None
+    target_1_r: Optional[float] = None
+    target_2_r: Optional[float] = None
+    min_target_1_r: Optional[float] = None
     r_distance: float
     status: BracketStatus = BracketStatus.PENDING_ENTRY
     use_trailing_target_2: bool = True
@@ -117,6 +120,9 @@ class DynamicBracketManager:
         trail_atr_multiplier: float = 1.5,
         target_1_override: Optional[float] = None,
         target_2_override: Optional[float] = None,
+        target_1_r: Optional[float] = None,
+        target_2_r: Optional[float] = None,
+        min_target_1_r: Optional[float] = None,
         timestamp: Optional[datetime] = None,
         arm: TradingArm = TradingArm.INTRADAY,
     ) -> BracketOrder:
@@ -140,8 +146,10 @@ class DynamicBracketManager:
         r_dist = abs(entry_price - stop_price)
         s = 1.0 if side_norm == "LONG" else -1.0
 
-        t1_price = round(target_1_override, 2) if target_1_override is not None else round(entry_price + (s * self.default_target_1_r * r_dist), 2)
-        t2_price = round(target_2_override, 2) if target_2_override is not None else round(entry_price + (s * self.default_target_2_r * r_dist), 2)
+        r1 = self.default_target_1_r if target_1_r is None else target_1_r
+        r2 = self.default_target_2_r if target_2_r is None else target_2_r
+        t1_price = round(target_1_override, 2) if target_1_override is not None else round(entry_price + (s * r1 * r_dist), 2)
+        t2_price = round(target_2_override, 2) if target_2_override is not None else round(entry_price + (s * r2 * r_dist), 2)
 
         q1 = max(1, total_qty // 2) if total_qty > 1 else 1
         q2 = total_qty - q1 if total_qty > 1 else 0
@@ -163,6 +171,9 @@ class DynamicBracketManager:
             target_2_qty=q2,
             target_1_override=target_1_override,
             target_2_override=target_2_override,
+            target_1_r=target_1_r,
+            target_2_r=target_2_r,
+            min_target_1_r=min_target_1_r,
             r_distance=round(r_dist, 4),
             status=BracketStatus.PENDING_ENTRY,
             use_trailing_target_2=use_trailing_target_2,
@@ -217,6 +228,8 @@ class DynamicBracketManager:
         bracket.entry_price = round(fill_price, 4)
         direction = 1.0 if bracket.side == "LONG" else -1.0
         is_buy = bracket.side == "LONG"
+        r1 = self.default_target_1_r if bracket.target_1_r is None else bracket.target_1_r
+        r2 = self.default_target_2_r if bracket.target_2_r is None else bracket.target_2_r
 
         # Sanity check Target 1 override against realized fill price:
         # For BUY: target_1 must be strictly > fill_price
@@ -227,17 +240,21 @@ class DynamicBracketManager:
                 t1_override_valid = True
             elif not is_buy and bracket.target_1_override < bracket.entry_price:
                 t1_override_valid = True
+        if t1_override_valid and bracket.min_target_1_r is not None:
+            actual_reward = direction * (bracket.target_1_override - bracket.entry_price)
+            if actual_reward + 1e-9 < bracket.min_target_1_r * bracket.r_distance:
+                t1_override_valid = False
 
         if t1_override_valid:
             bracket.target_1_price = round(bracket.target_1_override, 2)
         else:
             bracket.target_1_price = round(
-                bracket.entry_price + direction * self.default_target_1_r * bracket.r_distance, 2
+                bracket.entry_price + direction * r1 * bracket.r_distance, 2
             )
 
         # Sanity check Target 2 override: must be strictly beyond Target 1 in the profit direction
         t2_override_valid = False
-        if bracket.target_2_override is not None:
+        if t1_override_valid and bracket.target_2_override is not None:
             if is_buy and bracket.target_2_override > bracket.target_1_price:
                 t2_override_valid = True
             elif not is_buy and bracket.target_2_override < bracket.target_1_price:
@@ -247,7 +264,7 @@ class DynamicBracketManager:
             bracket.target_2_price = round(bracket.target_2_override, 2)
         else:
             bracket.target_2_price = round(
-                bracket.entry_price + direction * self.default_target_2_r * bracket.r_distance, 2
+                bracket.entry_price + direction * r2 * bracket.r_distance, 2
             )
         bracket.status = BracketStatus.ACTIVE
         bracket.peak_price_since_entry = fill_price

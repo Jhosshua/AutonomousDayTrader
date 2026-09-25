@@ -93,8 +93,9 @@ class VWAPPullbackStrategy(Strategy):
             del state.recent_bars[:-max_recent]
 
         state.session_bars.append(bar)
-        if len(state.session_bars) < 10:
-            # Need minimum sample for initial VWAP and SMA
+        if len(state.recent_bars) < self.ema_slow_period:
+            # The documented trend filter is EMA20 versus EMA50. Until fifty
+            # regular-session closes exist, neither direction is qualified.
             return []
 
         # A pullback condition can remain true across several bars.  Enforce
@@ -113,20 +114,10 @@ class VWAPPullbackStrategy(Strategy):
 
         # EMA Trend Filter
         closes = [b.close for b in state.recent_bars]
-        if len(closes) >= self.ema_slow_period:
-            ema_fast = calculate_ema(closes, self.ema_fast_period)
-            ema_slow = calculate_ema(closes, self.ema_slow_period)
-            is_bullish_trend = ema_fast > ema_slow
-            is_bearish_trend = ema_fast < ema_slow
-        elif len(closes) >= self.ema_fast_period:
-            ema_fast = calculate_ema(closes, max(2, self.ema_fast_period // 2))
-            ema_slow = calculate_ema(closes, self.ema_fast_period)
-            is_bullish_trend = ema_fast > ema_slow
-            is_bearish_trend = ema_fast < ema_slow
-        else:
-            # Fallback: trend determined by price vs VWAP
-            is_bullish_trend = bar.close > vwap
-            is_bearish_trend = bar.close < vwap
+        ema_fast = calculate_ema(closes, self.ema_fast_period)
+        ema_slow = calculate_ema(closes, self.ema_slow_period)
+        is_bullish_trend = ema_fast > ema_slow
+        is_bearish_trend = ema_fast < ema_slow
 
         # Volume SMAs (baseline excludes current candidate bar to prevent self-dilution)
         prior_volumes = [float(b.volume) for b in state.recent_bars[:-1][-10:]]
@@ -165,9 +156,11 @@ class VWAPPullbackStrategy(Strategy):
                 stop_loss, risk = resolve_stop(entry_price, raw_risk, True)
                 tp1 = round(vwap + (1.0 * std), 4)
                 min_tp1 = round(entry_price + 0.50 * risk, 4)
+                fallback_1 = tp1 < min_tp1
                 if tp1 < min_tp1:
                     tp1 = round(entry_price + self.target_1_r * risk, 4)
                 tp2 = round(vwap + (2.0 * std), 4)
+                fallback_2 = tp2 <= tp1
                 if tp2 <= tp1:
                     tp2 = round(entry_price + self.target_2_r * risk, 4)
 
@@ -184,6 +177,8 @@ class VWAPPullbackStrategy(Strategy):
                         confidence=0.75,
                         reason=f"VWAP_PULLBACK_LONG: Test of VWAP {vwap:.2f}, bounce to {entry_price:.2f}, VolSurge={bar.volume/max(1.0, sma10_vol):.2f}x",
                         timestamp=bar.timestamp,
+                        target_1_is_r_fallback=fallback_1,
+                        target_2_is_r_fallback=fallback_2,
                     )
                 )
                 state.in_pullback_zone = False
@@ -208,9 +203,11 @@ class VWAPPullbackStrategy(Strategy):
                 stop_loss, risk = resolve_stop(entry_price, raw_risk, False)
                 tp1 = round(vwap - (1.0 * std), 4)
                 max_tp1 = round(entry_price - 0.50 * risk, 4)
+                fallback_1 = tp1 > max_tp1
                 if tp1 > max_tp1:
                     tp1 = round(entry_price - self.target_1_r * risk, 4)
                 tp2 = round(vwap - (2.0 * std), 4)
+                fallback_2 = tp2 >= tp1
                 if tp2 >= tp1:
                     tp2 = round(entry_price - self.target_2_r * risk, 4)
 
@@ -227,6 +224,8 @@ class VWAPPullbackStrategy(Strategy):
                         confidence=0.75,
                         reason=f"VWAP_PULLBACK_SHORT: Test of VWAP {vwap:.2f}, rejection to {entry_price:.2f}, VolSurge={bar.volume/max(1.0, sma10_vol):.2f}x",
                         timestamp=bar.timestamp,
+                        target_1_is_r_fallback=fallback_1,
+                        target_2_is_r_fallback=fallback_2,
                     )
                 )
                 state.in_pullback_zone = False

@@ -35,7 +35,7 @@ GATE_LAG_SEC = 60
 
 STRATEGY_NOTES = {
     "orb": "Morning only. Needs the first 5 minutes to set the range.",
-    "vwap_pullback": "Sits out the midday chop.",
+    "vwap_pullback": "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop.",
     "news_momentum": "Rare by design: needs very strong news plus a volume spike.",
     "mean_reversion": "Sits out the opening half hour.",
 }

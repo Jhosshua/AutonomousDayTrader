@@ -108,6 +108,7 @@ class Order:
     broker_order_id: Optional[str] = None
     broker_booked_qty: int = 0
     broker_booked_notional: float = 0.0
+    swing_entry_atr: Optional[float] = None
 
     def __post_init__(self) -> None:
         self.remaining_qty = self.qty
@@ -488,7 +489,13 @@ class ExecutionEngine:
         self.account.update_market_price(symbol, mid_price)
 
         fills: List[Fill] = []
-        matching_orders = [o for o in list(self.working_orders.values()) if o.symbol == symbol]
+        matching_orders = [
+            o for o in list(self.working_orders.values())
+            if o.symbol == symbol and not (
+                o.arm == TradingArm.SWING and o.side == OrderSide.BUY
+                and o.strategy_id == "swing_panic_dip"
+            )
+        ]
         # A stop is the conservative outcome when one quote crosses both an
         # OCO stop and a profit target.  Process stops first and skip orders
         # removed by an earlier fill/cancel operation.
@@ -541,7 +548,13 @@ class ExecutionEngine:
         self.account.update_market_price(symbol, close)
 
         fills: List[Fill] = []
-        matching_orders = [o for o in list(self.working_orders.values()) if o.symbol == symbol]
+        matching_orders = [
+            o for o in list(self.working_orders.values())
+            if o.symbol == symbol and not (
+                o.arm == TradingArm.SWING and o.side == OrderSide.BUY
+                and o.strategy_id == "swing_panic_dip"
+            )
+        ]
         # Resolve an ambiguous OHLC bar conservatively: a stop is evaluated
         # before profit targets, and OCO children removed by reconciliation are
         # not allowed to fill later in the same snapshot.
@@ -739,8 +752,12 @@ class ExecutionEngine:
         if len(self.audit_log) > max_audit_records:
             self.audit_log = self.audit_log[-max_audit_records:]
         if len(self.orders) > max_orders:
-            working_orders = {oid: order for oid, order in self.orders.items() if oid in self.working_orders}
-            non_working = [order for oid, order in self.orders.items() if oid not in self.working_orders]
+            working_orders = {
+                oid: order for oid, order in self.orders.items()
+                if oid in self.working_orders or order.broker_order_id or order.broker_client_id
+            }
+            non_working = [order for oid, order in self.orders.items() if oid not in working_orders]
             keep_count = max(0, max_orders - len(working_orders))
-            kept_non_working = {order.id: order for order in non_working[-keep_count:]}
+            retained = non_working[-keep_count:] if keep_count else []
+            kept_non_working = {order.id: order for order in retained}
             self.orders = {**kept_non_working, **working_orders}

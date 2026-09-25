@@ -303,6 +303,22 @@ def _settle_broker_orders() -> None:
         _reconcile_fills(fills)
         _release_dead_entry_brackets()
         _checkpoint_runtime("BROKER_LATE_FILL")
+    _release_resolved_swing_reservations()
+
+
+def _release_resolved_swing_reservations() -> None:
+    """Keep a Swing symbol locked until every possible Alpaca entry is final."""
+    for sym in list(swing_reserved_symbols):
+        if sym in account.positions or swing_staged_order_manager.is_staged_for_entry(sym):
+            continue
+        unresolved = any(
+            order.symbol == sym and order.arm == TradingArm.SWING
+            and order.side == OrderSide.BUY
+            and (order.id in engine.working_orders or order.broker_order_id or order.broker_client_id)
+            for order in engine.orders.values()
+        )
+        if not unresolved:
+            release_symbol_for_swing(sym)
 
 
 async def _broker_reconcile_loop() -> None:
@@ -564,6 +580,11 @@ def _capture_checkpoint() -> Dict[str, Any]:
         swing_reserved_symbols=swing_reserved_symbols,
         daily_bar_store=daily_bar_store,
         decisions=decision_log.to_state(),
+        swing_scan={
+            "last_scan": swing_strategy_engine.audit_log[-1] if swing_strategy_engine.audit_log else None,
+            "last_close_data_note": getattr(swing_strategy_engine, "last_close_data_note", None),
+            "last_close_entries_withheld": bool(getattr(swing_strategy_engine, "last_close_entries_withheld", False)),
+        },
     )
 
 
@@ -695,6 +716,11 @@ def _restore_checkpoint() -> bool:
     last_session_date = restored["last_session_date"]
     last_vix_print = restored["last_vix_print"]
     decision_log.load_state(restored.get("decisions"))
+    swing_scan = restored.get("swing_scan") or {}
+    if swing_scan.get("last_scan"):
+        swing_strategy_engine.audit_log[:] = [swing_scan["last_scan"]]
+    swing_strategy_engine.last_close_data_note = swing_scan.get("last_close_data_note")
+    swing_strategy_engine.last_close_entries_withheld = bool(swing_scan.get("last_close_entries_withheld", False))
     persistence_revision = revision
     ledger_revision = max(restored["ledger_revision"], state_store.trade_count())
     persistence_healthy = True
@@ -965,6 +991,13 @@ def _reconcile_fills(fills: List[Any]) -> None:
         if not order:
             continue
 
+        if order.arm == TradingArm.SWING and order.strategy_id == "swing_panic_dip":
+            if order.side == OrderSide.BUY:
+                swing_strategy_engine.on_entry_fill(order, fill)
+            else:
+                swing_strategy_engine.on_exit_fill(order)
+            continue
+
         bracket_id = entry_order_to_bracket.get(order.id)
         if bracket_id:
             bracket = bracket_manager.brackets.get(bracket_id)
@@ -972,6 +1005,15 @@ def _reconcile_fills(fills: List[Any]) -> None:
                 directive = bracket_manager.activate_bracket_on_fill(
                     bracket_id, fill.qty, fill.price, fill.timestamp
                 )
+                if bracket.strategy_id == "mean_reversion" and bracket.r_distance > 0:
+                    direction = 1.0 if bracket.side == "LONG" else -1.0
+                    actual_reward_r = direction * (bracket.target_1_price - fill.price) / bracket.r_distance
+                    if actual_reward_r + 1e-9 < mean_reversion_strategy.min_rr_ratio:
+                        log.warning(
+                            "Mean Reversion %s filled with structural target %.3fR below %.2fR minimum; "
+                            "keeping the filled position and its protective stop",
+                            bracket.symbol, actual_reward_r, mean_reversion_strategy.min_rr_ratio,
+                        )
                 _apply_bracket_directive(bracket_id, directive)
                 # A partial entry is cancelled after protecting the filled shares;
                 # otherwise the remaining parent quantity has no matching bracket size.
@@ -1211,8 +1253,11 @@ def _expire_stale_staged_swing_orders(current_time: datetime) -> None:
                 order.action,
                 order.symbol,
             )
+            linked = engine.orders.get(order.execution_order_id or "")
+            if linked is not None and linked.id in engine.working_orders:
+                engine.cancel_order(linked.id, reason="SWING_OPEN_WINDOW_EXPIRED")
             swing_staged_order_manager.remove_staged_order(order.order_id)
-            release_symbol_for_swing(order.symbol)
+            _release_resolved_swing_reservations()
 
 
 _last_broadcast_time: float = 0.0
@@ -1381,6 +1426,51 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     return cards
 
 
+def _intraday_target_overrides(
+    signal: SignalEvent, adapted_stop: float
+) -> Tuple[Optional[float], Optional[float], Optional[str]]:
+    """Choose targets using the stop that will actually reach the order engine.
+
+    An adverse market-order fill cannot be refused after execution. R-based
+    brackets therefore use the bracket manager's fill-anchored defaults, while
+    structural targets are checked before the broker order is sent.
+    """
+    if signal.strategy_id in ("orb", "news_momentum"):
+        return None, None, None
+
+    direction = 1.0 if signal.side == OrderSide.BUY else -1.0
+    risk = abs(signal.entry_price - adapted_stop)
+    if risk <= 0:
+        return None, None, "Adapted stop has no risk distance"
+    # Cover a modest adverse fill while leaving the structural target in
+    # place. This is an entry gate, not a claim that broker slippage is capped.
+    fill_buffer = max(0.01, signal.entry_price * 0.0005)
+    buffered_risk = risk + fill_buffer
+    reward = direction * (signal.take_profit_1 - signal.entry_price)
+
+    if signal.strategy_id == "mean_reversion":
+        if reward + 1e-9 < mean_reversion_strategy.min_rr_ratio * buffered_risk:
+            return None, None, (
+                f"20-SMA target reward {reward:.4f} is below "
+                f"{mean_reversion_strategy.min_rr_ratio:.2f}R on adapted stop"
+            )
+        return signal.take_profit_1, signal.take_profit_2, None
+
+    if signal.strategy_id == "vwap_pullback":
+        if signal.target_1_is_r_fallback:
+            return None, None, None
+        if reward + 1e-9 < 0.50 * buffered_risk:
+            # None lets the bracket manager re-anchor both fallback targets
+            # to the actual broker fill and adapted stop.
+            return None, None, None
+        second_reward = direction * (signal.take_profit_2 - signal.entry_price)
+        if signal.target_2_is_r_fallback or second_reward <= reward:
+            return signal.take_profit_1, None, None
+        return signal.take_profit_1, signal.take_profit_2, None
+
+    return signal.take_profit_1, signal.take_profit_2, None
+
+
 async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] = None) -> None:
     """Evaluate and route strategy signals through adaptation and risk engines."""
     sym = signal.symbol.upper()
@@ -1389,6 +1479,9 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     # 1. Contradiction or Exit Signal
     if "CONTRADICTION" in signal.reason or "EXIT" in signal.reason:
         if existing_pos:
+            if getattr(existing_pos, "arm", None) == TradingArm.SWING or getattr(existing_pos, "strategy_id", "") == "swing_panic_dip":
+                log.info("Ignoring intraday News exit for Swing position %s", sym)
+                return
             bracket_id = bracket_manager.symbol_to_bracket.get(sym)
             cancel_dir = bracket_manager.cancel_bracket_for_flattening(sym, reason=signal.reason)
             if cancel_dir and cancel_dir.orders_to_cancel:
@@ -1436,6 +1529,12 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 
     latest_market_prices[sym] = signal.entry_price if bar is None else bar.close
     adapted_stop = adaptation_engine.calculate_adapted_stop(signal)
+    target_1_override, target_2_override, target_error = _intraday_target_overrides(signal, adapted_stop)
+    if target_error:
+        _record_decision(signal, "RISK", target_error)
+        if signal.strategy_id == "orb":
+            orb_strategy.notify_signal_rejected(sym)
+        return
     committed_symbols, committed_sectors, committed_count, notional_map = _get_effective_committed_portfolio(
         account, arm=TradingArm.INTRADAY
     )
@@ -1445,6 +1544,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         equity=account.equity,
         current_positions_count=committed_count,
         is_symbol_active=is_active,
+        stop_loss_price=adapted_stop,
     )
     if not approved or qty <= 0:
         _record_decision(signal, classify_adaptation_reason(reason) if not approved else "SIZING", reason)
@@ -1452,10 +1552,9 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             orb_strategy.notify_signal_rejected(sym)
         return
 
-    # The adaptation layer sizes from the strategy's raw stop for its public
-    # sizing contract.  Execution submits the volatility-adjusted stop, so cap
-    # that quantity against the exact risk geometry that will reach the order
-    # engine before creating the order.
+    # Admission and the final risk check use the same volatility-adjusted stop
+    # that reaches the order engine. The risk engine may reduce that size again
+    # for account-wide exposure and loss limits.
     risk_preview = risk_engine.evaluate_order_request(
         symbol=sym,
         side="BUY" if signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY" else "SELL",
@@ -1503,6 +1602,11 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     submitted = engine.submit_order(order.id)
     if submitted.status.value == "ACCEPTED":
         _record_decision(signal, "SUBMITTED", f"{side.value} {qty} {sym} order {submitted.id}")
+        ratio_strategy = {
+            "orb": orb_strategy,
+            "news_momentum": news_strategy,
+            "vwap_pullback": vwap_strategy,
+        }.get(signal.strategy_id)
         bracket = bracket_manager.create_bracket(
             bracket_id=f"brk_{submitted.id}",
             symbol=sym,
@@ -1512,8 +1616,11 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             stop_price=adapted_stop,
             strategy_id=signal.strategy_id,
             timestamp=signal.timestamp,
-            target_1_override=signal.take_profit_1,
-            target_2_override=signal.take_profit_2,
+            target_1_override=target_1_override,
+            target_2_override=target_2_override,
+            target_1_r=getattr(ratio_strategy, "target_1_r", None),
+            target_2_r=getattr(ratio_strategy, "target_2_r", None),
+            min_target_1_r=0.50 if signal.strategy_id == "vwap_pullback" else None,
         )
         entry_order_to_bracket[submitted.id] = bracket.bracket_id
         if bar:
@@ -1995,7 +2102,11 @@ async def _startup_backfill() -> None:
         # ran) would otherwise skip that day's swing exits and entries for good.
         closed = _last_closed_session(now_et)
         bench = daily_bar_store.get_latest_bar(settings.SWING_BENCHMARK)
-        if bench is None or bench.date < closed:
+        last_scan_date = (
+            swing_strategy_engine.audit_log[-1].get("session_date")
+            if swing_strategy_engine.audit_log else None
+        )
+        if bench is None or bench.date < closed or last_scan_date != closed.isoformat():
             log.warning("Close scan for %s never completed; running it now", closed)
             await _swing_close_with_backfill(closed, max_wait_sec=30.0)
         return

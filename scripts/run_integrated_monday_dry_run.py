@@ -38,6 +38,23 @@ class CaptureSocket:
         self.messages.append(json.loads(raw))
 
 
+def protected_book(runtime: Any) -> bool:
+    """A 10:30 replay may end with a runner; every share must have a live stop."""
+    linked_working = set()
+    for symbol, position in runtime.account.positions.items():
+        bracket_id = runtime.bracket_manager.symbol_to_bracket.get(symbol)
+        bracket = runtime.bracket_manager.brackets.get(bracket_id)
+        if bracket is None or bracket.remaining_qty != position.shares:
+            return False
+        stop = runtime.engine.working_orders.get(bracket.stop_order_id)
+        if stop is None or stop.remaining_qty != position.shares:
+            return False
+        for order_id in (bracket.stop_order_id, bracket.target_1_order_id, bracket.target_2_order_id):
+            if order_id in runtime.engine.working_orders:
+                linked_working.add(order_id)
+    return set(runtime.engine.working_orders).issubset(linked_working)
+
+
 async def wait_until(predicate: Callable[[], bool], timeout: float = 3.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -125,6 +142,7 @@ async def run(port: int, report_path: Path) -> dict[str, Any]:
 
         event_errors = event_bus.metrics["error_count"]
         account = runtime.account.get_snapshot()
+        all_open_positions_protected = protected_book(runtime)
         report = {
             "status": "PASS" if (
                 processed == len(fixture)
@@ -132,8 +150,7 @@ async def run(port: int, report_path: Path) -> dict[str, Any]:
                 and len(runtime.engine.orders) > 0
                 and any(order.status.value == "FILLED" for order in runtime.engine.orders.values())
                 and not any(order.status.value == "REJECTED" for order in runtime.engine.orders.values())
-                and not runtime.account.positions
-                and not runtime.engine.working_orders
+                and all_open_positions_protected
                 and all(runtime.relay_statuses.get(k) == "connected" for k in ("stock", "news", "vix"))
             ) else "FAIL",
             "simulation_only": True,
@@ -150,6 +167,10 @@ async def run(port: int, report_path: Path) -> dict[str, Any]:
                 "open_positions": len(runtime.account.positions),
                 "working_orders": len(runtime.engine.working_orders),
                 "status": getattr(account.status, "value", account.status),
+            },
+            "protection": {
+                "all_open_positions_protected": all_open_positions_protected,
+                "checked_at_fixture_end": "10:30 ET (before the scheduled EOD flatten)",
             },
             "orders": {
                 "created": len(runtime.engine.orders),

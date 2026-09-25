@@ -526,13 +526,22 @@ def test_decisions_are_optional_in_checkpoint_and_round_trip():
         completed_brackets_recorded=set(), latest_market_prices={}, market_history={}, recent_news=[],
     )
     # Old checkpoint (no key) still restores.
-    assert restore_runtime_state(capture_runtime_state(**common), **restore_kw(_components()))["decisions"] is None
+    old_state = restore_runtime_state(capture_runtime_state(**common), **restore_kw(_components()))
+    assert old_state["decisions"] is None and old_state["swing_scan"] is None
     log = DecisionLog()
     log.record("orb", "AAPL", "BUY", 1.0, "RISK", "x", datetime(2026, 9, 24, 14, 0, tzinfo=timezone.utc))
     payload = json.loads(json.dumps(capture_runtime_state(**common, decisions=log.to_state())))
     restored = DecisionLog()
     restored.load_state(restore_runtime_state(payload, **restore_kw(_components()))["decisions"])
     assert restored.summary("orb")["blocked_by_reason"] == {"RISK": 1}
+
+    scan = {
+        "last_scan": {"session_date": "2026-09-24", "timestamp": "2026-09-24T20:01:00+00:00"},
+        "last_close_data_note": "Full session data",
+        "last_close_entries_withheld": False,
+    }
+    payload = json.loads(json.dumps(capture_runtime_state(**common, swing_scan=scan)))
+    assert restore_runtime_state(payload, **restore_kw(_components()))["swing_scan"] == scan
 
 
 def test_restore_keeps_daily_loss_baseline_at_todays_starting_equity():

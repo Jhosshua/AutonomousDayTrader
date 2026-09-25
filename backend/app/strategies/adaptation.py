@@ -272,6 +272,7 @@ class DynamicAdaptationEngine:
         equity: float,
         current_positions_count: int,
         is_symbol_active: bool,
+        stop_loss_price: Optional[float] = None,
     ) -> Tuple[bool, str, int]:
         """Validate if a strategy signal passes adaptation gates and calculate sizing.
 
@@ -307,7 +308,7 @@ class DynamicAdaptationEngine:
         shares = self.calculate_adapted_size(
             equity=equity,
             entry_price=signal.entry_price,
-            stop_loss_price=signal.stop_loss,
+            stop_loss_price=signal.stop_loss if stop_loss_price is None else stop_loss_price,
         )
 
         if shares <= 0:

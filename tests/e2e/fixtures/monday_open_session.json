@@ -2302,7 +2302,7 @@
     "type": "control",
     "timestamp": "2026-09-21T14:25:00Z",
     "phase": "TREND_CONTINUATION",
-    "description": "AAPL Mean Reversion Take Profit Hit: Reverted to 20-SMA $150.25, Position Closed Flat"
+    "description": "AAPL Mean Reversion first target hit near 20-SMA; remaining runner stays protected"
   },
   {
     "type": "bar",
@@ -2448,6 +2448,6 @@
     "type": "control",
     "timestamp": "2026-09-21T14:30:00Z",
     "phase": "TREND_CONTINUATION",
-    "description": "Monday Market Open Session Complete (10:30 ET). All Positions Flat. Ledger Certified."
+    "description": "Monday Market Open Session Complete (10:30 ET). Any remaining runner requires a live protective stop."
   }
 ]

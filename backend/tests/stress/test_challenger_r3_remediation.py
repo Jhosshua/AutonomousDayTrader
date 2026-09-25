@@ -163,7 +163,7 @@ class TestNewsMomentumCausality:
 
     def test_future_news_rejected_zero_lookahead(self):
         """Verifies bar NEVER consumes future-dated news events."""
-        base_time = datetime(2026, 9, 23, 10, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2026, 9, 23, 14, 0, 0, tzinfo=timezone.utc)
         strat = self._setup_strategy(base_time)
 
         strat.pending_catalysts["AAPL"] = [
@@ -188,7 +188,7 @@ class TestNewsMomentumCausality:
 
     def test_simultaneous_news_consumed(self):
         """Verifies bar consumes simultaneous news event (exact timestamp match)."""
-        base_time = datetime(2026, 9, 23, 10, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2026, 9, 23, 14, 0, 0, tzinfo=timezone.utc)
         strat = self._setup_strategy(base_time)
 
         strat.pending_catalysts["AAPL"] = [
@@ -214,7 +214,7 @@ class TestNewsMomentumCausality:
 
     def test_past_news_within_ttl_consumed(self):
         """Verifies bar consumes past news within TTL window."""
-        base_time = datetime(2026, 9, 23, 10, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2026, 9, 23, 14, 0, 0, tzinfo=timezone.utc)
         strat = self._setup_strategy(base_time)
 
         strat.pending_catalysts["AAPL"] = [
@@ -240,7 +240,7 @@ class TestNewsMomentumCausality:
 
     def test_expired_past_news_rejected(self):
         """Verifies bar rejects news older than catalyst TTL (180s)."""
-        base_time = datetime(2026, 9, 23, 10, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2026, 9, 23, 14, 0, 0, tzinfo=timezone.utc)
         strat = self._setup_strategy(base_time)
 
         strat.pending_catalysts["AAPL"] = [
@@ -265,7 +265,7 @@ class TestNewsMomentumCausality:
 
     def test_mixed_future_and_past_catalysts_isolated(self):
         """Verifies mixed pending catalysts only consume valid past catalyst and ignore future."""
-        base_time = datetime(2026, 9, 23, 10, 0, 0, tzinfo=timezone.utc)
+        base_time = datetime(2026, 9, 23, 14, 0, 0, tzinfo=timezone.utc)
         strat = self._setup_strategy(base_time)
 
         strat.pending_catalysts["AAPL"] = [

@@ -1,14 +1,15 @@
 """backend/app/strategies/news_momentum.py
 Catalyst News Momentum Breakout Strategy.
 Ingests real-time Benzinga headlines, performs NLP sentiment classification,
-confirms breakout on >=3.5x volume surge, and enforces news contradiction circuit breakers.
+confirms breakout on >2.0x volume surge, and enforces news contradiction circuit breakers.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, time as dtime, timezone
 import math
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
+from zoneinfo import ZoneInfo
 
 from backend.app.config import settings
 from backend.app.models.events import BarEvent, NewsEvent, OrderSide, OrderType
@@ -20,6 +21,8 @@ from backend.app.strategies.base import (
     calculate_atr,
     resolve_stop,
 )
+
+ET_TZ = ZoneInfo("America/New_York")
 
 
 def score_news_sentiment(headline: str) -> float:
@@ -205,6 +208,14 @@ class NewsMomentumStrategy(Strategy):
         if self.status != StrategyStatus.ACTIVE:
             return []
 
+        # Only regular-session minutes can establish the volume baseline or
+        # consume a catalyst. A headline at 09:28 can still be used at 09:30
+        # if it remains within the catalyst TTL.
+        timestamp = bar.timestamp if bar.timestamp.tzinfo else bar.timestamp.replace(tzinfo=timezone.utc)
+        bar_et = timestamp.astimezone(ET_TZ)
+        if not dtime(9, 30) <= bar_et.time() < dtime(16, 0):
+            return []
+
         sym = bar.symbol.upper()
         if sym not in self.recent_bars:
             self.recent_bars[sym] = []
@@ -240,7 +251,7 @@ class NewsMomentumStrategy(Strategy):
         if not valid_catalysts:
             return []
 
-        # Volume confirmation check (>3.5x SMA20)
+        # Volume confirmation check (>2.0x SMA20 by default)
         # Exclude the candidate bar from its own baseline.  Including the
         # surge in SMA20 dilutes the ratio and can suppress the very catalyst
         # the rule is meant to detect.
@@ -253,7 +264,7 @@ class NewsMomentumStrategy(Strategy):
             sma20_vol = 100000.0
 
         vol_ratio = bar.volume / sma20_vol
-        if vol_ratio < self.volume_surge_multiplier:
+        if vol_ratio <= self.volume_surge_multiplier:
             return []
 
         # Latest catalyst triggered

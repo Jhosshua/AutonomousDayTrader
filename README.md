@@ -64,14 +64,14 @@
   - Hard Daily Circuit Breaker: Automatically halts trading and liquidates upon reaching $1,500 (3%) daily drawdown.
   - Per-Position Risk Cap: 1–2% maximum risk budget per trade.
   - Single-Position Concentration Cap: $25,000 notional (50% of equity, 12.5% of 4:1 DTBP). With the 3-position concurrency limit the whole book tops out at $75,000 (1.5x equity), and a 5% adverse gap on the largest allowed position costs $1,250, inside the $1,500 daily breaker.
-  - Dynamic Brackets: Multi-target profit scaling (Target 1 at 1.5R with 50% scale-out, Target 2 at 2.5R or trailing ATR stop).
+  - Dynamic Brackets: Multi-target profit scaling (Target 1 at 0.8R with 50% scale-out, Target 2 at 1.8R or trailing ATR stop).
   - 4-Phase Zero-Overnight Flattening: 15:45 entry lockout $\to$ 15:50 working order purge $\to$ 15:55 market liquidation $\to$ 15:58 flat audit before 16:00 ET.
 
 ### 2. 4 Dynamically Adapted Intraday Strategies
 1. **Opening Range Breakout (ORB)**: Uses the first 5 minutes in production (15 minutes is configurable), a relative volume threshold of 1.8x, midpoint invalidation stops, and tiered profit targets.
-2. **VWAP Trend Pullback & Continuation**: Anchored intraday VWAP with standard deviation volatility bands and EMA20/EMA50 trend confirmation.
-3. **Catalyst News Momentum Breakout**: Real-time Benzinga news sentiment parsing, volume surge validation ($>3.5\times$), and immediate contradictory news emergency exit.
-4. **Statistical Mean Reversion / Exhaustion Fades**: 1-minute $Z$-score ($\ge 2.5\sigma$) and RSI-14 extreme overbought/oversold fades back to the 20-period moving average.
+2. **VWAP Trend Pullback & Continuation**: Anchored intraday VWAP with standard deviation bands and an EMA20/EMA50 trend filter. It needs 50 regular-session one-minute closes before its first possible entry (about 10:20 ET on a normal feed); it can trade again from 14:00 to 15:45 ET.
+3. **Catalyst News Momentum Breakout**: Benzinga sentiment at least 0.60, a strictly greater than 2.0x regular-session volume surge, and contradictory-news emergency exits for intraday holdings. Premarket headlines remain eligible at the open while within the 180-second catalyst window.
+4. **Statistical Mean Reversion / Exhaustion Fades**: One-minute $|Z|\ge 1.65$ with RSI-14 extremes, volume greater than 1.30x, and wick rejection at least 0.30. It targets the 20-period mean only when the adapted-stop reward/risk is at least 1.0R.
 - **Dynamic Self-Adaptation**: Adapts position sizing, entry criteria, and stop widths dynamically across 4 VIX Volatility Regimes (Low, Normal, Elevated, Crisis) and 5 Time-of-Day Execution Phases (Pre-market scan, Open flush, Trend continuation, Midday chop defense, Power hour).
 
 ### 3. Autonomous Multi-Day Swing Trading Engine ("2-Day Panic Dip")
@@ -86,7 +86,7 @@ An autonomous multi-day swing engine operating across 5 certified liquid high-be
   7. *Take-Profit & Time Exit*: Sold at next 09:30 open if prior close > 5-day SMA, prior RSI(2) > 70.0, or held for 5 trading days.
 - **Strict Architectural Separation & EOD Flattening Exemption**:
   - Swing positions are explicitly tagged `arm=TradingArm.SWING` and strictly exempt from the 15:45–15:58 ET intraday auto-flattening engine and session sweeps.
-  - Shares the $50,000 virtual paper trading account pool with intraday day trading without margin collision or double-spending.
+  - Shares the $50,000 Alpaca paper trading account pool with intraday day trading without margin collision or double-spending.
   - Symbol-level mutual exclusion prevents concurrent intraday and swing trades on the same symbol (e.g. `AMD`).
 - **Operator Interface (Slow trades tab)**:
   - Tab toggle "Quick trades (same day)" / "Slow trades (a few days)".
@@ -188,13 +188,13 @@ count, and -$21.34 session result are preserved without inventing lost fills.
 
 ### Running Test Suites
 ```bash
-# Run the complete opaque-box E2E test suite (325 tests with port audit)
+# Run the complete opaque-box E2E test suite with port audit
 python3 tests/e2e/runner.py
 
 # Run all E2E tests using pytest (covering Tier 1-5, swing multi-day replay, and visual checks)
 pytest tests/e2e
 
-# Run backend unit & integration test suite (485 tests)
+# Run backend unit & integration test suite
 pytest backend/tests
 
 # Run dedicated forensic remediation unit test suite (11 tests)
@@ -284,7 +284,6 @@ AutonomousDayTrader/
 ├── SWING_SIMULATION_REPORT.md    # Multi-day swing dry run verification report
 ├── MONDAY_SIMULATION_REPORT.md   # Intraday Monday dry run replay report
 ├── TEST_INFRA.md                 # E2E test methodology & coverage matrix
-├── TEST_READY.md                 # Test harness readiness certificate
 └── PROJECT.md                    # Project architectural blueprint & contract specs
 ```
 

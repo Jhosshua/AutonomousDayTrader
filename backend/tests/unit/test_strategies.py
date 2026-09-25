@@ -253,33 +253,34 @@ def test_orb_bearish_breakdown():
 # 3. Strategy 2: VWAP Trend Pullback & Continuation
 # ============================================================================
 
-def test_vwap_pullback_bullish_bounce():
+@pytest.mark.parametrize("bounce_above_vwap, expected_fallback", [(0.7, False), (0.9, True)])
+def test_vwap_pullback_bullish_bounce(bounce_above_vwap, expected_fallback):
     strat = VWAPPullbackStrategy()
 
-    # Feed 15 bars in an uptrend between 10:00 and 10:14 ET
-    for i in range(15):
-        p = 100.0 + i * 0.5
+    # The documented EMA20/50 filter needs 50 regular-session closes.
+    for i in range(49):
+        p = 100.0 + i * 0.1
         b = _make_bar(
             symbol="MSFT",
             open_p=p,
-            high_p=p + 0.6,
+            high_p=p + 0.2,
             low_p=p - 0.2,
-            close_p=p + 0.4,
+            close_p=p + 0.15,
             vol=20000,
-            ts_str=f"2026-09-21T10:{i:02d}:00-04:00",
+            ts_str=f"2026-09-21T{9 + (30 + i) // 60:02d}:{(30 + i) % 60:02d}:00-04:00",
         )
-        strat.on_bar(b)
+        assert strat.on_bar(b) == []
 
-    # Current VWAP is ~103.50. Bar 16 pulls back to touch VWAP with hammer wick & surge
+    # Bar 50 pulls back to touch VWAP with hammer wick and volume surge.
     vwap, std = calculate_anchored_vwap(strat._get_state("MSFT").session_bars)
     bounce_bar = _make_bar(
         symbol="MSFT",
         open_p=vwap + 0.1,
-        high_p=vwap + 0.8,
-        low_p=vwap - 0.1,
-        close_p=vwap + 0.7,  # Green close above VWAP
+        high_p=vwap + max(0.8, bounce_above_vwap + 0.1),
+        low_p=vwap - 0.2,
+        close_p=vwap + bounce_above_vwap,
         vol=50000,           # Volume surge > 1.2x SMA10
-        ts_str="2026-09-21T10:15:00-04:00",
+        ts_str="2026-09-21T10:19:00-04:00",
     )
     sigs = strat.on_bar(bounce_bar)
     assert len(sigs) >= 1
@@ -288,6 +289,30 @@ def test_vwap_pullback_bullish_bounce():
     assert sig.strategy_id == "vwap_pullback"
     assert sig.stop_loss < sig.entry_price
     assert sig.take_profit_1 > sig.entry_price
+    assert sig.target_1_is_r_fallback is expected_fallback
+
+
+@pytest.mark.parametrize("rejection_below_vwap, expected_fallback", [(0.7, False), (0.9, True)])
+def test_vwap_pullback_bearish_rejection_needs_ema50(rejection_below_vwap, expected_fallback):
+    strat = VWAPPullbackStrategy()
+    for i in range(49):
+        p = 105.0 - i * 0.1
+        bar = _make_bar(
+            symbol="MSFT", open_p=p, high_p=p + 0.2, low_p=p - 0.2,
+            close_p=p - 0.15, vol=20000,
+            ts_str=f"2026-09-21T{9 + (30 + i) // 60:02d}:{(30 + i) % 60:02d}:00-04:00",
+        )
+        assert strat.on_bar(bar) == []
+    vwap, _ = calculate_anchored_vwap(strat._get_state("MSFT").session_bars)
+    rejection = _make_bar(
+        symbol="MSFT", open_p=vwap - 0.1, high_p=vwap + 0.2,
+        low_p=vwap - max(0.8, rejection_below_vwap + 0.1),
+        close_p=vwap - rejection_below_vwap, vol=50000,
+        ts_str="2026-09-21T10:19:00-04:00",
+    )
+    sigs = strat.on_bar(rejection)
+    assert len(sigs) == 1 and sigs[0].side == OrderSide.SELL
+    assert sigs[0].target_1_is_r_fallback is expected_fallback
 
 
 # ============================================================================

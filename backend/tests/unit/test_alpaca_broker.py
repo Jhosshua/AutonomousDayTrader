@@ -8,7 +8,9 @@ import pytest
 from backend.app.core.account import PaperTradingAccount
 from backend.app.core.broker import AlpacaBroker, BrokerReject
 from backend.app.core.engine import BrokerFillFailed, ExecutionEngine
+from backend.app.core.persistence import decode_runtime_value, encode_runtime_value
 from backend.app.models.events import OrderSide, OrderState, OrderType
+from backend.app.strategies.swing_panic_dip import StagedSwingOrder, SwingStrategyEngine
 
 NOW = datetime(2026, 9, 25, 14, 0, tzinfo=timezone.utc)
 
@@ -16,7 +18,7 @@ NOW = datetime(2026, 9, 25, 14, 0, tzinfo=timezone.utc)
 class FakeAlpaca:
     """Minimal Alpaca paper API with real position tracking.
 
-    mode: fill | partial | hang (accepted, never fills, cancel works) |
+    mode: fill | partial | partial_stuck | hang (accepted, never fills, cancel works) |
           stuck (never fills, cancel never confirmed) | reject
     """
 
@@ -57,7 +59,7 @@ class FakeAlpaca:
             self.orders[oid] = order
             if self.mode == "fill":
                 self.fill_later(oid)
-            elif self.mode == "partial":
+            elif self.mode in ("partial", "partial_stuck"):
                 part = int(qty * self.fill_ratio)
                 self._apply(order, part)
                 order.update(status="partially_filled", filled_qty=str(part), filled_avg_price=str(self.fill_price))
@@ -73,7 +75,7 @@ class FakeAlpaca:
         if request.method == "DELETE" and path.startswith("/v2/orders/"):
             oid = path.rsplit("/", 1)[1]
             self.cancels.append(oid)
-            if self.mode != "stuck":
+            if self.mode not in ("stuck", "partial_stuck"):
                 self.orders[oid]["status"] = "canceled"
             return httpx.Response(204)
         if path == "/v2/account":
@@ -382,3 +384,128 @@ def test_rejected_order_is_never_sent_for_real():
     with pytest.raises(BrokerFillFailed):
         engine._execute_fill(order, 10, 100.0, 0.0, NOW)
     assert fake.posts == []
+
+
+def test_swing_unresolved_entry_reuses_one_alpaca_order_and_late_fill_gets_stop():
+    fake = FakeAlpaca(mode="stuck", fill_price=101.25)
+    engine = make_engine(fake)
+    swing = SwingStrategyEngine(account=engine.account, execution_engine=engine)
+    staged = swing.staged_manager.stage_buy("MU", 25000.0, 4.0, NOW.date(), "PANIC_DIP")
+    opened = datetime(2026, 9, 25, 13, 30, tzinfo=timezone.utc)
+
+    first = swing.execute_market_open({"MU": 100.0}, opened)
+    assert first["entries"] == [] and swing.staged_manager.is_staged_for_entry("MU")
+    assert staged.execution_order_id in engine.orders and len(fake.posts) == 1
+    assert engine.process_bar("MU", 100, 101, 99, 100, 50000, opened) == []
+    assert len(fake.posts) == 1, "generic bar matching must not own staged Swing entries"
+
+    engine._broker_retry_after.clear()
+    swing.execute_market_open({"MU": 100.0}, opened)
+    assert len(fake.posts) == 1, "a second local id would buy twice if the first order fills late"
+
+    fake.fill_later("a1")
+    late = engine.settle_broker_orders()
+    assert len(late) == 1
+    swing.on_entry_fill(engine.orders[late[0].order_id], late[0])
+    pos = engine.account.positions["MU"]
+    assert pos.entry_atr == 4.0 and pos.stop_loss_price == round(pos.avg_entry_price - 10.0, 2)
+    assert pos.entry_date == opened.date() and not swing.staged_manager.is_staged_for_entry("MU")
+    assert len(fake.posts) == 1
+
+
+def test_swing_partial_then_late_remainder_reanchors_stop_without_new_order():
+    fake = FakeAlpaca(mode="partial_stuck", fill_ratio=0.5, fill_price=101.0)
+    engine = make_engine(fake)
+    swing = SwingStrategyEngine(account=engine.account, execution_engine=engine)
+    swing.staged_manager.stage_buy("MU", 25000.0, 4.0, NOW.date(), "PANIC_DIP")
+    opened = datetime(2026, 9, 25, 13, 30, tzinfo=timezone.utc)
+
+    first = swing.execute_market_open({"MU": 100.0}, opened)
+    assert len(first["entries"]) == 1 and engine.account.positions["MU"].shares == 125
+    assert not swing.staged_manager.is_staged_for_entry("MU")
+    order = next(o for o in engine.orders.values() if o.strategy_id == "swing_panic_dip")
+    assert order.status == OrderState.CANCELLED and len(fake.posts) == 1
+
+    fake.fill_price = 103.0
+    fake.fill_later("a1")
+    late = engine.settle_broker_orders()
+    assert len(late) == 1 and late[0].qty == 125
+    swing.on_entry_fill(order, late[0])
+    pos = engine.account.positions["MU"]
+    assert pos.shares == 250 and pos.stop_loss_price == round(pos.avg_entry_price - 10.0, 2)
+    assert pos.entry_atr == 4.0 and len(fake.posts) == 1
+
+
+def test_swing_restart_restores_linked_order_before_late_fill():
+    fake = FakeAlpaca(mode="stuck", fill_price=102.0)
+    first_engine = make_engine(fake)
+    first_swing = SwingStrategyEngine(account=first_engine.account, execution_engine=first_engine)
+    first_swing.staged_manager.stage_buy("MU", 25000.0, 4.0, NOW.date(), "PANIC_DIP")
+    opened = datetime(2026, 9, 25, 13, 30, tzinfo=timezone.utc)
+    first_swing.execute_market_open({"MU": 100.0}, opened)
+    saved_stage = first_swing.staged_manager.get_staged_entries()[0].to_dict()
+    saved_order = decode_runtime_value(encode_runtime_value(
+        first_engine.orders[saved_stage["execution_order_id"]]
+    ))
+
+    restored_engine = make_engine(fake)
+    restored_engine.orders[saved_order.id] = saved_order
+    restored_engine.working_orders[saved_order.id] = saved_order
+    restored_swing = SwingStrategyEngine(account=restored_engine.account, execution_engine=restored_engine)
+    restored_swing.staged_manager.load_staged_orders([StagedSwingOrder.from_dict(saved_stage)])
+    fake.fill_later("a1")
+    late = restored_engine.settle_broker_orders()
+    assert len(late) == 1
+    restored_swing.on_entry_fill(saved_order, late[0])
+    assert restored_engine.account.positions["MU"].stop_loss_price == 92.0
+    assert restored_swing.staged_manager.get_staged_entries() == [] and len(fake.posts) == 1
+
+
+def test_unfilled_swing_orders_use_the_two_available_slots():
+    fake = FakeAlpaca(mode="stuck")
+    engine = make_engine(fake)
+    swing = SwingStrategyEngine(account=engine.account, execution_engine=engine)
+    for symbol in ("MU", "LRCX", "KLAC"):
+        swing.staged_manager.stage_buy(symbol, 25000.0, 4.0, NOW.date(), "PANIC_DIP")
+    opened = datetime(2026, 9, 25, 13, 30, tzinfo=timezone.utc)
+    swing.execute_market_open({"MU": 100.0, "LRCX": 100.0, "KLAC": 100.0}, opened)
+    assert len(fake.posts) == 2
+    assert {row["symbol"] for row in fake.posts} == {"MU", "LRCX"}
+
+
+def test_swing_emergency_stop_submits_a_real_paper_sell_and_reuses_pending_exit():
+    fake = FakeAlpaca(fill_price=100.0)
+    engine = make_engine(fake)
+    swing = SwingStrategyEngine(account=engine.account, execution_engine=engine)
+    swing.staged_manager.stage_buy("MU", 25000.0, 4.0, NOW.date(), "PANIC_DIP")
+    opened = datetime(2026, 9, 25, 13, 30, tzinfo=timezone.utc)
+    assert swing.execute_market_open({"MU": 100.0}, opened)["entries"]
+    assert engine.account.positions["MU"].stop_loss_price == 90.0
+
+    fake.mode = "stuck"
+    assert swing.check_intraday_emergency_stops({"MU": 89.0}, opened) == []
+    sells = [o for o in fake.posts if o["side"] == "sell"]
+    assert len(sells) == 1
+    engine._broker_retry_after.clear()
+    assert swing.check_intraday_emergency_stops({"MU": 88.0}, opened) == []
+    assert len([o for o in fake.posts if o["side"] == "sell"]) == 1
+
+    fake.fill_price = 88.0
+    fake.fill_later("a2")
+    late = engine.settle_broker_orders()
+    assert len(late) == 1 and late[0].side == OrderSide.SELL
+    swing.on_exit_fill(engine.orders[late[0].order_id])
+    assert "MU" not in engine.account.positions and fake.positions == {}
+
+
+def test_pruning_keeps_broker_linked_order_for_late_fill():
+    fake = FakeAlpaca(mode="stuck")
+    engine = make_engine(fake)
+    entry = buy(engine)
+    engine.process_quote("AAPL", 100.0, 100.02, NOW)
+    assert entry.broker_order_id
+    other = buy(engine, sym="MSFT")
+    engine.cancel_order(other.id)
+    engine.prune_session_state(max_orders=1)
+    assert entry.id in engine.orders
+    assert other.id not in engine.orders
