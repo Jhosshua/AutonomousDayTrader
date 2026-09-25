@@ -38,6 +38,12 @@ A final local review caught an order-pruning edge case: with no retention slots 
 - Six-day concurrent Swing replay: PASS, $53,056.11 final equity, zero open positions, clean ports.
 - The replays used the built-in simulator and a local mock relay, not the Alpaca paper account. Mock server shut down.
 
+## Deployment and production verification (2026-09-25)
+
+The original release gate waited for the 15:55 ET flatten. At about 12:43 ET the user explicitly requested deployment now and CLI monitoring. Immediately before the push, read-only checks found zero app, Alpaca, and Swing positions; broker mismatch false, a fresh broker sync, and durable persistence. `git push origin main` advanced `676056f` to `04a70d91e4760dcdef3b434222d347a94c7724aa`.
+
+Railway deployment `ccde6327-3216-4bce-b9e4-d08c33e08531` reached `SUCCESS` for that exact commit and became the linked production service. The Dockerfile build completed. Startup logs show durable revision 38044 restored with $49,820.93 equity, zero positions, and 23 trades; Alpaca paper account `PA3CSVDZMMPY` matched the restored account. The stock and news sockets authenticated, the VIX poller connected, and the startup market-data backfill completed. The first 70 runtime log lines had no `ERROR`, `CRITICAL`, traceback, `error on bar`, broker mismatch, or recovery-halt match. The live dashboard and `/health`, `/api/account`, `/api/positions`, `/api/strategies`, `/api/decisions`, and `/api/swing/state` returned HTTP 200. `/health` reported healthy, durable persistence, broker mismatch false, and zero app/Alpaca positions. These checks prove deployment and state restoration; they do not establish a new qualifying News or Swing trade.
+
 ## Remaining limits
 
-No code-only QA can prove the five strategies have positive trading expectancy or that a rare News or Swing setup will occur today. Production behavior after deployment can verify wiring and state preservation; a later qualifying market session is required to observe a real Swing entry and a new News entry.
+No code-only QA can prove the five strategies have positive trading expectancy or that a rare News or Swing setup will occur today. The production checks above verify wiring and state preservation; a later qualifying market session is required to observe a real Swing entry and a new News entry.
