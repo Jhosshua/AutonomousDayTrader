@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { LineChart } from "lucide-react";
 import { etParts } from "@/lib/plain";
+import type { BrokerInfo } from "@/types/trading";
 
 interface HeaderProps {
   isConnected: boolean;
+  broker?: BrokerInfo;
   showPro: boolean;
   onTogglePro: (next: boolean) => void;
 }
@@ -50,7 +52,15 @@ function nowLabel(): string {
   return `${weekday}, ${month} ${day} · ${h12}:${String(minute).padStart(2, "0")} ${ampm}`;
 }
 
-export default function Header({ isConnected, showPro, onTogglePro }: HeaderProps) {
+function accountLabel(broker?: BrokerInfo): string {
+  if (!broker) return "";
+  if (broker.mode === "alpaca_paper") {
+    return `Alpaca paper account${broker.account_number ? ` ${broker.account_number}` : ""}. Real orders, practice money.`;
+  }
+  return "Practice account. The trades are simulated, no real orders.";
+}
+
+export default function Header({ isConnected, broker, showPro, onTogglePro }: HeaderProps) {
   const [clock, setClock] = useState<string>("");
   useEffect(() => {
     setClock(nowLabel());
@@ -69,7 +79,7 @@ export default function Header({ isConnected, showPro, onTogglePro }: HeaderProp
         </div>
         <div className="flex flex-col gap-0.5">
           <div className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-ink">Day Trader</div>
-          <div className="text-xs sm:text-sm text-muted">Practice account. The $50,000 is pretend money.</div>
+          <div className="text-xs sm:text-sm text-muted" data-testid="account-label">{accountLabel(broker)}</div>
         </div>
       </div>
 

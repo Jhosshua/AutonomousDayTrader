@@ -1,6 +1,8 @@
 # AutonomousDayTrader 🚀📈
 
-> Intraday paper-trading system for US equities connected downstream to **AlpacaRelay**, operating on a virtual **$50,000** account across four dynamically adapted strategies with a **plain-language, light, mobile-first** dashboard anyone can read.
+> Intraday + swing paper-trading system for US equities. Market data comes from **AlpacaRelay**; since **2026-09-25** every trade is a **real order on Alpaca paper account PA3CSVDZMMPY** (started at $50,018.45, matched to the bot's balance). Four dynamically adapted intraday strategies plus a swing arm, with a **plain-language, light, mobile-first** dashboard anyone can read.
+>
+> **Execution (2026-09-25):** the bot still decides locally when an entry, stop, target or flatten triggers; at that moment `backend/app/core/broker.py` sends a real day order to Alpaca paper and the ledger books Alpaca's real quantity and average price (no simulated fee). `BROKER_MODE=alpaca_paper` + `ALPACA_API_KEY`/`ALPACA_SECRET_KEY` on Railway turn it on; unset (default `simulated`) keeps the old built-in fill simulator for tests, replays and local dev. Replays (`set_simulation_mode(True)`) always detach the real broker. See `PLAN_2026_09_25_alpaca_paper_broker.md`.
 
 ---
 
@@ -160,7 +162,7 @@ Live Railway dashboard: https://autonomousdaytrader-production.up.railway.app
 
 The Railway service `AutonomousDayTrader` is connected to the GitHub repo `Jhosshua/AutonomousDayTrader` (`main` branch) with an automatic deployment trigger: every push to `main` rebuilds and redeploys production. No manual `railway up` is needed. `scripts/deploy_and_push.sh` wraps this flow with test/build gates and a post-push `/health` verification.
 
-The deployed `/health` endpoint is the source of truth for upstream readiness; the current verified state reports stock, news, and VIX connected. The system remains paper-trading only.
+The deployed `/health` endpoint is the source of truth for upstream readiness; the current verified state reports stock, news, and VIX connected. The system remains paper-trading only: the broker refuses any base URL other than `https://paper-api.alpaca.markets`. `/health` → `broker` shows the Alpaca account number, Alpaca equity/positions, equity drift vs the bot, and `mismatch` (entries paused while positions differ).
 
 ### Durable Account Ledger
 
@@ -238,7 +240,8 @@ AutonomousDayTrader/
 │   │   ├── config.py             # Config & env vars (ports, tokens, risk limits)
 │   │   ├── data/                 # Seed historical daily bars & earnings calendar
 │   │   ├── core/
-│   │   │   ├── account.py        # $50,000 Paper Account state machine & TradingArm
+│   │   │   ├── account.py        # Paper account ledger (cash, positions, P&L) & TradingArm
+│   │   │   ├── broker.py         # Alpaca PAPER order client (real fills since 2026-09-25)
 │   │   │   ├── risk.py           # Institutional Risk Engine & circuit breakers
 │   │   │   ├── bracket.py        # Stop-loss & dynamic take-profit brackets
 │   │   │   ├── flattening.py     # 4-phase zero-overnight auto-liquidation state machine

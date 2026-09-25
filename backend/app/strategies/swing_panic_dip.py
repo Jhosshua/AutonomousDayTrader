@@ -464,21 +464,26 @@ class SwingStrategyEngine:
                     )
                     exits_executed.append({
                         "symbol": sym,
-                        "shares": shares,
-                        "price": fill_price,
+                        "shares": fill.qty,
+                        "price": fill.price,
                         "slippage": slippage,
                         "realized_pnl": fill.realized_pnl,
                         "reason": exit_order.reason,
                     })
-                    log.info(f"Executed swing EXIT for {sym}: {shares} shares @ ${fill_price:,.2f} ({exit_order.reason})")
+                    log.info(f"Executed swing EXIT for {sym}: {fill.qty} shares @ ${fill.price:,.2f} ({exit_order.reason})")
                 except Exception as e:
                     log.error(f"Error executing swing exit for {sym}: {e}")
                     errors.append(f"Exit error for {sym}: {e}")
                 finally:
-                    self.staged_manager.remove_staged_order(exit_order.order_id)
                     rem_pos = self.account.positions.get(sym)
-                    if (not rem_pos or rem_pos.shares <= 0) and self.release_symbol_cb:
-                        self.release_symbol_cb(sym)
+                    if not rem_pos or rem_pos.shares <= 0:
+                        self.staged_manager.remove_staged_order(exit_order.order_id)
+                        if self.release_symbol_cb:
+                            self.release_symbol_cb(sym)
+                    else:
+                        # A real broker can refuse or part-fill the exit. Keep it
+                        # staged so the next open bar retries the shares still held.
+                        log.warning(f"Swing EXIT for {sym} not complete ({rem_pos.shares} shares left); staying staged")
 
             # -------------------------------------------------------------
             # 2. PROCESS ENTRIES NEXT
@@ -611,16 +616,16 @@ class SwingStrategyEngine:
 
                     entries_executed.append({
                         "symbol": sym,
-                        "shares": qty,
+                        "shares": fill.qty,
                         "price": open_price,
                         "fill_price": fill.price,
                         "slippage": slippage,
-                        "notional": round(qty * fill.price, 2),
+                        "notional": round(fill.qty * fill.price, 2),
                         "stop_loss_price": realized_stop_price,
                         "daily_atr": entry_order.daily_atr,
                     })
                     log.info(
-                        f"Executed swing ENTRY for {sym}: {qty} shares @ ${fill.price:,.2f} "
+                        f"Executed swing ENTRY for {sym}: {fill.qty} shares @ ${fill.price:,.2f} "
                         f"(stop=${realized_stop_price:,.2f}, ATR=${entry_order.daily_atr:.2f}, slippage=${slippage:.4f})"
                     )
                 except Exception as e:
@@ -698,8 +703,8 @@ class SwingStrategyEngine:
                     )
                     stops_triggered.append({
                         "symbol": sym,
-                        "shares": pos.shares,
-                        "fill_price": fill_price,
+                        "shares": fill.qty,
+                        "fill_price": fill.price,
                         "stop_price": stop_price,
                         "realized_pnl": fill.realized_pnl,
                         "timestamp": timestamp.isoformat(),
@@ -707,7 +712,9 @@ class SwingStrategyEngine:
                 except Exception as e:
                     log.error(f"Error executing emergency stop for {sym}: {e}")
                 finally:
-                    if self.release_symbol_cb:
+                    # Release only once flat; a refused or partial broker exit
+                    # keeps the symbol reserved and the stop re-checks next bar.
+                    if sym not in self.account.positions and self.release_symbol_cb:
                         self.release_symbol_cb(sym)
 
         return stops_triggered
@@ -866,17 +873,18 @@ class SwingStrategyEngine:
                 slippage=slippage,
                 timestamp=now_dt,
             )
-            self.staged_manager.remove_for_symbol(sym)
-            if self.release_symbol_cb:
-                self.release_symbol_cb(sym)
+            if sym not in self.account.positions:
+                self.staged_manager.remove_for_symbol(sym)
+                if self.release_symbol_cb:
+                    self.release_symbol_cb(sym)
             log.info(
                 f"Operator executed IMMEDIATE exit for swing position {sym}: "
-                f"{pos.shares} shares @ ${fill_price:,.2f}"
+                f"{fill.qty} shares @ ${fill.price:,.2f}"
             )
             return {
                 "symbol": sym,
-                "shares": pos.shares,
-                "fill_price": fill_price,
+                "shares": fill.qty,
+                "fill_price": fill.price,
                 "slippage": slippage,
                 "realized_pnl": fill.realized_pnl,
                 "timestamp": now_dt.isoformat(),

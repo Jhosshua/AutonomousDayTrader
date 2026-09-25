@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.config import settings
 from backend.app.core.account import PaperTradingAccount, PositionSide, TradingArm
+from backend.app.core.broker import AlpacaBroker
 from backend.app.core.bracket import BracketChildType, BracketStatus, DynamicBracketManager
 from backend.app.core.market_filter import MarketTrendFilter
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
@@ -232,6 +233,126 @@ def _get_effective_committed_portfolio(
     return committed_symbols, committed_sectors, len(committed_symbols), existing_notional
 
 
+# Real broker (Alpaca paper). Built once at startup when BROKER_MODE=alpaca_paper;
+# detached while simulation/replay mode is on so replays never place real orders.
+alpaca_broker: Optional[AlpacaBroker] = None
+broker_state: Dict[str, Any] = {
+    "mode": "simulated",
+    "mismatch": False,
+    "mismatch_detail": None,
+    "mismatch_streak": 0,
+    "last_check_at": None,
+    "last_error": None,
+    "equity_drift": None,
+}
+
+
+def _local_signed_positions(acct: PaperTradingAccount) -> Dict[str, int]:
+    return {
+        sym: (pos.shares if pos.side == PositionSide.LONG else -pos.shares)
+        for sym, pos in acct.positions.items()
+        if pos.shares
+    }
+
+
+def _compare_with_broker(broker_positions: Dict[str, int], broker_equity: Optional[float]) -> None:
+    """Block new entries while the local book and Alpaca disagree on positions."""
+    local = _local_signed_positions(account)
+    diffs = {
+        sym: {"bot": local.get(sym, 0), "alpaca": broker_positions.get(sym, 0)}
+        for sym in set(local) | set(broker_positions)
+        if local.get(sym, 0) != broker_positions.get(sym, 0)
+    }
+    broker_state["last_check_at"] = datetime.now(timezone.utc).isoformat()
+    broker_state["equity_drift"] = None if broker_equity is None else round(account.equity - broker_equity, 2)
+    if diffs:
+        broker_state["mismatch_streak"] += 1
+        broker_state["mismatch_detail"] = diffs
+        # Block at the first difference: a fill landing mid-check only costs one
+        # 30-second pause, a real gap must never get more exposure on top.
+        if not broker_state["mismatch"]:
+            log.error("BROKER MISMATCH: bot and Alpaca positions differ %s; new entries blocked", diffs)
+        broker_state["mismatch"] = True
+    else:
+        if broker_state["mismatch"]:
+            log.warning("Broker positions match again; new entries allowed")
+        broker_state.update({"mismatch": False, "mismatch_detail": None, "mismatch_streak": 0})
+
+
+async def _broker_reconcile_once() -> None:
+    if alpaca_broker is None or engine.broker is None:
+        return
+    try:
+        status = await asyncio.to_thread(alpaca_broker.sync)
+    except Exception as exc:
+        broker_state["last_error"] = f"sync failed: {exc}"
+        broker_state["mismatch"] = True
+        broker_state["mismatch_detail"] = {"sync": "failed, cannot confirm the Alpaca account"}
+        log.warning("Alpaca sync failed (%s); new entries paused until a sync succeeds", exc)
+        return
+    broker_state["last_error"] = alpaca_broker.status.last_error
+    _compare_with_broker(dict(status.positions), status.equity)
+
+
+def _settle_broker_orders() -> None:
+    """Book late Alpaca fills on orders the bot already gave up on, then link them."""
+    if engine.broker is None:
+        return
+    fills = engine.settle_broker_orders()
+    if fills:
+        _reconcile_fills(fills)
+        _release_dead_entry_brackets()
+        _checkpoint_runtime("BROKER_LATE_FILL")
+
+
+async def _broker_reconcile_loop() -> None:
+    last_sync = 0.0
+    while True:
+        try:
+            await asyncio.sleep(5.0)
+            if any(o.broker_order_id or o.broker_client_id for o in engine.orders.values()):
+                _settle_broker_orders()
+            if _time_mod.monotonic() - last_sync >= settings.BROKER_RECONCILE_SEC:
+                last_sync = _time_mod.monotonic()
+                await _broker_reconcile_once()
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            log.exception("Broker reconcile loop failed")
+
+
+def _broker_health() -> Dict[str, Any]:
+    st = alpaca_broker.status if alpaca_broker else None
+    return {
+        "mode": broker_state["mode"] if engine.broker is not None else "simulated",
+        "account_number": st.account_number if st else None,
+        "alpaca_equity": st.equity if st else None,
+        "alpaca_cash": st.cash if st else None,
+        "alpaca_positions": dict(st.positions) if st else {},
+        "equity_drift": broker_state["equity_drift"],
+        "mismatch": broker_state["mismatch"],
+        "mismatch_detail": broker_state["mismatch_detail"],
+        "last_check_at": broker_state["last_check_at"],
+        "last_order_at": st.last_order_at if st else None,
+        "orders_sent": st.orders_sent if st else 0,
+        "fills_booked": st.fills_booked if st else 0,
+        "last_error": (st.last_error if st else None) or broker_state["last_error"],
+    }
+
+
+def _broker_gate(order: Any, is_exit: bool) -> Optional[Tuple[str, bool, float]]:
+    """Last check before a real order goes to Alpaca. Returns None to allow, else
+    (reason, hard, retry_sec). Hard refusals cancel an entry; exits always retry."""
+    now_et = datetime.now(ET_TZ)
+    today = now_et.date()
+    if not is_trading_day(today) or not (time(9, 30) <= now_et.time() < session_close(today)):
+        # Alpaca would queue a day order for the next open; never let it.
+        return ("MARKET_CLOSED: real orders only go out during regular hours", not is_exit, 60.0)
+    if not is_exit and broker_state["mismatch"]:
+        return ("BROKER_MISMATCH: bot and Alpaca positions differ; entries paused", True, 30.0)
+    return None
+
+
 def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[bool, str]:
     """Validate order against Institutional Risk Engine, active flattening lockout, and arm separation."""
     order_arm = getattr(order, "arm", TradingArm.INTRADAY)
@@ -274,6 +395,16 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     # exists in volatile memory. Position-reducing orders remain available.
     if state_store is not None and not persistence_healthy and not is_exit:
         return False, "PERSISTENCE_RECOVERY_HALT: durable ledger is unavailable"
+
+    # Never add exposure while the bot's book and the real Alpaca account differ.
+    target_engine_for_broker = globals().get("engine")
+    if (
+        not is_exit
+        and target_engine_for_broker is not None
+        and getattr(target_engine_for_broker, "broker", None) is not None
+        and broker_state["mismatch"]
+    ):
+        return False, "BROKER_MISMATCH: bot and Alpaca positions differ; entries paused until they match"
 
     # Symbol reservation / mutual exclusion check:
     if not is_exit:
@@ -358,6 +489,7 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
 
 engine = ExecutionEngine(account=account, risk_validator=pre_trade_risk_validator)
+engine.broker_gate = _broker_gate
 
 # Swing Trading Infrastructure & Engine
 daily_bar_store = DailyBarStore(seed_path=settings.DAILY_BARS_SEED_PATH)
@@ -1161,6 +1293,11 @@ async def broadcast_ui_state(force: bool = False) -> None:
             "restored_at": state_store.restored_at if state_store else None,
         },
         "ingestion": relay_statuses,
+        "broker": {
+            "mode": _broker_health()["mode"],
+            "account_number": _broker_health()["account_number"],
+            "mismatch": broker_state["mismatch"],
+        },
         "recent_news": recent_news[-10:],
         "recent_activity": [
             {
@@ -1483,6 +1620,8 @@ async def handle_bar_event(bar: BarEvent) -> None:
         timestamp=bar.timestamp,
     )
     _reconcile_fills(fills)
+    if engine.broker is not None:
+        _release_dead_entry_brackets()  # entries Alpaca refused
 
     # Check risk state
     status = risk_engine.evaluate_account_state(
@@ -1571,6 +1710,8 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         timestamp=quote.timestamp,
     )
     _reconcile_fills(fills)
+    if engine.broker is not None:
+        _release_dead_entry_brackets()  # entries Alpaca refused
 
     # Circuit breaker is evaluated on quotes too, not only on bars
     status = risk_engine.evaluate_account_state(
@@ -2009,6 +2150,8 @@ def set_simulation_mode(enabled: bool) -> None:
     """Select deterministic replay time or the live wall clock."""
     global simulation_mode
     simulation_mode = enabled
+    # Replays must never reach the real account.
+    engine.broker = None if enabled else alpaca_broker
     if not enabled:
         flattening_engine.clock.clear_simulated_time()
 
@@ -2024,6 +2167,35 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "Production requires PERSISTENCE_ENABLED=true and PERSISTENCE_REQUIRED=true"
         )
     _restore_checkpoint()
+    global alpaca_broker
+    if settings.BROKER_MODE.lower() == "alpaca_paper":
+        alpaca_broker = AlpacaBroker(
+            api_key=settings.ALPACA_API_KEY,
+            secret_key=settings.ALPACA_SECRET_KEY,
+            base_url=settings.ALPACA_BASE_URL,
+        )
+        broker_state["mode"] = "alpaca_paper"
+        if not simulation_mode:
+            engine.broker = alpaca_broker
+        try:
+            # Finish any Alpaca order left open by a crash BEFORE pending events replay.
+            if engine.broker is not None:
+                _settle_broker_orders()
+            status = await asyncio.to_thread(alpaca_broker.sync)
+            log.info(
+                "Alpaca paper broker attached: account %s equity %.2f positions %s (bot equity %.2f positions %s)",
+                status.account_number, status.equity or 0.0, status.positions,
+                account.equity, _local_signed_positions(account),
+            )
+            # Startup is the moment a crash gap would show: mismatch blocks entries at once.
+            _compare_with_broker(dict(status.positions), status.equity)
+            if broker_state["mismatch_detail"]:
+                broker_state["mismatch"] = True
+                log.error("BROKER MISMATCH at startup %s; new entries blocked", broker_state["mismatch_detail"])
+        except Exception as exc:
+            broker_state["last_error"] = f"startup sync failed: {exc}"
+            broker_state["mismatch"] = True
+            log.error("Alpaca startup sync failed (%s); new entries blocked until a sync succeeds", exc)
     # Register bus event handlers
     event_bus.subscribe(BarEvent, handle_bar_event)
     event_bus.subscribe(QuoteEvent, handle_quote_event)
@@ -2079,6 +2251,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # The runtime clock drives EOD flattening and session resets even without relay clients
     clock_task = asyncio.create_task(_runtime_clock_loop(), name="TradingRuntimeClock")
     runtime_tasks.add(clock_task)
+    if alpaca_broker is not None:
+        rec_task = asyncio.create_task(_broker_reconcile_loop(), name="BrokerReconcile")
+        runtime_tasks.add(rec_task)
 
     yield
 
@@ -2183,6 +2358,7 @@ async def get_health() -> Dict[str, Any]:
             "mock": settings.MOCK_PORT,
         },
         "relay": relay_statuses,
+        "broker": _broker_health(),
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
                 "disabled" if state_store is None else "recovery_halt"

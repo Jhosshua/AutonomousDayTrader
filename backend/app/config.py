@@ -35,6 +35,15 @@ class Settings(BaseSettings):
         description="Start AlpacaRelay stock, news, and VIX clients during application lifespan"
     )
 
+    # Order execution. "simulated" = built-in fill simulator (tests, replay,
+    # local dev). "alpaca_paper" = every fill is a real order on the Alpaca
+    # paper account; market data still comes from AlpacaRelay.
+    BROKER_MODE: str = Field(default="simulated", description="simulated or alpaca_paper")
+    ALPACA_API_KEY: str = Field(default="", description="Alpaca paper key id; environment only")
+    ALPACA_SECRET_KEY: str = Field(default="", description="Alpaca paper secret; environment only")
+    ALPACA_BASE_URL: str = Field(default="https://paper-api.alpaca.markets", description="Paper trading API only")
+    BROKER_RECONCILE_SEC: float = Field(default=30.0, description="How often local positions are compared with Alpaca")
+
     # Durable singleton state. Production enables this against a Railway volume;
     # tests and local development remain opt-in so replays cannot contaminate the
     # live paper ledger.

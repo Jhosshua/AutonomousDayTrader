@@ -95,7 +95,7 @@ export default function Home() {
     return (
       <main className="min-h-screen bg-ground px-4 py-6 sm:px-10 sm:py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:gap-7">
-          <Header isConnected={isConnected} showPro={showPro} onTogglePro={setShowPro} />
+          <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro} />
           <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-line border-t-darkcard" aria-hidden="true" />
             <p className="text-sm text-muted">Connecting to the robot…</p>
@@ -111,7 +111,7 @@ export default function Home() {
       <div className="drift2 pointer-events-none absolute -right-40 -top-40 h-[420px] w-[420px] rounded-full opacity-80 blur-3xl" style={{ background: "#E2E1F1" }} />
 
       <div className="relative mx-auto flex max-w-6xl flex-col gap-6 sm:gap-7">
-        <Header isConnected={isConnected} showPro={showPro} onTogglePro={setShowPro} />
+        <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro} />
 
         {showPro && (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-white/70 px-4 py-2 text-xs text-muted">
@@ -144,6 +144,12 @@ export default function Home() {
           <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
             <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
             Price feed is down, it can't trade right now.
+          </div>
+        )}
+        {state.broker?.mismatch && (
+          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
+            <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
+            The robot's positions don't match the Alpaca account. New trades are paused until they match.
           </div>
         )}
         {savingProblem && (

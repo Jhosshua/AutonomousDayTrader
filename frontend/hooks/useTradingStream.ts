@@ -232,6 +232,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 working_orders_count: payload.working_orders_count ?? prev.working_orders_count,
                 recent_activity: payload.recent_activity || prev.recent_activity,
                 ingestion: payload.ingestion || prev.ingestion,
+                broker: payload.broker || prev.broker,
                 recent_news: payload.recent_news || prev.recent_news,
                 ledger_revision: payload.ledger_revision ?? prev.ledger_revision,
                 persistence: payload.persistence || prev.persistence,

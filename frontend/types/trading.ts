@@ -269,6 +269,7 @@ export interface TradingState {
   working_orders_count: number;
   recent_activity: AuditRecord[];
   ingestion: Record<string, string>;
+  broker?: BrokerInfo;
   recent_news: NewsItem[];
   ledger_revision: number;
   persistence: PersistenceStatus;
@@ -277,3 +278,9 @@ export interface TradingState {
   lastUpdated: Date;
 }
 
+
+export interface BrokerInfo {
+  mode: "simulated" | "alpaca_paper" | string;
+  account_number: string | null;
+  mismatch: boolean;
+}

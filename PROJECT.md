@@ -1,7 +1,7 @@
 # Project: AutonomousDayTrader
 
 ## Architecture
-AutonomousDayTrader is a local intraday paper-trading system for US equities connected downstream to AlpacaRelay, operating on a $50,000 virtual account. It features four dynamically adapted trading strategies, institutional risk guardrails, a plain-language light mobile-first dashboard (redesigned 2026-09-24), real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
+AutonomousDayTrader is an intraday + swing paper-trading system for US equities. Market data comes from AlpacaRelay. Since 2026-09-25 every fill is a real order on Alpaca paper account PA3CSVDZMMPY (`BROKER_MODE=alpaca_paper`, `backend/app/core/broker.py`); the old built-in fill simulator is kept only for tests, replays and local dev. It features four dynamically adapted trading strategies, institutional risk guardrails, a plain-language light mobile-first dashboard (redesigned 2026-09-24), real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
 
 ```
                   ┌────────────────────────────────────────────────────────┐
@@ -195,7 +195,8 @@ AutonomousDayTrader is a local intraday paper-trading system for US equities con
 │   │   ├── main.py               # FastAPI server (Port 8005) & WS endpoints
 │   │   ├── config.py             # Config & env vars (RELAY_TOKEN, ports, etc.)
 │   │   ├── core/
-│   │   │   ├── account.py        # $50,000 Paper Trading Account state machine
+│   │   │   ├── account.py        # Paper account ledger (cash, positions, P&L)
+│   │   │   ├── broker.py         # Alpaca PAPER order client (real fills since 2026-09-25)
 │   │   │   ├── risk.py           # Circuit breaker ($1,500 limit) & position sizing
 │   │   │   ├── bracket.py        # Stop-loss & dynamic take-profit brackets
 │   │   │   ├── flattening.py     # 4-phase zero-overnight auto-liquidation
