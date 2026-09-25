@@ -29,7 +29,7 @@
                                               ▼
                   ┌────────────────────────────────────────────────────────┐
                   │             Dynamic Strategy Execution Core            │
-                  │  1. Opening Range Breakout (ORB 5m/15m)                │
+                  │  1. Opening Range Breakout (ORB 5m default)             │
                   │  2. VWAP Trend Pullback & Continuation                 │
                   │  3. Catalyst News Momentum Breakout (Benzinga NLP)     │
                   │  4. Statistical Mean Reversion / Exhaustion Fades      │
@@ -68,7 +68,7 @@
   - 4-Phase Zero-Overnight Flattening: 15:45 entry lockout $\to$ 15:50 working order purge $\to$ 15:55 market liquidation $\to$ 15:58 flat audit before 16:00 ET.
 
 ### 2. 4 Dynamically Adapted Intraday Strategies
-1. **Opening Range Breakout (ORB)**: Evaluates 5m/15m opening ranges with relative volume surge ($\ge 1.8\times$), midpoint invalidation stops, and tiered profit targets.
+1. **Opening Range Breakout (ORB)**: Uses the first 5 minutes in production (15 minutes is configurable), a relative volume threshold of 1.8x, midpoint invalidation stops, and tiered profit targets.
 2. **VWAP Trend Pullback & Continuation**: Anchored intraday VWAP with standard deviation volatility bands and EMA20/EMA50 trend confirmation.
 3. **Catalyst News Momentum Breakout**: Real-time Benzinga news sentiment parsing, volume surge validation ($>3.5\times$), and immediate contradictory news emergency exit.
 4. **Statistical Mean Reversion / Exhaustion Fades**: 1-minute $Z$-score ($\ge 2.5\sigma$) and RSI-14 extreme overbought/oversold fades back to the 20-period moving average.

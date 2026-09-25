@@ -266,8 +266,8 @@ def test_flattening_phase4_continuous_retry_until_flat():
     assert directive3 is None
 
 
-def test_adaptation_stop_loss_institutional_bounds_clamp():
-    """Verify calculate_adapted_stop clamps stop distance to [0.0040, 0.0400]."""
+def test_adaptation_stop_loss_floor_and_wide_stop_rejection():
+    """Tight stops reach the floor; wide structural stops remain rejectable."""
     # 1. Low VIX (0.85 multiplier) with very tight stop (0.0041 distance)
     # 0.0041 * 0.85 = 0.003485 -> breaches 0.0040 floor -> clamped to 0.0040
     engine_low = DynamicAdaptationEngine()
@@ -291,8 +291,8 @@ def test_adaptation_stop_loss_institutional_bounds_clamp():
     assert round(100.0 - adapted_stop, 2) == 0.40
     assert adapted_stop == 99.60
 
-    # 2. Crisis VIX (2.00 multiplier) with wide stop (0.0300 distance)
-    # 0.0300 * 2.00 = 0.0600 -> breaches 0.0400 ceiling -> clamped to 0.0400
+    # 2. Crisis VIX (2.00 multiplier) with a 3% structural stop.
+    # The adapted 6% distance must reach the risk engine unchanged.
     engine_crisis = DynamicAdaptationEngine()
     engine_crisis.on_vix_print(MagicMock(value=40.0, received_at=datetime.now(timezone.utc)))
     assert engine_crisis.current_stop_multiplier == 2.00
@@ -310,9 +310,13 @@ def test_adaptation_stop_loss_institutional_bounds_clamp():
         reason="test",
     )
     adapted_crisis = engine_crisis.calculate_adapted_stop(sig_wide)
-    # Distance must be clamped to 4.00 (0.0400 * 100)
-    assert round(100.0 - adapted_crisis, 2) == 4.00
-    assert adapted_crisis == 96.00
+    assert round(100.0 - adapted_crisis, 2) == 6.00
+    assert adapted_crisis == 94.00
+
+    # A 4.2% structural stop must remain too wide even in Low VIX, where
+    # multiplying by 0.85 alone would pull it inside the risk limit.
+    sig_long.stop_loss = 95.80
+    assert engine_low.calculate_adapted_stop(sig_long) == 95.80
 
     # 3. Capital allocation cap matches risk engine (50% equity / $25,000 on $50,000 equity)
     shares = calculate_position_size(equity=50000.0, entry_price=10.0, stop_loss_price=9.99, vix_multiplier=1.0)

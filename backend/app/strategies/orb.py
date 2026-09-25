@@ -20,6 +20,7 @@ def evaluate_orb_signal(
     rvol: float,
     min_clv: float = 0.65,
     max_clv_sell: float = 0.35,
+    min_rvol: float = 1.80,
 ) -> Optional[str]:
     """Opening Range Breakout signal evaluator with Close Location Value (CLV).
 
@@ -41,8 +42,8 @@ def evaluate_orb_signal(
     range_high = max(highs)
     range_low = min(lows)
 
-    # Breakout requires RVOL >= 1.80
-    if rvol < 1.80:
+    # Use the strategy's configured threshold, including for non-default instances.
+    if rvol < min_rvol:
         return None
 
     close_p = current_bar.close if isinstance(current_bar, BarEvent) else float(current_bar.get("c", current_bar.get("close", 0.0)))
@@ -199,6 +200,7 @@ class OpeningRangeBreakoutStrategy(Strategy):
             rvol=rvol,
             min_clv=self.min_clv,
             max_clv_sell=self.max_clv_sell,
+            min_rvol=self.min_rvol,
         )
         if not sig_type:
             return []

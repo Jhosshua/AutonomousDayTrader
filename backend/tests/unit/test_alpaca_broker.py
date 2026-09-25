@@ -279,6 +279,28 @@ def test_simulator_unchanged_without_broker():
     assert fills and fills[0].fee > 0.0
 
 
+def test_cancelled_orb_entry_releases_breakout_lock():
+    """A broker-refused entry may be tried again on a later valid ORB bar."""
+    import backend.app.main as runtime
+    runtime.reset_runtime_state()
+    try:
+        order = runtime.engine.create_order(
+            "AAPL", OrderSide.BUY, OrderType.MARKET, 1,
+            estimated_price=100.0, strategy_id="orb",
+        )
+        order.status = OrderState.CANCELLED
+        runtime.entry_order_to_bracket[order.id] = "brk_cancelled_orb"
+        state = runtime.orb_strategy._get_state("AAPL")
+        state.breakout_fired = True
+
+        runtime._release_dead_entry_brackets()
+
+        assert state.breakout_fired is False
+        assert order.id not in runtime.entry_order_to_bracket
+    finally:
+        runtime.reset_runtime_state()
+
+
 # ----------------------------------------------------------------- app wiring
 def test_mismatch_blocks_entries_on_every_route_but_not_exits():
     import backend.app.main as runtime

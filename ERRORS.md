@@ -1,5 +1,13 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-09-25: ORB configuration and rejection lifecycle gaps
+
+**What did not work**: ORB stored `min_rvol` but its evaluator always used 1.80, so configured thresholds had no effect. A hard broker rejection or same-bar arbitration loss left `breakout_fired` set, preventing another valid ORB signal for that symbol. VIX adaptation still capped wide stops at 4%, despite the earlier removal of that cap from the strategies; this could turn a structurally invalid setup into an order.
+
+**What worked instead**: Pass the configured RVOL threshold into the evaluator; unlock ORB after cancelled, unfilled entry orders and arbitration losses; preserve wide raw and VIX-adjusted stops for the risk engine to reject. Keep the 0.4% floor and round away from entry. The production endpoint showed zero ORB signals by about 10:05 ET on 09-25, which alone does not establish that today's market produced a qualifying setup.
+
+**Verification**: 546 backend tests and 868 full-suite tests passed. The integrated mock Monday replay emitted, filled, and closed an ORB trade. The replay demonstrates wiring only; it does not establish live trading performance.
+
 ## 2026-09-23: Ingestion Queue Saturation Dropping Critical Candle Bars and Fills (R6-1)
 
 **What did not work**: Under extreme quote floods across 12 tickers (~3.5M quotes/session), incoming wire messages filled the FIFO queue beyond `QUEUE_MAX_SIZE` (10,000 items). An unprioritized queue dropped all subsequent messages via `asyncio.QueueFull`, discarding critical candle bars (`b`) and trade execution prints (`t`).

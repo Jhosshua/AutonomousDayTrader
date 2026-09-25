@@ -2,7 +2,7 @@
 Adversarial Empirical Stress Harness & Mutation Verification for Challenger 1 (Remediation R3):
 1. VIX Stop Distance Adaptation:
    - Full grid and Monte Carlo stress testing entry prices from $1 to $5000 and VIX values from 5 to 100 across BUY and SELL.
-   - Empirically verifies calculate_adapted_stop never yields a stop distance outside [0.0040, 0.0400] times entry price.
+   - Verifies tight stops reach the 0.4% floor and stops over 4% remain rejectable.
 2. News Momentum Causality:
    - Tests future, simultaneous, past, expired, and mixed catalysts.
    - Verifies bars never consume future news (zero lookahead bias).
@@ -84,8 +84,11 @@ class TestVixStopDistanceAdaptationStress:
                         actual_ratio = actual_dist / ep
 
                         # Allow floating-point / 4-decimal rounding slack (0.0001 / ep)
-                        slack = max(1e-6, 0.0001 / ep)
-                        if actual_ratio < 0.0040 - slack or actual_ratio > 0.0400 + slack:
+                        slack = max(1e-6, 0.00011 / ep)
+                        expected = max(0.0040, factor * engine.current_stop_multiplier)
+                        if factor > 0.0400:
+                            expected = max(expected, factor)
+                        if abs(actual_ratio - expected) > slack:
                             violations.append((vix, ep, factor, side, actual_dist, actual_ratio))
 
         assert total_tested >= 3000
@@ -123,8 +126,11 @@ class TestVixStopDistanceAdaptationStress:
             actual_dist = abs(ep - adapted_stop)
             actual_ratio = actual_dist / ep
 
-            slack = max(1e-6, 0.0001 / ep)
-            if actual_ratio < 0.0040 - slack or actual_ratio > 0.0400 + slack:
+            slack = max(1e-6, 0.00011 / ep)
+            expected = max(0.0040, factor * engine.current_stop_multiplier)
+            if factor > 0.0400:
+                expected = max(expected, factor)
+            if abs(actual_ratio - expected) > slack:
                 violations.append((vix, ep, factor, side, actual_dist, actual_ratio))
 
         assert len(violations) == 0, f"Monte Carlo violations found: {violations[:5]}"

@@ -202,6 +202,37 @@ def test_orb_bullish_breakout_and_brackets():
     assert len(strat.on_bar(next_bar)) == 0
 
 
+def test_orb_uses_configured_rvol_threshold():
+    opening = [
+        _make_bar(high_p=100.5, low_p=99.5, close_p=100.0, vol=10000,
+                  ts_str=f"2026-09-21T09:{m:02d}:00-04:00")
+        for m in range(30, 35)
+    ]
+    candidate = _make_bar(high_p=100.9, low_p=100.3, close_p=100.8, vol=17000,
+                          ts_str="2026-09-21T09:35:00-04:00")
+    permissive = OpeningRangeBreakoutStrategy(min_rvol=1.6)
+    strict = OpeningRangeBreakoutStrategy(min_rvol=1.8)
+    for strategy in (permissive, strict):
+        for bar in opening:
+            strategy.on_bar(bar)
+
+    assert len(permissive.on_bar(candidate)) == 1
+    assert strict.on_bar(candidate) == []
+
+
+def test_orb_fifteen_minute_range_waits_until_0945():
+    strategy = OpeningRangeBreakoutStrategy(range_minutes=15)
+    for minute in range(30, 45):
+        opening = _make_bar(high_p=100.5, low_p=99.5, close_p=100.0, vol=10000,
+                            ts_str=f"2026-09-21T09:{minute:02d}:00-04:00")
+        assert strategy.on_bar(opening) == []
+    candidate = _make_bar(high_p=100.9, low_p=100.3, close_p=100.8, vol=25000,
+                          ts_str="2026-09-21T09:45:00-04:00")
+
+    assert len(strategy.on_bar(candidate)) == 1
+    assert strategy._get_state("AAPL").range_high == 100.5
+
+
 def test_orb_bearish_breakdown():
     strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
     for m in range(30, 35):
@@ -689,4 +720,3 @@ def test_news_momentum_default_calibration():
     strat = NewsMomentumStrategy()
     assert strat.volume_surge_multiplier == 2.00
     assert strat.sentiment_threshold == 0.60
-

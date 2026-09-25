@@ -2,6 +2,12 @@
 
 ## Decisions
 
+### 2026-09-25: ORB code review
+- Production ORB uses a 5-minute opening range; the 15-minute constructor option is tested but is not instantiated in production. Trading hours are 9:30-11:30 ET, with market trend and risk gates after the strategy signal.
+- Fixed the unused `min_rvol` setting, unlock after an unfilled broker cancellation or arbitration loss, and a remaining adaptation clamp that could pull stops wider than 4% inside the structural level. Tight stops still reach the 0.4% risk floor; wide stops are rejected by the risk engine.
+- Read-only production check around 10:05 ET: healthy relay/broker/persistence, ORB active, zero ORB signals today. That count cannot distinguish no qualifying setup from a strategy-internal veto. The 09-24 session also recorded zero ORB signals; 09-22 had one ORB trade. No live fill is claimed from this review.
+- Verification: 546 backend tests and 868 full-suite tests passed; integrated Monday replay passed (184 events, one synthetic ORB fill and exit, zero event-bus errors). The mock relay closed and ports 8005/3005/8080 were free.
+
 ### 2026-09-25: moved to the real Alpaca PAPER account PA3CSVDZMMPY
 Plan: `PLAN_2026_09_25_alpaca_paper_broker.md` (Codex attacked the plan, then the code; both reviews triaged below).
 - **What:** every fill is now a real day order on Alpaca paper account PA3CSVDZMMPY. Market data stays on AlpacaRelay; SQLite ledger, trade history, checkpoints unchanged (same Railway volume). Operator matched the Alpaca balance to the bot first: both $50,018.45, flat, at 00:42 ET 09-25.

@@ -1015,6 +1015,8 @@ def _release_dead_entry_brackets() -> None:
         bracket = bracket_manager.brackets.get(bracket_id)
         if bracket is not None:
             bracket_manager.cancel_pending_entry_bracket(bracket.symbol)
+        if order.strategy_id == "orb":
+            orb_strategy.notify_signal_rejected(order.symbol)
         entry_order_to_bracket.pop(order_id, None)
 
 
@@ -1607,6 +1609,8 @@ async def handle_bar_event(bar: BarEvent) -> None:
         for sig in collected_signals:
             if id(sig) not in kept and sig.entry_price > 0:
                 _record_decision(sig, "ARBITRATION_LOST", "A higher-priority strategy signalled the same stock on this bar")
+                if sig.strategy_id == "orb":
+                    orb_strategy.notify_signal_rejected(sig.symbol)
         for sig in arbitrated:
             await execute_strategy_signal(sig)
 

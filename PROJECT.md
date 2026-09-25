@@ -24,7 +24,7 @@ AutonomousDayTrader is an intraday + swing paper-trading system for US equities.
                                               ▼
                   ┌────────────────────────────────────────────────────────┐
                   │             Dynamic Strategy Execution Core            │
-                  │  1. Opening Range Breakout (ORB 5m/15m)                │
+                  │  1. Opening Range Breakout (ORB 5m default)             │
                   │  2. VWAP Trend Pullback & Continuation                 │
                   │  3. Catalyst News Momentum Breakout (Benzinga NLP)     │
                   │  4. Statistical Mean Reversion / Exhaustion Fades      │
@@ -58,7 +58,7 @@ AutonomousDayTrader is an intraday + swing paper-trading system for US equities.
 | F5 | Risk Guardrails & Circuit Breakers | Hard max daily loss limit ($1,500 / 3% drawdown) halting trading, 1–2% per-position risk limit, dynamic sizing, multi-sector limits (max 2/sector, max 3 concurrent total; Index exempt) | M1 | ORIGINAL_REQUEST §R1 |
 | F6 | Dynamic Bracket Orders | Multi-tier take-profit brackets with calibrated intraday geometry (Target 1 at 0.80R with 50% scale-out, Target 2 at 1.80R runner or trailing ATR stop locked to TARGET_1_HIT; slippage boundary validation and decremental partial fill tracking) | M1 | ORIGINAL_REQUEST §R1 |
 | F7 | Zero Overnight Flattening | 4-phase protocol: 15:45 entry lockout, 15:50 working order purge, 15:55 market liquidation, 15:58 flat audit before 16:00 ET | M1 | ORIGINAL_REQUEST §R1 |
-| F8 | Strategy 1: ORB | Opening Range Breakout on 5m/15m bars with RVOL $\ge 1.8\times$, midpoint stops, and target brackets | M2 | ORIGINAL_REQUEST §R2 |
+| F8 | Strategy 1: ORB | Opening Range Breakout on the first 5 minutes in production (15 minutes configurable), with RVOL $\ge 1.8\times$, midpoint stops, and target brackets | M2 | ORIGINAL_REQUEST §R2 |
 | F9 | Strategy 2: VWAP Pullback | Anchored VWAP from 09:30, standard deviation bands, EMA20 > EMA50 trend filter, bounce confirmation | M2 | ORIGINAL_REQUEST §R2 |
 | F10 | Strategy 3: News Momentum | Benzinga news catalyst sentiment trigger with strict regex word boundaries (`\b...`), volume surge $>2.0\times$ validation, news contradiction emergency exit | M2 | ORIGINAL_REQUEST §R2 |
 | F11 | Strategy 4: Mean Reversion | 1-min bar $Z$-score $\ge 1.65$, volume climax $>1.30\times$, upper/lower wick rejection $\ge 0.30$, 20-SMA mean reversion active in `NEUTRAL` regimes without fighting runaway trends | M2 | ORIGINAL_REQUEST §R2 |
@@ -274,7 +274,7 @@ Key fixes by area:
 
 ### 2026-09-20: Architectural Audit Remediation, Terminology De-themification & Hardening Release
 A comprehensive multi-agent adversarial audit and remediation cycle eliminated remaining edge cases, enforced mathematical risk boundaries, completed full terminology de-themification, and hardened test harnesses across the codebase.
-- **Mathematical floating-point risk clamp**: Strategy stop distances in `orb.py`, `news_momentum.py`, and `vwap_pullback.py` are clamped to interior bounds `[0.0042, 0.0380]` (42 to 380 bps). Coupled with `EPS = 1e-6` floating-point tolerance in `risk.py` (`stop_dist_pct < min_stop - EPS` and `stop_dist_pct > max_stop + EPS`), this completely eliminates false order rejections caused by IEEE 754 precision artifacts while preserving institutional guardrails.
+- **Historical note (superseded)**: An early strategy stop clamp to `[0.0042, 0.0380]` was later removed because it pulled wide structural stops inside their setup. The current path widens only stops below the 0.4% floor and lets the risk engine reject stops above 4.0%; `EPS = 1e-6` handles floating-point boundaries.
 - **Bracket lifecycle invariants**: In `bracket.py`, `manual_tighten_stop` strictly enforces that stops may only be tightened for brackets in `ACTIVE` or `TARGET_1_HIT` states, preventing mutations on `PENDING_ENTRY` or already closed brackets. Test harnesses invoke `activate_bracket_on_fill` to mirror real-world execution.
 - **Ingestion telemetry accuracy**: Telemetry counters (`bars_received`, `quotes_received`, `trades_received`, `articles_received`) in `stock_ws.py` and `news_ws.py` are incremented strictly after domain event object instantiation and successful event bus publication, eliminating metric drift on malformed frames.
 - **Flat-book session boundary reset**: In `main.py` `_check_session_boundary`, `account.positions.clear()` and working order cancellation guarantee that the account begins each trading day 100% flat with zero orphaned positions or dangling brackets.
@@ -510,8 +510,6 @@ AutonomousDayTrader underwent an exhaustive forensic audit across both intraday 
 - Live Production URL: `https://autonomousdaytrader-production.up.railway.app`.
 - Remote Health Endpoint: `GET /health` $\to$ HTTP 200 OK (`status: "healthy"`, relay feeds connected, durable SQLite persistence active).
 - Remote Swing State Endpoint: `GET /api/swing/state` $\to$ HTTP 200 OK (telemetry active, 5 candidate stocks evaluated).
-
-
 
 
 

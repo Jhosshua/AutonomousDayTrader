@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import zoneinfo
 
 from backend.app.models.events import OrderSide, VixPrint, VixRegime, classify_vix_regime
-from backend.app.strategies.base import SignalEvent
+from backend.app.strategies.base import SignalEvent, resolve_stop
 
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 
@@ -213,25 +213,23 @@ class DynamicAdaptationEngine:
         return True
 
     def calculate_adapted_stop(self, signal: SignalEvent) -> float:
-        """Calculate volatility-adapted stop-loss price scaled by current_stop_multiplier.
-        
-        Strictly clamps adapted stop distance to institutional bounds [0.0042, 0.0380]
-        (or [min_stop_distance_pct + 0.0002, max_stop_distance_pct - 0.0002]), guaranteeing
-        that VIX multipliers (0.85 to 2.00) never breach the [0.0040, 0.0400] risk engine invariant.
+        """Scale the stop for VIX, leaving wide stops for the risk engine to reject.
+
+        The 0.4% floor keeps a tight stop valid. A stop wider than 4% must
+        remain wide: capping it would move protection inside the setup's
+        structural level and turn a rejected setup into a live order.
         """
         raw_dist = abs(signal.entry_price - signal.stop_loss)
         adapted_dist = raw_dist * self.current_stop_multiplier
 
-        # Institutional stop distance bounds (40 bps to 400 bps)
-        min_dist = signal.entry_price * 0.0040
-        max_dist = signal.entry_price * 0.0400
-        clamped_dist = max(min_dist, min(adapted_dist, max_dist))
+        # Low VIX must not pull an already-wide structural stop below the risk
+        # ceiling. The downstream risk engine owns the 4% maximum.
+        if raw_dist > signal.entry_price * (0.0400 + 1e-6):
+            adapted_dist = max(raw_dist, adapted_dist)
 
         is_buy = signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY"
-        if is_buy:
-            return round(signal.entry_price - clamped_dist, 4)
-        else:
-            return round(signal.entry_price + clamped_dist, 4)
+        stop, _ = resolve_stop(signal.entry_price, adapted_dist, is_buy)
+        return stop
 
     def calculate_adapted_size(
         self,
