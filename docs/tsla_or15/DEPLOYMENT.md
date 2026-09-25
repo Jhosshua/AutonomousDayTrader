@@ -26,3 +26,7 @@ Refreshed the production page in the user's local Chrome using the installed bro
 Screenshots retained in `.local_qa_screenshots/`: `or15-production-desktop.png`, `or15-production-mobile.png`, `or15-production-mobile-detail.png`. Existing pro-words preference was preserved. The task tab remains on the production dashboard. Local synthetic visual servers were terminated, and their ports were released. No user Chrome process or unrelated server was stopped.
 
 This report and selected endpoint evidence are committed in a documentation follow-up. It changes no implementation files; the implementation hash and the 935-test verification remain applicable. The final main revision is checked again against Railway and live health after that push.
+
+## 2026-09-25 evening: implementation hash changed by research recording
+
+Commits 0e6fe3e..6a5ec34 added observation-only research hooks to shared files the OR15 fingerprint covers (`engine.py` fill listeners, `main.py`, `runtime_state.py`). OR15 rules, prices and order flow are unchanged. New implementation hash `e45284623485473b5b4cd233a18253194914c999d6a17d378536b1bf53220e8c`; the OR15 dry run was re-run on this code (6 cases PASS, all flat) and `DRY_RUN_EVIDENCE.json` regenerated. The hash is provenance only; nothing gates trading on it.
