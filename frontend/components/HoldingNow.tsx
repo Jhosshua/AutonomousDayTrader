@@ -2,7 +2,7 @@
 
 import { Position } from "@/types/trading";
 import { useActionButton } from "@/hooks/useActionButton";
-import { companyName, formatMoney, formatSignedMoney } from "@/lib/plain";
+import { companyName, formatMoney, formatSignedMoney, etTimeLabel } from "@/lib/plain";
 
 interface HoldingNowProps {
   positions: Position[];
@@ -27,9 +27,9 @@ function HoldingRow({
 
   // F2: enabled only when moving the stop to entry is an improvement AND cannot trigger an
   // immediate exit. Long: current_stop < entry < market. Short: current_stop > entry > market.
-  const breakEvenEnabled = isLong
+  const breakEvenEnabled = !position.fixed_protection && (isLong
     ? (stop == null || stop < entry) && entry < market
-    : (stop == null || stop > entry) && entry > market;
+    : (stop == null || stop > entry) && entry > market);
 
   const sellButton = useActionButton({
     send: () => onFlattenPosition(position.symbol),
@@ -66,6 +66,12 @@ function HoldingRow({
       <div className="text-sm text-muted">
         Safety exit: {stop != null ? formatMoney(stop) : "No safety exit set"}
       </div>
+      {position.fixed_protection && (
+        <div className="text-sm text-muted">
+          Fixed Tesla plan · Target: {position.take_profit_1 != null ? formatMoney(position.take_profit_1) : "Setting up"}
+          {position.exit_due && <> · Close by {etTimeLabel(position.exit_due)} ET</>}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -81,12 +87,12 @@ function HoldingRow({
           type="button"
           onClick={breakEvenButton.trigger}
           disabled={!breakEvenEnabled || breakEvenButton.phase === "sending"}
-          title="Before fees"
+          title={position.fixed_protection ? "This Tesla plan keeps its safety exit fixed" : "Before fees"}
           data-testid={`btn-break-even-${position.symbol}`}
           className="min-h-[44px] flex-1 min-w-[180px] rounded-xl border px-4 text-sm font-semibold disabled:opacity-40"
           style={{ borderColor: "#D5E2D6", color: "#2F5A45", background: "#EDF3EE" }}
         >
-          {beLabel}
+          {position.fixed_protection ? "Safety exit stays fixed" : beLabel}
         </button>
       </div>
     </div>

@@ -339,7 +339,8 @@ class InstitutionalRiskEngine:
 
         stop_dist_pct = stop_dist / entry_price
         EPS = 1e-6  # Tolerance for IEEE 754 floating-point representation discrepancies
-        if stop_dist_pct < self.config.min_stop_distance_pct - EPS:
+        fixed_or15 = strategy_id == "tsla_or15_retest"
+        if stop_dist_pct < self.config.min_stop_distance_pct - EPS and not fixed_or15:
             return RiskCheckResult(
                 approved=False,
                 reason=f"STOP_DISTANCE_TOO_TIGHT: Stop distance {stop_dist_pct:.4f} < min {self.config.min_stop_distance_pct:.4f}",
@@ -350,7 +351,7 @@ class InstitutionalRiskEngine:
                 rejection_code="STOP_DISTANCE_TOO_TIGHT",
             )
 
-        if stop_dist_pct > self.config.max_stop_distance_pct + EPS:
+        if stop_dist_pct > self.config.max_stop_distance_pct + EPS and not fixed_or15:
             return RiskCheckResult(
                 approved=False,
                 reason=f"STOP_DISTANCE_TOO_WIDE: Stop distance {stop_dist_pct:.4f} > max {self.config.max_stop_distance_pct:.4f}",
@@ -363,6 +364,8 @@ class InstitutionalRiskEngine:
 
         # 6. Risk-Adjusted Sizing Calculation
         # In warning mode, enforce strict 1.0% limit; otherwise use base_trade_risk_pct scaled by VIX
+        if fixed_or15:
+            vix_multiplier = 1.0
         risk_pct = self.config.base_trade_risk_pct if self.risk_level == RiskLevel.WARNING else min(
             self.config.max_trade_risk_pct, self.config.base_trade_risk_pct * vix_multiplier
         )

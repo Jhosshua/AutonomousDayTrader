@@ -21,6 +21,15 @@ export interface StrategyTheme {
 }
 
 export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
+  tsla_or15_retest: {
+    name: "Tesla Morning Retest",
+    band: "#DCE9EF",
+    ink: "#2F5368",
+    tint: "#EDF4F7",
+    bar: "#7299AF",
+    track: "#DFEAF0",
+    what: "Buys one Tesla share after a morning breakout pulls back and holds. Checks QQQ for support, then uses fixed exits and a two-hour limit.",
+  },
   orb: {
     name: "Morning Breakout",
     band: "#F4E0CF",
@@ -112,6 +121,8 @@ export interface StatusChip {
 export function windowToChip(win: { state: string; headline: string; blockers?: string[] } | undefined): StatusChip {
   if (!win) return { label: "Unknown", tone: "grey", breathing: false };
   switch (win.state) {
+    case "MANAGING":
+      return { label: "Managing trade", tone: "sage", breathing: true };
     case "CAN_TRADE":
       return { label: "Watching now", tone: "sage", breathing: true };
     case "LIMITED":
@@ -266,7 +277,8 @@ export function rightNowSentence(inputs: RightNowInputs): string {
         base += ` One is resting until ${when || "later"}.`;
       }
     } else if (waiting.length > 0) {
-      base = `Waiting. ${waiting[0].window?.headline || ""}`.trim();
+      const headline = waiting[0].window?.headline || "";
+      base = /^Waiting\b/i.test(headline) ? headline : `Waiting. ${headline}`.trim();
     } else {
       base = "Nothing is watching right now.";
     }

@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import os
+import sys
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -43,6 +44,11 @@ from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
+from backend.app.strategies.tsla_or15_retest import (
+    TSLAOR15RetestStrategy, STRATEGY_ID as OR15_ID, SOURCE_SHA256 as OR15_SOURCE_HASH,
+    implementation_sha256, session_bounds as or15_session_bounds,
+)
+from backend.app.core.or15_execution import OR15ExecutionController
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
 from backend.app.core.decisions import decision_log, classify_adaptation_reason
@@ -78,6 +84,7 @@ orb_strategy = OpeningRangeBreakoutStrategy()
 vwap_strategy = VWAPPullbackStrategy()
 news_strategy = NewsMomentumStrategy()
 mean_reversion_strategy = MeanReversionStrategy()
+tsla_or15_strategy = TSLAOR15RetestStrategy()
 adaptation_engine = DynamicAdaptationEngine(
     max_concurrent_positions=settings.MAX_CONCURRENT_POSITIONS,
     base_risk_pct=settings.PER_POSITION_RISK_PCT,
@@ -89,8 +96,16 @@ strategies: List[Strategy] = [
     vwap_strategy,
     news_strategy,
     mean_reversion_strategy,
+    tsla_or15_strategy,
 ]
 strategy_map: Dict[str, Strategy] = {s.strategy_id: s for s in strategies}
+or15_controller = OR15ExecutionController(sys.modules[__name__])
+or15_sip_verified = False
+or15_implementation_hash = implementation_sha256()
+
+
+def or15_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 # Real-time symbol market price cache for pre-trade risk valuation
 latest_market_prices: Dict[str, float] = {}
@@ -390,6 +405,8 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     )
 
     is_exit = False
+    if existing_strat == OR15_ID and order_strat != OR15_ID:
+        return False, "OR15 position is managed by its fixed exit controller"
     if getattr(order, "strategy_id", None) in (
         "CIRCUIT_BREAKER",
         "AUTO_FLATTEN",
@@ -425,6 +442,10 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     # Symbol reservation / mutual exclusion check:
     if not is_exit:
         target_engine = globals().get("engine")
+        if or15_controller.reserves(sym) and order_strat != OR15_ID:
+            return False, "SYMBOL_RESERVED_FOR_OR15: first signal owns TSLA until resolved"
+        if order_strat == OR15_ID and (sym != "TSLA" or order.side != OrderSide.BUY or order.qty != 1):
+            return False, "OR15 requires exactly one TSLA share, long only"
         if is_swing:
             # Swing cannot enter if an INTRADAY position is currently open for this symbol
             if existing_pos is not None and (
@@ -506,6 +527,7 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
 engine = ExecutionEngine(account=account, risk_validator=pre_trade_risk_validator)
 engine.broker_gate = _broker_gate
+engine.before_fixed_broker_submit = or15_controller.before_submit
 
 # Swing Trading Infrastructure & Engine
 daily_bar_store = DailyBarStore(seed_path=settings.DAILY_BARS_SEED_PATH)
@@ -788,6 +810,8 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
         "take_profit_1": bracket.target_1_price if bracket else None,
         "take_profit_2": bracket.target_2_price if bracket else None,
         "strategy_id": bracket.strategy_id if bracket else "manual",
+        "fixed_protection": bool(bracket and bracket.fixed_single_target),
+        "exit_due": tsla_or15_strategy.exit_due.isoformat() if bracket and bracket.strategy_id == OR15_ID and tsla_or15_strategy.exit_due else None,
     }
     if include_chart:
         history = market_history.get(symbol, [])
@@ -837,6 +861,8 @@ def _apply_bracket_directive(bracket_id: str, directive: Any) -> None:
                 parent_order_id=bracket_id,
             )
             submitted = engine.submit_order(child_order.id)
+            if bracket.fixed_single_target:
+                child_order.execution_policy = OR15_ID
             if submitted.status.value != "ACCEPTED":
                 log.error("Bracket child %s rejected: %s", child_type.value, submitted.reject_reason)
                 continue
@@ -947,6 +973,8 @@ def _session_summary(session_day: Any, source: str = "SYSTEM") -> Dict[str, Any]
             }
             for strategy in strategies
         },
+        "tsla_or15": tsla_or15_strategy.session_record(),
+        "tsla_or15_implementation_sha256": or15_implementation_hash,
         "source": source,
         "aggregate_only": source == "LEGACY_SUMMARY_IMPORT",
     }
@@ -965,6 +993,8 @@ def _record_completed_bracket(bracket_id: str) -> None:
         strategy.record_trade(realized_pnl)
     trade = _completed_trade_record(bracket_id, realized_pnl)
     if trade:
+        if bracket.strategy_id == OR15_ID:
+            or15_controller.completed(trade)
         pending_trade_records[trade["trade_id"]] = trade
     bracket_realized_pnl.pop(bracket_id, None)
 
@@ -1002,6 +1032,9 @@ def _reconcile_fills(fills: List[Any]) -> None:
         if bracket_id:
             bracket = bracket_manager.brackets.get(bracket_id)
             if bracket and bracket.status.value == "PENDING_ENTRY":
+                if bracket.strategy_id == OR15_ID and not or15_controller.entry_filled(order, fill):
+                    entry_order_to_bracket.pop(order.id, None)
+                    continue
                 directive = bracket_manager.activate_bracket_on_fill(
                     bracket_id, fill.qty, fill.price, fill.timestamp
                 )
@@ -1052,6 +1085,8 @@ def _release_dead_entry_brackets() -> None:
     """
     for order_id, bracket_id in list(entry_order_to_bracket.items()):
         order = engine.orders.get(order_id)
+        if order and order.strategy_id == OR15_ID and (order.broker_order_id or order.broker_client_id):
+            continue  # a late fill still needs its original fixed bracket
         if order is None or order.status.value not in ("CANCELLED", "REJECTED") or order.filled_qty > 0:
             continue
         bracket = bracket_manager.brackets.get(bracket_id)
@@ -1078,9 +1113,16 @@ def _flatten_symbol(sym: str, price: float, timestamp: datetime) -> List[Any]:
 def _trip_circuit_breaker(timestamp: datetime) -> None:
     """Halt trading and liquidate all open intraday positions after a daily-loss breach. Swing positions are strictly exempt."""
     account.status = account.status.__class__.CIRCUIT_HALTED
+    if tsla_or15_strategy.phase == "WAITING_ENTRY":
+        tsla_or15_strategy.skip("CIRCUIT_BREAKER", timestamp)
+    elif tsla_or15_strategy.phase == "ENTERING":
+        or15_controller.request_exit("CIRCUIT_BREAKER", timestamp)
     engine.cancel_all_orders("CIRCUIT_BREAKER_HALT", arm=TradingArm.INTRADAY)
     _release_dead_entry_brackets()
     for sym, pos in list(account.positions.items()):
+        if or15_controller.owns(sym):
+            or15_controller.request_exit("CIRCUIT_BREAKER", timestamp)
+            continue
         if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
             continue
         side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
@@ -1111,6 +1153,10 @@ def _check_session_boundary(now_dt: datetime) -> None:
     if session_date < last_session_date:
         log.warning("Ignoring out-of-order historical event from %s (current session: %s)", session_date, last_session_date)
         return
+    if or15_controller.reserves("TSLA") and tsla_or15_strategy.phase in ("ENTERING", "HOLDING", "EXITING"):
+        tsla_or15_strategy.incomplete = True
+        or15_controller.request_exit("SESSION_RECOVERY", now_dt)
+        return  # retain previous-day ownership and native ids until broker flat
     boundary_event_key: Optional[str] = None
     if not inflight_event_keys:
         should_process, boundary_event_key = _begin_durable_event(
@@ -1422,6 +1468,19 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
             vix_stale=vix_stale,
         )
         card["decisions"] = decision_log.summary(s.strategy_id)
+        if s.strategy_id == OR15_ID:
+            blockers = []
+            if risk_engine.status != BreakerStatus.ARMED:
+                blockers.append("Daily loss limit hit.")
+            if state_store is not None and not persistence_healthy:
+                blockers.append("Saving is unavailable.")
+            if committed_count >= settings.MAX_CONCURRENT_POSITIONS and not or15_controller.owns("TSLA"):
+                blockers.append("All quick-trade places are in use.")
+            if not simulation_mode and (engine.broker is None or broker_state["mismatch"]):
+                blockers.append("Paper account is not ready.")
+            if not simulation_mode and (not or15_sip_verified or relay_statuses.get("stock") != "connected"):
+                blockers.append("Waiting for the price feed.")
+            card["window"] = s.window(now, blockers)
         cards.append(card)
     return cards
 
@@ -1479,6 +1538,8 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     # 1. Contradiction or Exit Signal
     if "CONTRADICTION" in signal.reason or "EXIT" in signal.reason:
         if existing_pos:
+            if or15_controller.owns(sym):
+                return
             if getattr(existing_pos, "arm", None) == TradingArm.SWING or getattr(existing_pos, "strategy_id", "") == "swing_panic_dip":
                 log.info("Ignoring intraday News exit for Swing position %s", sym)
                 return
@@ -1634,8 +1695,13 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 
 
 # Event Bus Handlers
-async def handle_bar_event(bar: BarEvent) -> None:
+async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     """Ingest bar, update clocks, match orders, process strategies, check risk, update trailing stops."""
+    now = bar.timestamp + timedelta(minutes=1) if simulation_mode else or15_now()
+    prior = tsla_or15_strategy.bars.get(bar.symbol.upper(), [])
+    if not durable_replay and prior and bar.timestamp <= prior[-1].timestamp:
+        tsla_or15_strategy.skip("DUPLICATE_OR_OUT_OF_ORDER_BAR", now)
+        _checkpoint_runtime("OR15_DUPLICATE_BAR")
     should_process, event_key = _begin_durable_event("BAR", bar)
     if not should_process:
         return
@@ -1644,6 +1710,8 @@ async def handle_bar_event(bar: BarEvent) -> None:
     else:
         flattening_engine.clock.clear_simulated_time()
     _check_session_boundary(bar.timestamp)
+    if not durable_replay:
+        or15_controller.on_bar(bar, now)
     latest_market_prices[bar.symbol.upper()] = bar.close
     _mark_feed_event("bar")
     if bar.symbol.upper() in ("SPY", "QQQ"):
@@ -1661,6 +1729,8 @@ async def handle_bar_event(bar: BarEvent) -> None:
     adaptation_engine.update_clock(bar.timestamp)
     for strat in strategies:
         try:
+            if strat.strategy_id == OR15_ID:
+                continue
             strat.on_time_tick(bar.timestamp)
         except Exception as e:
             log.error(f"Strategy {strat.strategy_id} error on time tick: {e}")
@@ -1704,6 +1774,8 @@ async def handle_bar_event(bar: BarEvent) -> None:
     if bar.symbol.upper() in settings.WATCHLIST_SYMBOLS:
         for strat in strategies:
             try:
+                if strat.strategy_id == OR15_ID:
+                    continue
                 sigs = strat.on_bar(bar)
                 if sigs:
                     collected_signals.extend(sigs)
@@ -1761,6 +1833,7 @@ async def handle_bar_event(bar: BarEvent) -> None:
                 engine.working_orders[oid].stop_price = mod["new_stop_price"]
 
     _checkpoint_runtime("BAR_EVENT", (event_key, "BAR") if event_key else None)
+    or15_controller.tick(now if simulation_mode else or15_now())
     await broadcast_ui_state()
 
 
@@ -1807,6 +1880,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
             return
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
     _mark_feed_event("quote")
+    or15_controller.on_quote(quote)
     for strat in strategies:
         try:
             strat.on_quote(quote)
@@ -1839,6 +1913,10 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         _checkpoint_runtime("QUOTE_MUTATION", (event_key, "QUOTE"))
     elif fills or risk_engine.status != prior_risk_status:
         _checkpoint_runtime("QUOTE_MUTATION")
+    if not simulation_mode and tsla_or15_strategy.phase == "WAITING_ENTRY" and tsla_or15_strategy.entry_due:
+        now = or15_now()
+        if now >= tsla_or15_strategy.entry_due:
+            or15_controller.tick(now)
     await broadcast_ui_state(force=bool(fills))
 
 
@@ -1943,7 +2021,14 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
 
     if directive.liquidate_all_positions:
         now_dt = directive.timestamp
+        if tsla_or15_strategy.phase == "WAITING_ENTRY":
+            tsla_or15_strategy.skip("FORCED_FLAT", now_dt)
+        elif tsla_or15_strategy.phase == "ENTERING":
+            or15_controller.request_exit("FORCED_FLAT", now_dt)
         for sym, pos in list(account.positions.items()):
+            if or15_controller.owns(sym):
+                or15_controller.request_exit("FORCED_FLAT", now_dt)
+                continue
             if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
                 continue
             side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
@@ -1958,6 +2043,10 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
             _reconcile_fills(fills)
 
     if directive.run_audit:
+        if tsla_or15_strategy.phase == "WAITING_ENTRY":
+            tsla_or15_strategy.skip("EMERGENCY_SWEEP", directive.timestamp)
+        elif tsla_or15_strategy.phase == "ENTERING":
+            or15_controller.request_exit("EMERGENCY_SWEEP", directive.timestamp)
         audit_res = flattening_engine.execute_phase_4_audit(
             open_positions=account.positions,
             working_orders=list(engine.working_orders.values()),
@@ -1968,6 +2057,9 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         if audit_res.liquidate_all_positions and account.positions:
             now_dt = audit_res.timestamp
             for sym, pos in list(account.positions.items()):
+                if or15_controller.owns(sym):
+                    or15_controller.request_exit("EMERGENCY_SWEEP", now_dt)
+                    continue
                 if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip":
                     continue
                 side = OrderSide.SELL if pos.side == PositionSide.LONG else OrderSide.BUY
@@ -2187,12 +2279,15 @@ async def _runtime_clock_loop() -> None:
             _expire_stale_staged_swing_orders(now_dt)
             for strat in strategies:
                 try:
+                    if strat.strategy_id == OR15_ID:
+                        continue
                     strat.on_time_tick(now_dt)
                 except Exception as e:
                     log.error(f"Strategy {strat.strategy_id} error on time tick: {e}")
             directive = flattening_engine.check_time_tick()
             if directive:
                 await handle_flattening_directive(directive)
+            or15_controller.tick(now_dt)
             # Cards must flip at window boundaries even when no bar arrives.
             if ui_clients and _time_mod.monotonic() - last_clock_broadcast >= 10.0:
                 last_clock_broadcast = _time_mod.monotonic()
@@ -2211,8 +2306,33 @@ async def handle_trade_event(trade: TradeEvent) -> None:
     _mark_feed_event("trade")
 
 
+async def _verify_or15_sip_loop() -> None:
+    """Read the relay's actual feed identity, failing closed on uncertainty."""
+    import httpx
+    global or15_sip_verified
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        while True:
+            try:
+                response = await client.get(settings.RELAY_HTTP_URL.rstrip("/") + "/health")
+                response.raise_for_status()
+                payload = response.json()
+                or15_sip_verified = payload.get("feed") == "sip" and payload.get("upstream") == "connected"
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                or15_sip_verified = False
+            await asyncio.sleep(60)
+
+
 async def _handle_relay_status(status: RelayStatusEvent) -> None:
     relay_statuses[status.feed_type] = status.status
+    bounds = or15_session_bounds(status.timestamp.astimezone(ET_TZ).date())
+    if status.feed_type == "stock" and status.status != "connected" and bounds and bounds[0] <= status.timestamp < bounds[1]:
+        if tsla_or15_strategy.phase in ("WAITING_ENTRY", "BUILDING_RANGE", "WAITING_RETEST", "WAITING_BREAKOUT"):
+            tsla_or15_strategy.skip("FEED_DISCONNECTED", status.timestamp)
+        if or15_controller.owns("TSLA"):
+            tsla_or15_strategy.incomplete = True
+            or15_controller.request_exit("FEED_DISCONNECTED", status.timestamp)
 
 
 def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
@@ -2233,6 +2353,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     engine.orders.clear()
     engine.working_orders.clear()
     engine.audit_log.clear()
+    engine._broker_retry_after.clear()
     bracket_manager.brackets.clear()
     bracket_manager.symbol_to_bracket.clear()
     bracket_manager.order_to_bracket.clear()
@@ -2256,6 +2377,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     for strategy in strategies:
         strategy.reset_daily_stats()
     swing_strategy_engine.reset()
+    tsla_or15_strategy.__init__()
     daily_bar_aggregator.reset_for_new_session()
     swing_reserved_symbols.clear()
     decision_log.reset_for_session(None)
@@ -2275,6 +2397,9 @@ def set_simulation_mode(enabled: bool) -> None:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup and graceful teardown lifecycle."""
     log.info(f"Starting AutonomousDayTrader backend on port {settings.API_PORT}...")
+    source = Path(__file__).resolve().parents[2] / "docs/tsla_or15/SOURCE_EXECUTION_PLAN.md"
+    if hashlib.sha256(source.read_bytes()).hexdigest() != OR15_SOURCE_HASH:
+        raise PersistenceError("OR15 frozen source hash mismatch")
     if settings.ENV.lower() == "production" and (
         not settings.PERSISTENCE_ENABLED or not settings.PERSISTENCE_REQUIRED
     ):
@@ -2323,7 +2448,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         for event_key, event_type, event in state_store.list_pending_events():
             log.warning("Replaying pending durable %s event %s", event_type, event_key)
             if event_type == "BAR" and isinstance(event, BarEvent):
-                await handle_bar_event(event)
+                await handle_bar_event(event, durable_replay=True)
             elif event_type == "QUOTE" and isinstance(event, QuoteEvent):
                 await handle_quote_event(event)
             elif event_type == "NEWS" and isinstance(event, NewsEvent):
@@ -2358,6 +2483,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await stock_ws_client.start()
         await news_ws_client.start()
         await vix_client.start()
+        sip_task = asyncio.create_task(_verify_or15_sip_loop(), name="OR15FeedIdentity")
+        runtime_tasks.add(sip_task)
         if _relay_backfill_enabled():
             bf = asyncio.create_task(_startup_backfill(), name="StartupBackfill")
             runtime_tasks.add(bf)
@@ -2577,6 +2704,14 @@ async def get_strategies() -> List[Dict[str, Any]]:
     return _strategy_cards()
 
 
+@app.get("/api/tsla-or15")
+async def get_tsla_or15() -> Dict[str, Any]:
+    return {**tsla_or15_strategy.to_dict(), "session": tsla_or15_strategy.session_record(),
+            "implementation_sha256": or15_implementation_hash, "sip_verified": or15_sip_verified,
+            "broker_mode": settings.BROKER_MODE, "enabled": True, "shadow": False,
+            "formal_observation_start": "2026-10-01", "validation": "NOT_EVALUATED"}
+
+
 @app.get("/api/decisions")
 async def get_decisions(limit: int = 50, strategy: Optional[str] = None) -> Dict[str, Any]:
     """Every signal the strategies raised today and what the bot decided (newest first)."""
@@ -2769,6 +2904,8 @@ async def submit_order(req: OrderCreateRequest) -> Dict[str, Any]:
 async def cancel_order(order_id: str) -> Dict[str, Any]:
     """Cancel a working order."""
     try:
+        if engine.orders.get(order_id) and engine.orders[order_id].execution_policy == OR15_ID:
+            raise ValueError("Use Close trade for OR15 so broker protection is reconciled first")
         cancelled = engine.cancel_order(order_id, reason="API_REQUEST")
         _release_dead_entry_brackets()
         _checkpoint_runtime("API_ORDER_CANCEL")
@@ -2797,9 +2934,18 @@ async def _execute_manual_flatten(
     flattened: List[str] = []
     skipped: List[Dict[str, str]] = []
     rejected: List[Dict[str, str]] = []
+    fixed_requested = False
 
     for sym in target_symbols:
         pos = account.positions.get(sym)
+        if or15_controller.reserves(sym):
+            if tsla_or15_strategy.phase == "WAITING_ENTRY":
+                tsla_or15_strategy.skip("MANUAL_CANCEL", now_dt)
+            else:
+                tsla_or15_strategy.incomplete = True
+                or15_controller.request_exit("MANUAL_FLATTEN", now_dt)
+                fixed_requested = True
+            continue
         if _is_swing_arm(pos):
             skipped.append({"symbol": sym, "reason": "SWING_HOLDING: use the slow-trades exit actions instead"})
             continue
@@ -2851,6 +2997,15 @@ async def _execute_manual_flatten(
         "MANUAL_FLATTEN",
         (event_key, "MANUAL_FLATTEN") if event_key else None,
     )
+    if fixed_requested:
+        if simulation_mode:
+            or15_controller._run_exit(now_dt, account.positions.get("TSLA").market_price if "TSLA" in account.positions else None)
+        else:
+            or15_controller.tick(now_dt)
+        if "TSLA" in account.positions:
+            rejected.append({"symbol": "TSLA", "reason": "Close requested; waiting for broker confirmation"})
+        else:
+            flattened.append("TSLA")
     await broadcast_ui_state(force=True)
     return {
         "flattened": flattened,
@@ -2875,6 +3030,7 @@ async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]
             set(account.positions.keys())
             | {o.symbol.upper() for o in engine.working_orders.values()}
             | {s.upper() for s in bracket_manager.symbol_to_bracket.keys()}
+            | ({"TSLA"} if or15_controller.reserves("TSLA") else set())
         )
     payload = {"target_symbols": target_symbols, "timestamp": now_dt}
     should_process, event_key = _begin_durable_event("MANUAL_FLATTEN", payload)

@@ -132,14 +132,17 @@ for (const [testid, file] of Object.entries(testidLocations)) {
 }
 console.log("  ✅ Verified all required data-testids are present on their new elements");
 
-// 7. Verify all 4 strategy ids are themed in lib/plain.ts and referenced by StrategyCard.tsx.
+// 7. Verify all five strategy ids are themed and fixed OR15 controls are present.
 const plainLib = fs.readFileSync(path.join(FRONTEND_DIR, "lib/plain.ts"), "utf8");
-for (const id of ["orb", "vwap_pullback", "news_momentum", "mean_reversion"]) {
+for (const id of ["orb", "vwap_pullback", "news_momentum", "mean_reversion", "tsla_or15_retest"]) {
   assert(plainLib.includes(`${id}:`), `Missing strategy theme for ${id} in lib/plain.ts`);
 }
 const card = fs.readFileSync(path.join(FRONTEND_DIR, "components/StrategyCard.tsx"), "utf8");
 assert(card.includes("strategyTheme"), "StrategyCard.tsx must use strategyTheme() from lib/plain.ts");
-console.log("  ✅ Verified all 4 strategy themes (Morning Breakout, Ride the Trend, Big News, Snap Back)");
+assert(card.includes('data-testid="or15-details"') && card.includes("Offline replay"), "OR15 must distinguish replay from paper");
+const holding = fs.readFileSync(path.join(FRONTEND_DIR, "components/HoldingNow.tsx"), "utf8");
+assert(holding.includes("!position.fixed_protection") && holding.includes("Safety exit stays fixed"), "OR15 must disable stop movement");
+console.log("  ✅ Verified all five strategy themes and OR15 fixed protection controls");
 
 // 8. Verify plain-language copy replaced jargon in the swing and safety components (F10).
 const safetyCard = fs.readFileSync(path.join(FRONTEND_DIR, "components/SafetyCard.tsx"), "utf8");

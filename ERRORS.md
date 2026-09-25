@@ -1,5 +1,13 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-09-25: Fixed TSLA strategy execution and recovery findings
+
+The plan and diff reviews found generic paths that could distort the frozen strategy: signal-bar matching, stop rounding/trailing, news exits, automatic cancellation of native OCO, deferred checkpoint success during an inflight input, staged signals omitted from Close All, and stale time captured before storage I/O. Added dedicated fixed-rule matching, precise prices, explicit ownership, passive native protection, durable intent before POST, staged cancellation, and a fresh submission clock.
+
+Crash probes found that a saved OCO identity with no POST must recover by reposting the same identity. Emergency exits need a precommitted identity before BUY, including storage failure after fill. A canceled/no-fill emergency sell needs a new deterministic attempt; a refused POST that created no broker order must reuse its identity, otherwise restart can stop at the missing id and overlook a later fill. Dedicated SQLite plus real Alpaca HTTP-adapter tests now exercise these paths, including cancel/fill races and recovery without duplicate POSTs.
+
+Replay labels and modeled fees must never imply actual paper observations or known broker fees. Native accepted protection fields are recorded from broker responses separately from requested cent-rounded and theoretical levels. Full verification and limitations: `docs/tsla_or15/DRY_RUN_REPORT.md`.
+
 ## 2026-09-25: Strategy audit found target, timing and Swing broker lifecycle defects
 
 **What did not work:** ORB and News sent absolute profit targets calculated from raw stops even though VIX adaptation changed the stop; admission also sized from the raw stop. VWAP accepted early entries without EMA20/EMA50 history and could retain raw-stop fallback targets. A qualifying premarket News bar could consume a headline before the trading-hours gate opened, while thin premarket volume could distort its baseline. Mean Reversion checked its 1.0R minimum before VIX adaptation. Swing discarded staged entries after transient broker errors, could duplicate an unresolved order, did not attach fill-anchored ATR stops to late fills, and created emergency stop sells without submitting them to the broker. Its scan timestamp disappeared on restart. Order pruning kept every completed order when broker-linked orders filled the retention budget.

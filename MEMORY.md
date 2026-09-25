@@ -2,6 +2,16 @@
 
 ## Decisions
 
+### 2026-09-25: TSLA OR15 fixed paper strategy
+
+- User explicitly overrode the source's shadow-only phase: enabled one-share Alpaca paper routing immediately. The source was found under `megacap_intraday_edge_lab` (requested `..._1ab` was absent) and frozen byte-for-byte in `docs/tsla_or15/SOURCE_EXECUTION_PLAN.md` with SHA-256 `1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd`.
+- Source strategy id `tsla_or15_retest`, protocol `TSLA_OR15_RETEST_2R_BROKER_PAPER_V1`: exact 09:30–09:44 range; 09:45–11:30 signal bars; unusual frozen ATR; later retest only; exact QQQ VWAP check; one consumed signal; T+2 entry; fixed ORL and single 2R target; 120 minutes / official close minus five. One share is not VIX-sized. Existing account risk, symbol exclusion, cash and ledger apply.
+- Native OCO protection is specific to this strategy. Do not let generic settlement cancel it, news flatten it, or manual breakeven/trailing move it. Manual/account emergency closes must resolve entry and cancel/settle native legs first. Precommit entry, OCO and emergency close identities. Emergency retries advance only after the prior broker identity exists and is terminal; reuse an absent identity so recovery cannot skip a later fill. Storage failure after entry still permits precommitted risk reduction.
+- Migration adds only this known fifth strategy to legacy four-strategy checkpoints; contradictory ownership/phase/price/consumed-latch states fail closed. All source prices retain precision; requested cent-rounded OCO levels and actual nullable response levels are separate audit fields.
+- SIP identity must be verified. Completion grace 10 seconds, entry first 5 seconds of T+2, quote <=2 seconds old. A missing first minute after a midday restart skips that session; no reconstructed late entry. Calendar coverage is 2026/2027 and unsupported years skip.
+- Commissioning paper sessions precede 2026-10-01. Formal paper observation is separate from the source shadow trial; statistical evaluation remains `NOT_EVALUATED`. Offline sessions are `OFFLINE_TEST`, actual broker fees remain unknown/null, simulator fees have their own field, and 3/6bps are assumptions. Prior official TSLA study selected NO_CANDIDATE and failed holdout.
+- Subagent plan critique and independent execution/fidelity reviews are in `docs/tsla_or15/`; material findings were fixed and re-reviewed. Verification, screenshots and final production observations are recorded in `DRY_RUN_REPORT.md` / `DEPLOYMENT.md`. Do not describe synthetic replay or after-hours health as a real OR15 session or fill.
+
 ### 2026-09-25: five-strategy audit remediation and deployment
 - Source: `PLAN_2026_09_25_strategy_audit_remediation.md`, reviewed twice by Claude Code CLI in read-only plan mode. The first critique found four blocking safety gaps and five incorrect assumptions; the second implementation review found no P0 issue and two P1 issues, both repaired.
 - Before editing, production had live Alpaca paper ORB shorts in AMZN and AMD plus a VWAP SPY long, with broker position mismatch false. Those are evidence that the existing live routes submitted and filled orders, not evidence that the new code is deployed or profitable. Production restarts are held until the intraday book is flat because stops are local to the app.

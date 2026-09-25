@@ -1,7 +1,7 @@
 """Capture and restore the mutable trading runtime without pickling code."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import inspect
 import math
 from typing import Any, Dict, Iterable, Optional
@@ -223,10 +223,17 @@ def restore_runtime_state(
         setattr(adaptation_engine, name, value)
 
     strategy_map = {strategy.strategy_id: strategy for strategy in strategies}
-    if set(decoded["strategies"]) != set(strategy_map):
+    saved_ids, deployed_ids = set(decoded["strategies"]), set(strategy_map)
+    legacy_ids = {"orb", "vwap_pullback", "news_momentum", "mean_reversion"}
+    known_addition = saved_ids == legacy_ids and deployed_ids == legacy_ids | {"tsla_or15_retest"}
+    if saved_ids != deployed_ids and not known_addition:
         raise PersistenceError("Persisted strategy set does not match this deployment")
     for strategy_id, strategy_state in decoded["strategies"].items():
         strategy = strategy_map[strategy_id]
+        if strategy_id == "tsla_or15_retest":
+            from backend.app.strategies.tsla_or15_retest import VERSION, SOURCE_SHA256
+            if strategy_state.get("protocol_version") != VERSION or strategy_state.get("source_hash") != SOURCE_SHA256:
+                raise PersistenceError("OR15 checkpoint protocol/source identity mismatch")
         # Tuning parameters always come from the deployed code, never from an older
         # checkpoint; attributes added since the checkpoint keep their fresh defaults.
         tuning = set(inspect.signature(type(strategy).__init__).parameters) - {"self"}
@@ -262,7 +269,7 @@ def restore_runtime_state(
                     continue
                 daily_bar_store.append_bar(bar_obj)
 
-    validate_runtime_state(account, engine, bracket_manager)
+    validate_runtime_state(account, engine, bracket_manager, strategy_map.values())
 
     return {
         "last_session_date": decoded.get("last_session_date"),
@@ -277,6 +284,7 @@ def validate_runtime_state(
     account: PaperTradingAccount,
     engine: ExecutionEngine,
     bracket_manager: DynamicBracketManager,
+    strategies: Optional[Iterable[Strategy]] = None,
 ) -> None:
     """Reject a checkpoint that could resume with incoherent protection."""
     if not all(math.isfinite(value) for value in (account.cash, account.equity, account.buying_power)):
@@ -321,3 +329,46 @@ def validate_runtime_state(
 
     if account.status == AccountStatus.CLOSED and account.positions:
         raise PersistenceError("Closed account checkpoint contains open positions")
+
+    for strategy in strategies or []:
+        if strategy.strategy_id != "tsla_or15_retest":
+            continue
+        s = strategy
+        if s.phase not in {"WAITING_SESSION", "BUILDING_RANGE", "WAITING_BREAKOUT", "WAITING_RETEST",
+                           "WAITING_ENTRY", "ENTERING", "HOLDING", "EXITING", "CLOSED", "SKIPPED", "NO_SIGNAL"}:
+            raise PersistenceError("Unknown OR15 lifecycle phase")
+        if s.signal_consumed and (s.signal is None or s.entry_due is None):
+            raise PersistenceError("OR15 consumed signal is missing its source/timing")
+        if s.signal and s.entry_due != s.signal.timestamp + timedelta(minutes=2):
+            raise PersistenceError("OR15 entry timing is not T+2")
+        if s.phase == "WAITING_ENTRY" and not s.signal_consumed:
+            raise PersistenceError("OR15 waiting entry without a consumed signal")
+        owned = account.positions.get("TSLA")
+        if owned and owned.strategy_id == s.strategy_id and s.phase not in ("HOLDING", "EXITING"):
+            raise PersistenceError("OR15 position contradicts its lifecycle phase")
+        if s.phase in ("ENTERING", "HOLDING", "EXITING"):
+            entry = engine.orders.get(s.entry_order_id)
+            if not s.signal_consumed or entry is None or entry.symbol != "TSLA" or entry.qty != 1 or entry.side.value != "BUY":
+                raise PersistenceError("OR15 active lifecycle lacks its sole one-share entry")
+        if s.phase == "HOLDING":
+            from backend.app.strategies.tsla_or15_retest import session_bounds
+            pos = account.positions.get("TSLA")
+            b = bracket_manager.brackets.get(f"brk_{s.entry_order_id}")
+            bounds = session_bounds(s.session_day)
+            if not pos or pos.strategy_id != s.strategy_id or pos.shares != 1 or pos.side.value != "LONG":
+                raise PersistenceError("OR15 holding ownership/quantity mismatch")
+            if not b or not b.fixed_single_target or b.use_trailing_target_2 or b.target_2_qty != 0:
+                raise PersistenceError("OR15 fixed single-target bracket missing")
+            if s.entry_price is None or s.or_low is None or s.entry_price <= s.or_low:
+                raise PersistenceError("OR15 positive risk missing")
+            expected = s.entry_price + 2 * (s.entry_price - s.or_low)
+            if (s.target_price is None or abs(s.target_price - expected) > 1e-8
+                    or abs(b.target_1_price - expected) > 1e-8 or b.current_stop_price != s.or_low
+                    or b.initial_stop_price != s.or_low or abs(b.entry_price - s.entry_price) > 1e-8):
+                raise PersistenceError("OR15 fixed ORL/2R levels changed")
+            if not bounds or not s.filled_at or s.exit_due != min(s.filled_at + timedelta(minutes=120), bounds[1] - timedelta(minutes=5)):
+                raise PersistenceError("OR15 holding timeout mismatch")
+            if s.execution_mode == "alpaca_paper" and s.protection_confirmed:
+                legs = [engine.orders.get(b.stop_order_id), engine.orders.get(b.target_1_order_id)]
+                if any(not leg or not leg.broker_resting or not leg.broker_order_id for leg in legs):
+                    raise PersistenceError("OR15 confirmed broker protection lacks its native ids")

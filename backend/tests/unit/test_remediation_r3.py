@@ -331,7 +331,7 @@ def test_adaptation_stop_loss_floor_and_wide_stop_rejection():
 def test_news_momentum_strict_causality_and_sliding_window():
     """Verify NewsMomentumStrategy prevents forward leakage and bounds recent_bars."""
     strategy = NewsMomentumStrategy()
-    now_ts = datetime.now(timezone.utc)
+    now_ts = datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc)
 
     # Ingest a catalyst in the future (forward data leakage)
     future_catalyst = PendingCatalyst(

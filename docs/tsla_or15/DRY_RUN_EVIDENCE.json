@@ -1,0 +1,919 @@
+{
+  "status": "PASS",
+  "execution_mode": "offline_raw_open",
+  "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+  "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1",
+  "cases": [
+    {
+      "case": "target",
+      "passed": true,
+      "trade": {
+        "trade_id": "brk_ord_d38cf254a840",
+        "session_date": "2026-09-28",
+        "symbol": "TSLA",
+        "side": "LONG",
+        "status": "CLOSED",
+        "strategy_id": "tsla_or15_retest",
+        "opened_at": "2026-09-28T09:48:00-04:00",
+        "closed_at": "2026-09-28T09:49:00-04:00",
+        "quantity": 1,
+        "avg_entry_price": 102.0,
+        "avg_exit_price": 108.0,
+        "realized_pnl": 5.98,
+        "fees": 0.02,
+        "exit_reason": "TARGET",
+        "aggregate_only": false,
+        "fill_legs": [
+          {
+            "fill_id": "fl_b54c0422ff",
+            "order_id": "ord_d38cf254a840",
+            "side": "BUY",
+            "qty": 1,
+            "price": 102,
+            "fee": 0.0,
+            "realized_pnl": 0.0,
+            "timestamp": "2026-09-28T09:48:00-04:00"
+          },
+          {
+            "fill_id": "fl_b10fe5a195",
+            "order_id": "ord_d84e186b259f",
+            "side": "SELL",
+            "qty": 1,
+            "price": 108,
+            "fee": 0.02,
+            "realized_pnl": 5.98,
+            "timestamp": "2026-09-28T09:49:00-04:00"
+          }
+        ],
+        "execution_mode": "offline_raw_open",
+        "strategy_version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "gross_pnl": 6.0,
+        "assumed_cost_3bps": 0.063,
+        "assumed_cost_6bps": 0.126,
+        "normal_cost_pnl": 5.937,
+        "stress_cost_pnl": 5.874,
+        "broker_fees": null,
+        "simulator_fees": 0.02,
+        "risk_per_share": 3.0,
+        "incomplete": false,
+        "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1"
+      },
+      "session": {
+        "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "session_date": "2026-09-28",
+        "phase": "CLOSED",
+        "reason": null,
+        "signal_consumed": true,
+        "incomplete": false,
+        "execution_mode": "offline_raw_open",
+        "validation": "NOT_EVALUATED",
+        "events": [
+          {
+            "kind": "SESSION",
+            "at": "2026-09-28T09:30:00-04:00",
+            "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+            "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+            "evaluation": "OFFLINE_TEST",
+            "validation": "NOT_EVALUATED"
+          },
+          {
+            "kind": "OPENING_RANGE",
+            "at": "2026-09-28T09:45:00-04:00",
+            "high": 101,
+            "low": 99,
+            "mid": 100.0
+          },
+          {
+            "kind": "BREAKOUT",
+            "at": "2026-09-28T09:46:00-04:00",
+            "bar_at": "2026-09-28T09:45:00-04:00",
+            "close": 102
+          },
+          {
+            "kind": "RETEST",
+            "at": "2026-09-28T09:47:00-04:00",
+            "bar_at": "2026-09-28T09:46:00-04:00",
+            "o": 101.1,
+            "h": 102,
+            "l": 101,
+            "c": 101.5,
+            "v": 10000,
+            "atr": 1.9642857142857142,
+            "qqq_close": 200.5,
+            "qqq_vwap": 200.16666666666669,
+            "checks": {
+              "near_range_high": true,
+              "above_midpoint": true,
+              "green_candle": true,
+              "close_reclaims_high": true,
+              "qqq_above_vwap": true
+            }
+          },
+          {
+            "kind": "SIGNAL",
+            "at": "2026-09-28T09:47:00-04:00",
+            "signal_bar_at": "2026-09-28T09:46:00-04:00",
+            "due_at": "2026-09-28T09:48:00-04:00",
+            "quantity": 1
+          },
+          {
+            "kind": "ORDER",
+            "at": "2026-09-28T09:48:00-04:00",
+            "order_id": "ord_d38cf254a840",
+            "trigger_price": 102,
+            "quantity": 1,
+            "quote": null
+          },
+          {
+            "kind": "ENTRY_FILL",
+            "at": "2026-09-28T09:48:00-04:00",
+            "price": 102,
+            "quantity": 1,
+            "mode": "offline_raw_open",
+            "slippage": 0.0,
+            "broker_fee_known": null
+          },
+          {
+            "kind": "MODEL_EXIT",
+            "at": "2026-09-28T09:49:00-04:00",
+            "reason": "TARGET",
+            "both_touched": false
+          },
+          {
+            "kind": "CLOSED",
+            "at": "2026-09-28T09:49:00-04:00",
+            "trade_id": "brk_ord_d38cf254a840",
+            "exit_reason": "TARGET",
+            "gross_pnl": 6.0,
+            "normal_cost_pnl": 5.937,
+            "stress_cost_pnl": 5.874,
+            "mode": "offline_raw_open"
+          }
+        ]
+      },
+      "open_positions": 0,
+      "working_orders": 0
+    },
+    {
+      "case": "stop",
+      "passed": true,
+      "trade": {
+        "trade_id": "brk_ord_a62c1063e356",
+        "session_date": "2026-09-28",
+        "symbol": "TSLA",
+        "side": "LONG",
+        "status": "CLOSED",
+        "strategy_id": "tsla_or15_retest",
+        "opened_at": "2026-09-28T09:48:00-04:00",
+        "closed_at": "2026-09-28T09:49:00-04:00",
+        "quantity": 1,
+        "avg_entry_price": 102.0,
+        "avg_exit_price": 99.0,
+        "realized_pnl": -3.02,
+        "fees": 0.02,
+        "exit_reason": "STOP",
+        "aggregate_only": false,
+        "fill_legs": [
+          {
+            "fill_id": "fl_c2bd5e80ff",
+            "order_id": "ord_a62c1063e356",
+            "side": "BUY",
+            "qty": 1,
+            "price": 102,
+            "fee": 0.0,
+            "realized_pnl": 0.0,
+            "timestamp": "2026-09-28T09:48:00-04:00"
+          },
+          {
+            "fill_id": "fl_14ffd8d37c",
+            "order_id": "ord_0878a5a40dc9",
+            "side": "SELL",
+            "qty": 1,
+            "price": 99,
+            "fee": 0.02,
+            "realized_pnl": -3.02,
+            "timestamp": "2026-09-28T09:49:00-04:00"
+          }
+        ],
+        "execution_mode": "offline_raw_open",
+        "strategy_version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "gross_pnl": -3.0,
+        "assumed_cost_3bps": 0.0603,
+        "assumed_cost_6bps": 0.1206,
+        "normal_cost_pnl": -3.0603,
+        "stress_cost_pnl": -3.1206,
+        "broker_fees": null,
+        "simulator_fees": 0.02,
+        "risk_per_share": 3.0,
+        "incomplete": false,
+        "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1"
+      },
+      "session": {
+        "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "session_date": "2026-09-28",
+        "phase": "CLOSED",
+        "reason": null,
+        "signal_consumed": true,
+        "incomplete": false,
+        "execution_mode": "offline_raw_open",
+        "validation": "NOT_EVALUATED",
+        "events": [
+          {
+            "kind": "SESSION",
+            "at": "2026-09-28T09:30:00-04:00",
+            "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+            "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+            "evaluation": "OFFLINE_TEST",
+            "validation": "NOT_EVALUATED"
+          },
+          {
+            "kind": "OPENING_RANGE",
+            "at": "2026-09-28T09:45:00-04:00",
+            "high": 101,
+            "low": 99,
+            "mid": 100.0
+          },
+          {
+            "kind": "BREAKOUT",
+            "at": "2026-09-28T09:46:00-04:00",
+            "bar_at": "2026-09-28T09:45:00-04:00",
+            "close": 102
+          },
+          {
+            "kind": "RETEST",
+            "at": "2026-09-28T09:47:00-04:00",
+            "bar_at": "2026-09-28T09:46:00-04:00",
+            "o": 101.1,
+            "h": 102,
+            "l": 101,
+            "c": 101.5,
+            "v": 10000,
+            "atr": 1.9642857142857142,
+            "qqq_close": 200.5,
+            "qqq_vwap": 200.16666666666669,
+            "checks": {
+              "near_range_high": true,
+              "above_midpoint": true,
+              "green_candle": true,
+              "close_reclaims_high": true,
+              "qqq_above_vwap": true
+            }
+          },
+          {
+            "kind": "SIGNAL",
+            "at": "2026-09-28T09:47:00-04:00",
+            "signal_bar_at": "2026-09-28T09:46:00-04:00",
+            "due_at": "2026-09-28T09:48:00-04:00",
+            "quantity": 1
+          },
+          {
+            "kind": "ORDER",
+            "at": "2026-09-28T09:48:00-04:00",
+            "order_id": "ord_a62c1063e356",
+            "trigger_price": 102,
+            "quantity": 1,
+            "quote": null
+          },
+          {
+            "kind": "ENTRY_FILL",
+            "at": "2026-09-28T09:48:00-04:00",
+            "price": 102,
+            "quantity": 1,
+            "mode": "offline_raw_open",
+            "slippage": 0.0,
+            "broker_fee_known": null
+          },
+          {
+            "kind": "MODEL_EXIT",
+            "at": "2026-09-28T09:49:00-04:00",
+            "reason": "STOP",
+            "both_touched": false
+          },
+          {
+            "kind": "CLOSED",
+            "at": "2026-09-28T09:49:00-04:00",
+            "trade_id": "brk_ord_a62c1063e356",
+            "exit_reason": "STOP",
+            "gross_pnl": -3.0,
+            "normal_cost_pnl": -3.0603,
+            "stress_cost_pnl": -3.1206,
+            "mode": "offline_raw_open"
+          }
+        ]
+      },
+      "open_positions": 0,
+      "working_orders": 0
+    },
+    {
+      "case": "both",
+      "passed": true,
+      "trade": {
+        "trade_id": "brk_ord_529b3ce35ce4",
+        "session_date": "2026-09-28",
+        "symbol": "TSLA",
+        "side": "LONG",
+        "status": "CLOSED",
+        "strategy_id": "tsla_or15_retest",
+        "opened_at": "2026-09-28T09:48:00-04:00",
+        "closed_at": "2026-09-28T09:49:00-04:00",
+        "quantity": 1,
+        "avg_entry_price": 102.0,
+        "avg_exit_price": 99.0,
+        "realized_pnl": -3.02,
+        "fees": 0.02,
+        "exit_reason": "STOP",
+        "aggregate_only": false,
+        "fill_legs": [
+          {
+            "fill_id": "fl_1986711ffd",
+            "order_id": "ord_529b3ce35ce4",
+            "side": "BUY",
+            "qty": 1,
+            "price": 102,
+            "fee": 0.0,
+            "realized_pnl": 0.0,
+            "timestamp": "2026-09-28T09:48:00-04:00"
+          },
+          {
+            "fill_id": "fl_a63fe34a7c",
+            "order_id": "ord_ce32b032a617",
+            "side": "SELL",
+            "qty": 1,
+            "price": 99,
+            "fee": 0.02,
+            "realized_pnl": -3.02,
+            "timestamp": "2026-09-28T09:49:00-04:00"
+          }
+        ],
+        "execution_mode": "offline_raw_open",
+        "strategy_version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "gross_pnl": -3.0,
+        "assumed_cost_3bps": 0.0603,
+        "assumed_cost_6bps": 0.1206,
+        "normal_cost_pnl": -3.0603,
+        "stress_cost_pnl": -3.1206,
+        "broker_fees": null,
+        "simulator_fees": 0.02,
+        "risk_per_share": 3.0,
+        "incomplete": false,
+        "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1"
+      },
+      "session": {
+        "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "session_date": "2026-09-28",
+        "phase": "CLOSED",
+        "reason": null,
+        "signal_consumed": true,
+        "incomplete": false,
+        "execution_mode": "offline_raw_open",
+        "validation": "NOT_EVALUATED",
+        "events": [
+          {
+            "kind": "SESSION",
+            "at": "2026-09-28T09:30:00-04:00",
+            "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+            "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+            "evaluation": "OFFLINE_TEST",
+            "validation": "NOT_EVALUATED"
+          },
+          {
+            "kind": "OPENING_RANGE",
+            "at": "2026-09-28T09:45:00-04:00",
+            "high": 101,
+            "low": 99,
+            "mid": 100.0
+          },
+          {
+            "kind": "BREAKOUT",
+            "at": "2026-09-28T09:46:00-04:00",
+            "bar_at": "2026-09-28T09:45:00-04:00",
+            "close": 102
+          },
+          {
+            "kind": "RETEST",
+            "at": "2026-09-28T09:47:00-04:00",
+            "bar_at": "2026-09-28T09:46:00-04:00",
+            "o": 101.1,
+            "h": 102,
+            "l": 101,
+            "c": 101.5,
+            "v": 10000,
+            "atr": 1.9642857142857142,
+            "qqq_close": 200.5,
+            "qqq_vwap": 200.16666666666669,
+            "checks": {
+              "near_range_high": true,
+              "above_midpoint": true,
+              "green_candle": true,
+              "close_reclaims_high": true,
+              "qqq_above_vwap": true
+            }
+          },
+          {
+            "kind": "SIGNAL",
+            "at": "2026-09-28T09:47:00-04:00",
+            "signal_bar_at": "2026-09-28T09:46:00-04:00",
+            "due_at": "2026-09-28T09:48:00-04:00",
+            "quantity": 1
+          },
+          {
+            "kind": "ORDER",
+            "at": "2026-09-28T09:48:00-04:00",
+            "order_id": "ord_529b3ce35ce4",
+            "trigger_price": 102,
+            "quantity": 1,
+            "quote": null
+          },
+          {
+            "kind": "ENTRY_FILL",
+            "at": "2026-09-28T09:48:00-04:00",
+            "price": 102,
+            "quantity": 1,
+            "mode": "offline_raw_open",
+            "slippage": 0.0,
+            "broker_fee_known": null
+          },
+          {
+            "kind": "MODEL_EXIT",
+            "at": "2026-09-28T09:49:00-04:00",
+            "reason": "STOP",
+            "both_touched": true
+          },
+          {
+            "kind": "CLOSED",
+            "at": "2026-09-28T09:49:00-04:00",
+            "trade_id": "brk_ord_529b3ce35ce4",
+            "exit_reason": "STOP",
+            "gross_pnl": -3.0,
+            "normal_cost_pnl": -3.0603,
+            "stress_cost_pnl": -3.1206,
+            "mode": "offline_raw_open"
+          }
+        ]
+      },
+      "open_positions": 0,
+      "working_orders": 0
+    },
+    {
+      "case": "gap",
+      "passed": true,
+      "trade": {
+        "trade_id": "brk_ord_6a14b1cb31cf",
+        "session_date": "2026-09-28",
+        "symbol": "TSLA",
+        "side": "LONG",
+        "status": "CLOSED",
+        "strategy_id": "tsla_or15_retest",
+        "opened_at": "2026-09-28T09:48:00-04:00",
+        "closed_at": "2026-09-28T09:49:00-04:00",
+        "quantity": 1,
+        "avg_entry_price": 102.0,
+        "avg_exit_price": 97.0,
+        "realized_pnl": -5.02,
+        "fees": 0.02,
+        "exit_reason": "STOP",
+        "aggregate_only": false,
+        "fill_legs": [
+          {
+            "fill_id": "fl_3050aaadfa",
+            "order_id": "ord_6a14b1cb31cf",
+            "side": "BUY",
+            "qty": 1,
+            "price": 102,
+            "fee": 0.0,
+            "realized_pnl": 0.0,
+            "timestamp": "2026-09-28T09:48:00-04:00"
+          },
+          {
+            "fill_id": "fl_36344a9a4f",
+            "order_id": "ord_f2490d780385",
+            "side": "SELL",
+            "qty": 1,
+            "price": 97,
+            "fee": 0.02,
+            "realized_pnl": -5.02,
+            "timestamp": "2026-09-28T09:49:00-04:00"
+          }
+        ],
+        "execution_mode": "offline_raw_open",
+        "strategy_version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "gross_pnl": -5.0,
+        "assumed_cost_3bps": 0.0597,
+        "assumed_cost_6bps": 0.1194,
+        "normal_cost_pnl": -5.0597,
+        "stress_cost_pnl": -5.1194,
+        "broker_fees": null,
+        "simulator_fees": 0.02,
+        "risk_per_share": 3.0,
+        "incomplete": false,
+        "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1"
+      },
+      "session": {
+        "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "session_date": "2026-09-28",
+        "phase": "CLOSED",
+        "reason": null,
+        "signal_consumed": true,
+        "incomplete": false,
+        "execution_mode": "offline_raw_open",
+        "validation": "NOT_EVALUATED",
+        "events": [
+          {
+            "kind": "SESSION",
+            "at": "2026-09-28T09:30:00-04:00",
+            "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+            "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+            "evaluation": "OFFLINE_TEST",
+            "validation": "NOT_EVALUATED"
+          },
+          {
+            "kind": "OPENING_RANGE",
+            "at": "2026-09-28T09:45:00-04:00",
+            "high": 101,
+            "low": 99,
+            "mid": 100.0
+          },
+          {
+            "kind": "BREAKOUT",
+            "at": "2026-09-28T09:46:00-04:00",
+            "bar_at": "2026-09-28T09:45:00-04:00",
+            "close": 102
+          },
+          {
+            "kind": "RETEST",
+            "at": "2026-09-28T09:47:00-04:00",
+            "bar_at": "2026-09-28T09:46:00-04:00",
+            "o": 101.1,
+            "h": 102,
+            "l": 101,
+            "c": 101.5,
+            "v": 10000,
+            "atr": 1.9642857142857142,
+            "qqq_close": 200.5,
+            "qqq_vwap": 200.16666666666669,
+            "checks": {
+              "near_range_high": true,
+              "above_midpoint": true,
+              "green_candle": true,
+              "close_reclaims_high": true,
+              "qqq_above_vwap": true
+            }
+          },
+          {
+            "kind": "SIGNAL",
+            "at": "2026-09-28T09:47:00-04:00",
+            "signal_bar_at": "2026-09-28T09:46:00-04:00",
+            "due_at": "2026-09-28T09:48:00-04:00",
+            "quantity": 1
+          },
+          {
+            "kind": "ORDER",
+            "at": "2026-09-28T09:48:00-04:00",
+            "order_id": "ord_6a14b1cb31cf",
+            "trigger_price": 102,
+            "quantity": 1,
+            "quote": null
+          },
+          {
+            "kind": "ENTRY_FILL",
+            "at": "2026-09-28T09:48:00-04:00",
+            "price": 102,
+            "quantity": 1,
+            "mode": "offline_raw_open",
+            "slippage": 0.0,
+            "broker_fee_known": null
+          },
+          {
+            "kind": "MODEL_EXIT",
+            "at": "2026-09-28T09:49:00-04:00",
+            "reason": "STOP",
+            "both_touched": false
+          },
+          {
+            "kind": "CLOSED",
+            "at": "2026-09-28T09:49:00-04:00",
+            "trade_id": "brk_ord_6a14b1cb31cf",
+            "exit_reason": "STOP",
+            "gross_pnl": -5.0,
+            "normal_cost_pnl": -5.0597,
+            "stress_cost_pnl": -5.1194,
+            "mode": "offline_raw_open"
+          }
+        ]
+      },
+      "open_positions": 0,
+      "working_orders": 0
+    },
+    {
+      "case": "time",
+      "passed": true,
+      "trade": {
+        "trade_id": "brk_ord_4bffb1e2db35",
+        "session_date": "2026-09-28",
+        "symbol": "TSLA",
+        "side": "LONG",
+        "status": "CLOSED",
+        "strategy_id": "tsla_or15_retest",
+        "opened_at": "2026-09-28T09:48:00-04:00",
+        "closed_at": "2026-09-28T11:48:00-04:00",
+        "quantity": 1,
+        "avg_entry_price": 102.0,
+        "avg_exit_price": 104.0,
+        "realized_pnl": 1.98,
+        "fees": 0.02,
+        "exit_reason": "TIME_LIMIT",
+        "aggregate_only": false,
+        "fill_legs": [
+          {
+            "fill_id": "fl_810c7a4720",
+            "order_id": "ord_4bffb1e2db35",
+            "side": "BUY",
+            "qty": 1,
+            "price": 102,
+            "fee": 0.0,
+            "realized_pnl": 0.0,
+            "timestamp": "2026-09-28T09:48:00-04:00"
+          },
+          {
+            "fill_id": "fl_be9d307d1f",
+            "order_id": "ord_a45bc6346e64",
+            "side": "SELL",
+            "qty": 1,
+            "price": 104,
+            "fee": 0.02,
+            "realized_pnl": 1.98,
+            "timestamp": "2026-09-28T11:48:00-04:00"
+          }
+        ],
+        "execution_mode": "offline_raw_open",
+        "strategy_version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "gross_pnl": 2.0,
+        "assumed_cost_3bps": 0.0618,
+        "assumed_cost_6bps": 0.1236,
+        "normal_cost_pnl": 1.9382,
+        "stress_cost_pnl": 1.8764,
+        "broker_fees": null,
+        "simulator_fees": 0.02,
+        "risk_per_share": 3.0,
+        "incomplete": false,
+        "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1"
+      },
+      "session": {
+        "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "session_date": "2026-09-28",
+        "phase": "CLOSED",
+        "reason": null,
+        "signal_consumed": true,
+        "incomplete": false,
+        "execution_mode": "offline_raw_open",
+        "validation": "NOT_EVALUATED",
+        "events": [
+          {
+            "kind": "SESSION",
+            "at": "2026-09-28T09:30:00-04:00",
+            "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+            "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+            "evaluation": "OFFLINE_TEST",
+            "validation": "NOT_EVALUATED"
+          },
+          {
+            "kind": "OPENING_RANGE",
+            "at": "2026-09-28T09:45:00-04:00",
+            "high": 101,
+            "low": 99,
+            "mid": 100.0
+          },
+          {
+            "kind": "BREAKOUT",
+            "at": "2026-09-28T09:46:00-04:00",
+            "bar_at": "2026-09-28T09:45:00-04:00",
+            "close": 102
+          },
+          {
+            "kind": "RETEST",
+            "at": "2026-09-28T09:47:00-04:00",
+            "bar_at": "2026-09-28T09:46:00-04:00",
+            "o": 101.1,
+            "h": 102,
+            "l": 101,
+            "c": 101.5,
+            "v": 10000,
+            "atr": 1.9642857142857142,
+            "qqq_close": 200.5,
+            "qqq_vwap": 200.16666666666669,
+            "checks": {
+              "near_range_high": true,
+              "above_midpoint": true,
+              "green_candle": true,
+              "close_reclaims_high": true,
+              "qqq_above_vwap": true
+            }
+          },
+          {
+            "kind": "SIGNAL",
+            "at": "2026-09-28T09:47:00-04:00",
+            "signal_bar_at": "2026-09-28T09:46:00-04:00",
+            "due_at": "2026-09-28T09:48:00-04:00",
+            "quantity": 1
+          },
+          {
+            "kind": "ORDER",
+            "at": "2026-09-28T09:48:00-04:00",
+            "order_id": "ord_4bffb1e2db35",
+            "trigger_price": 102,
+            "quantity": 1,
+            "quote": null
+          },
+          {
+            "kind": "ENTRY_FILL",
+            "at": "2026-09-28T09:48:00-04:00",
+            "price": 102,
+            "quantity": 1,
+            "mode": "offline_raw_open",
+            "slippage": 0.0,
+            "broker_fee_known": null
+          },
+          {
+            "kind": "EXIT_REQUEST",
+            "at": "2026-09-28T11:48:00-04:00",
+            "reason": "TIME_LIMIT"
+          },
+          {
+            "kind": "CLOSED",
+            "at": "2026-09-28T11:48:00-04:00",
+            "trade_id": "brk_ord_4bffb1e2db35",
+            "exit_reason": "TIME_LIMIT",
+            "gross_pnl": 2.0,
+            "normal_cost_pnl": 1.9382,
+            "stress_cost_pnl": 1.8764,
+            "mode": "offline_raw_open"
+          }
+        ]
+      },
+      "open_positions": 0,
+      "working_orders": 0
+    },
+    {
+      "case": "early_close",
+      "passed": true,
+      "trade": {
+        "trade_id": "brk_ord_412db7afe4d8",
+        "session_date": "2026-11-27",
+        "symbol": "TSLA",
+        "side": "LONG",
+        "status": "CLOSED",
+        "strategy_id": "tsla_or15_retest",
+        "opened_at": "2026-11-27T11:32:00-05:00",
+        "closed_at": "2026-11-27T12:55:00-05:00",
+        "quantity": 1,
+        "avg_entry_price": 102.0,
+        "avg_exit_price": 104.0,
+        "realized_pnl": 1.98,
+        "fees": 0.02,
+        "exit_reason": "FORCED_FLAT",
+        "aggregate_only": false,
+        "fill_legs": [
+          {
+            "fill_id": "fl_f00c3bae03",
+            "order_id": "ord_412db7afe4d8",
+            "side": "BUY",
+            "qty": 1,
+            "price": 102,
+            "fee": 0.0,
+            "realized_pnl": 0.0,
+            "timestamp": "2026-11-27T11:32:00-05:00"
+          },
+          {
+            "fill_id": "fl_12bfb05ba5",
+            "order_id": "ord_938f383d0277",
+            "side": "SELL",
+            "qty": 1,
+            "price": 104,
+            "fee": 0.02,
+            "realized_pnl": 1.98,
+            "timestamp": "2026-11-27T12:55:00-05:00"
+          }
+        ],
+        "execution_mode": "offline_raw_open",
+        "strategy_version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "gross_pnl": 2.0,
+        "assumed_cost_3bps": 0.0618,
+        "assumed_cost_6bps": 0.1236,
+        "normal_cost_pnl": 1.9382,
+        "stress_cost_pnl": 1.8764,
+        "broker_fees": null,
+        "simulator_fees": 0.02,
+        "risk_per_share": 3.0,
+        "incomplete": false,
+        "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1"
+      },
+      "session": {
+        "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+        "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+        "session_date": "2026-11-27",
+        "phase": "CLOSED",
+        "reason": null,
+        "signal_consumed": true,
+        "incomplete": false,
+        "execution_mode": "offline_raw_open",
+        "validation": "NOT_EVALUATED",
+        "events": [
+          {
+            "kind": "SESSION",
+            "at": "2026-11-27T09:30:00-05:00",
+            "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+            "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+            "evaluation": "OFFLINE_TEST",
+            "validation": "NOT_EVALUATED"
+          },
+          {
+            "kind": "OPENING_RANGE",
+            "at": "2026-11-27T09:45:00-05:00",
+            "high": 101,
+            "low": 99,
+            "mid": 100.0
+          },
+          {
+            "kind": "BREAKOUT",
+            "at": "2026-11-27T11:30:00-05:00",
+            "bar_at": "2026-11-27T11:29:00-05:00",
+            "close": 102
+          },
+          {
+            "kind": "RETEST",
+            "at": "2026-11-27T11:31:00-05:00",
+            "bar_at": "2026-11-27T11:30:00-05:00",
+            "o": 101.1,
+            "h": 102,
+            "l": 101,
+            "c": 101.5,
+            "v": 10000,
+            "atr": 1.9642857142857142,
+            "qqq_close": 200.5,
+            "qqq_vwap": 200.16666666666634,
+            "checks": {
+              "near_range_high": true,
+              "above_midpoint": true,
+              "green_candle": true,
+              "close_reclaims_high": true,
+              "qqq_above_vwap": true
+            }
+          },
+          {
+            "kind": "SIGNAL",
+            "at": "2026-11-27T11:31:00-05:00",
+            "signal_bar_at": "2026-11-27T11:30:00-05:00",
+            "due_at": "2026-11-27T11:32:00-05:00",
+            "quantity": 1
+          },
+          {
+            "kind": "ORDER",
+            "at": "2026-11-27T11:32:00-05:00",
+            "order_id": "ord_412db7afe4d8",
+            "trigger_price": 102,
+            "quantity": 1,
+            "quote": null
+          },
+          {
+            "kind": "ENTRY_FILL",
+            "at": "2026-11-27T11:32:00-05:00",
+            "price": 102,
+            "quantity": 1,
+            "mode": "offline_raw_open",
+            "slippage": 0.0,
+            "broker_fee_known": null
+          },
+          {
+            "kind": "EXIT_REQUEST",
+            "at": "2026-11-27T12:55:00-05:00",
+            "reason": "FORCED_FLAT"
+          },
+          {
+            "kind": "CLOSED",
+            "at": "2026-11-27T12:55:00-05:00",
+            "trade_id": "brk_ord_412db7afe4d8",
+            "exit_reason": "FORCED_FLAT",
+            "gross_pnl": 2.0,
+            "normal_cost_pnl": 1.9382,
+            "stress_cost_pnl": 1.8764,
+            "mode": "offline_raw_open"
+          }
+        ]
+      },
+      "open_positions": 0,
+      "working_orders": 0
+    }
+  ],
+  "scope": "Real main.handle_bar_event, strategy, risk, order/bracket engine, ledger, WebSocket serializer. Synthetic market bars. No real session/fills; persistence tested separately via real SQLite and broker HTTP adapter."
+}

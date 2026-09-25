@@ -125,7 +125,7 @@ class AlpacaBroker:
 
     def get_order(self, alpaca_id: str) -> Dict[str, Any]:
         try:
-            resp = self._client.get(f"/v2/orders/{alpaca_id}")
+            resp = self._client.get(f"/v2/orders/{alpaca_id}", params={"nested": "true"})
         except httpx.HTTPError as exc:
             raise BrokerError(f"order lookup {alpaca_id} failed: {exc}") from exc
         if resp.status_code != 200:
@@ -156,6 +156,33 @@ class AlpacaBroker:
         return self.status
 
     # ----------------------------------------------------------------- orders
+    def submit_oco(self, symbol: str, qty: int, client_order_id: str,
+                   stop: float, target: float) -> Dict[str, Any]:
+        """Rest a fixed sell stop and target at Alpaca. Caller persists id FIRST.
+
+        An uncertain response only permits lookup of this id, never a second
+        protection request. The caller owns passive polling and cancellation.
+        """
+        body = {"symbol": symbol, "qty": str(qty), "side": "sell", "type": "limit",
+                "time_in_force": "day", "order_class": "oco", "client_order_id": client_order_id,
+                "take_profit": {"limit_price": f"{target:.2f}"},
+                "stop_loss": {"stop_price": f"{stop:.2f}"}}
+        self.status.orders_sent += 1
+        self.status.last_order_at = datetime.now(timezone.utc).isoformat()
+        try:
+            resp = self._client.post("/v2/orders", json=body)
+        except httpx.HTTPError:
+            found = self.find_by_client_id(client_order_id)
+            if found is not None:
+                return self.get_order(found["id"])
+            raise BrokerError("OR15 protection POST outcome unknown")
+        if resp.status_code in (200, 201):
+            return resp.json()
+        found = self.find_by_client_id(client_order_id)
+        if found is not None:
+            return self.get_order(found["id"])
+        raise BrokerReject(f"OR15 protection rejected: HTTP {resp.status_code}", hard=resp.status_code < 500)
+
     def submit(
         self,
         symbol: str,

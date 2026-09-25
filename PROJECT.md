@@ -1,7 +1,11 @@
 # Project: AutonomousDayTrader
 
+## TSLA OR15 addition (2026-09-25)
+
+Plan: `PLAN_2026_09_25_tsla_or15.md`. Implementation uses the existing intraday strategy registry, account risk, order engine, fixed bracket extension, durable SQLite ledger and five-card dashboard. The new strategy routes to Alpaca paper immediately and uses native OCO protection. It ignores adaptive signal/stop/trailing/news overrides while retaining account controls. Replays are isolated and labeled `offline_raw_open`; no historical or forward statistical validation is asserted. Full evidence: `docs/tsla_or15/DRY_RUN_REPORT.md` and independent review reports beside it.
+
 ## Architecture
-AutonomousDayTrader is an intraday + swing paper-trading system for US equities. Market data comes from AlpacaRelay. Since 2026-09-25 every fill is a real order on Alpaca paper account PA3CSVDZMMPY (`BROKER_MODE=alpaca_paper`, `backend/app/core/broker.py`); the old built-in fill simulator is kept only for tests, replays and local dev. It features four dynamically adapted trading strategies, institutional risk guardrails, a plain-language light mobile-first dashboard (redesigned 2026-09-24), real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
+AutonomousDayTrader is an intraday + swing paper-trading system for US equities. Market data comes from AlpacaRelay. Since 2026-09-25 every fill is a real order on Alpaca paper account PA3CSVDZMMPY (`BROKER_MODE=alpaca_paper`, `backend/app/core/broker.py`); the old built-in fill simulator is kept only for tests, replays and local dev. It features four dynamically adapted trading strategies plus a fixed one-share TSLA OR15 retest strategy, institutional risk guardrails, a plain-language light mobile-first dashboard (redesigned 2026-09-24), real-time WebSocket state streaming, and deterministic production-path replay verification. A replay is not a live-market certification or a claim about real-account fills.
 
 ```
                   ┌────────────────────────────────────────────────────────┐

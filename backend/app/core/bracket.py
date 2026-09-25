@@ -60,6 +60,7 @@ class BracketOrder(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     arm: TradingArm = TradingArm.INTRADAY
+    fixed_single_target: bool = False
 
     @property
     def target_1_remaining_qty(self) -> int:
@@ -125,6 +126,7 @@ class DynamicBracketManager:
         min_target_1_r: Optional[float] = None,
         timestamp: Optional[datetime] = None,
         arm: TradingArm = TradingArm.INTRADAY,
+        fixed_single_target: bool = False,
     ) -> BracketOrder:
         """
         Create and compute price levels for a dynamic multi-tier bracket.
@@ -153,6 +155,10 @@ class DynamicBracketManager:
 
         q1 = max(1, total_qty // 2) if total_qty > 1 else 1
         q2 = total_qty - q1 if total_qty > 1 else 0
+        if fixed_single_target:
+            q1, q2 = total_qty, 0
+            t1_price = entry_price + 2 * r_dist
+            t2_price = t1_price
 
         now = timestamp or datetime.now(timezone.utc)
         bracket = BracketOrder(
@@ -162,9 +168,9 @@ class DynamicBracketManager:
             strategy_id=strategy_id,
             total_qty=total_qty,
             remaining_qty=total_qty,
-            entry_price=round(entry_price, 4),
-            initial_stop_price=round(stop_price, 4),
-            current_stop_price=round(stop_price, 4),
+            entry_price=entry_price if fixed_single_target else round(entry_price, 4),
+            initial_stop_price=stop_price if fixed_single_target else round(stop_price, 4),
+            current_stop_price=stop_price if fixed_single_target else round(stop_price, 4),
             target_1_price=t1_price,
             target_1_qty=q1,
             target_2_price=t2_price,
@@ -174,7 +180,7 @@ class DynamicBracketManager:
             target_1_r=target_1_r,
             target_2_r=target_2_r,
             min_target_1_r=min_target_1_r,
-            r_distance=round(r_dist, 4),
+            r_distance=r_dist if fixed_single_target else round(r_dist, 4),
             status=BracketStatus.PENDING_ENTRY,
             use_trailing_target_2=use_trailing_target_2,
             trail_atr_multiplier=trail_atr_multiplier,
@@ -185,6 +191,7 @@ class DynamicBracketManager:
             created_at=now,
             updated_at=now,
             arm=arm,
+            fixed_single_target=fixed_single_target,
         )
 
         self.brackets[bracket_id] = bracket
@@ -225,7 +232,9 @@ class DynamicBracketManager:
         bracket.target_2_qty = bracket.total_qty - bracket.target_1_qty if bracket.total_qty > 1 else 0
         bracket.target_2_order_id = f"t2_{bracket_id}" if bracket.target_2_qty > 0 else None
         bracket.r_distance = round(abs(fill_price - bracket.initial_stop_price), 4)
-        bracket.entry_price = round(fill_price, 4)
+        if bracket.fixed_single_target and fill_price <= bracket.initial_stop_price:
+            raise ValueError("Fixed long entry filled at or below its opening-range stop")
+        bracket.entry_price = fill_price if bracket.fixed_single_target else round(fill_price, 4)
         direction = 1.0 if bracket.side == "LONG" else -1.0
         is_buy = bracket.side == "LONG"
         r1 = self.default_target_1_r if bracket.target_1_r is None else bracket.target_1_r
@@ -267,6 +276,13 @@ class DynamicBracketManager:
                 bracket.entry_price + direction * r2 * bracket.r_distance, 2
             )
         bracket.status = BracketStatus.ACTIVE
+        if bracket.fixed_single_target:
+            bracket.r_distance = fill_price - bracket.initial_stop_price
+            bracket.target_1_price = fill_price + 2 * bracket.r_distance
+            bracket.target_2_price = bracket.target_1_price
+            bracket.target_1_qty, bracket.target_2_qty = bracket.total_qty, 0
+            bracket.target_2_order_id = None
+            bracket.use_trailing_target_2 = False
         bracket.peak_price_since_entry = fill_price
         bracket.updated_at = timestamp
 
@@ -545,6 +561,9 @@ class DynamicBracketManager:
         bracket = self.brackets.get(bracket_id)
         if not bracket:
             return BracketUpdateDirective(action="NO_ACTION", bracket_status=BracketStatus.COMPLETED_FLATTEN)
+
+        if bracket.fixed_single_target:
+            raise ValueError("OR15 uses a fixed opening-range safety exit; only close-trade is available")
 
         if bracket.status not in (BracketStatus.ACTIVE, BracketStatus.TARGET_1_HIT):
             return BracketUpdateDirective(action="NO_ACTION", bracket_status=bracket.status)

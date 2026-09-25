@@ -1,10 +1,16 @@
 # AutonomousDayTrader 🚀📈
 
-> Intraday + swing paper-trading system for US equities. Market data comes from **AlpacaRelay**; since **2026-09-25** every trade is a **real order on Alpaca paper account PA3CSVDZMMPY** (started at $50,018.45, matched to the bot's balance). Four dynamically adapted intraday strategies plus a swing arm, with a **plain-language, light, mobile-first** dashboard anyone can read.
+> Intraday + swing paper-trading system for US equities. Market data comes from **AlpacaRelay**; since **2026-09-25** every trade is a **real order on Alpaca paper account PA3CSVDZMMPY** (started at $50,018.45, matched to the bot's balance). Four dynamically adapted intraday strategies, a fixed TSLA OR15 retest strategy, and a swing arm, with a **plain-language, light, mobile-first** dashboard anyone can read.
 >
 > **Execution (2026-09-25):** the bot still decides locally when an entry, stop, target or flatten triggers; at that moment `backend/app/core/broker.py` sends a real day order to Alpaca paper and the ledger books Alpaca's real quantity and average price (no simulated fee). `BROKER_MODE=alpaca_paper` + `ALPACA_API_KEY`/`ALPACA_SECRET_KEY` on Railway turn it on; unset (default `simulated`) keeps the old built-in fill simulator for tests, replays and local dev. Replays (`set_simulation_mode(True)`) always detach the real broker. See `PLAN_2026_09_25_alpaca_paper_broker.md`.
 
 ---
+
+## TSLA Morning Retest — enabled for Alpaca paper
+
+The fifth intraday strategy (`tsla_or15_retest`) buys one TSLA share after the fixed 15-minute opening-range breakout/retest and exact-minute QQQ VWAP check. It stages entry for T+2, keeps the ORL stop and full 2R target, and closes after 120 minutes or official close minus five minutes. This strategy uses native Alpaca OCO protection; generic intraday strategies retain their existing execution policy. It shares account limits and the existing ledger/dashboard.
+
+Paper routing is enabled immediately, with no shadow waiting period. Actual broker fills and cent increments can differ from the frozen offline raw-open model. Future statistical validation remains `NOT_EVALUATED`; commissioning precedes 2026-10-01. See [implementation plan](PLAN_2026_09_25_tsla_or15.md), [verification report](docs/tsla_or15/DRY_RUN_REPORT.md), and `GET /api/tsla-or15` for mode, feed, hashes and session evidence.
 
 ## 🏛️ System Architecture
 

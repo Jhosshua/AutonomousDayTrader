@@ -109,6 +109,10 @@ class Order:
     broker_booked_qty: int = 0
     broker_booked_notional: float = 0.0
     swing_entry_atr: Optional[float] = None
+    execution_policy: Optional[str] = None
+    broker_resting: bool = False
+    broker_fill_timestamp: Optional[datetime] = None
+    fixed_intent_client_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         self.remaining_qty = self.qty
@@ -192,6 +196,8 @@ class ExecutionEngine:
     def _book_broker_order(self, order: "Order", alpaca: Dict) -> Tuple[int, float]:
         """New shares filled on the attached Alpaca order since the last booking."""
         from backend.app.core.broker import filled_avg, filled_qty, is_terminal
+        if alpaca.get("filled_at"):
+            order.broker_fill_timestamp = datetime.fromisoformat(str(alpaca["filled_at"]).replace("Z", "+00:00"))
         total = filled_qty(alpaca)
         notional = total * filled_avg(alpaca)
         delta = total - order.broker_booked_qty
@@ -219,6 +225,11 @@ class ExecutionEngine:
         if order.broker_order_id is None and order.broker_client_id:
             found = broker.find_by_client_id(order.broker_client_id)
             if found is None:
+                if order.fixed_intent_client_id:
+                    # A refused/uncertain POST may never create a broker order.
+                    # Reuse that identity until the broker confirms a terminal
+                    # order; recovery must never have a hole in this namespace.
+                    order.broker_attempts = max(0, order.broker_attempts - 1)
                 order.broker_client_id = None
             else:
                 order.broker_order_id = str(found["id"])
@@ -251,7 +262,16 @@ class ExecutionEngine:
 
         # 4. Send a new order with a client id that is stable across restarts.
         order.broker_attempts += 1
-        order.broker_client_id = f"adt-{order.id}-{order.broker_attempts}"
+        if order.execution_policy == "tsla_or15_retest" and order.side == OrderSide.BUY:
+            order.broker_client_id = f"adt-or15-{order.created_at.date().isoformat()}-entry"
+        elif order.fixed_intent_client_id and order.broker_attempts == 1:
+            order.broker_client_id = order.fixed_intent_client_id
+        else:
+            order.broker_client_id = f"adt-{order.id}-{order.broker_attempts}"
+        if order.execution_policy == "tsla_or15_retest":
+            before_submit = getattr(self, "before_fixed_broker_submit", None)
+            if before_submit is None or not before_submit(order):
+                raise BrokerReject("OR15 order intent could not be persisted", hard=True)
         limit = order.limit_price if order.order_type == OrderType.LIMIT else None
         alpaca = broker.submit_and_settle(order.symbol, order.side.value, qty, order.broker_client_id, limit)
         order.broker_order_id = str(alpaca.get("id"))
@@ -281,6 +301,42 @@ class ExecutionEngine:
         if self.broker is None:
             return fills
         for order in list(self.orders.values()):
+            if order.fixed_intent_client_id and order.side == OrderSide.SELL:
+                if order.status.value == "FILLED":
+                    continue
+                # The exit order and its deterministic retry namespace were
+                # committed before entry. Discover unsaved emergency attempts
+                # in order, stopping at the first id Alpaca has never seen.
+                # One whole share means the first fill completes this exit.
+                attempt = max(1, order.broker_attempts)
+                for _ in range(100):
+                    cid = order.fixed_intent_client_id if attempt == 1 else f"adt-{order.id}-{attempt}"
+                    try:
+                        found = self.broker.find_by_client_id(cid)
+                        if found is None:
+                            order.broker_attempts = attempt - 1
+                            order.broker_client_id = None
+                            order.broker_order_id = None
+                            break
+                        order.broker_attempts = attempt
+                        order.broker_client_id = cid
+                        order.broker_order_id = found["id"]
+                        native = self.broker.cancel_and_settle(found)
+                        delta, price = self._book_broker_order(order, native)
+                        if delta:
+                            fills.append(self._apply_fill_to_ledger(order, delta, price, 0.0, 0.0,
+                                order.broker_fill_timestamp or datetime.now(timezone.utc)))
+                            break
+                        if not is_terminal(native):
+                            break
+                        attempt += 1
+                    except Exception as exc:
+                        log.warning("OR15 emergency attempt lookup unresolved: %s", exc)
+                        break
+                continue
+            if (order.fixed_intent_client_id and not order.broker_client_id and not order.broker_order_id
+                    and order.status.value != "FILLED"):
+                order.broker_client_id = order.fixed_intent_client_id
             if not order.broker_order_id and not order.broker_client_id:
                 continue
             try:
@@ -290,7 +346,9 @@ class ExecutionEngine:
                         order.broker_client_id = None
                         continue
                     order.broker_order_id = str(found["id"])
-                alpaca = self.broker.cancel_and_settle(self.broker.get_order(order.broker_order_id))
+                alpaca = self.broker.get_order(order.broker_order_id)
+                if not order.broker_resting:
+                    alpaca = self.broker.cancel_and_settle(alpaca)
             except Exception as exc:
                 log.warning("Could not settle Alpaca order for %s: %s", order.id, exc)
                 continue
@@ -301,10 +359,13 @@ class ExecutionEngine:
                     order.side.value, order.symbol, delta, price, order.id, order.status.value,
                 )
                 was = order.status
-                fills.append(self._apply_fill_to_ledger(order, delta, price, 0.0, 0.0, datetime.now(timezone.utc)))
+                fills.append(self._apply_fill_to_ledger(order, delta, price, 0.0, 0.0,
+                    order.broker_fill_timestamp or datetime.now(timezone.utc)))
                 if was in (OrderState.CANCELLED, OrderState.REJECTED) and order.status != OrderState.FILLED:
                     order.status = was  # still cancelled locally; only the ledger moved
-            if not is_terminal(alpaca):
+            if is_terminal(alpaca) and delta == 0 and order.broker_resting and order.id in self.working_orders:
+                self.cancel_order(order.id, reason="BROKER_PROTECTION_TERMINAL")
+            if not is_terminal(alpaca) and not order.broker_resting:
                 log.error("Alpaca order %s for %s still open after cancel", alpaca.get("id"), order.symbol)
         return fills
 
@@ -427,6 +488,8 @@ class ExecutionEngine:
         cancelled = []
         for order_id in list(self.working_orders.keys()):
             order = self.working_orders.get(order_id)
+            if order and order.execution_policy == "tsla_or15_retest":
+                continue  # native protection is canceled/settled by its controller
             if order and arm is not None and getattr(order, "arm", None) != arm:
                 continue
             cancelled.append(self.cancel_order(order_id, reason))
@@ -491,7 +554,7 @@ class ExecutionEngine:
         fills: List[Fill] = []
         matching_orders = [
             o for o in list(self.working_orders.values())
-            if o.symbol == symbol and not (
+            if o.symbol == symbol and o.execution_policy != "tsla_or15_retest" and not (
                 o.arm == TradingArm.SWING and o.side == OrderSide.BUY
                 and o.strategy_id == "swing_panic_dip"
             )
@@ -550,7 +613,7 @@ class ExecutionEngine:
         fills: List[Fill] = []
         matching_orders = [
             o for o in list(self.working_orders.values())
-            if o.symbol == symbol and not (
+            if o.symbol == symbol and o.execution_policy != "tsla_or15_retest" and not (
                 o.arm == TradingArm.SWING and o.side == OrderSide.BUY
                 and o.strategy_id == "swing_panic_dip"
             )
@@ -644,6 +707,8 @@ class ExecutionEngine:
             self._broker_retry_after.pop(order.id, None)
             slippage = (price - trigger_price) if order.side == OrderSide.BUY else (trigger_price - price)
             fee = 0.0
+            if order.execution_policy == "tsla_or15_retest":
+                timestamp = order.broker_fill_timestamp or datetime.now(timezone.utc)
         else:
             fee = self.calculate_fees(order.side, qty, price)
         return self._apply_fill_to_ledger(order, qty, price, fee, slippage, timestamp)
@@ -664,7 +729,7 @@ class ExecutionEngine:
             symbol=order.symbol,
             side=order.side,
             qty=qty,
-            price=round(price, 4),
+            price=price if order.execution_policy == "tsla_or15_retest" else round(price, 4),
             fee=fee,
             slippage=round(slippage, 4),
             realized_pnl=0.0,
@@ -678,7 +743,8 @@ class ExecutionEngine:
 
         # Update order weighted average fill price
         total_val = sum(f.qty * f.price for f in order.fills)
-        order.avg_fill_price = round(total_val / order.filled_qty, 4)
+        order.avg_fill_price = (total_val / order.filled_qty if order.execution_policy == "tsla_or15_retest"
+                                else round(total_val / order.filled_qty, 4))
 
         # Apply to account ledger
         realized_delta, _ = self.account.apply_fill(

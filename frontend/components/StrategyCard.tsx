@@ -1,6 +1,6 @@
 "use client";
 
-import { Sunrise, Waves, Zap, Undo2 } from "lucide-react";
+import { Sunrise, Waves, Zap, Undo2, CornerDownRight } from "lucide-react";
 import { StrategyState } from "@/types/trading";
 import {
   StrategyLedgerAgg,
@@ -19,6 +19,7 @@ const ICONS: Record<string, typeof Sunrise> = {
   vwap_pullback: Waves,
   news_momentum: Zap,
   mean_reversion: Undo2,
+  tsla_or15_retest: CornerDownRight,
 };
 
 interface StrategyCardProps {
@@ -101,6 +102,14 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
           </div>
         )}
         <p className="text-sm leading-relaxed text-[#3E3A57]">{theme.what}</p>
+        {strategy.or15 && (
+          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="or15-details">
+            <span className="font-semibold">1 share · {strategy.or15.mode === "offline_raw_open" ? "Offline replay" : "Paper account"}</span>
+            <div>Watches 9:45–11:30 AM ET</div>
+            {strategy.or15.phase === "HOLDING" && <div>{strategy.or15.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : strategy.or15.protection_confirmed ? "Safety exit and target held at the broker." : "Confirming protection with the broker."}</div>}
+            {showPro && strategy.or15.reason && <div className="break-words">Reason: {strategy.or15.reason}</div>}
+          </div>
+        )}
 
         <div className="mt-auto flex flex-col gap-1.5" data-testid="strategy-window">
           <div className="relative h-3 rounded-full" style={{ background: theme.track }}>

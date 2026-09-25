@@ -59,6 +59,19 @@ export interface StrategyState {
   sharpe?: number | null;
   subtitle?: string;
   description?: string;
+  or15?: {
+    phase: string;
+    reason: string | null;
+    quantity: number;
+    mode: string;
+    or_high: number | null;
+    or_low: number | null;
+    target_price: number | null;
+    exit_due: string | null;
+    protection_confirmed: boolean;
+    version: string;
+    incomplete: boolean;
+  };
 }
 
 export interface ChartPoint {
@@ -89,6 +102,8 @@ export interface Position {
   realized_pnl?: number;
   entry_atr?: number | null;
   entry_date?: string | null;
+  fixed_protection?: boolean;
+  exit_due?: string | null;
 }
 
 export interface AuditRecord {
