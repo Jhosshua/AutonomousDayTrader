@@ -1,5 +1,9 @@
 # Project: AutonomousDayTrader
 
+## Research recording (2026-09-25)
+
+Plan: `PLAN_2026_09_25_backtest_tracking.md`. `backend/app/core/research.py` (recorder: own SQLite, bounded queue, size/free-space caps, excursion math) and `backend/app/core/research_tracker.py` (builds signal and trade rows from hooks). Hooks in `main.py` (signal decisions, bracket open/activation/completion, bar folding before fills, stop-change causes, `engine.fill_listeners`), `SignalEvent.features` (init=False so a new checkpoint still restores on the previous release) and `Strategy.tuning_params()`. Research open-trade state rides in the checkpoint as one opaque JSON string. Verification: full suite 961 passed, E2E 321 passed, Monday/multi-day/OR15 dry runs PASS, five real SIP sessions (09-21..09-25) replayed with 36/36 trades matched to the ledger, 334 signal rows, 0 audit problems.
+
 ## TSLA OR15 addition (2026-09-25)
 
 Plan: `PLAN_2026_09_25_tsla_or15.md`. Implementation uses the existing intraday strategy registry, account risk, order engine, fixed bracket extension, durable SQLite ledger and five-card dashboard. The new strategy routes to Alpaca paper immediately and uses native OCO protection. It ignores adaptive signal/stop/trailing/news overrides while retaining account controls. Replays are isolated and labeled `offline_raw_open`; no historical or forward statistical validation is asserted. Full evidence: `docs/tsla_or15/DRY_RUN_REPORT.md` and independent review reports beside it.

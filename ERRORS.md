@@ -1,5 +1,13 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-09-25: Research "coverage complete" flag took three rounds to be honest
+
+**What did not work:** First version folded bars only for ACTIVE brackets and demanded a bar at the exit minute, so every 15:55 auto-flatten, quote-hit stop and OR15 broker exit read "incomplete" while bar-triggered exits read "complete" (a filter on the flag would have biased stop/hours analysis). Second version fixed that but ignored whole missing days for swing and let bars after a late-booked exit count toward MFE. The market-trend snapshot was also read at wall-clock time while admission reads it at the signal's bar time.
+
+**What worked instead:** Count only whole minutes strictly between the entry minute and the exit minute (exit-minute bar kept aside as `exit_bar_high/low`), flag any bar at or after the exit minute, check every trading day of a swing hold reaches both session ends, and snapshot the filter with `asof=signal.timestamp` plus the same read-only `is_signal_permitted` verdict.
+
+**Note for next time:** Replay real sessions and audit the recorded rows against the ledger (trade ids, P&L, exit move inside [-MAE, MFE], coverage) before trusting any research flag; two independent attackers plus a second round on the fixes each found real issues the tests did not.
+
 ## 2026-09-25: Fixed TSLA strategy execution and recovery findings
 
 The plan and diff reviews found generic paths that could distort the frozen strategy: signal-bar matching, stop rounding/trailing, news exits, automatic cancellation of native OCO, deferred checkpoint success during an inflight input, staged signals omitted from Close All, and stale time captured before storage I/O. Added dedicated fixed-rule matching, precise prices, explicit ownership, passive native protection, durable intent before POST, staged cancellation, and a fresh submission clock.

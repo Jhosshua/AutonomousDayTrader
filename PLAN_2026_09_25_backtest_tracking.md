@@ -1,6 +1,6 @@
 # Plan 2026-09-25: record what we need to backtest and tune the knobs
 
-Status: DRAFT, not built. Written 2026-09-25 after market close.
+Status: BUILT 2026-09-25 (M1-M4 in commits 0e6fe3e, c7eaa3c, d1d0ca6). See MEMORY.md for attacks, verification and accepted limits. Offline scorer and strategy-internal candidate sampling remain future work.
 
 ## Goal
 

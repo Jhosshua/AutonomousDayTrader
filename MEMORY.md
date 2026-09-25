@@ -2,6 +2,14 @@
 
 ## Decisions
 
+### 2026-09-25: research recording BUILT (commits 0e6fe3e, c7eaa3c, d1d0ca6)
+- **What:** signal table + rich trade rows + swing round trips into `research.sqlite3` beside the trading DB; `/api/research/{trades|signals}`; `/health.research`. Observation only: own SQLite file, bounded background queue, every hook in `research_safe`, failures counted not raised.
+- **Why:** the ledger row kept only entry/exit/P&L; knob decisions need stop/R, MFE/MAE, blocked signals and the settings/market state at decision time.
+- **Attacks:** round 1 (safety agent: no P0, rollback crash P1; data agent: 2 P0 trend-label timing + coverage bias, 4 P1) and round 2 on the fixes (no P0, 2 P1 coverage overclaims) all fixed with tests and mutation checks.
+- **Rejected:** research rows inside the checkpoint transaction (a failed save locks out entries); decoding research state during trading restore (now one opaque JSON string); a generic `persistence` decode change to tolerate the 0e6fe3e `features` constructor field (0e6fe3e was never pushed or run in production, so no such checkpoint exists).
+- **Known limits (accepted):** strategy-internal rejections (ORB volume/CLV, MR z/RSI) not recorded; OR15 controller skips and unfilled OR15 entries have no signal/final row; late broker entry shares after completion are not reflected; in broker mode a T1+stop fill inside one settle poll can label the stop "initial_stop"; swing context is captured at the 09:30 fill, not the 16:00 scan; research DB capped at 1 GB and stops when the volume has < 500 MB free.
+- **Verification:** 961 tests, E2E 321, Monday/multi-day/OR15 dry runs PASS, real SIP replays 09-21..09-25: 36/36 trades matched, 334 signals, 0 problems, 0 dropped.
+
 ### 2026-09-25: plan to record backtest data (not built)
 - Plan: `PLAN_2026_09_25_backtest_tracking.md`. Goal: after enough real paper trades, tune knobs from saved data. Today trade rows drop stop/R/targets, no MFE/MAE, blocked signals kept only last 300, no knob/market snapshot, swing trades never reach `completed_trades`.
 - Codex attacked it: revise before building (2 P0, 13 P1). P0s verified: research writes must stay OUT of the checkpoint transaction (a failed save locks out entries, `main.py:648`), and enrichment must not be able to break `_record_completed_bracket`/OR15 closing. Also: never pass `bar` into `execute_strategy_signal` (triggers extra `process_bar`).

@@ -192,6 +192,25 @@ session summaries, and completed-trade execution legs. The September 21 recovery
 stored as `LEGACY_SUMMARY_IMPORT`: its verified $49,978.66 closing equity, five-trade
 count, and -$21.34 session result are preserved without inventing lost fills.
 
+### Research data for backtesting (2026-09-25)
+
+Observation only. Every emitted intraday signal (with its outcome, the strategy's
+decision numbers, admission stages, settings and a market snapshot at the signal's
+bar time) and every closed trade (intraday, TSLA OR15 and swing round trips, with
+stop ladder, quantity ladder, R, MFE/MAE plus a coverage verdict, per-fill timing
+source, slippage, exit intent and the unchanged ledger row) are written to
+`research.sqlite3` next to `STATE_DB_PATH` (`/data/research.sqlite3` on Railway).
+Writes go through a bounded background queue, never through the trading checkpoint.
+
+- `GET /api/research/trades?since=YYYY-MM-DD&limit=200&after=<next_after>`
+- `GET /api/research/signals?since=YYYY-MM-DD` (rows with `kind: SIGNAL_FINAL` mark SUBMITTED entries that never filled)
+- `/health` → `research`: disk path, written, dropped, errors.
+- Settings: `RESEARCH_ENABLED` (default true), `RESEARCH_DB_PATH` (optional), `RESEARCH_RUN_ID` (replay namespace).
+
+Limits: only signals a strategy emits are recorded (ORB/Mean Reversion internal
+filter rejections are not); MFE/MAE is censored at the real exit; Alpaca fees are
+booked as 0 (`fees_known: false`). Plan and reviews: `PLAN_2026_09_25_backtest_tracking.md`.
+
 ### Running Test Suites
 ```bash
 # Run the complete opaque-box E2E test suite with port audit
