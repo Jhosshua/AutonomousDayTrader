@@ -1,0 +1,135 @@
+{
+  "checked_at": "2026-09-25T20:47:57.765934+00:00",
+  "implementation_commit": "8a3013086b87b03cf81101f77adf57a383734c4c",
+  "deployment_id": "11c03878-5edc-4aa3-979b-4051ea341b58",
+  "status": "SUCCESS",
+  "health": {
+    "status": "healthy",
+    "broker": {
+      "mode": "alpaca_paper",
+      "account_number": "PA3CSVDZMMPY",
+      "alpaca_equity": 49702.1,
+      "alpaca_cash": 49702.1,
+      "alpaca_positions": {},
+      "equity_drift": 0.0,
+      "mismatch": false,
+      "mismatch_detail": null,
+      "last_check_at": "2026-09-25T20:47:30.529786+00:00",
+      "last_order_at": null,
+      "orders_sent": 0,
+      "fills_booked": 0,
+      "last_error": null
+    },
+    "persistence": {
+      "status": "durable",
+      "required": true,
+      "schema_version": 2,
+      "checkpoint_revision": 42297,
+      "ledger_revision": 26,
+      "last_checkpoint_at": "2026-09-25T20:47:24.968515+00:00",
+      "restored_at": "2026-09-25T20:47:24.356522+00:00",
+      "error": null
+    },
+    "relay": {
+      "stock": "connected",
+      "news": "connected",
+      "vix": "connected"
+    },
+    "account": {
+      "equity": 49702.1,
+      "cash": 49702.1,
+      "buying_power": 198808.4,
+      "status": "EOD_FLAT",
+      "open_positions": 0
+    }
+  },
+  "or15": {
+    "id": "tsla_or15_retest",
+    "name": "TSLA 15-minute Opening Range Retest",
+    "status": "ACTIVE",
+    "daily_pnl": 0.0,
+    "win_rate": 0.0,
+    "trades_count": 0,
+    "sharpe": 0.0,
+    "or15": {
+      "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+      "source_version": "TSLA_OR15_RETEST_2R_PAPER_V1",
+      "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+      "phase": "SKIPPED",
+      "reason": "MISSING_REQUIRED_BAR",
+      "quantity": 1,
+      "mode": "alpaca_paper",
+      "or_high": null,
+      "or_low": null,
+      "or_mid": null,
+      "signal_consumed": false,
+      "qqq_close": null,
+      "qqq_vwap": null,
+      "entry_due": null,
+      "exit_due": null,
+      "target_price": null,
+      "protection_confirmed": false,
+      "validation": "NOT_EVALUATED",
+      "incomplete": false
+    },
+    "session": {
+      "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+      "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+      "session_date": "2026-09-25",
+      "phase": "SKIPPED",
+      "reason": "MISSING_REQUIRED_BAR",
+      "signal_consumed": false,
+      "incomplete": false,
+      "execution_mode": "alpaca_paper",
+      "validation": "NOT_EVALUATED",
+      "events": [
+        {
+          "kind": "SESSION",
+          "at": "2026-09-25T09:30:00-04:00",
+          "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1",
+          "source_sha256": "1ed5091248fcaf1b66004eda2a8c21ed5114c23dbe9a590370c7a30e596ee5cd",
+          "evaluation": "COMMISSIONING",
+          "validation": "NOT_EVALUATED"
+        },
+        {
+          "kind": "SKIP",
+          "at": "2026-09-25T16:47:24.828560-04:00",
+          "reason": "MISSING_REQUIRED_BAR"
+        }
+      ]
+    },
+    "implementation_sha256": "b926f187e2313b51e2ddff4dd38105cae096bb96b709aa9ec6425a25dddd6aa1",
+    "sip_verified": true,
+    "broker_mode": "alpaca_paper",
+    "enabled": true,
+    "shadow": false,
+    "formal_observation_start": "2026-10-01",
+    "validation": "NOT_EVALUATED"
+  },
+  "strategy_ids": [
+    "orb",
+    "vwap_pullback",
+    "news_momentum",
+    "mean_reversion",
+    "tsla_or15_retest"
+  ],
+  "positions": {},
+  "trades_summary": {
+    "opening_equity": 50018.45,
+    "current_equity": 49702.1,
+    "realized_pnl": -316.35,
+    "fees": 0.0,
+    "fees_known": true,
+    "trades_count": 13,
+    "wins": 4,
+    "losses": 9,
+    "win_rate": 0.3077
+  },
+  "http_statuses": {
+    "/health": 200,
+    "/api/tsla-or15": 200,
+    "/api/strategies": 200,
+    "/api/positions": 200,
+    "/api/trades?range=today&limit=100": 200
+  }
+}
