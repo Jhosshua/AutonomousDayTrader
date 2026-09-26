@@ -1,16 +1,23 @@
 # AutonomousDayTrader 🚀📈
 
-> Intraday + swing paper-trading system for US equities. Market data comes from **AlpacaRelay**; since **2026-09-25** every trade is a **real order on Alpaca paper account PA3CSVDZMMPY** (started at $50,018.45, matched to the bot's balance). Four dynamically adapted intraday strategies, a fixed TSLA OR15 retest strategy, and a swing arm, with a **plain-language, light, mobile-first** dashboard anyone can read.
+> Intraday + swing paper-trading system for US equities. Market data comes from **AlpacaRelay**; since **2026-09-25** every trade is a **real order on Alpaca paper account PA3CSVDZMMPY** (started at $50,018.45, matched to the bot's balance). Four dynamically adapted intraday strategies, the fixed Tesla + Coeur Morning Plan (two arms), and a swing arm, with a **plain-language, light, mobile-first** dashboard anyone can read.
 >
 > **Execution (2026-09-25):** the bot still decides locally when an entry, stop, target or flatten triggers; at that moment `backend/app/core/broker.py` sends a real day order to Alpaca paper and the ledger books Alpaca's real quantity and average price (no simulated fee). `BROKER_MODE=alpaca_paper` + `ALPACA_API_KEY`/`ALPACA_SECRET_KEY` on Railway turn it on; unset (default `simulated`) keeps the old built-in fill simulator for tests, replays and local dev. Replays (`set_simulation_mode(True)`) always detach the real broker. See `PLAN_2026_09_25_alpaca_paper_broker.md`.
 
 ---
 
-## TSLA Morning Retest — enabled for Alpaca paper
+## Tesla + Coeur Morning Plan — live on Alpaca paper (since 2026-09-26)
 
-The fifth intraday strategy (`tsla_or15_retest`) buys one TSLA share after the fixed 15-minute opening-range breakout/retest and exact-minute QQQ VWAP check. It stages entry for T+2, keeps the ORL stop and full 2R target, and closes after 120 minutes or official close minus five minutes. This strategy uses native Alpaca OCO protection; generic intraday strategies retain their existing execution policy. It shares account limits and the existing ledger/dashboard.
+Two fixed-rule arms from `/Users/mo/multi_stock_edge_lab_3yr/EXECUTION_PLAN.md` (frozen copy `docs/tri_engine/SOURCE_EXECUTION_PLAN.md`, hash checked at startup):
 
-Paper routing is enabled immediately, with no shadow waiting period. Actual broker fills and cent increments can differ from the frozen offline raw-open model. Future statistical validation remains `NOT_EVALUATED`; commissioning precedes 2026-10-01. See [implementation plan](PLAN_2026_09_25_tsla_or15.md), [verification report](docs/tsla_or15/DRY_RUN_REPORT.md), and `GET /api/tsla-or15` for mode, feed, hashes and session evidence.
+- **Tesla Morning Plan** (`tsla_asymmetric_dual`): 15-minute opening range 09:30-09:44. Long after a breakout and a later green retest bar that holds the midpoint (QQQ at/above its VWAP), signals through 11:30. Short when a bar closes under the range low with QQQ under VWAP, before 11:00. Market order at T+2. Half the shares target 1.5R and close after 180 min, half target 2R and close after 240 min. Stop: range low (long) or midpoint (short). Each half has its own native Alpaca OCO.
+- **Coeur Morning Plan** (`cde_asymmetric_dual`): same rules on CDE, longs until noon, shorts before 11:30, full size at 2R / 180 min.
+- Risk 0.75% of session-start equity per symbol, sized by stop distance (only buying power limits size). Account daily loss stop = min($1,500, 2.5% of session-start equity). Everything flat at 15:55 (12:55 on half days).
+- Code: `backend/app/strategies/tri_engine.py` (signals), `backend/app/core/tri_execution.py` (orders, tranches, recovery). State: `GET /api/tri-engine`.
+- Evidence and decisions: `docs/tri_engine/EVIDENCE.md`. **The plan's win-rate table came from a pre-market opening range; the live 09:30 version backtests weaker (TSLA 2R and CDE not significant).**
+- Tools: `scripts/tri_research_parity.py`, `scripts/tri_real_day_replay.py`, `scripts/tri_variant_backtest.py`, `scripts/run_tri_engine_dry_run.py [--serve]`.
+
+The old TSLA OR15 one-share arm (`tsla_or15_retest`) takes no new entries (`OR15_NEW_ENTRIES = False` in `main.py`); its code stays for restoring old checkpoints.
 
 ## 🏛️ System Architecture
 

@@ -2,7 +2,7 @@
 
 import { Position } from "@/types/trading";
 import { useActionButton } from "@/hooks/useActionButton";
-import { companyName, formatMoney, formatSignedMoney, etTimeLabel } from "@/lib/plain";
+import { companyName, formatMoney, formatSignedMoney, etTimeLabel, trancheName } from "@/lib/plain";
 
 interface HoldingNowProps {
   positions: Position[];
@@ -54,7 +54,7 @@ function HoldingRow({
           <div className="text-base sm:text-lg font-semibold text-ink">
             {companyName(position.symbol)} <span className="text-xs font-medium text-muted">{position.symbol}</span>
           </div>
-          <div className="text-sm text-muted">{isLong ? "bet it goes up" : "bet it goes down"} &middot; bought at {formatMoney(entry)}</div>
+          <div className="text-sm text-muted">{isLong ? "bet it goes up" : "bet it goes down"} &middot; {position.shares} shares &middot; entered at {formatMoney(entry)}</div>
         </div>
         <div
           className="rounded-full px-3 py-1.5 text-sm font-bold tabular-nums"
@@ -66,7 +66,18 @@ function HoldingRow({
       <div className="text-sm text-muted">
         Safety exit: {stop != null ? formatMoney(stop) : "No safety exit set"}
       </div>
-      {position.fixed_protection && (
+      {position.tranches && (
+        <div className="grid gap-2 sm:grid-cols-2" data-testid="fixed-tranches">
+          {position.tranches.map((t, i, all) => (
+            <div key={t.id} className="rounded-xl bg-[#EDF4F7] px-3 py-2 text-sm text-[#2F5368]">
+              <div className="font-semibold">{trancheName(i, all.length)} · {t.qty - t.closed_qty} shares open</div>
+              <div>Sells at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
+              <div>{t.closed_qty === t.qty ? "Finished" : t.protection_confirmed && !t.protection_terminal ? "Protection held at the broker" : "Checking protection and exit orders"}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {position.fixed_protection && !position.tranches && (
         <div className="text-sm text-muted">
           Fixed Tesla plan · Target: {position.take_profit_1 != null ? formatMoney(position.take_profit_1) : "Setting up"}
           {position.exit_due && <> · Close by {etTimeLabel(position.exit_due)} ET</>}
@@ -87,7 +98,7 @@ function HoldingRow({
           type="button"
           onClick={breakEvenButton.trigger}
           disabled={!breakEvenEnabled || breakEvenButton.phase === "sending"}
-          title={position.fixed_protection ? "This Tesla plan keeps its safety exit fixed" : "Before fees"}
+          title={position.fixed_protection ? "This plan keeps its safety exit fixed" : "Before fees"}
           data-testid={`btn-break-even-${position.symbol}`}
           className="min-h-[44px] flex-1 min-w-[180px] rounded-xl border px-4 text-sm font-semibold disabled:opacity-40"
           style={{ borderColor: "#D5E2D6", color: "#2F5A45", background: "#EDF3EE" }}

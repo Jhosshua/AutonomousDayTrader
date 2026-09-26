@@ -82,8 +82,9 @@ def test_no_feed_and_entry_deadline_fail_closed():
 
 
 @pytest.fixture
-def runtime():
+def runtime(monkeypatch):
     from backend.app import main as r
+    monkeypatch.setattr(r, "OR15_NEW_ENTRIES", True)  # retired protocol, still tested
     r.reset_runtime_state()
     r.set_simulation_mode(True)
     for s in r.strategies:

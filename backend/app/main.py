@@ -50,6 +50,8 @@ from backend.app.strategies.tsla_or15_retest import (
     implementation_sha256, session_bounds as or15_session_bounds,
 )
 from backend.app.core.or15_execution import OR15ExecutionController
+from backend.app.strategies.tri_engine import AsymmetricDualStrategy, TRI_IDS, FIXED_IDS, SOURCE_PATH as TRI_SOURCE_PATH, SOURCE_SHA256 as TRI_SOURCE_HASH
+from backend.app.core.tri_execution import TriExecutionController
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
 from backend.app.core.decisions import decision_log, classify_adaptation_reason
@@ -88,6 +90,7 @@ vwap_strategy = VWAPPullbackStrategy()
 news_strategy = NewsMomentumStrategy()
 mean_reversion_strategy = MeanReversionStrategy()
 tsla_or15_strategy = TSLAOR15RetestStrategy()
+tri_strategies = [AsymmetricDualStrategy("TSLA"), AsymmetricDualStrategy("CDE")]
 adaptation_engine = DynamicAdaptationEngine(
     max_concurrent_positions=settings.MAX_CONCURRENT_POSITIONS,
     base_risk_pct=settings.PER_POSITION_RISK_PCT,
@@ -100,10 +103,15 @@ strategies: List[Strategy] = [
     news_strategy,
     mean_reversion_strategy,
     tsla_or15_strategy,
+    *tri_strategies,
 ]
 strategy_map: Dict[str, Strategy] = {s.strategy_id: s for s in strategies}
 or15_controller = OR15ExecutionController(sys.modules[__name__])
+tri_controller = TriExecutionController(sys.modules[__name__], tri_strategies)
 or15_sip_verified = False
+# OR15 was replaced by the TSLA/CDE asymmetric plan on 2026-09-25. It only
+# finishes a trade restored from a checkpoint; tests may re-enable it.
+OR15_NEW_ENTRIES = False
 or15_implementation_hash = implementation_sha256()
 
 
@@ -374,6 +382,11 @@ def _broker_health() -> Dict[str, Any]:
     }
 
 
+def daily_loss_limit(start_equity: float) -> float:
+    """Tri-engine plan: stop the day at 2.5% of session-start equity, never looser than the $1,500 limit."""
+    return min(settings.MAX_DAILY_LOSS_LIMIT, start_equity * .025)
+
+
 def _broker_gate(order: Any, is_exit: bool) -> Optional[Tuple[str, bool, float]]:
     """Last check before a real order goes to Alpaca. Returns None to allow, else
     (reason, hard, retry_sec). Hard refusals cancel an entry; exits always retry."""
@@ -408,6 +421,8 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     )
 
     is_exit = False
+    if existing_strat in TRI_IDS and order_strat != existing_strat:
+        return False, "Fixed position is managed by its owning tranche controller"
     if existing_strat == OR15_ID and order_strat != OR15_ID:
         return False, "OR15 position is managed by its fixed exit controller"
     if getattr(order, "strategy_id", None) in (
@@ -445,6 +460,14 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     # Symbol reservation / mutual exclusion check:
     if not is_exit:
         target_engine = globals().get("engine")
+        if tri_controller.reserves(sym) and order_strat != tri_controller.by_symbol[sym].strategy_id:
+            return False, "SYMBOL_RESERVED_FOR_TRI_ENGINE"
+        if order_strat in TRI_IDS and (sym not in tri_controller.by_symbol or order_strat != tri_controller.by_symbol[sym].strategy_id):
+            return False, "Fixed strategy symbol identity mismatch"
+        if target_engine is not None:
+            allowed, detail = tri_controller.validate_entry(order)
+            if not allowed:
+                return False, detail
         if or15_controller.reserves(sym) and order_strat != OR15_ID:
             return False, "SYMBOL_RESERVED_FOR_OR15: first signal owns TSLA until resolved"
         if order_strat == OR15_ID and (sym != "TSLA" or order.side != OrderSide.BUY or order.qty != 1):
@@ -792,6 +815,9 @@ def _restore_checkpoint() -> bool:
 
     last_session_date = restored["last_session_date"]
     last_vix_print = restored["last_vix_print"]
+    # Not in the checkpoint: rebuild from today's opening equity so a mid-day
+    # restart keeps the tighter tri-engine limit instead of the $1,500 default.
+    risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.daily_starting_equity)
     decision_log.load_state(restored.get("decisions"))
     research_safe(research_tracker.load_state, restored.get("research"), recorder=research_recorder)
     swing_scan = restored.get("swing_scan") or {}
@@ -869,6 +895,8 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
         "fixed_protection": bool(bracket and bracket.fixed_single_target),
         "exit_due": tsla_or15_strategy.exit_due.isoformat() if bracket and bracket.strategy_id == OR15_ID and tsla_or15_strategy.exit_due else None,
     }
+    if tri_controller.owns(symbol):
+        pos_data.update(tri_controller.position_details(symbol))
     if include_chart:
         history = market_history.get(symbol, [])
         pos_data["chart_points"] = list(history)[-120:]
@@ -1029,6 +1057,7 @@ def _session_summary(session_day: Any, source: str = "SYSTEM") -> Dict[str, Any]
             }
             for strategy in strategies
         },
+        "tri_engine": [s.session_record() for s in tri_strategies],
         "tsla_or15": tsla_or15_strategy.session_record(),
         "tsla_or15_implementation_sha256": or15_implementation_hash,
         "source": source,
@@ -1079,6 +1108,10 @@ def _reconcile_fills(fills: List[Any]) -> None:
     for fill in fills:
         order = engine.orders.get(fill.order_id)
         if not order:
+            continue
+
+        if order.strategy_id in TRI_IDS:
+            tri_controller.on_fill(order, fill)
             continue
 
         if order.arm == TradingArm.SWING and order.strategy_id == "swing_panic_dip":
@@ -1178,6 +1211,7 @@ def _flatten_symbol(sym: str, price: float, timestamp: datetime) -> List[Any]:
 def _trip_circuit_breaker(timestamp: datetime) -> None:
     """Halt trading and liquidate all open intraday positions after a daily-loss breach. Swing positions are strictly exempt."""
     account.status = account.status.__class__.CIRCUIT_HALTED
+    tri_controller.request_all_exits("CIRCUIT_BREAKER", timestamp)
     if tsla_or15_strategy.phase == "WAITING_ENTRY":
         tsla_or15_strategy.skip("CIRCUIT_BREAKER", timestamp)
     elif tsla_or15_strategy.phase == "ENTERING":
@@ -1185,6 +1219,8 @@ def _trip_circuit_breaker(timestamp: datetime) -> None:
     engine.cancel_all_orders("CIRCUIT_BREAKER_HALT", arm=TradingArm.INTRADAY)
     _release_dead_entry_brackets()
     for sym, pos in list(account.positions.items()):
+        if tri_controller.owns(sym):
+            continue
         if or15_controller.owns(sym):
             or15_controller.request_exit("CIRCUIT_BREAKER", timestamp)
             continue
@@ -1217,6 +1253,9 @@ def _check_session_boundary(now_dt: datetime) -> None:
         return
     if session_date < last_session_date:
         log.warning("Ignoring out-of-order historical event from %s (current session: %s)", session_date, last_session_date)
+        return
+    if any(s.phase in ("ENTERING", "HOLDING", "EXITING") for s in tri_strategies):
+        tri_controller.request_all_exits("SESSION_RECOVERY", now_dt)
         return
     if or15_controller.reserves("TSLA") and tsla_or15_strategy.phase in ("ENTERING", "HOLDING", "EXITING"):
         tsla_or15_strategy.incomplete = True
@@ -1297,6 +1336,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
     market_filter.reset_session(session_date)
     daily_bar_aggregator.reset_for_new_session()
     risk_engine.reset_daily_metrics(account.equity)
+    risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.equity)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
     # Bracket/linkage state: clear INTRADAY brackets so no stale PENDING_ENTRY
@@ -1377,6 +1417,8 @@ _UI_BROADCAST_THROTTLE_SEC: float = 0.25  # 4 Hz maximum rate
 
 def _sanitize_for_json(val: Any) -> Any:
     """Recursively replace non-finite numbers (NaN, Infinity, -Infinity) with 0.0."""
+    if isinstance(val, (datetime, date)):
+        return val.isoformat()
     if isinstance(val, float):
         if math.isnan(val) or math.isinf(val):
             return 0.0
@@ -1526,6 +1568,8 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     vix_stale = bool(last_vix_print is not None and (getattr(last_vix_print, "is_stale", False) or getattr(last_vix_print, "is_fallback", False)))
     cards = []
     for s in strategies:
+        if s.strategy_id == OR15_ID and not OR15_NEW_ENTRIES and not or15_controller.reserves("TSLA"):
+            continue  # Retired protocol remains in checkpoint/history only.
         card = s.to_dict()
         card["window"] = strategy_window(
             s.strategy_id,
@@ -1540,13 +1584,13 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
             vix_stale=vix_stale,
         )
         card["decisions"] = decision_log.summary(s.strategy_id)
-        if s.strategy_id == OR15_ID:
+        if s.strategy_id in FIXED_IDS:
             blockers = []
             if risk_engine.status != BreakerStatus.ARMED:
                 blockers.append("Daily loss limit hit.")
             if state_store is not None and not persistence_healthy:
                 blockers.append("Saving is unavailable.")
-            if committed_count >= settings.MAX_CONCURRENT_POSITIONS and not or15_controller.owns("TSLA"):
+            if committed_count >= settings.MAX_CONCURRENT_POSITIONS and not (or15_controller.owns("TSLA") if s.strategy_id == OR15_ID else tri_controller.owns(s.symbol)):
                 blockers.append("All quick-trade places are in use.")
             if not simulation_mode and (engine.broker is None or broker_state["mismatch"]):
                 blockers.append("Paper account is not ready.")
@@ -1610,7 +1654,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     # 1. Contradiction or Exit Signal
     if "CONTRADICTION" in signal.reason or "EXIT" in signal.reason:
         if existing_pos:
-            if or15_controller.owns(sym):
+            if or15_controller.owns(sym) or tri_controller.owns(sym):
                 return
             if getattr(existing_pos, "arm", None) == TradingArm.SWING or getattr(existing_pos, "strategy_id", "") == "swing_panic_dip":
                 log.info("Ignoring intraday News exit for Swing position %s", sym)
@@ -1799,7 +1843,13 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
         flattening_engine.clock.clear_simulated_time()
     _check_session_boundary(bar.timestamp)
     if not durable_replay:
-        or15_controller.on_bar(bar, now)
+        if OR15_NEW_ENTRIES or tsla_or15_strategy.phase in ("ENTERING", "HOLDING", "EXITING"):
+            or15_controller.on_bar(bar, now)
+        try:
+            tri_controller.on_bar(bar, now)
+        except Exception:
+            # Must not escape: a leaked in-flight event key freezes tri management.
+            log.exception("Tri-engine bar handling failed for %s", bar.symbol)
     latest_market_prices[bar.symbol.upper()] = bar.close
     _mark_feed_event("bar")
     if bar.symbol.upper() in ("SPY", "QQQ"):
@@ -1817,7 +1867,7 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     adaptation_engine.update_clock(bar.timestamp)
     for strat in strategies:
         try:
-            if strat.strategy_id == OR15_ID:
+            if strat.strategy_id in FIXED_IDS:
                 continue
             strat.on_time_tick(bar.timestamp)
         except Exception as e:
@@ -1862,7 +1912,7 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     if bar.symbol.upper() in settings.WATCHLIST_SYMBOLS:
         for strat in strategies:
             try:
-                if strat.strategy_id == OR15_ID:
+                if strat.strategy_id in FIXED_IDS:
                     continue
                 sigs = strat.on_bar(bar)
                 if sigs:
@@ -1932,6 +1982,7 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
 
     _checkpoint_runtime("BAR_EVENT", (event_key, "BAR") if event_key else None)
     or15_controller.tick(now if simulation_mode else or15_now())
+    tri_controller.tick(now if simulation_mode else or15_now())
     await broadcast_ui_state()
 
 
@@ -1979,6 +2030,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
     _mark_feed_event("quote")
     or15_controller.on_quote(quote)
+    tri_controller.on_quote(quote)
     for strat in strategies:
         try:
             strat.on_quote(quote)
@@ -2015,6 +2067,8 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         now = or15_now()
         if now >= tsla_or15_strategy.entry_due:
             or15_controller.tick(now)
+    if not simulation_mode:
+        tri_controller.tick(or15_now())
     await broadcast_ui_state(force=bool(fills))
 
 
@@ -2119,11 +2173,14 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
 
     if directive.liquidate_all_positions:
         now_dt = directive.timestamp
+        tri_controller.request_all_exits("FORCED_FLAT", now_dt)
         if tsla_or15_strategy.phase == "WAITING_ENTRY":
             tsla_or15_strategy.skip("FORCED_FLAT", now_dt)
         elif tsla_or15_strategy.phase == "ENTERING":
             or15_controller.request_exit("FORCED_FLAT", now_dt)
         for sym, pos in list(account.positions.items()):
+            if tri_controller.owns(sym):
+                continue
             if or15_controller.owns(sym):
                 or15_controller.request_exit("FORCED_FLAT", now_dt)
                 continue
@@ -2141,6 +2198,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
             _reconcile_fills(fills)
 
     if directive.run_audit:
+        tri_controller.request_all_exits("EMERGENCY_SWEEP", directive.timestamp)
         if tsla_or15_strategy.phase == "WAITING_ENTRY":
             tsla_or15_strategy.skip("EMERGENCY_SWEEP", directive.timestamp)
         elif tsla_or15_strategy.phase == "ENTERING":
@@ -2155,6 +2213,8 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         if audit_res.liquidate_all_positions and account.positions:
             now_dt = audit_res.timestamp
             for sym, pos in list(account.positions.items()):
+                if tri_controller.owns(sym):
+                    continue
                 if or15_controller.owns(sym):
                     or15_controller.request_exit("EMERGENCY_SWEEP", now_dt)
                     continue
@@ -2377,7 +2437,7 @@ async def _runtime_clock_loop() -> None:
             _expire_stale_staged_swing_orders(now_dt)
             for strat in strategies:
                 try:
-                    if strat.strategy_id == OR15_ID:
+                    if strat.strategy_id in FIXED_IDS:
                         continue
                     strat.on_time_tick(now_dt)
                 except Exception as e:
@@ -2386,6 +2446,7 @@ async def _runtime_clock_loop() -> None:
             if directive:
                 await handle_flattening_directive(directive)
             or15_controller.tick(now_dt)
+            tri_controller.tick(now_dt)
             # Cards must flip at window boundaries even when no bar arrives.
             if ui_clients and _time_mod.monotonic() - last_clock_broadcast >= 10.0:
                 last_clock_broadcast = _time_mod.monotonic()
@@ -2470,12 +2531,16 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     recent_news.clear()
     last_vix_print = None
     risk_engine.reset_daily_metrics(account.equity)
+    risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.equity)
     flattening_engine.reset_for_new_session()
     market_filter.reset_session()
     for strategy in strategies:
         strategy.reset_daily_stats()
     swing_strategy_engine.reset()
     tsla_or15_strategy.__init__()
+    tri_controller.shutdown()
+    for fixed_strategy in tri_strategies:
+        fixed_strategy.__init__(fixed_strategy.symbol)
     daily_bar_aggregator.reset_for_new_session()
     swing_reserved_symbols.clear()
     decision_log.reset_for_session(None)
@@ -2498,6 +2563,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup and graceful teardown lifecycle."""
     log.info(f"Starting AutonomousDayTrader backend on port {settings.API_PORT}...")
     source = Path(__file__).resolve().parents[2] / "docs/tsla_or15/SOURCE_EXECUTION_PLAN.md"
+    if hashlib.sha256(TRI_SOURCE_PATH.read_bytes()).hexdigest() != TRI_SOURCE_HASH:
+        raise PersistenceError("Tri-engine frozen source hash mismatch")
     if hashlib.sha256(source.read_bytes()).hexdigest() != OR15_SOURCE_HASH:
         raise PersistenceError("OR15 frozen source hash mismatch")
     if settings.ENV.lower() == "production" and (
@@ -2619,6 +2686,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception:
             pass
         ui_clients.discard(ws)
+    tri_controller.shutdown()
     # Producers are fully stopped before the final durable checkpoint. Nothing
     # can fill or mutate the account after this point.
     checkpoint_saved = False
@@ -2804,6 +2872,15 @@ async def get_positions() -> Dict[str, Any]:
 async def get_strategies() -> List[Dict[str, Any]]:
     """Strategies with live trading window, blockers and today's decision counts."""
     return _strategy_cards()
+
+
+@app.get("/api/tri-engine")
+async def get_tri_engine() -> Dict[str, Any]:
+    return _sanitize_for_json({"strategies": [s.to_dict() for s in tri_strategies],
+        "sessions": [s.session_record() for s in tri_strategies],
+        "paper_broker": engine.broker is not None, "sip_verified": or15_sip_verified,
+        "combined_open_risk": tri_controller.open_risk(),
+        "risk_cap": account.daily_starting_equity * .015})
 
 
 @app.get("/api/tsla-or15")
@@ -3036,7 +3113,7 @@ async def submit_order(req: OrderCreateRequest) -> Dict[str, Any]:
 async def cancel_order(order_id: str) -> Dict[str, Any]:
     """Cancel a working order."""
     try:
-        if engine.orders.get(order_id) and engine.orders[order_id].execution_policy == OR15_ID:
+        if engine.orders.get(order_id) and engine.orders[order_id].execution_policy in FIXED_IDS:
             raise ValueError("Use Close trade for OR15 so broker protection is reconciled first")
         cancelled = engine.cancel_order(order_id, reason="API_REQUEST")
         _release_dead_entry_brackets()
@@ -3067,9 +3144,14 @@ async def _execute_manual_flatten(
     skipped: List[Dict[str, str]] = []
     rejected: List[Dict[str, str]] = []
     fixed_requested = False
+    tri_requested = []
 
     for sym in target_symbols:
         pos = account.positions.get(sym)
+        if tri_controller.reserves(sym):
+            tri_controller.request_exit(sym, "MANUAL_FLATTEN", now_dt)
+            tri_requested.append(sym)
+            continue
         if or15_controller.reserves(sym):
             if tsla_or15_strategy.phase == "WAITING_ENTRY":
                 tsla_or15_strategy.skip("MANUAL_CANCEL", now_dt)
@@ -3129,6 +3211,13 @@ async def _execute_manual_flatten(
         "MANUAL_FLATTEN",
         (event_key, "MANUAL_FLATTEN") if event_key else None,
     )
+    if tri_requested:
+        tri_controller.tick(now_dt)
+        for sym in tri_requested:
+            if tri_controller.reserves(sym):
+                rejected.append({"symbol": sym, "reason": "Close requested; waiting for broker confirmation"})
+            else:
+                flattened.append(sym)
     if fixed_requested:
         if simulation_mode:
             or15_controller._run_exit(now_dt, account.positions.get("TSLA").market_price if "TSLA" in account.positions else None)
@@ -3163,6 +3252,7 @@ async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]
             | {o.symbol.upper() for o in engine.working_orders.values()}
             | {s.upper() for s in bracket_manager.symbol_to_bracket.keys()}
             | ({"TSLA"} if or15_controller.reserves("TSLA") else set())
+            | {s.symbol for s in tri_strategies if tri_controller.reserves(s.symbol)}
         )
     payload = {"target_symbols": target_symbols, "timestamp": now_dt}
     should_process, event_key = _begin_durable_event("MANUAL_FLATTEN", payload)
@@ -3203,6 +3293,9 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                         continue
                     pos = account.positions.get(sym)
                     mkt_price = pos.market_price if pos else None
+                    if tri_controller.owns(sym):
+                        await websocket.send_json({"type": "error", "message": "This plan keeps its safety exit fixed"})
+                        continue
                     bracket_dir = bracket_manager.manual_tighten_stop(sym, new_stop, current_market_price=mkt_price)
                     if bracket_dir and getattr(bracket_dir, "orders_to_modify", None):
                         for mod in bracket_dir.orders_to_modify:

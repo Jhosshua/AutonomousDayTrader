@@ -230,10 +230,19 @@ def restore_runtime_state(
     saved_ids, deployed_ids = set(decoded["strategies"]), set(strategy_map)
     legacy_ids = {"orb", "vwap_pullback", "news_momentum", "mean_reversion"}
     known_addition = saved_ids == legacy_ids and deployed_ids == legacy_ids | {"tsla_or15_retest"}
+    tri_ids = {"tsla_asymmetric_dual", "cde_asymmetric_dual"}
+    known_addition = known_addition or (
+        saved_ids in (legacy_ids, legacy_ids | {"tsla_or15_retest"})
+        and deployed_ids == legacy_ids | {"tsla_or15_retest"} | tri_ids
+    )
     if saved_ids != deployed_ids and not known_addition:
         raise PersistenceError("Persisted strategy set does not match this deployment")
     for strategy_id, strategy_state in decoded["strategies"].items():
         strategy = strategy_map[strategy_id]
+        if strategy_id in tri_ids:
+            from backend.app.strategies.tri_engine import VERSION as TRI_VERSION, SOURCE_SHA256 as TRI_HASH
+            if strategy_state.get("protocol_version") != TRI_VERSION or strategy_state.get("source_hash") != TRI_HASH:
+                raise PersistenceError("Tri-engine checkpoint protocol/source identity mismatch")
         if strategy_id == "tsla_or15_retest":
             from backend.app.strategies.tsla_or15_retest import VERSION, SOURCE_SHA256
             if strategy_state.get("protocol_version") != VERSION or strategy_state.get("source_hash") != SOURCE_SHA256:
@@ -336,6 +345,10 @@ def validate_runtime_state(
         raise PersistenceError("Closed account checkpoint contains open positions")
 
     for strategy in strategies or []:
+        if strategy.strategy_id in {"tsla_asymmetric_dual", "cde_asymmetric_dual"}:
+            from backend.app.core.tri_execution import validate_tri_state
+            validate_tri_state(strategy, account, engine)
+            continue
         if strategy.strategy_id != "tsla_or15_retest":
             continue
         s = strategy

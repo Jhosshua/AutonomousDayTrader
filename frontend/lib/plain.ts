@@ -21,6 +21,16 @@ export interface StrategyTheme {
 }
 
 export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
+  tsla_asymmetric_dual: {
+    name: "Tesla Morning Plan", band: "#DCE9EF", ink: "#2F5368", tint: "#EDF4F7",
+    bar: "#7299AF", track: "#DFEAF0",
+    what: "Trades a confirmed morning bounce or breakdown. Splits the position into two equal parts, each with a fixed target and closing time.",
+  },
+  cde_asymmetric_dual: {
+    name: "Coeur Morning Plan", band: "#EAE3CF", ink: "#65542E", tint: "#F5F1E5",
+    bar: "#AD985E", track: "#EBE4D2",
+    what: "Trades Coeur Mining after a morning bounce or breakdown, with QQQ confirmation. Uses one fixed target and a three-hour limit.",
+  },
   tsla_or15_retest: {
     name: "Tesla Morning Retest",
     band: "#DCE9EF",
@@ -88,6 +98,7 @@ const COMPANY_NAMES: Record<string, string> = {
   NVDA: "Nvidia",
   PLTR: "Palantir",
   TSLA: "Tesla",
+  CDE: "Coeur Mining",
   META: "Meta",
   AMD: "AMD",
   MSFT: "Microsoft",
@@ -393,4 +404,10 @@ export function shortDate(iso: string | null | undefined): string {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const mi = Number(m[2]) - 1;
   return mi >= 0 && mi < 12 ? `${months[mi]} ${Number(m[3])}` : iso;
+}
+
+/** Plain name for one fixed part of a Tesla/Coeur plan trade. */
+export function trancheName(index: number, count: number): string {
+  if (count <= 1) return "Whole position";
+  return index === 0 ? "First half" : "Second half";
 }

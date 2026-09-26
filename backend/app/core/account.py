@@ -151,7 +151,8 @@ class PaperTradingAccount:
             pos.update_market_price(price)
             self._recompute_account_state()
 
-    def can_afford(self, symbol: str, side: str, qty: int, est_price: float) -> Tuple[bool, str]:
+    def can_afford(self, symbol: str, side: str, qty: int, est_price: float,
+                   concentration_cap: bool = True) -> Tuple[bool, str]:
         """
         Validate whether account has sufficient Day Trading Buying Power (DTBP)
         and complies with FINRA Rule 4210 and per-position concentration limits.
@@ -165,6 +166,8 @@ class PaperTradingAccount:
         max_alloc = self.initial_balance * self.leverage * self.MAX_POSITION_ALLOCATION_PCT
         if self.max_position_notional is not None:
             max_alloc = min(max_alloc, self.max_position_notional)
+        if not concentration_cap:
+            max_alloc = float("inf")  # sized by stop risk; buying power still applies
         current_alloc = abs(existing_pos.market_value) if existing_pos else 0.0
 
         # Determine if order is position-reducing

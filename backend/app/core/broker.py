@@ -156,17 +156,34 @@ class AlpacaBroker:
         return self.status
 
     # ----------------------------------------------------------------- orders
+    def get_asset(self, symbol: str) -> Dict[str, Any]:
+        response = self._client.get(f"/v2/assets/{symbol.upper()}")
+        response.raise_for_status()
+        return response.json()
+
+    def request_cancel(self, alpaca_id: str) -> None:
+        """Request cancellation without blocking the event loop waiting for it.
+
+        The caller must GET and reconcile a terminal state before another exit.
+        """
+        response = self._client.delete(f"/v2/orders/{alpaca_id}")
+        if response.status_code not in (200, 204, 404, 422):
+            response.raise_for_status()
+
     def submit_oco(self, symbol: str, qty: int, client_order_id: str,
-                   stop: float, target: float) -> Dict[str, Any]:
+                   stop: float, target: float, side: str = "sell") -> Dict[str, Any]:
         """Rest a fixed sell stop and target at Alpaca. Caller persists id FIRST.
 
         An uncertain response only permits lookup of this id, never a second
         protection request. The caller owns passive polling and cancellation.
         """
-        body = {"symbol": symbol, "qty": str(qty), "side": "sell", "type": "limit",
+        if side.lower() not in ("buy", "sell"):
+            raise ValueError("OCO exit side must be buy or sell")
+        decimals = 2 if min(stop, target) >= 1 else 4
+        body = {"symbol": symbol, "qty": str(qty), "side": side.lower(), "type": "limit",
                 "time_in_force": "day", "order_class": "oco", "client_order_id": client_order_id,
-                "take_profit": {"limit_price": f"{target:.2f}"},
-                "stop_loss": {"stop_price": f"{stop:.2f}"}}
+                "take_profit": {"limit_price": f"{target:.{decimals}f}"},
+                "stop_loss": {"stop_price": f"{stop:.{decimals}f}"}}
         self.status.orders_sent += 1
         self.status.last_order_at = datetime.now(timezone.utc).isoformat()
         try:

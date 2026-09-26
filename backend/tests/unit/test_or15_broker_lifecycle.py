@@ -90,6 +90,7 @@ class PaperExchange:
 @pytest.fixture
 def paper(monkeypatch, tmp_path):
     from backend.app import main as r
+    monkeypatch.setattr(r, "OR15_NEW_ENTRIES", True)  # retired protocol, still tested
     r.reset_runtime_state()
     exchange = PaperExchange()
     broker = AlpacaBroker("test", "test", transport=httpx.MockTransport(exchange.handler), fill_wait_sec=.001, cancel_wait_sec=.001, poll_interval_sec=.001)

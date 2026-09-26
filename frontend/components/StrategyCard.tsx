@@ -12,6 +12,9 @@ import {
   strategyNoteLine,
   strategyTheme,
   windowToChip,
+  formatMoney,
+  etTimeLabel,
+  trancheName,
 } from "@/lib/plain";
 
 const ICONS: Record<string, typeof Sunrise> = {
@@ -20,6 +23,8 @@ const ICONS: Record<string, typeof Sunrise> = {
   news_momentum: Zap,
   mean_reversion: Undo2,
   tsla_or15_retest: CornerDownRight,
+  tsla_asymmetric_dual: CornerDownRight,
+  cde_asymmetric_dual: Waves,
 };
 
 interface StrategyCardProps {
@@ -102,6 +107,23 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
           </div>
         )}
         <p className="text-sm leading-relaxed text-[#3E3A57]">{theme.what}</p>
+        {strategy.tri_engine && (
+          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="tri-engine-details">
+            <div className="font-semibold">{strategy.tri_engine.mode === "offline_raw_open" ? "Offline replay" : "Paper account"} · {strategy.tri_engine.quantity ? `${strategy.tri_engine.quantity} shares` : "Size follows the risk budget"}</div>
+            <div>{strategy.tri_engine.symbol === "TSLA" ? "Buys until 11:30 AM · Bets on a drop until 11 AM" : "Buys until noon · Bets on a drop until 11:30 AM"} ET</div>
+            <div>{strategy.tri_engine.symbol === "TSLA"
+              ? (showPro ? "Half at 1.5R / 3 hours · Half at 2R / 4 hours" : "Half aims for 1.5× its risk within 3 hours, half for 2× within 4 hours")
+              : (showPro ? "Full position at 2R / 3 hours" : "Aims for 2× its risk within 3 hours")}</div>
+            {strategy.tri_engine.risk_budget != null && <div>Risk budget: {formatMoney(strategy.tri_engine.risk_budget)}</div>}
+            {strategy.tri_engine.tranches.map((t, i, all) => (
+              <div key={t.id} className="mt-2 border-t pt-2" style={{ borderColor: theme.track }}>
+                <span className="font-semibold">{showPro ? `${t.target_r}R part` : trancheName(i, all.length)} · {t.qty - t.closed_qty} of {t.qty} shares open</span>
+                <div>Sells at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
+              </div>
+            ))}
+            {showPro && strategy.tri_engine.reason && <div className="mt-2 break-words">Reason: {strategy.tri_engine.reason}</div>}
+          </div>
+        )}
         {strategy.or15 && (
           <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="or15-details">
             <span className="font-semibold">1 share · {strategy.or15.mode === "offline_raw_open" ? "Offline replay" : "Paper account"}</span>

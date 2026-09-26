@@ -1,0 +1,5271 @@
+{
+  "holding": {
+    "type": "STATE_UPDATE",
+    "timestamp": "2026-09-28T09:49:00-04:00",
+    "account": {
+      "equity": 50000.0,
+      "cash": 37352.0,
+      "buying_power": 187352.0,
+      "daily_pnl": 0.0,
+      "daily_pnl_pct": 0.0,
+      "daily_drawdown": 0.0,
+      "daily_drawdown_pct": 0.0,
+      "is_circuit_broken": false,
+      "risk_level": "NORMAL",
+      "status": "ACTIVE",
+      "daily_starting_equity": 50000.0
+    },
+    "market_context": {
+      "vix": 20.0,
+      "vix_regime": "NORMAL",
+      "time_phase": "OPEN_VOLATILITY_FLUSH",
+      "market_status": "OPEN",
+      "sizing_multiplier": 1.0,
+      "stop_multiplier": 1.0,
+      "market_trend": "UNKNOWN"
+    },
+    "strategies": [
+      {
+        "id": "orb",
+        "name": "Opening Range Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Morning only. Needs the first 5 minutes to set the range."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "vwap_pullback",
+        "name": "VWAP Trend Pullback & Continuation",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ],
+            [
+              "14:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "news_momentum",
+        "name": "Catalyst News Momentum Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 3:45 PM.",
+          "next_change_at": "2026-09-28T15:45:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [
+            "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
+          ],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+          "notes": [
+            "Rare by design: needs very strong news plus a volume spike."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "mean_reversion",
+        "name": "Statistical Mean Reversion / Exhaustion Fades",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "10:00 AM - 3:45 PM",
+          "ranges": [
+            [
+              "10:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 10:00 AM.",
+          "next_change_at": "2026-09-28T10:00:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Sits out the opening half hour."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "tsla_asymmetric_dual",
+        "name": "TSLA Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "TSLA",
+          "phase": "HOLDING",
+          "reason": null,
+          "quantity": 124,
+          "side": "LONG",
+          "mode": "offline_raw_open",
+          "risk_reserved": 372.0,
+          "risk_budget": 375.0,
+          "or_high": 101.0,
+          "or_low": 99.0,
+          "or_mid": 100.0,
+          "qqq_close": 200.5,
+          "qqq_vwap": 200.5,
+          "entry_due": "2026-09-28T09:48:00-04:00",
+          "incomplete": false,
+          "tranches": [
+            {
+              "id": 1,
+              "qty": 62,
+              "closed_qty": 0,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 1.5,
+              "target": 106.5,
+              "exit_due": "2026-09-28T12:48:00-04:00",
+              "exit_reason": null,
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+              "protection_confirmed": false,
+              "protection_terminal": false,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [],
+              "realized_pnl": 0.0,
+              "exit_notional": 0.0
+            },
+            {
+              "id": 2,
+              "qty": 62,
+              "closed_qty": 0,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 2.0,
+              "target": 108.0,
+              "exit_due": "2026-09-28T13:48:00-04:00",
+              "exit_reason": null,
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+              "protection_confirmed": false,
+              "protection_terminal": false,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [],
+              "realized_pnl": 0.0,
+              "exit_notional": 0.0
+            }
+          ]
+        },
+        "window": {
+          "state": "MANAGING",
+          "headline": "Managing fixed targets and safety exits.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201311:30 ET",
+          "ranges": [
+            [
+              "09:45",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Managing fixed targets and safety exits.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Managing fixed targets and safety exits.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 2,
+          "orders_today": 1,
+          "blocked_today": 1,
+          "top_block_reason": "SIGNAL",
+          "top_block_text": null,
+          "blocked_by_reason": {
+            "SIGNAL": 1
+          }
+        }
+      },
+      {
+        "id": "cde_asymmetric_dual",
+        "name": "CDE Asymmetric Opening Range",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "CDE",
+          "phase": "SKIPPED",
+          "reason": "MISSING_OPENING_RANGE_BAR",
+          "quantity": 0,
+          "side": null,
+          "mode": "offline_raw_open",
+          "risk_reserved": 0.0,
+          "risk_budget": 375.0,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "DONE_FOR_DAY",
+          "headline": "Skipped today; a required check did not pass.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201312:00 ET",
+          "ranges": [
+            [
+              "09:45",
+              "12:00"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Skipped today; a required check did not pass.",
+          "next_change_at": null,
+          "blockers": [
+            "Paused by operator.",
+            "Session checks did not pass."
+          ],
+          "limits": [],
+          "market_text": "Skipped today; a required check did not pass.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      }
+    ],
+    "primary_position": {
+      "symbol": "TSLA",
+      "side": "LONG",
+      "shares": 124,
+      "qty": 124,
+      "entry_price": 102.0,
+      "avg_entry_price": 102.0,
+      "market_price": 102.0,
+      "current_price": 102.0,
+      "market_value": 12648.0,
+      "cost_basis": 12648.0,
+      "unrealized_pnl": 0.0,
+      "unrealized_pnl_pct": 0.0,
+      "realized_pnl": 0.0,
+      "fees_paid": 0.0,
+      "stop_loss": 99.0,
+      "take_profit_1": 106.5,
+      "take_profit_2": 108.0,
+      "strategy_id": "tsla_asymmetric_dual",
+      "fixed_protection": true,
+      "exit_due": "2026-09-28T12:48:00-04:00",
+      "tranches": [
+        {
+          "id": 1,
+          "qty": 62,
+          "closed_qty": 0,
+          "entry_price": 102.0,
+          "entry_at": "2026-09-28T09:48:00-04:00",
+          "stop": 99.0,
+          "risk_per_share": 3.0,
+          "target_r": 1.5,
+          "target": 106.5,
+          "exit_due": "2026-09-28T12:48:00-04:00",
+          "exit_reason": null,
+          "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+          "protection_confirmed": false,
+          "protection_terminal": false,
+          "stop_order_id": null,
+          "target_order_id": null,
+          "close_order_ids": [],
+          "realized_pnl": 0.0,
+          "exit_notional": 0.0
+        },
+        {
+          "id": 2,
+          "qty": 62,
+          "closed_qty": 0,
+          "entry_price": 102.0,
+          "entry_at": "2026-09-28T09:48:00-04:00",
+          "stop": 99.0,
+          "risk_per_share": 3.0,
+          "target_r": 2.0,
+          "target": 108.0,
+          "exit_due": "2026-09-28T13:48:00-04:00",
+          "exit_reason": null,
+          "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+          "protection_confirmed": false,
+          "protection_terminal": false,
+          "stop_order_id": null,
+          "target_order_id": null,
+          "close_order_ids": [],
+          "realized_pnl": 0.0,
+          "exit_notional": 0.0
+        }
+      ],
+      "chart_points": [
+        {
+          "time": "2026-09-28T09:30:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:31:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:32:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:33:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:34:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:35:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:36:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:37:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:38:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:39:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:40:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:41:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:42:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:43:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:44:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:45:00-04:00",
+          "open": 100.0,
+          "high": 102.5,
+          "low": 100.0,
+          "close": 102.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:46:00-04:00",
+          "open": 101.1,
+          "high": 102.0,
+          "low": 101.0,
+          "close": 101.5,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:47:00-04:00",
+          "open": 102.0,
+          "high": 103.0,
+          "low": 101.0,
+          "close": 102.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:48:00-04:00",
+          "open": 102.0,
+          "high": 103.0,
+          "low": 101.0,
+          "close": 102.0,
+          "volume": 50000
+        }
+      ]
+    },
+    "all_positions": [
+      {
+        "symbol": "TSLA",
+        "side": "LONG",
+        "shares": 124,
+        "qty": 124,
+        "entry_price": 102.0,
+        "avg_entry_price": 102.0,
+        "market_price": 102.0,
+        "current_price": 102.0,
+        "market_value": 12648.0,
+        "cost_basis": 12648.0,
+        "unrealized_pnl": 0.0,
+        "unrealized_pnl_pct": 0.0,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.0,
+        "stop_loss": 99.0,
+        "take_profit_1": 106.5,
+        "take_profit_2": 108.0,
+        "strategy_id": "tsla_asymmetric_dual",
+        "fixed_protection": true,
+        "exit_due": "2026-09-28T12:48:00-04:00",
+        "tranches": [
+          {
+            "id": 1,
+            "qty": 62,
+            "closed_qty": 0,
+            "entry_price": 102.0,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 99.0,
+            "risk_per_share": 3.0,
+            "target_r": 1.5,
+            "target": 106.5,
+            "exit_due": "2026-09-28T12:48:00-04:00",
+            "exit_reason": null,
+            "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+            "protection_confirmed": false,
+            "protection_terminal": false,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [],
+            "realized_pnl": 0.0,
+            "exit_notional": 0.0
+          },
+          {
+            "id": 2,
+            "qty": 62,
+            "closed_qty": 0,
+            "entry_price": 102.0,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 99.0,
+            "risk_per_share": 3.0,
+            "target_r": 2.0,
+            "target": 108.0,
+            "exit_due": "2026-09-28T13:48:00-04:00",
+            "exit_reason": null,
+            "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+            "protection_confirmed": false,
+            "protection_terminal": false,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [],
+            "realized_pnl": 0.0,
+            "exit_notional": 0.0
+          }
+        ]
+      }
+    ],
+    "positions_count": 1,
+    "working_orders_count": 0,
+    "ledger_revision": 0,
+    "persistence": {
+      "status": "disabled",
+      "last_checkpoint_at": null,
+      "restored_at": null
+    },
+    "ingestion": {
+      "stock": "connected",
+      "news": "unconfigured",
+      "vix": "unconfigured"
+    },
+    "broker": {
+      "mode": "simulated",
+      "account_number": null,
+      "mismatch": false
+    },
+    "recent_news": [],
+    "recent_activity": [
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "TSLA",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "TSLA",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "TSLA",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "TSLA",
+        "message": "ACCEPTED -> FILLED (Filled 124 @ $102.00, fee $0.00)",
+        "price": 102.0,
+        "qty": 124,
+        "quantity": 124
+      }
+    ],
+    "swing": {
+      "status": "STANDBY",
+      "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+      "allocated_capital": 50000.0,
+      "slot_notional": 25000.0,
+      "max_slots": 2,
+      "active_slots_used": 0,
+      "available_slots": 2,
+      "flattening_exempt": true,
+      "candidates": [
+        {
+          "symbol": "LRCX",
+          "date": "2026-09-23",
+          "price": 307.28,
+          "close": 307.28,
+          "sma_200": 268.9575,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -25.14,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -25.14,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 73.59,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-21",
+          "next_earnings_date": "2026-10-21",
+          "daily_atr_14": 15.6091,
+          "atr_14": 15.6091,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-25.14%_QQQ_+2.47%",
+            "RSI2_73.59_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "KLAC",
+          "date": "2026-09-23",
+          "price": 187.86,
+          "close": 187.86,
+          "sma_200": 174.9609,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -32.44,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -32.44,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 89.29,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-29",
+          "next_earnings_date": "2026-10-29",
+          "daily_atr_14": 8.43,
+          "atr_14": 8.43,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-32.44%_QQQ_+2.47%",
+            "RSI2_89.29_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "MU",
+          "date": "2026-09-23",
+          "price": 1071.88,
+          "close": 1071.88,
+          "sma_200": 652.5792,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -6.39,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -6.39,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 62.4,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-09-30",
+          "next_earnings_date": "2026-09-30",
+          "daily_atr_14": 49.8424,
+          "atr_14": 49.8424,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
+            "RSI2_62.40_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "AMD",
+          "date": "2026-09-23",
+          "price": 614.61,
+          "close": 614.61,
+          "sma_200": 360.6494,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": 13.92,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": 13.92,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": true,
+          "rs_pass": true,
+          "rsi_2": 70.54,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-27",
+          "next_earnings_date": "2026-10-27",
+          "daily_atr_14": 25.1157,
+          "atr_14": 25.1157,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "WATCHING",
+          "rejection_reasons": [
+            "RSI2_70.54_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "GS",
+          "date": "2026-09-23",
+          "price": 936.36,
+          "close": 936.36,
+          "sma_200": 950.6203,
+          "sma_200_pass": false,
+          "above_200_sma": false,
+          "rs_stock_60d": -7.77,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -7.77,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 19.94,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-13",
+          "next_earnings_date": "2026-10-13",
+          "daily_atr_14": 27.466,
+          "atr_14": 27.466,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "CLOSE_936.36_BELOW_200_SMA_950.62",
+            "WEAKER_THAN_QQQ_STOCK_-7.77%_QQQ_+2.47%",
+            "RSI2_19.94_NOT_BELOW_10"
+          ]
+        }
+      ],
+      "positions": [],
+      "last_scan_time": null,
+      "last_scan_session_date": null,
+      "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+      "last_close_data_note": null,
+      "last_close_entries_withheld": false
+    }
+  },
+  "partial": {
+    "type": "STATE_UPDATE",
+    "timestamp": "2026-09-28T09:50:00-04:00",
+    "account": {
+      "equity": 50527.0,
+      "cash": 43955.0,
+      "buying_power": 195536.0,
+      "daily_pnl": 527.0,
+      "daily_pnl_pct": 1.05,
+      "daily_drawdown": 0.0,
+      "daily_drawdown_pct": 0.0,
+      "is_circuit_broken": false,
+      "risk_level": "NORMAL",
+      "status": "ACTIVE",
+      "daily_starting_equity": 50000.0
+    },
+    "market_context": {
+      "vix": 20.0,
+      "vix_regime": "NORMAL",
+      "time_phase": "OPEN_VOLATILITY_FLUSH",
+      "market_status": "OPEN",
+      "sizing_multiplier": 1.0,
+      "stop_multiplier": 1.0,
+      "market_trend": "UNKNOWN"
+    },
+    "strategies": [
+      {
+        "id": "orb",
+        "name": "Opening Range Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Morning only. Needs the first 5 minutes to set the range."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "vwap_pullback",
+        "name": "VWAP Trend Pullback & Continuation",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ],
+            [
+              "14:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "news_momentum",
+        "name": "Catalyst News Momentum Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 3:45 PM.",
+          "next_change_at": "2026-09-28T15:45:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [
+            "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
+          ],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+          "notes": [
+            "Rare by design: needs very strong news plus a volume spike."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "mean_reversion",
+        "name": "Statistical Mean Reversion / Exhaustion Fades",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "10:00 AM - 3:45 PM",
+          "ranges": [
+            [
+              "10:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 10:00 AM.",
+          "next_change_at": "2026-09-28T10:00:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Sits out the opening half hour."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "tsla_asymmetric_dual",
+        "name": "TSLA Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "TSLA",
+          "phase": "HOLDING",
+          "reason": null,
+          "quantity": 124,
+          "side": "LONG",
+          "mode": "offline_raw_open",
+          "risk_reserved": 186.0,
+          "risk_budget": 375.0,
+          "or_high": 101.0,
+          "or_low": 99.0,
+          "or_mid": 100.0,
+          "qqq_close": 200.5,
+          "qqq_vwap": 200.5,
+          "entry_due": "2026-09-28T09:48:00-04:00",
+          "incomplete": false,
+          "tranches": [
+            {
+              "id": 1,
+              "qty": 62,
+              "closed_qty": 62,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 1.5,
+              "target": 106.5,
+              "exit_due": "2026-09-28T12:48:00-04:00",
+              "exit_reason": "TARGET",
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+              "protection_confirmed": false,
+              "protection_terminal": true,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [
+                "ord_3fadbfc20a9e"
+              ],
+              "realized_pnl": 279.0,
+              "exit_notional": 6603.0,
+              "exit_at": "2026-09-28T09:49:00-04:00"
+            },
+            {
+              "id": 2,
+              "qty": 62,
+              "closed_qty": 0,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 2.0,
+              "target": 108.0,
+              "exit_due": "2026-09-28T13:48:00-04:00",
+              "exit_reason": null,
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+              "protection_confirmed": false,
+              "protection_terminal": false,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [],
+              "realized_pnl": 0.0,
+              "exit_notional": 0.0
+            }
+          ]
+        },
+        "window": {
+          "state": "MANAGING",
+          "headline": "Managing fixed targets and safety exits.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201311:30 ET",
+          "ranges": [
+            [
+              "09:45",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Managing fixed targets and safety exits.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Managing fixed targets and safety exits.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 2,
+          "orders_today": 1,
+          "blocked_today": 1,
+          "top_block_reason": "SIGNAL",
+          "top_block_text": null,
+          "blocked_by_reason": {
+            "SIGNAL": 1
+          }
+        }
+      },
+      {
+        "id": "cde_asymmetric_dual",
+        "name": "CDE Asymmetric Opening Range",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "CDE",
+          "phase": "SKIPPED",
+          "reason": "MISSING_OPENING_RANGE_BAR",
+          "quantity": 0,
+          "side": null,
+          "mode": "offline_raw_open",
+          "risk_reserved": 0.0,
+          "risk_budget": 375.0,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "DONE_FOR_DAY",
+          "headline": "Skipped today; a required check did not pass.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201312:00 ET",
+          "ranges": [
+            [
+              "09:45",
+              "12:00"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Skipped today; a required check did not pass.",
+          "next_change_at": null,
+          "blockers": [
+            "Paused by operator.",
+            "Session checks did not pass."
+          ],
+          "limits": [],
+          "market_text": "Skipped today; a required check did not pass.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      }
+    ],
+    "primary_position": {
+      "symbol": "TSLA",
+      "side": "LONG",
+      "shares": 62,
+      "qty": 62,
+      "entry_price": 102.0,
+      "avg_entry_price": 102.0,
+      "market_price": 106.0,
+      "current_price": 106.0,
+      "market_value": 6572.0,
+      "cost_basis": 6324.0,
+      "unrealized_pnl": 248.0,
+      "unrealized_pnl_pct": 0.0392,
+      "realized_pnl": 279.0,
+      "fees_paid": 0.0,
+      "stop_loss": 99.0,
+      "take_profit_1": 106.5,
+      "take_profit_2": 108.0,
+      "strategy_id": "tsla_asymmetric_dual",
+      "fixed_protection": true,
+      "exit_due": "2026-09-28T13:48:00-04:00",
+      "tranches": [
+        {
+          "id": 1,
+          "qty": 62,
+          "closed_qty": 62,
+          "entry_price": 102.0,
+          "entry_at": "2026-09-28T09:48:00-04:00",
+          "stop": 99.0,
+          "risk_per_share": 3.0,
+          "target_r": 1.5,
+          "target": 106.5,
+          "exit_due": "2026-09-28T12:48:00-04:00",
+          "exit_reason": "TARGET",
+          "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+          "protection_confirmed": false,
+          "protection_terminal": true,
+          "stop_order_id": null,
+          "target_order_id": null,
+          "close_order_ids": [
+            "ord_3fadbfc20a9e"
+          ],
+          "realized_pnl": 279.0,
+          "exit_notional": 6603.0,
+          "exit_at": "2026-09-28T09:49:00-04:00"
+        },
+        {
+          "id": 2,
+          "qty": 62,
+          "closed_qty": 0,
+          "entry_price": 102.0,
+          "entry_at": "2026-09-28T09:48:00-04:00",
+          "stop": 99.0,
+          "risk_per_share": 3.0,
+          "target_r": 2.0,
+          "target": 108.0,
+          "exit_due": "2026-09-28T13:48:00-04:00",
+          "exit_reason": null,
+          "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+          "protection_confirmed": false,
+          "protection_terminal": false,
+          "stop_order_id": null,
+          "target_order_id": null,
+          "close_order_ids": [],
+          "realized_pnl": 0.0,
+          "exit_notional": 0.0
+        }
+      ],
+      "chart_points": [
+        {
+          "time": "2026-09-28T09:30:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:31:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:32:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:33:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:34:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:35:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:36:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:37:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:38:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:39:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:40:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:41:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:42:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:43:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:44:00-04:00",
+          "open": 100.0,
+          "high": 101.0,
+          "low": 99.0,
+          "close": 100.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:45:00-04:00",
+          "open": 100.0,
+          "high": 102.5,
+          "low": 100.0,
+          "close": 102.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:46:00-04:00",
+          "open": 101.1,
+          "high": 102.0,
+          "low": 101.0,
+          "close": 101.5,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:47:00-04:00",
+          "open": 102.0,
+          "high": 103.0,
+          "low": 101.0,
+          "close": 102.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:48:00-04:00",
+          "open": 102.0,
+          "high": 103.0,
+          "low": 101.0,
+          "close": 102.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:49:00-04:00",
+          "open": 103.0,
+          "high": 106.5,
+          "low": 102.0,
+          "close": 106.0,
+          "volume": 50000
+        }
+      ]
+    },
+    "all_positions": [
+      {
+        "symbol": "TSLA",
+        "side": "LONG",
+        "shares": 62,
+        "qty": 62,
+        "entry_price": 102.0,
+        "avg_entry_price": 102.0,
+        "market_price": 106.0,
+        "current_price": 106.0,
+        "market_value": 6572.0,
+        "cost_basis": 6324.0,
+        "unrealized_pnl": 248.0,
+        "unrealized_pnl_pct": 0.0392,
+        "realized_pnl": 279.0,
+        "fees_paid": 0.0,
+        "stop_loss": 99.0,
+        "take_profit_1": 106.5,
+        "take_profit_2": 108.0,
+        "strategy_id": "tsla_asymmetric_dual",
+        "fixed_protection": true,
+        "exit_due": "2026-09-28T13:48:00-04:00",
+        "tranches": [
+          {
+            "id": 1,
+            "qty": 62,
+            "closed_qty": 62,
+            "entry_price": 102.0,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 99.0,
+            "risk_per_share": 3.0,
+            "target_r": 1.5,
+            "target": 106.5,
+            "exit_due": "2026-09-28T12:48:00-04:00",
+            "exit_reason": "TARGET",
+            "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+            "protection_confirmed": false,
+            "protection_terminal": true,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [
+              "ord_3fadbfc20a9e"
+            ],
+            "realized_pnl": 279.0,
+            "exit_notional": 6603.0,
+            "exit_at": "2026-09-28T09:49:00-04:00"
+          },
+          {
+            "id": 2,
+            "qty": 62,
+            "closed_qty": 0,
+            "entry_price": 102.0,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 99.0,
+            "risk_per_share": 3.0,
+            "target_r": 2.0,
+            "target": 108.0,
+            "exit_due": "2026-09-28T13:48:00-04:00",
+            "exit_reason": null,
+            "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+            "protection_confirmed": false,
+            "protection_terminal": false,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [],
+            "realized_pnl": 0.0,
+            "exit_notional": 0.0
+          }
+        ]
+      }
+    ],
+    "positions_count": 1,
+    "working_orders_count": 0,
+    "ledger_revision": 0,
+    "persistence": {
+      "status": "disabled",
+      "last_checkpoint_at": null,
+      "restored_at": null
+    },
+    "ingestion": {
+      "stock": "connected",
+      "news": "unconfigured",
+      "vix": "unconfigured"
+    },
+    "broker": {
+      "mode": "simulated",
+      "account_number": null,
+      "mismatch": false
+    },
+    "recent_news": [],
+    "recent_activity": [
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "TSLA",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "TSLA",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "TSLA",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "TSLA",
+        "message": "ACCEPTED -> FILLED (Filled 124 @ $102.00, fee $0.00)",
+        "price": 102.0,
+        "qty": 124,
+        "quantity": 124
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "TSLA",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "TSLA",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "TSLA",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "TSLA",
+        "message": "ACCEPTED -> FILLED (Filled 62 @ $106.50, fee $0.00)",
+        "price": 106.5,
+        "qty": 62,
+        "quantity": 62
+      }
+    ],
+    "swing": {
+      "status": "STANDBY",
+      "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+      "allocated_capital": 50000.0,
+      "slot_notional": 25000.0,
+      "max_slots": 2,
+      "active_slots_used": 0,
+      "available_slots": 2,
+      "flattening_exempt": true,
+      "candidates": [
+        {
+          "symbol": "LRCX",
+          "date": "2026-09-23",
+          "price": 307.28,
+          "close": 307.28,
+          "sma_200": 268.9575,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -25.14,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -25.14,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 73.59,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-21",
+          "next_earnings_date": "2026-10-21",
+          "daily_atr_14": 15.6091,
+          "atr_14": 15.6091,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-25.14%_QQQ_+2.47%",
+            "RSI2_73.59_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "KLAC",
+          "date": "2026-09-23",
+          "price": 187.86,
+          "close": 187.86,
+          "sma_200": 174.9609,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -32.44,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -32.44,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 89.29,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-29",
+          "next_earnings_date": "2026-10-29",
+          "daily_atr_14": 8.43,
+          "atr_14": 8.43,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-32.44%_QQQ_+2.47%",
+            "RSI2_89.29_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "MU",
+          "date": "2026-09-23",
+          "price": 1071.88,
+          "close": 1071.88,
+          "sma_200": 652.5792,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -6.39,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -6.39,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 62.4,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-09-30",
+          "next_earnings_date": "2026-09-30",
+          "daily_atr_14": 49.8424,
+          "atr_14": 49.8424,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
+            "RSI2_62.40_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "AMD",
+          "date": "2026-09-23",
+          "price": 614.61,
+          "close": 614.61,
+          "sma_200": 360.6494,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": 13.92,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": 13.92,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": true,
+          "rs_pass": true,
+          "rsi_2": 70.54,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-27",
+          "next_earnings_date": "2026-10-27",
+          "daily_atr_14": 25.1157,
+          "atr_14": 25.1157,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "WATCHING",
+          "rejection_reasons": [
+            "RSI2_70.54_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "GS",
+          "date": "2026-09-23",
+          "price": 936.36,
+          "close": 936.36,
+          "sma_200": 950.6203,
+          "sma_200_pass": false,
+          "above_200_sma": false,
+          "rs_stock_60d": -7.77,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -7.77,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 19.94,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-13",
+          "next_earnings_date": "2026-10-13",
+          "daily_atr_14": 27.466,
+          "atr_14": 27.466,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "CLOSE_936.36_BELOW_200_SMA_950.62",
+            "WEAKER_THAN_QQQ_STOCK_-7.77%_QQQ_+2.47%",
+            "RSI2_19.94_NOT_BELOW_10"
+          ]
+        }
+      ],
+      "positions": [],
+      "last_scan_time": null,
+      "last_scan_session_date": null,
+      "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+      "last_close_data_note": null,
+      "last_close_entries_withheld": false
+    }
+  },
+  "closed": {
+    "type": "STATE_UPDATE",
+    "timestamp": "2026-09-28T09:51:00-04:00",
+    "account": {
+      "equity": 50651.0,
+      "cash": 50651.0,
+      "buying_power": 202604.0,
+      "daily_pnl": 651.0,
+      "daily_pnl_pct": 1.3,
+      "daily_drawdown": 0.0,
+      "daily_drawdown_pct": 0.0,
+      "is_circuit_broken": false,
+      "risk_level": "NORMAL",
+      "status": "ACTIVE",
+      "daily_starting_equity": 50000.0
+    },
+    "market_context": {
+      "vix": 20.0,
+      "vix_regime": "NORMAL",
+      "time_phase": "OPEN_VOLATILITY_FLUSH",
+      "market_status": "OPEN",
+      "sizing_multiplier": 1.0,
+      "stop_multiplier": 1.0,
+      "market_trend": "UNKNOWN"
+    },
+    "strategies": [
+      {
+        "id": "orb",
+        "name": "Opening Range Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Morning only. Needs the first 5 minutes to set the range."
+          ],
+          "evaluated_at": "2026-09-28T09:51:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "vwap_pullback",
+        "name": "VWAP Trend Pullback & Continuation",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ],
+            [
+              "14:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop."
+          ],
+          "evaluated_at": "2026-09-28T09:51:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "news_momentum",
+        "name": "Catalyst News Momentum Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 3:45 PM.",
+          "next_change_at": "2026-09-28T15:45:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [
+            "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
+          ],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+          "notes": [
+            "Rare by design: needs very strong news plus a volume spike."
+          ],
+          "evaluated_at": "2026-09-28T09:51:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "mean_reversion",
+        "name": "Statistical Mean Reversion / Exhaustion Fades",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "10:00 AM - 3:45 PM",
+          "ranges": [
+            [
+              "10:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 10:00 AM.",
+          "next_change_at": "2026-09-28T10:00:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Sits out the opening half hour."
+          ],
+          "evaluated_at": "2026-09-28T09:51:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "tsla_asymmetric_dual",
+        "name": "TSLA Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 651.0,
+        "win_rate": 1.0,
+        "trades_count": 1,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "TSLA",
+          "phase": "CLOSED",
+          "reason": null,
+          "quantity": 124,
+          "side": "LONG",
+          "mode": "offline_raw_open",
+          "risk_reserved": 0.0,
+          "risk_budget": 375.0,
+          "or_high": 101.0,
+          "or_low": 99.0,
+          "or_mid": 100.0,
+          "qqq_close": 200.5,
+          "qqq_vwap": 200.5,
+          "entry_due": "2026-09-28T09:48:00-04:00",
+          "incomplete": false,
+          "tranches": [
+            {
+              "id": 1,
+              "qty": 62,
+              "closed_qty": 62,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 1.5,
+              "target": 106.5,
+              "exit_due": "2026-09-28T12:48:00-04:00",
+              "exit_reason": "TARGET",
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+              "protection_confirmed": false,
+              "protection_terminal": true,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [
+                "ord_3fadbfc20a9e"
+              ],
+              "realized_pnl": 279.0,
+              "exit_notional": 6603.0,
+              "exit_at": "2026-09-28T09:49:00-04:00"
+            },
+            {
+              "id": 2,
+              "qty": 62,
+              "closed_qty": 62,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 2.0,
+              "target": 108.0,
+              "exit_due": "2026-09-28T13:48:00-04:00",
+              "exit_reason": "TARGET",
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+              "protection_confirmed": false,
+              "protection_terminal": true,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [
+                "ord_171fa8adc780"
+              ],
+              "realized_pnl": 372.0,
+              "exit_notional": 6696.0,
+              "exit_at": "2026-09-28T09:50:00-04:00"
+            }
+          ]
+        },
+        "window": {
+          "state": "DONE_FOR_DAY",
+          "headline": "Finished today's trade.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201311:30 ET",
+          "ranges": [
+            [
+              "09:45",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Finished today's trade.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Finished today's trade.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:51:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 2,
+          "orders_today": 1,
+          "blocked_today": 1,
+          "top_block_reason": "SIGNAL",
+          "top_block_text": null,
+          "blocked_by_reason": {
+            "SIGNAL": 1
+          }
+        }
+      },
+      {
+        "id": "cde_asymmetric_dual",
+        "name": "CDE Asymmetric Opening Range",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "CDE",
+          "phase": "SKIPPED",
+          "reason": "MISSING_OPENING_RANGE_BAR",
+          "quantity": 0,
+          "side": null,
+          "mode": "offline_raw_open",
+          "risk_reserved": 0.0,
+          "risk_budget": 375.0,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "DONE_FOR_DAY",
+          "headline": "Skipped today; a required check did not pass.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201312:00 ET",
+          "ranges": [
+            [
+              "09:45",
+              "12:00"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Skipped today; a required check did not pass.",
+          "next_change_at": null,
+          "blockers": [
+            "Paused by operator.",
+            "Session checks did not pass."
+          ],
+          "limits": [],
+          "market_text": "Skipped today; a required check did not pass.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:51:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      }
+    ],
+    "primary_position": null,
+    "all_positions": [],
+    "positions_count": 0,
+    "working_orders_count": 0,
+    "ledger_revision": 0,
+    "persistence": {
+      "status": "disabled",
+      "last_checkpoint_at": null,
+      "restored_at": null
+    },
+    "ingestion": {
+      "stock": "connected",
+      "news": "unconfigured",
+      "vix": "unconfigured"
+    },
+    "broker": {
+      "mode": "simulated",
+      "account_number": null,
+      "mismatch": false
+    },
+    "recent_news": [],
+    "recent_activity": [
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "TSLA",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "TSLA",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "TSLA",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_e54a6d24d94c",
+        "timestamp": "05:46:12",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "TSLA",
+        "message": "ACCEPTED -> FILLED (Filled 124 @ $102.00, fee $0.00)",
+        "price": 102.0,
+        "qty": 124,
+        "quantity": 124
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "TSLA",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "TSLA",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "TSLA",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_3fadbfc20a9e",
+        "timestamp": "05:46:13",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "TSLA",
+        "message": "ACCEPTED -> FILLED (Filled 62 @ $106.50, fee $0.00)",
+        "price": 106.5,
+        "qty": 62,
+        "quantity": 62
+      },
+      {
+        "id": "ord_171fa8adc780",
+        "timestamp": "05:46:13",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "TSLA",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_171fa8adc780",
+        "timestamp": "05:46:13",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "TSLA",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_171fa8adc780",
+        "timestamp": "05:46:13",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "TSLA",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_171fa8adc780",
+        "timestamp": "05:46:13",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "TSLA",
+        "message": "ACCEPTED -> FILLED (Filled 62 @ $108.00, fee $0.00)",
+        "price": 108.0,
+        "qty": 62,
+        "quantity": 62
+      }
+    ],
+    "swing": {
+      "status": "STANDBY",
+      "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+      "allocated_capital": 50000.0,
+      "slot_notional": 25000.0,
+      "max_slots": 2,
+      "active_slots_used": 0,
+      "available_slots": 2,
+      "flattening_exempt": true,
+      "candidates": [
+        {
+          "symbol": "LRCX",
+          "date": "2026-09-23",
+          "price": 307.28,
+          "close": 307.28,
+          "sma_200": 268.9575,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -25.14,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -25.14,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 73.59,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-21",
+          "next_earnings_date": "2026-10-21",
+          "daily_atr_14": 15.6091,
+          "atr_14": 15.6091,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-25.14%_QQQ_+2.47%",
+            "RSI2_73.59_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "KLAC",
+          "date": "2026-09-23",
+          "price": 187.86,
+          "close": 187.86,
+          "sma_200": 174.9609,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -32.44,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -32.44,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 89.29,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-29",
+          "next_earnings_date": "2026-10-29",
+          "daily_atr_14": 8.43,
+          "atr_14": 8.43,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-32.44%_QQQ_+2.47%",
+            "RSI2_89.29_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "MU",
+          "date": "2026-09-23",
+          "price": 1071.88,
+          "close": 1071.88,
+          "sma_200": 652.5792,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -6.39,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -6.39,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 62.4,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-09-30",
+          "next_earnings_date": "2026-09-30",
+          "daily_atr_14": 49.8424,
+          "atr_14": 49.8424,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
+            "RSI2_62.40_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "AMD",
+          "date": "2026-09-23",
+          "price": 614.61,
+          "close": 614.61,
+          "sma_200": 360.6494,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": 13.92,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": 13.92,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": true,
+          "rs_pass": true,
+          "rsi_2": 70.54,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-27",
+          "next_earnings_date": "2026-10-27",
+          "daily_atr_14": 25.1157,
+          "atr_14": 25.1157,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "WATCHING",
+          "rejection_reasons": [
+            "RSI2_70.54_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "GS",
+          "date": "2026-09-23",
+          "price": 936.36,
+          "close": 936.36,
+          "sma_200": 950.6203,
+          "sma_200_pass": false,
+          "above_200_sma": false,
+          "rs_stock_60d": -7.77,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -7.77,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 19.94,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-13",
+          "next_earnings_date": "2026-10-13",
+          "daily_atr_14": 27.466,
+          "atr_14": 27.466,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "CLOSE_936.36_BELOW_200_SMA_950.62",
+            "WEAKER_THAN_QQQ_STOCK_-7.77%_QQQ_+2.47%",
+            "RSI2_19.94_NOT_BELOW_10"
+          ]
+        }
+      ],
+      "positions": [],
+      "last_scan_time": null,
+      "last_scan_session_date": null,
+      "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+      "last_close_data_note": null,
+      "last_close_entries_withheld": false
+    }
+  },
+  "short": {
+    "type": "STATE_UPDATE",
+    "timestamp": "2026-09-28T09:49:00-04:00",
+    "account": {
+      "equity": 50000.0,
+      "cash": 68369.12,
+      "buying_power": 137520.0,
+      "daily_pnl": 0.0,
+      "daily_pnl_pct": 0.0,
+      "daily_drawdown": 0.0,
+      "daily_drawdown_pct": 0.0,
+      "is_circuit_broken": false,
+      "risk_level": "NORMAL",
+      "status": "ACTIVE",
+      "daily_starting_equity": 50000.0
+    },
+    "market_context": {
+      "vix": 20.0,
+      "vix_regime": "NORMAL",
+      "time_phase": "OPEN_VOLATILITY_FLUSH",
+      "market_status": "OPEN",
+      "sizing_multiplier": 1.0,
+      "stop_multiplier": 1.0,
+      "market_trend": "UNKNOWN"
+    },
+    "strategies": [
+      {
+        "id": "orb",
+        "name": "Opening Range Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Morning only. Needs the first 5 minutes to set the range."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "vwap_pullback",
+        "name": "VWAP Trend Pullback & Continuation",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ],
+            [
+              "14:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "news_momentum",
+        "name": "Catalyst News Momentum Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 3:45 PM.",
+          "next_change_at": "2026-09-28T15:45:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [
+            "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
+          ],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+          "notes": [
+            "Rare by design: needs very strong news plus a volume spike."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "mean_reversion",
+        "name": "Statistical Mean Reversion / Exhaustion Fades",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "10:00 AM - 3:45 PM",
+          "ranges": [
+            [
+              "10:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 10:00 AM.",
+          "next_change_at": "2026-09-28T10:00:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Sits out the opening half hour."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "tsla_asymmetric_dual",
+        "name": "TSLA Asymmetric Opening Range",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "TSLA",
+          "phase": "SKIPPED",
+          "reason": "MISSING_OPENING_RANGE_BAR",
+          "quantity": 0,
+          "side": null,
+          "mode": "offline_raw_open",
+          "risk_reserved": 0.0,
+          "risk_budget": 375.0,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "DONE_FOR_DAY",
+          "headline": "Skipped today; a required check did not pass.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201311:30 ET",
+          "ranges": [
+            [
+              "09:45",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Skipped today; a required check did not pass.",
+          "next_change_at": null,
+          "blockers": [
+            "Paused by operator.",
+            "Session checks did not pass."
+          ],
+          "limits": [],
+          "market_text": "Skipped today; a required check did not pass.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "cde_asymmetric_dual",
+        "name": "CDE Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "CDE",
+          "phase": "HOLDING",
+          "reason": null,
+          "quantity": 3124,
+          "side": "SHORT",
+          "mode": "offline_raw_open",
+          "risk_reserved": 374.88000000000034,
+          "risk_budget": 375.0,
+          "or_high": 6.06,
+          "or_low": 5.9399999999999995,
+          "or_mid": 6.0,
+          "qqq_close": 199.5,
+          "qqq_vwap": 200.38235294117646,
+          "entry_due": "2026-09-28T09:48:00-04:00",
+          "incomplete": false,
+          "tranches": [
+            {
+              "id": 1,
+              "qty": 3124,
+              "closed_qty": 0,
+              "entry_price": 5.88,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 6.0,
+              "risk_per_share": 0.1200000000000001,
+              "target_r": 2.0,
+              "target": 5.64,
+              "exit_due": "2026-09-28T12:48:00-04:00",
+              "exit_reason": null,
+              "protection_cid": "adt-tri-CDE-2026-09-28-t1",
+              "protection_confirmed": false,
+              "protection_terminal": false,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [],
+              "realized_pnl": 0.0,
+              "exit_notional": 0.0
+            }
+          ]
+        },
+        "window": {
+          "state": "MANAGING",
+          "headline": "Managing fixed targets and safety exits.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201312:00 ET",
+          "ranges": [
+            [
+              "09:45",
+              "12:00"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Managing fixed targets and safety exits.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Managing fixed targets and safety exits.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 2,
+          "orders_today": 1,
+          "blocked_today": 1,
+          "top_block_reason": "SIGNAL",
+          "top_block_text": null,
+          "blocked_by_reason": {
+            "SIGNAL": 1
+          }
+        }
+      }
+    ],
+    "primary_position": {
+      "symbol": "CDE",
+      "side": "SHORT",
+      "shares": 3124,
+      "qty": 3124,
+      "entry_price": 5.88,
+      "avg_entry_price": 5.88,
+      "market_price": 5.88,
+      "current_price": 5.88,
+      "market_value": -18369.12,
+      "cost_basis": 18369.12,
+      "unrealized_pnl": 0.0,
+      "unrealized_pnl_pct": 0.0,
+      "realized_pnl": 0.0,
+      "fees_paid": 0.0,
+      "stop_loss": 6.0,
+      "take_profit_1": 5.64,
+      "take_profit_2": 5.64,
+      "strategy_id": "cde_asymmetric_dual",
+      "fixed_protection": true,
+      "exit_due": "2026-09-28T12:48:00-04:00",
+      "tranches": [
+        {
+          "id": 1,
+          "qty": 3124,
+          "closed_qty": 0,
+          "entry_price": 5.88,
+          "entry_at": "2026-09-28T09:48:00-04:00",
+          "stop": 6.0,
+          "risk_per_share": 0.1200000000000001,
+          "target_r": 2.0,
+          "target": 5.64,
+          "exit_due": "2026-09-28T12:48:00-04:00",
+          "exit_reason": null,
+          "protection_cid": "adt-tri-CDE-2026-09-28-t1",
+          "protection_confirmed": false,
+          "protection_terminal": false,
+          "stop_order_id": null,
+          "target_order_id": null,
+          "close_order_ids": [],
+          "realized_pnl": 0.0,
+          "exit_notional": 0.0
+        }
+      ],
+      "chart_points": [
+        {
+          "time": "2026-09-28T09:30:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:31:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:32:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:33:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:34:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:35:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:36:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:37:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:38:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:39:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:40:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:41:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:42:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:43:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:44:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:45:00-04:00",
+          "open": 6.0,
+          "high": 6.06,
+          "low": 5.9399999999999995,
+          "close": 6.0,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:46:00-04:00",
+          "open": 5.97,
+          "high": 6.0,
+          "low": 5.88,
+          "close": 5.91,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:47:00-04:00",
+          "open": 5.88,
+          "high": 5.9399999999999995,
+          "low": 5.819999999999999,
+          "close": 5.88,
+          "volume": 50000
+        },
+        {
+          "time": "2026-09-28T09:48:00-04:00",
+          "open": 5.88,
+          "high": 5.9399999999999995,
+          "low": 5.819999999999999,
+          "close": 5.88,
+          "volume": 50000
+        }
+      ]
+    },
+    "all_positions": [
+      {
+        "symbol": "CDE",
+        "side": "SHORT",
+        "shares": 3124,
+        "qty": 3124,
+        "entry_price": 5.88,
+        "avg_entry_price": 5.88,
+        "market_price": 5.88,
+        "current_price": 5.88,
+        "market_value": -18369.12,
+        "cost_basis": 18369.12,
+        "unrealized_pnl": 0.0,
+        "unrealized_pnl_pct": 0.0,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.0,
+        "stop_loss": 6.0,
+        "take_profit_1": 5.64,
+        "take_profit_2": 5.64,
+        "strategy_id": "cde_asymmetric_dual",
+        "fixed_protection": true,
+        "exit_due": "2026-09-28T12:48:00-04:00",
+        "tranches": [
+          {
+            "id": 1,
+            "qty": 3124,
+            "closed_qty": 0,
+            "entry_price": 5.88,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 6.0,
+            "risk_per_share": 0.1200000000000001,
+            "target_r": 2.0,
+            "target": 5.64,
+            "exit_due": "2026-09-28T12:48:00-04:00",
+            "exit_reason": null,
+            "protection_cid": "adt-tri-CDE-2026-09-28-t1",
+            "protection_confirmed": false,
+            "protection_terminal": false,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [],
+            "realized_pnl": 0.0,
+            "exit_notional": 0.0
+          }
+        ]
+      }
+    ],
+    "positions_count": 1,
+    "working_orders_count": 0,
+    "ledger_revision": 0,
+    "persistence": {
+      "status": "disabled",
+      "last_checkpoint_at": null,
+      "restored_at": null
+    },
+    "ingestion": {
+      "stock": "connected",
+      "news": "unconfigured",
+      "vix": "unconfigured"
+    },
+    "broker": {
+      "mode": "simulated",
+      "account_number": null,
+      "mismatch": false
+    },
+    "recent_news": [],
+    "recent_activity": [
+      {
+        "id": "ord_60e581f1889c",
+        "timestamp": "05:46:13",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "CDE",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_60e581f1889c",
+        "timestamp": "05:46:13",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "CDE",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_60e581f1889c",
+        "timestamp": "05:46:13",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "CDE",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_60e581f1889c",
+        "timestamp": "05:46:13",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "CDE",
+        "message": "ACCEPTED -> FILLED (Filled 3124 @ $5.88, fee $0.00)",
+        "price": 5.88,
+        "qty": 3124,
+        "quantity": 3124
+      }
+    ],
+    "swing": {
+      "status": "STANDBY",
+      "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+      "allocated_capital": 50000.0,
+      "slot_notional": 25000.0,
+      "max_slots": 2,
+      "active_slots_used": 0,
+      "available_slots": 2,
+      "flattening_exempt": true,
+      "candidates": [
+        {
+          "symbol": "LRCX",
+          "date": "2026-09-23",
+          "price": 307.28,
+          "close": 307.28,
+          "sma_200": 268.9575,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -25.14,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -25.14,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 73.59,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-21",
+          "next_earnings_date": "2026-10-21",
+          "daily_atr_14": 15.6091,
+          "atr_14": 15.6091,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-25.14%_QQQ_+2.47%",
+            "RSI2_73.59_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "KLAC",
+          "date": "2026-09-23",
+          "price": 187.86,
+          "close": 187.86,
+          "sma_200": 174.9609,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -32.44,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -32.44,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 89.29,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-29",
+          "next_earnings_date": "2026-10-29",
+          "daily_atr_14": 8.43,
+          "atr_14": 8.43,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-32.44%_QQQ_+2.47%",
+            "RSI2_89.29_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "MU",
+          "date": "2026-09-23",
+          "price": 1071.88,
+          "close": 1071.88,
+          "sma_200": 652.5792,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -6.39,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -6.39,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 62.4,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-09-30",
+          "next_earnings_date": "2026-09-30",
+          "daily_atr_14": 49.8424,
+          "atr_14": 49.8424,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
+            "RSI2_62.40_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "AMD",
+          "date": "2026-09-23",
+          "price": 614.61,
+          "close": 614.61,
+          "sma_200": 360.6494,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": 13.92,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": 13.92,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": true,
+          "rs_pass": true,
+          "rsi_2": 70.54,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-27",
+          "next_earnings_date": "2026-10-27",
+          "daily_atr_14": 25.1157,
+          "atr_14": 25.1157,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "WATCHING",
+          "rejection_reasons": [
+            "RSI2_70.54_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "GS",
+          "date": "2026-09-23",
+          "price": 936.36,
+          "close": 936.36,
+          "sma_200": 950.6203,
+          "sma_200_pass": false,
+          "above_200_sma": false,
+          "rs_stock_60d": -7.77,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -7.77,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 19.94,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-13",
+          "next_earnings_date": "2026-10-13",
+          "daily_atr_14": 27.466,
+          "atr_14": 27.466,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "CLOSE_936.36_BELOW_200_SMA_950.62",
+            "WEAKER_THAN_QQQ_STOCK_-7.77%_QQQ_+2.47%",
+            "RSI2_19.94_NOT_BELOW_10"
+          ]
+        }
+      ],
+      "positions": [],
+      "last_scan_time": null,
+      "last_scan_session_date": null,
+      "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+      "last_close_data_note": null,
+      "last_close_entries_withheld": false
+    }
+  },
+  "holding_both": {
+    "type": "STATE_UPDATE",
+    "timestamp": "2026-09-28T09:49:00-04:00",
+    "account": {
+      "equity": 50000.0,
+      "cash": 24104.04,
+      "buying_power": 174104.04,
+      "daily_pnl": 0.0,
+      "daily_pnl_pct": 0.0,
+      "daily_drawdown": 0.0,
+      "daily_drawdown_pct": 0.0,
+      "is_circuit_broken": false,
+      "risk_level": "NORMAL",
+      "status": "ACTIVE",
+      "daily_starting_equity": 50000.0
+    },
+    "market_context": {
+      "vix": 20.0,
+      "vix_regime": "NORMAL",
+      "time_phase": "OPEN_VOLATILITY_FLUSH",
+      "market_status": "OPEN",
+      "sizing_multiplier": 1.0,
+      "stop_multiplier": 1.0,
+      "market_trend": "UNKNOWN"
+    },
+    "strategies": [
+      {
+        "id": "orb",
+        "name": "Opening Range Breakout",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "BLOCKED",
+          "headline": "Blocked right now",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Maximum open positions reached.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Morning only. Needs the first 5 minutes to set the range."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "vwap_pullback",
+        "name": "VWAP Trend Pullback & Continuation",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "BLOCKED",
+          "headline": "Blocked right now",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ],
+            [
+              "14:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Maximum open positions reached.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "news_momentum",
+        "name": "Catalyst News Momentum Breakout",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "BLOCKED",
+          "headline": "Blocked right now",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 3:45 PM.",
+          "next_change_at": "2026-09-28T15:45:00-04:00",
+          "blockers": [
+            "Maximum open positions reached."
+          ],
+          "limits": [
+            "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
+          ],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+          "notes": [
+            "Rare by design: needs very strong news plus a volume spike."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "mean_reversion",
+        "name": "Statistical Mean Reversion / Exhaustion Fades",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "WAITING",
+          "headline": "Opens 10:00 AM",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "10:00 AM - 3:45 PM",
+          "ranges": [
+            [
+              "10:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 10:00 AM.",
+          "next_change_at": "2026-09-28T10:00:00-04:00",
+          "blockers": [
+            "Maximum open positions reached."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Sits out the opening half hour."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "tsla_asymmetric_dual",
+        "name": "TSLA Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "TSLA",
+          "phase": "HOLDING",
+          "reason": null,
+          "quantity": 124,
+          "side": "LONG",
+          "mode": "offline_raw_open",
+          "risk_reserved": 372.0,
+          "risk_budget": 375.0,
+          "or_high": 101.0,
+          "or_low": 99.0,
+          "or_mid": 100.0,
+          "qqq_close": 200.5,
+          "qqq_vwap": 200.5,
+          "entry_due": "2026-09-28T09:48:00-04:00",
+          "incomplete": false,
+          "tranches": [
+            {
+              "id": 1,
+              "qty": 62,
+              "closed_qty": 0,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 1.5,
+              "target": 106.5,
+              "exit_due": "2026-09-28T12:48:00-04:00",
+              "exit_reason": null,
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+              "protection_confirmed": false,
+              "protection_terminal": false,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [],
+              "realized_pnl": 0.0,
+              "exit_notional": 0.0
+            },
+            {
+              "id": 2,
+              "qty": 62,
+              "closed_qty": 0,
+              "entry_price": 102.0,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 99.0,
+              "risk_per_share": 3.0,
+              "target_r": 2.0,
+              "target": 108.0,
+              "exit_due": "2026-09-28T13:48:00-04:00",
+              "exit_reason": null,
+              "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+              "protection_confirmed": false,
+              "protection_terminal": false,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [],
+              "realized_pnl": 0.0,
+              "exit_notional": 0.0
+            }
+          ]
+        },
+        "window": {
+          "state": "MANAGING",
+          "headline": "Managing fixed targets and safety exits.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201311:30 ET",
+          "ranges": [
+            [
+              "09:45",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Managing fixed targets and safety exits.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Managing fixed targets and safety exits.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 2,
+          "orders_today": 1,
+          "blocked_today": 1,
+          "top_block_reason": "SIGNAL",
+          "top_block_text": null,
+          "blocked_by_reason": {
+            "SIGNAL": 1
+          }
+        }
+      },
+      {
+        "id": "cde_asymmetric_dual",
+        "name": "CDE Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "CDE",
+          "phase": "HOLDING",
+          "reason": null,
+          "quantity": 2083,
+          "side": "LONG",
+          "mode": "offline_raw_open",
+          "risk_reserved": 374.94000000000125,
+          "risk_budget": 375.0,
+          "or_high": 6.06,
+          "or_low": 5.9399999999999995,
+          "or_mid": 6.0,
+          "qqq_close": 200.5,
+          "qqq_vwap": 200.5,
+          "entry_due": "2026-09-28T09:48:00-04:00",
+          "incomplete": false,
+          "tranches": [
+            {
+              "id": 1,
+              "qty": 2083,
+              "closed_qty": 0,
+              "entry_price": 6.12,
+              "entry_at": "2026-09-28T09:48:00-04:00",
+              "stop": 5.9399999999999995,
+              "risk_per_share": 0.1800000000000006,
+              "target_r": 2.0,
+              "target": 6.480000000000001,
+              "exit_due": "2026-09-28T12:48:00-04:00",
+              "exit_reason": null,
+              "protection_cid": "adt-tri-CDE-2026-09-28-t1",
+              "protection_confirmed": false,
+              "protection_terminal": false,
+              "stop_order_id": null,
+              "target_order_id": null,
+              "close_order_ids": [],
+              "realized_pnl": 0.0,
+              "exit_notional": 0.0
+            }
+          ]
+        },
+        "window": {
+          "state": "MANAGING",
+          "headline": "Managing fixed targets and safety exits.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201312:00 ET",
+          "ranges": [
+            [
+              "09:45",
+              "12:00"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Managing fixed targets and safety exits.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Managing fixed targets and safety exits.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:49:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 2,
+          "orders_today": 1,
+          "blocked_today": 1,
+          "top_block_reason": "SIGNAL",
+          "top_block_text": null,
+          "blocked_by_reason": {
+            "SIGNAL": 1
+          }
+        }
+      }
+    ],
+    "primary_position": {
+      "symbol": "AAPL",
+      "side": "LONG",
+      "shares": 5,
+      "qty": 5,
+      "entry_price": 100,
+      "avg_entry_price": 100,
+      "market_price": 100,
+      "current_price": 100,
+      "market_value": 500,
+      "cost_basis": 500,
+      "unrealized_pnl": 0,
+      "unrealized_pnl_pct": 0.0,
+      "realized_pnl": 0.0,
+      "fees_paid": 0,
+      "stop_loss": null,
+      "take_profit_1": null,
+      "take_profit_2": null,
+      "strategy_id": "manual",
+      "fixed_protection": false,
+      "exit_due": null,
+      "chart_points": []
+    },
+    "all_positions": [
+      {
+        "symbol": "AAPL",
+        "side": "LONG",
+        "shares": 5,
+        "qty": 5,
+        "entry_price": 100,
+        "avg_entry_price": 100,
+        "market_price": 100,
+        "current_price": 100,
+        "market_value": 500,
+        "cost_basis": 500,
+        "unrealized_pnl": 0,
+        "unrealized_pnl_pct": 0.0,
+        "realized_pnl": 0.0,
+        "fees_paid": 0,
+        "stop_loss": null,
+        "take_profit_1": null,
+        "take_profit_2": null,
+        "strategy_id": "manual",
+        "fixed_protection": false,
+        "exit_due": null
+      },
+      {
+        "symbol": "CDE",
+        "side": "LONG",
+        "shares": 2083,
+        "qty": 2083,
+        "entry_price": 6.12,
+        "avg_entry_price": 6.12,
+        "market_price": 6.12,
+        "current_price": 6.12,
+        "market_value": 12747.96,
+        "cost_basis": 12747.96,
+        "unrealized_pnl": 0.0,
+        "unrealized_pnl_pct": 0.0,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.0,
+        "stop_loss": 5.9399999999999995,
+        "take_profit_1": 6.480000000000001,
+        "take_profit_2": 6.480000000000001,
+        "strategy_id": "cde_asymmetric_dual",
+        "fixed_protection": true,
+        "exit_due": "2026-09-28T12:48:00-04:00",
+        "tranches": [
+          {
+            "id": 1,
+            "qty": 2083,
+            "closed_qty": 0,
+            "entry_price": 6.12,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 5.9399999999999995,
+            "risk_per_share": 0.1800000000000006,
+            "target_r": 2.0,
+            "target": 6.480000000000001,
+            "exit_due": "2026-09-28T12:48:00-04:00",
+            "exit_reason": null,
+            "protection_cid": "adt-tri-CDE-2026-09-28-t1",
+            "protection_confirmed": false,
+            "protection_terminal": false,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [],
+            "realized_pnl": 0.0,
+            "exit_notional": 0.0
+          }
+        ]
+      },
+      {
+        "symbol": "TSLA",
+        "side": "LONG",
+        "shares": 124,
+        "qty": 124,
+        "entry_price": 102.0,
+        "avg_entry_price": 102.0,
+        "market_price": 102.0,
+        "current_price": 102.0,
+        "market_value": 12648.0,
+        "cost_basis": 12648.0,
+        "unrealized_pnl": 0.0,
+        "unrealized_pnl_pct": 0.0,
+        "realized_pnl": 0.0,
+        "fees_paid": 0.0,
+        "stop_loss": 99.0,
+        "take_profit_1": 106.5,
+        "take_profit_2": 108.0,
+        "strategy_id": "tsla_asymmetric_dual",
+        "fixed_protection": true,
+        "exit_due": "2026-09-28T12:48:00-04:00",
+        "tranches": [
+          {
+            "id": 1,
+            "qty": 62,
+            "closed_qty": 0,
+            "entry_price": 102.0,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 99.0,
+            "risk_per_share": 3.0,
+            "target_r": 1.5,
+            "target": 106.5,
+            "exit_due": "2026-09-28T12:48:00-04:00",
+            "exit_reason": null,
+            "protection_cid": "adt-tri-TSLA-2026-09-28-t1",
+            "protection_confirmed": false,
+            "protection_terminal": false,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [],
+            "realized_pnl": 0.0,
+            "exit_notional": 0.0
+          },
+          {
+            "id": 2,
+            "qty": 62,
+            "closed_qty": 0,
+            "entry_price": 102.0,
+            "entry_at": "2026-09-28T09:48:00-04:00",
+            "stop": 99.0,
+            "risk_per_share": 3.0,
+            "target_r": 2.0,
+            "target": 108.0,
+            "exit_due": "2026-09-28T13:48:00-04:00",
+            "exit_reason": null,
+            "protection_cid": "adt-tri-TSLA-2026-09-28-t2",
+            "protection_confirmed": false,
+            "protection_terminal": false,
+            "stop_order_id": null,
+            "target_order_id": null,
+            "close_order_ids": [],
+            "realized_pnl": 0.0,
+            "exit_notional": 0.0
+          }
+        ]
+      }
+    ],
+    "positions_count": 3,
+    "working_orders_count": 0,
+    "ledger_revision": 0,
+    "persistence": {
+      "status": "disabled",
+      "last_checkpoint_at": null,
+      "restored_at": null
+    },
+    "ingestion": {
+      "stock": "connected",
+      "news": "unconfigured",
+      "vix": "unconfigured"
+    },
+    "broker": {
+      "mode": "simulated",
+      "account_number": null,
+      "mismatch": false
+    },
+    "recent_news": [],
+    "recent_activity": [
+      {
+        "id": "ord_daca10ea04d2",
+        "timestamp": "05:46:13",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "CDE",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_daca10ea04d2",
+        "timestamp": "05:46:13",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "CDE",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_daca10ea04d2",
+        "timestamp": "05:46:13",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "CDE",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_daca10ea04d2",
+        "timestamp": "05:46:13",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "CDE",
+        "message": "ACCEPTED -> FILLED (Filled 2083 @ $6.12, fee $0.00)",
+        "price": 6.12,
+        "qty": 2083,
+        "quantity": 2083
+      },
+      {
+        "id": "ord_395064554862",
+        "timestamp": "05:46:13",
+        "type": "ORDER_CREATED",
+        "event_type": "ORDER_CREATED",
+        "symbol": "TSLA",
+        "message": "NONE -> CREATED (Order initialized)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_395064554862",
+        "timestamp": "05:46:13",
+        "type": "SUBMITTED",
+        "event_type": "SUBMITTED",
+        "symbol": "TSLA",
+        "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_395064554862",
+        "timestamp": "05:46:13",
+        "type": "ACCEPTED",
+        "event_type": "ACCEPTED",
+        "symbol": "TSLA",
+        "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+        "price": 0.0,
+        "qty": 0,
+        "quantity": 0
+      },
+      {
+        "id": "ord_395064554862",
+        "timestamp": "05:46:13",
+        "type": "FULL_FILL",
+        "event_type": "FULL_FILL",
+        "symbol": "TSLA",
+        "message": "ACCEPTED -> FILLED (Filled 124 @ $102.00, fee $0.00)",
+        "price": 102.0,
+        "qty": 124,
+        "quantity": 124
+      }
+    ],
+    "swing": {
+      "status": "STANDBY",
+      "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+      "allocated_capital": 50000.0,
+      "slot_notional": 25000.0,
+      "max_slots": 2,
+      "active_slots_used": 0,
+      "available_slots": 2,
+      "flattening_exempt": true,
+      "candidates": [
+        {
+          "symbol": "LRCX",
+          "date": "2026-09-23",
+          "price": 307.28,
+          "close": 307.28,
+          "sma_200": 268.9575,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -25.14,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -25.14,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 73.59,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-21",
+          "next_earnings_date": "2026-10-21",
+          "daily_atr_14": 15.6091,
+          "atr_14": 15.6091,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-25.14%_QQQ_+2.47%",
+            "RSI2_73.59_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "KLAC",
+          "date": "2026-09-23",
+          "price": 187.86,
+          "close": 187.86,
+          "sma_200": 174.9609,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -32.44,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -32.44,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 89.29,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-29",
+          "next_earnings_date": "2026-10-29",
+          "daily_atr_14": 8.43,
+          "atr_14": 8.43,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-32.44%_QQQ_+2.47%",
+            "RSI2_89.29_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "MU",
+          "date": "2026-09-23",
+          "price": 1071.88,
+          "close": 1071.88,
+          "sma_200": 652.5792,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -6.39,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -6.39,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 62.4,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-09-30",
+          "next_earnings_date": "2026-09-30",
+          "daily_atr_14": 49.8424,
+          "atr_14": 49.8424,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
+            "RSI2_62.40_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "AMD",
+          "date": "2026-09-23",
+          "price": 614.61,
+          "close": 614.61,
+          "sma_200": 360.6494,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": 13.92,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": 13.92,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": true,
+          "rs_pass": true,
+          "rsi_2": 70.54,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-27",
+          "next_earnings_date": "2026-10-27",
+          "daily_atr_14": 25.1157,
+          "atr_14": 25.1157,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "WATCHING",
+          "rejection_reasons": [
+            "RSI2_70.54_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "GS",
+          "date": "2026-09-23",
+          "price": 936.36,
+          "close": 936.36,
+          "sma_200": 950.6203,
+          "sma_200_pass": false,
+          "above_200_sma": false,
+          "rs_stock_60d": -7.77,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -7.77,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 19.94,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-13",
+          "next_earnings_date": "2026-10-13",
+          "daily_atr_14": 27.466,
+          "atr_14": 27.466,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "CLOSE_936.36_BELOW_200_SMA_950.62",
+            "WEAKER_THAN_QQQ_STOCK_-7.77%_QQQ_+2.47%",
+            "RSI2_19.94_NOT_BELOW_10"
+          ]
+        }
+      ],
+      "positions": [],
+      "last_scan_time": null,
+      "last_scan_session_date": null,
+      "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+      "last_close_data_note": null,
+      "last_close_entries_withheld": false
+    }
+  },
+  "idle": {
+    "type": "STATE_UPDATE",
+    "timestamp": "2026-09-28T09:25:00-04:00",
+    "account": {
+      "equity": 50000.0,
+      "cash": 50000.0,
+      "buying_power": 200000.0,
+      "daily_pnl": 0.0,
+      "daily_pnl_pct": 0.0,
+      "daily_drawdown": 0.0,
+      "daily_drawdown_pct": 0.0,
+      "is_circuit_broken": false,
+      "risk_level": "NORMAL",
+      "status": "ACTIVE",
+      "daily_starting_equity": 50000.0
+    },
+    "market_context": {
+      "vix": 20.0,
+      "vix_regime": "NORMAL",
+      "time_phase": "MIDDAY_CHOP",
+      "market_status": "OPEN",
+      "sizing_multiplier": 1.0,
+      "stop_multiplier": 1.0,
+      "market_trend": "UNKNOWN"
+    },
+    "strategies": [
+      {
+        "id": "orb",
+        "name": "Opening Range Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "9:30 AM - 11:30 AM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 9:30 AM.",
+          "next_change_at": "2026-09-28T09:30:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Morning only. Needs the first 5 minutes to set the range."
+          ],
+          "evaluated_at": "2026-09-28T09:25:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "vwap_pullback",
+        "name": "VWAP Trend Pullback & Continuation",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ],
+            [
+              "14:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 9:30 AM.",
+          "next_change_at": "2026-09-28T09:30:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop."
+          ],
+          "evaluated_at": "2026-09-28T09:25:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "news_momentum",
+        "name": "Catalyst News Momentum Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "9:30 AM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 9:30 AM.",
+          "next_change_at": "2026-09-28T09:30:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+          "notes": [
+            "Rare by design: needs very strong news plus a volume spike."
+          ],
+          "evaluated_at": "2026-09-28T09:25:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "mean_reversion",
+        "name": "Statistical Mean Reversion / Exhaustion Fades",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "10:00 AM - 3:45 PM",
+          "ranges": [
+            [
+              "10:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 10:00 AM.",
+          "next_change_at": "2026-09-28T10:00:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Sits out the opening half hour."
+          ],
+          "evaluated_at": "2026-09-28T09:25:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "tsla_asymmetric_dual",
+        "name": "TSLA Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "TSLA",
+          "phase": "WAITING_SESSION",
+          "reason": null,
+          "quantity": 0,
+          "side": null,
+          "mode": "alpaca_paper",
+          "risk_reserved": 0.0,
+          "risk_budget": null,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "WAITING",
+          "headline": "Waiting for the next session.",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "9:45 AM\u201311:30 ET",
+          "ranges": [
+            [
+              "09:45",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Waiting for the next session.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Waiting for the next session.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:25:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "cde_asymmetric_dual",
+        "name": "CDE Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "CDE",
+          "phase": "WAITING_SESSION",
+          "reason": null,
+          "quantity": 0,
+          "side": null,
+          "mode": "alpaca_paper",
+          "risk_reserved": 0.0,
+          "risk_budget": null,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "WAITING",
+          "headline": "Waiting for the next session.",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "9:45 AM\u201312:00 ET",
+          "ranges": [
+            [
+              "09:45",
+              "12:00"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Waiting for the next session.",
+          "next_change_at": null,
+          "blockers": [],
+          "limits": [],
+          "market_text": "Waiting for the next session.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:25:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      }
+    ],
+    "primary_position": null,
+    "all_positions": [],
+    "positions_count": 0,
+    "working_orders_count": 0,
+    "ledger_revision": 0,
+    "persistence": {
+      "status": "disabled",
+      "last_checkpoint_at": null,
+      "restored_at": null
+    },
+    "ingestion": {
+      "stock": "connected",
+      "news": "unconfigured",
+      "vix": "unconfigured"
+    },
+    "broker": {
+      "mode": "simulated",
+      "account_number": null,
+      "mismatch": false
+    },
+    "recent_news": [],
+    "recent_activity": [],
+    "swing": {
+      "status": "STANDBY",
+      "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+      "allocated_capital": 50000.0,
+      "slot_notional": 25000.0,
+      "max_slots": 2,
+      "active_slots_used": 0,
+      "available_slots": 2,
+      "flattening_exempt": true,
+      "candidates": [
+        {
+          "symbol": "LRCX",
+          "date": "2026-09-23",
+          "price": 307.28,
+          "close": 307.28,
+          "sma_200": 268.9575,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -25.14,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -25.14,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 73.59,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-21",
+          "next_earnings_date": "2026-10-21",
+          "daily_atr_14": 15.6091,
+          "atr_14": 15.6091,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-25.14%_QQQ_+2.47%",
+            "RSI2_73.59_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "KLAC",
+          "date": "2026-09-23",
+          "price": 187.86,
+          "close": 187.86,
+          "sma_200": 174.9609,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -32.44,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -32.44,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 89.29,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-29",
+          "next_earnings_date": "2026-10-29",
+          "daily_atr_14": 8.43,
+          "atr_14": 8.43,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-32.44%_QQQ_+2.47%",
+            "RSI2_89.29_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "MU",
+          "date": "2026-09-23",
+          "price": 1071.88,
+          "close": 1071.88,
+          "sma_200": 652.5792,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -6.39,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -6.39,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 62.4,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-09-30",
+          "next_earnings_date": "2026-09-30",
+          "daily_atr_14": 49.8424,
+          "atr_14": 49.8424,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
+            "RSI2_62.40_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "AMD",
+          "date": "2026-09-23",
+          "price": 614.61,
+          "close": 614.61,
+          "sma_200": 360.6494,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": 13.92,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": 13.92,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": true,
+          "rs_pass": true,
+          "rsi_2": 70.54,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-27",
+          "next_earnings_date": "2026-10-27",
+          "daily_atr_14": 25.1157,
+          "atr_14": 25.1157,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "WATCHING",
+          "rejection_reasons": [
+            "RSI2_70.54_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "GS",
+          "date": "2026-09-23",
+          "price": 936.36,
+          "close": 936.36,
+          "sma_200": 950.6203,
+          "sma_200_pass": false,
+          "above_200_sma": false,
+          "rs_stock_60d": -7.77,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -7.77,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 19.94,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-13",
+          "next_earnings_date": "2026-10-13",
+          "daily_atr_14": 27.466,
+          "atr_14": 27.466,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "CLOSE_936.36_BELOW_200_SMA_950.62",
+            "WEAKER_THAN_QQQ_STOCK_-7.77%_QQQ_+2.47%",
+            "RSI2_19.94_NOT_BELOW_10"
+          ]
+        }
+      ],
+      "positions": [],
+      "last_scan_time": null,
+      "last_scan_session_date": null,
+      "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+      "last_close_data_note": null,
+      "last_close_entries_withheld": false
+    }
+  },
+  "blocked": {
+    "type": "STATE_UPDATE",
+    "timestamp": "2026-09-28T09:50:00-04:00",
+    "account": {
+      "equity": 50000.0,
+      "cash": 50000.0,
+      "buying_power": 200000.0,
+      "daily_pnl": 0.0,
+      "daily_pnl_pct": 0.0,
+      "daily_drawdown": 0.0,
+      "daily_drawdown_pct": 0.0,
+      "is_circuit_broken": false,
+      "risk_level": "NORMAL",
+      "status": "ACTIVE",
+      "daily_starting_equity": 50000.0
+    },
+    "market_context": {
+      "vix": 20.0,
+      "vix_regime": "NORMAL",
+      "time_phase": "MIDDAY_CHOP",
+      "market_status": "OPEN",
+      "sizing_multiplier": 1.0,
+      "stop_multiplier": 1.0,
+      "market_trend": "UNKNOWN"
+    },
+    "strategies": [
+      {
+        "id": "orb",
+        "name": "Opening Range Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Morning only. Needs the first 5 minutes to set the range."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "vwap_pullback",
+        "name": "VWAP Trend Pullback & Continuation",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "11:30"
+            ],
+            [
+              "14:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 11:30 AM.",
+          "next_change_at": "2026-09-28T11:30:00-04:00",
+          "blockers": [
+            "Paused by operator.",
+            "Market direction unknown."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "news_momentum",
+        "name": "Catalyst News Momentum Breakout",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:30 AM - 3:45 PM",
+          "ranges": [
+            [
+              "09:30",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "In its trading hours until 3:45 PM.",
+          "next_change_at": "2026-09-28T15:45:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [
+            "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
+          ],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+          "notes": [
+            "Rare by design: needs very strong news plus a volume spike."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "mean_reversion",
+        "name": "Statistical Mean Reversion / Exhaustion Fades",
+        "status": "PAUSED",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "window": {
+          "state": "PAUSED",
+          "headline": "Paused",
+          "can_open_now": false,
+          "in_hours": false,
+          "hours": "10:00 AM - 3:45 PM",
+          "ranges": [
+            [
+              "10:00",
+              "15:45"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Outside its hours. Opens at 10:00 AM.",
+          "next_change_at": "2026-09-28T10:00:00-04:00",
+          "blockers": [
+            "Paused by operator."
+          ],
+          "limits": [],
+          "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+          "notes": [
+            "Sits out the opening half hour."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "tsla_asymmetric_dual",
+        "name": "TSLA Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "TSLA",
+          "phase": "SKIPPED",
+          "reason": "MISSING_REQUIRED_BAR",
+          "quantity": 0,
+          "side": null,
+          "mode": "alpaca_paper",
+          "risk_reserved": 0.0,
+          "risk_budget": null,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "DONE_FOR_DAY",
+          "headline": "Skipped today; a required check did not pass.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201311:30 ET",
+          "ranges": [
+            [
+              "09:45",
+              "11:30"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Skipped today; a required check did not pass.",
+          "next_change_at": null,
+          "blockers": [
+            "Session checks did not pass."
+          ],
+          "limits": [],
+          "market_text": "Skipped today; a required check did not pass.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      },
+      {
+        "id": "cde_asymmetric_dual",
+        "name": "CDE Asymmetric Opening Range",
+        "status": "ACTIVE",
+        "daily_pnl": 0.0,
+        "win_rate": 0.0,
+        "trades_count": 0,
+        "sharpe": 0.0,
+        "tri_engine": {
+          "version": "ASYMMETRIC_DUAL_PAPER_V1",
+          "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+          "symbol": "CDE",
+          "phase": "SKIPPED",
+          "reason": "MISSING_REQUIRED_BAR",
+          "quantity": 0,
+          "side": null,
+          "mode": "alpaca_paper",
+          "risk_reserved": 0.0,
+          "risk_budget": null,
+          "or_high": null,
+          "or_low": null,
+          "or_mid": null,
+          "qqq_close": null,
+          "qqq_vwap": null,
+          "entry_due": null,
+          "incomplete": false,
+          "tranches": []
+        },
+        "window": {
+          "state": "DONE_FOR_DAY",
+          "headline": "Skipped today; a required check did not pass.",
+          "can_open_now": false,
+          "in_hours": true,
+          "hours": "9:45 AM\u201312:00 ET",
+          "ranges": [
+            [
+              "09:45",
+              "12:00"
+            ]
+          ],
+          "trading_day": true,
+          "schedule_text": "Skipped today; a required check did not pass.",
+          "next_change_at": null,
+          "blockers": [
+            "Session checks did not pass."
+          ],
+          "limits": [],
+          "market_text": "Skipped today; a required check did not pass.",
+          "notes": [
+            "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+          ],
+          "evaluated_at": "2026-09-28T09:50:00-04:00"
+        },
+        "decisions": {
+          "signals_today": 0,
+          "orders_today": 0,
+          "blocked_today": 0,
+          "top_block_reason": null,
+          "top_block_text": null,
+          "blocked_by_reason": {}
+        }
+      }
+    ],
+    "primary_position": null,
+    "all_positions": [],
+    "positions_count": 0,
+    "working_orders_count": 0,
+    "ledger_revision": 0,
+    "persistence": {
+      "status": "disabled",
+      "last_checkpoint_at": null,
+      "restored_at": null
+    },
+    "ingestion": {
+      "stock": "connected",
+      "news": "unconfigured",
+      "vix": "unconfigured"
+    },
+    "broker": {
+      "mode": "simulated",
+      "account_number": null,
+      "mismatch": false
+    },
+    "recent_news": [],
+    "recent_activity": [],
+    "swing": {
+      "status": "STANDBY",
+      "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+      "allocated_capital": 50000.0,
+      "slot_notional": 25000.0,
+      "max_slots": 2,
+      "active_slots_used": 0,
+      "available_slots": 2,
+      "flattening_exempt": true,
+      "candidates": [
+        {
+          "symbol": "LRCX",
+          "date": "2026-09-23",
+          "price": 307.28,
+          "close": 307.28,
+          "sma_200": 268.9575,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -25.14,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -25.14,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 73.59,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-21",
+          "next_earnings_date": "2026-10-21",
+          "daily_atr_14": 15.6091,
+          "atr_14": 15.6091,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-25.14%_QQQ_+2.47%",
+            "RSI2_73.59_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "KLAC",
+          "date": "2026-09-23",
+          "price": 187.86,
+          "close": 187.86,
+          "sma_200": 174.9609,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -32.44,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -32.44,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 89.29,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-29",
+          "next_earnings_date": "2026-10-29",
+          "daily_atr_14": 8.43,
+          "atr_14": 8.43,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-32.44%_QQQ_+2.47%",
+            "RSI2_89.29_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "MU",
+          "date": "2026-09-23",
+          "price": 1071.88,
+          "close": 1071.88,
+          "sma_200": 652.5792,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": -6.39,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -6.39,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 62.4,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-09-30",
+          "next_earnings_date": "2026-09-30",
+          "daily_atr_14": 49.8424,
+          "atr_14": 49.8424,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
+            "RSI2_62.40_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "AMD",
+          "date": "2026-09-23",
+          "price": 614.61,
+          "close": 614.61,
+          "sma_200": 360.6494,
+          "sma_200_pass": true,
+          "above_200_sma": true,
+          "rs_stock_60d": 13.92,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": 13.92,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": true,
+          "rs_pass": true,
+          "rsi_2": 70.54,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-27",
+          "next_earnings_date": "2026-10-27",
+          "daily_atr_14": 25.1157,
+          "atr_14": 25.1157,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "WATCHING",
+          "rejection_reasons": [
+            "RSI2_70.54_NOT_BELOW_10"
+          ]
+        },
+        {
+          "symbol": "GS",
+          "date": "2026-09-23",
+          "price": 936.36,
+          "close": 936.36,
+          "sma_200": 950.6203,
+          "sma_200_pass": false,
+          "above_200_sma": false,
+          "rs_stock_60d": -7.77,
+          "rs_qqq_60d": 2.47,
+          "rs_60d_stock": -7.77,
+          "rs_60d_qqq": 2.47,
+          "relative_strength_ok": false,
+          "rs_pass": false,
+          "rsi_2": 19.94,
+          "rsi_pass": false,
+          "panic_trigger": false,
+          "earnings_blackout": false,
+          "earnings_date": "2026-10-13",
+          "next_earnings_date": "2026-10-13",
+          "daily_atr_14": 27.466,
+          "atr_14": 27.466,
+          "qualified": false,
+          "is_held": false,
+          "is_staged": false,
+          "status": "INELIGIBLE",
+          "rejection_reasons": [
+            "CLOSE_936.36_BELOW_200_SMA_950.62",
+            "WEAKER_THAN_QQQ_STOCK_-7.77%_QQQ_+2.47%",
+            "RSI2_19.94_NOT_BELOW_10"
+          ]
+        }
+      ],
+      "positions": [],
+      "last_scan_time": null,
+      "last_scan_session_date": null,
+      "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+      "last_close_data_note": null,
+      "last_close_entries_withheld": false
+    }
+  }
+}

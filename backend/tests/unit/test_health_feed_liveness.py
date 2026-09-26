@@ -95,7 +95,8 @@ async def test_health_publishes_the_live_risk_limits():
     limits = (await main.get_health())["limits"]
     assert limits["max_position_notional"] == 25000.0
     assert limits["max_position_equity_pct"] == 0.500
-    assert limits["max_daily_loss_dollars"] == 1500.0
+    # Tri-engine plan: stop the day at 2.5% of session-start equity or $1,500, whichever is smaller.
+    assert limits["max_daily_loss_dollars"] == min(1500.0, main.account.equity * .025)
     assert limits["max_concurrent_positions"] == 3
     assert limits["stop_distance_pct"] == [0.004, 0.040]
 
@@ -135,3 +136,18 @@ async def test_vix_health_reports_a_fresh_print_as_fresh():
     vix = (await main.get_health())["feeds"]["vix"]
     assert vix["value_age_sec"] < 30.0
     assert vix["stale"] is False
+
+
+def test_restart_keeps_the_tighter_daily_loss_limit(tmp_path, monkeypatch):
+    """A mid-day restart must rebuild 2.5% of today's opening equity, not the $1,500 default."""
+    from backend.app.core.persistence import TradingStateStore
+    store = TradingStateStore(str(tmp_path / "limit.sqlite3"))
+    monkeypatch.setattr(main, "state_store", store)
+    main.reset_runtime_state()
+    main.account.daily_starting_equity = 49702.10
+    main._checkpoint_runtime("LIMIT_TEST")
+    main.risk_engine.config.hard_max_daily_loss_dollars = 1500.0  # what a fresh process starts with
+    assert main._restore_checkpoint()
+    assert main.risk_engine.config.hard_max_daily_loss_dollars == 49702.10 * .025
+    main.reset_runtime_state()
+    store.close()

@@ -59,6 +59,20 @@ export interface StrategyState {
   sharpe?: number | null;
   subtitle?: string;
   description?: string;
+  tri_engine?: {
+    version: string;
+    symbol: string;
+    phase: string;
+    reason: string | null;
+    quantity: number;
+    side: string | null;
+    mode: string;
+    risk_reserved: number;
+    risk_budget: number | null;
+    entry_due: string | null;
+    incomplete: boolean;
+    tranches: FixedTranche[];
+  };
   or15?: {
     phase: string;
     reason: string | null;
@@ -74,6 +88,19 @@ export interface StrategyState {
   };
 }
 
+export interface FixedTranche {
+  id: number;
+  qty: number;
+  closed_qty: number;
+  target: number;
+  target_r: number;
+  stop: number;
+  exit_due: string;
+  exit_reason: string | null;
+  protection_confirmed: boolean;
+  protection_terminal: boolean;
+}
+
 export interface ChartPoint {
   time: string | number;
   open: number;
@@ -84,6 +111,7 @@ export interface ChartPoint {
 }
 
 export interface Position {
+  tranches?: FixedTranche[];
   symbol: string;
   side: "LONG" | "SHORT" | string;
   shares: number;

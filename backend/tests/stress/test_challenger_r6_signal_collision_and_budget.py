@@ -402,6 +402,9 @@ class TestR6AdversarialCircuitBreakerLossBudgeting:
         ($20 risk) under $1,490 drawdown creates an order capped to 5 shares ($10 risk).
         """
         _reset_main_state()
+        # Budget-capping mechanics at a $10 remaining budget; the limit level itself
+        # (min($1,500, 2.5% equity) since 2026-09-25) is covered by the health test.
+        monkeypatch.setattr(main.risk_engine.config, "hard_max_daily_loss_dollars", 1500.0)
         monkeypatch.setattr(main.adaptation_engine.market_filter, "is_signal_permitted", lambda **kwargs: (True, "OK"))
 
         # Set account equity to $48,510 ($1,490 drawdown)
@@ -424,12 +427,13 @@ class TestR6AdversarialCircuitBreakerLossBudgeting:
         max_possible_loss = order.qty * abs(order.limit_price - order.stop_price)
         assert max_possible_loss == 10.00
 
-    def test_direct_injection_bypass_rejected_by_pre_trade_validator(self):
+    def test_direct_injection_bypass_rejected_by_pre_trade_validator(self, monkeypatch):
         """If an adversary attempts to bypass execute_strategy_signal and inject an un-capped
         10-share order ($20 risk) directly into engine.submit_order under $1,490 drawdown,
         pre_trade_risk_validator must intercept and REJECT with RISK_SIZE_REJECTED.
         """
         _reset_main_state()
+        monkeypatch.setattr(main.risk_engine.config, "hard_max_daily_loss_dollars", 1500.0)
         main.account.cash = 48510.0
         main.account.equity = 48510.0
 

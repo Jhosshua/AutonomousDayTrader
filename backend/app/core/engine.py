@@ -13,6 +13,7 @@ import uuid
 
 from backend.app.core.account import PaperTradingAccount, TradingArm
 from backend.app.models.events import OrderSide, OrderType, OrderState
+from backend.app.strategies.tri_engine import FIXED_IDS, TRI_IDS
 
 log = logging.getLogger("engine")
 
@@ -220,6 +221,8 @@ class ExecutionEngine:
         """Fill `order` for real. Returns (shares, avg price) newly filled; raises BrokerError."""
         from backend.app.core.broker import BrokerError, BrokerNoFill, BrokerReject, is_terminal
         broker = self.broker
+        if order.execution_policy in TRI_IDS:
+            raise BrokerReject("Tri-engine orders require their dedicated lifecycle", hard=True)
         if time.monotonic() < self._broker_retry_after.get(f"sym:{order.symbol}", 0.0):
             raise BrokerNoFill(f"{order.symbol} is in broker backoff")
         is_exit = self._reduces_position(order)
@@ -265,13 +268,13 @@ class ExecutionEngine:
 
         # 4. Send a new order with a client id that is stable across restarts.
         order.broker_attempts += 1
-        if order.execution_policy == "tsla_or15_retest" and order.side == OrderSide.BUY:
+        if order.execution_policy in FIXED_IDS and order.side == OrderSide.BUY:
             order.broker_client_id = f"adt-or15-{order.created_at.date().isoformat()}-entry"
         elif order.fixed_intent_client_id and order.broker_attempts == 1:
             order.broker_client_id = order.fixed_intent_client_id
         else:
             order.broker_client_id = f"adt-{order.id}-{order.broker_attempts}"
-        if order.execution_policy == "tsla_or15_retest":
+        if order.execution_policy in FIXED_IDS:
             before_submit = getattr(self, "before_fixed_broker_submit", None)
             if before_submit is None or not before_submit(order):
                 raise BrokerReject("OR15 order intent could not be persisted", hard=True)
@@ -304,6 +307,8 @@ class ExecutionEngine:
         if self.broker is None:
             return fills
         for order in list(self.orders.values()):
+            if order.execution_policy in TRI_IDS:
+                continue  # Dedicated controller reconciles cumulative fills and tranche ownership.
             if order.fixed_intent_client_id and order.side == OrderSide.SELL:
                 if order.status.value == "FILLED":
                     continue
@@ -441,7 +446,8 @@ class ExecutionEngine:
         # 1. Account Buying Power & Concentration check
         est_price = order.limit_price or order.estimated_price or order.stop_price or 100.0
         can_afford, afford_reason = self.account.can_afford(
-            order.symbol, order.side.value, order.qty, est_price
+            order.symbol, order.side.value, order.qty, est_price,
+            concentration_cap=order.strategy_id not in TRI_IDS,  # tri plan sizes by 0.75% stop risk
         )
         if not can_afford:
             return self._reject_order(order, afford_reason)
@@ -491,7 +497,7 @@ class ExecutionEngine:
         cancelled = []
         for order_id in list(self.working_orders.keys()):
             order = self.working_orders.get(order_id)
-            if order and order.execution_policy == "tsla_or15_retest":
+            if order and order.execution_policy in FIXED_IDS:
                 continue  # native protection is canceled/settled by its controller
             if order and arm is not None and getattr(order, "arm", None) != arm:
                 continue
@@ -557,7 +563,7 @@ class ExecutionEngine:
         fills: List[Fill] = []
         matching_orders = [
             o for o in list(self.working_orders.values())
-            if o.symbol == symbol and o.execution_policy != "tsla_or15_retest" and not (
+            if o.symbol == symbol and o.execution_policy not in FIXED_IDS and not (
                 o.arm == TradingArm.SWING and o.side == OrderSide.BUY
                 and o.strategy_id == "swing_panic_dip"
             )
@@ -616,7 +622,7 @@ class ExecutionEngine:
         fills: List[Fill] = []
         matching_orders = [
             o for o in list(self.working_orders.values())
-            if o.symbol == symbol and o.execution_policy != "tsla_or15_retest" and not (
+            if o.symbol == symbol and o.execution_policy not in FIXED_IDS and not (
                 o.arm == TradingArm.SWING and o.side == OrderSide.BUY
                 and o.strategy_id == "swing_panic_dip"
             )
@@ -710,7 +716,7 @@ class ExecutionEngine:
             self._broker_retry_after.pop(order.id, None)
             slippage = (price - trigger_price) if order.side == OrderSide.BUY else (trigger_price - price)
             fee = 0.0
-            if order.execution_policy == "tsla_or15_retest":
+            if order.execution_policy in FIXED_IDS:
                 timestamp = order.broker_fill_timestamp or datetime.now(timezone.utc)
         else:
             fee = self.calculate_fees(order.side, qty, price)
@@ -732,7 +738,7 @@ class ExecutionEngine:
             symbol=order.symbol,
             side=order.side,
             qty=qty,
-            price=price if order.execution_policy == "tsla_or15_retest" else round(price, 4),
+            price=price if order.execution_policy in FIXED_IDS else round(price, 4),
             fee=fee,
             slippage=round(slippage, 4),
             realized_pnl=0.0,
@@ -746,7 +752,7 @@ class ExecutionEngine:
 
         # Update order weighted average fill price
         total_val = sum(f.qty * f.price for f in order.fills)
-        order.avg_fill_price = (total_val / order.filled_qty if order.execution_policy == "tsla_or15_retest"
+        order.avg_fill_price = (total_val / order.filled_qty if order.execution_policy in FIXED_IDS
                                 else round(total_val / order.filled_qty, 4))
 
         # Apply to account ledger

@@ -469,3 +469,16 @@ The completed 2026-09-24 operator-window plan was removed from the active notes 
 - **Post-deploy bug found and fixed (B7)**: the $1,500 daily loss breaker measures from `risk_engine.config.starting_equity`, which was not in the checkpoint, so every restart re-armed it against the $50,000 default instead of today's opening equity (live after the 14:13 ET restart: day start $49,798.32, breaker baseline $50,000, $202 too strict; after a winning streak it would allow more than $1,500 of loss). Fix in `restore_runtime_state`; test `test_restore_keeps_daily_loss_baseline_at_todays_starting_equity`.
 - **Open**: `/api/trades?range=today` filters by entry session_date, so a trade closed today but entered yesterday is not in "today".
 - **Next session priorities**: find the counter drift root cause; watch the first full session on the new UI.
+
+
+### 2026-09-26: Tesla + Coeur Morning Plan (tri-engine) built and deployed to paper
+- **Worked on**: The Codex run of this goal died mid-build (OpenAI key 401). Resumed in Claude Code: fixed the half-built integration (38 failing tests), Codex review E1-E6, two attack rounds, real-data replays, UI audit, deploy.
+- **Decisions** (What / Why / Rejected):
+  - Longs AND shorts use a market order at T+2. Why: the plan's numbers come from a T+2 raw-open fill; a passive limit at the range high fills mostly on losers. Rejected: passive limit (plan table wording). Operator chose.
+  - TSLA is first come, first served with the older arms. Operator chose. Rejected: reserving TSLA/CDE from 09:30.
+  - Opening range = 09:30-09:44 as written. Operator chose, after being shown that the research used 04:00-09:44 and that the as-written version backtests weaker (TSLA 2R p=.13, CDE p=.19). Rejected: pre-market range (reproduces plan numbers, needs pre-market bars from the relay).
+  - Plan orders skip the $25k per-position cap and are sized by 0.75% stop risk; buying power still limits (tight-stop shorts shrink to fit). Why: the cap refused 92/146 real 2026 TSLA trades. Other arms keep the cap.
+  - Daily loss stop account-wide = min($1,500, 2.5% session-start equity), rebuilt on restore. Why: plan's -2.5R portfolio breaker; the stricter reading.
+  - Missing bars after 09:45 tolerated like the research loop; partial entries kept; feed outage never closes a trade; transient Alpaca errors retried, not treated as a reason to exit.
+- **Verified**: parity 565/565 TSLA sessions vs research (with its quirks emulated); real-day handler replay 145/146 TSLA and 178/178 simulable CDE exits identical to the research simulator; dry run 29/29; backend 773 passed (1 pre-existing date-bound swing test fails on HEAD too); old-to-new checkpoint upgrade; UI 7 states x 2 widths.
+- **Next session priorities**: watch the first live session (Mon 2026-09-28): `/api/tri-engine`, Railway logs for `tri_execution`, both TSLA OCOs accepted at Alpaca, `/health` broker mismatch false. Fix the date-bound swing test.

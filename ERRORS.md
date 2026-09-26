@@ -367,3 +367,24 @@ right. Run the mutation check.
 **What did not work:** `0 <= age` on bar completion and quote freshness. Replays feed exact timestamps so every test passed, but a live host clock a few tens of ms behind the exchange makes complete bars look unfinished and skips the day.
 **What worked instead:** measure real arrival lag on the deployed host (relay probe via `railway ssh`), then allow a small skew (0.5 s) below zero.
 **Note for next time:** any freshness check comparing exchange timestamps to the local clock needs a skew bound, and a test with a slightly early/future stamp.
+
+
+## 2026-09-26: the plan's statistics were measured on a different opening range
+- **What did not work**: Trusting that the research script implemented the plan's text. Its data files start at 04:00 ET, and `minute_et < "09:45"` pulled pre-market into the "15-minute" range and the QQQ VWAP.
+- **What worked instead**: Replay the live signal code over the research's own bars and compare day by day (`scripts/tri_research_parity.py`). 211/565 days differed; emulating the pre-market range made it 565/565.
+- **Note for next time**: Before building any researched strategy, run a day-by-day signal parity against the research artifact. Matching the rule text is not enough.
+
+## 2026-09-26: synthetic $100 bars hid a cap that blocked 63% of real trades
+- **What did not work**: The dry run used $100 prices, so the $25k per-position cap never bound. Real 2026 TSLA days (~$430) were refused on 92 of 146 plan trades, in two separate places (`risk.py` q_alloc and `account.can_afford`).
+- **What worked instead**: Replay real days through `main.handle_bar_event` and compare against the research simulator (`scripts/tri_real_day_replay.py`).
+- **Note for next time**: End-to-end dry runs need at least one pass on real prices and sizes, not only toy numbers.
+
+## 2026-09-26: new frozen source file missing from the Docker image
+- **What did not work**: Startup refuses to run if `docs/tri_engine/SOURCE_EXECUTION_PLAN.md` hash is wrong or missing, but the Dockerfile only copied the OR15 source file. Tests passed because they run from the repo.
+- **What worked instead**: Add the COPY line; check by copying exactly the Dockerfile's paths to a temp dir and running the startup hash checks there.
+- **Note for next time**: Any file read at startup must be grepped against the Dockerfile COPY lines.
+
+## 2026-09-26: FastAPI websocket 403 with postponed annotations
+- **What did not work**: `run_tri_engine_dry_run.py --serve` imported `WebSocket` inside a function while the module uses `from __future__ import annotations`; FastAPI could not resolve the type, treated `ws` as a query param and refused every connection (403). The dashboard sat on "Connecting to the robot".
+- **What worked instead**: Import `WebSocket` at module level.
+- **Note for next time**: The local dashboard only connects to port 8005 (`useTradingStream.ts`); serve snapshots there.

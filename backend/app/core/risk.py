@@ -339,7 +339,7 @@ class InstitutionalRiskEngine:
 
         stop_dist_pct = stop_dist / entry_price
         EPS = 1e-6  # Tolerance for IEEE 754 floating-point representation discrepancies
-        fixed_or15 = strategy_id == "tsla_or15_retest"
+        fixed_or15 = strategy_id in {"tsla_or15_retest", "tsla_asymmetric_dual", "cde_asymmetric_dual"}
         if stop_dist_pct < self.config.min_stop_distance_pct - EPS and not fixed_or15:
             return RiskCheckResult(
                 approved=False,
@@ -380,6 +380,8 @@ class InstitutionalRiskEngine:
         max_notional = account_equity * self.config.max_position_equity_pct
         available_notional = max(0.0, max_notional - existing_position_notional)
         q_alloc = int(math.floor(available_notional / entry_price))
+        if strategy_id in {"tsla_asymmetric_dual", "cde_asymmetric_dual"}:
+            q_alloc = int(math.floor(buying_power / entry_price))  # sized by the plan's 0.75% risk only
         # Buying power capacity
         q_bp = int(math.floor(buying_power / entry_price))
 

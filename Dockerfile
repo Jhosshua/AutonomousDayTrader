@@ -17,6 +17,7 @@ COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend ./backend
 COPY docs/tsla_or15/SOURCE_EXECUTION_PLAN.md ./docs/tsla_or15/SOURCE_EXECUTION_PLAN.md
+COPY docs/tri_engine/SOURCE_EXECUTION_PLAN.md ./docs/tri_engine/SOURCE_EXECUTION_PLAN.md
 COPY --from=ui-build /src/frontend/out ./frontend/out
 COPY tests ./tests
 COPY scripts ./scripts
