@@ -304,10 +304,13 @@ class AsymmetricDualStrategy(Strategy):
                   "CLOSED": "Finished today's trade.", "SKIPPED": "Skipped today; a required check did not pass.",
                   "NO_SIGNAL": "No qualifying setup today.", "WAITING_SESSION": "Waiting for the next session."}
         headline = labels.get(self.phase, self.phase)
+        closed_day = not bounds or self.reason == "CALENDAR_UNAVAILABLE_OR_CLOSED"
+        if closed_day:
+            headline = "Market closed today."  # a weekend or holiday is normal, not a failed check
         blockers = list(blockers)
         if self.status != StrategyStatus.ACTIVE:
             blockers.append("Paused by operator.")
-        if self.phase == "SKIPPED":
+        if self.phase == "SKIPPED" and not closed_day:
             blockers.append("Session checks did not pass.")
         done = self.phase in TERMINAL_PHASES
         state = ("MARKET_CLOSED" if not bounds else "MANAGING" if self.phase in ACTIVE_PHASES | {"WAITING_ENTRY"}

@@ -389,3 +389,12 @@ def test_ui_state_and_paper_contract_for_blocked_active_and_early_close_states(s
     assert data["mode"] == "alpaca_paper" and data["quantity"] == 10
     early = s.window(datetime(2026, 11, 27, 10, tzinfo=ET), [])
     assert any("12:55 PM" in text for text in early["notes"])
+
+
+def test_weekend_card_says_market_closed_not_failed_check():
+    s = AsymmetricDualStrategy("TSLA")
+    saturday = datetime(2026, 9, 26, 10, 0, tzinfo=ET)
+    s.on_time_tick(saturday)
+    w = s.window(saturday, [])
+    assert w["state"] == "MARKET_CLOSED" and w["headline"] == "Market closed today."
+    assert not w["blockers"]
