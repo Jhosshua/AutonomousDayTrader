@@ -199,6 +199,13 @@ session summaries, and completed-trade execution legs. The September 21 recovery
 stored as `LEGACY_SUMMARY_IMPORT`: its verified $49,978.66 closing equity, five-trade
 count, and -$21.34 session result are preserved without inventing lost fills.
 
+History groups saved days newest first, including days with no finished trades.
+Filters are Today, Yesterday, 7 days, and All; dates and trade times use Eastern
+time. When today has no finished trades, the dashboard previews the last three
+saved days. Normal daily summaries and recovered daily totals remain distinct.
+Mixed UTC/Eastern execution timestamps are sorted by actual time, including
+across pagination. The API accepts `range=yesterday` and includes `sessions`.
+
 ### Research data for backtesting (2026-09-25)
 
 Observation only. Every emitted intraday signal (with its outcome, the strategy's

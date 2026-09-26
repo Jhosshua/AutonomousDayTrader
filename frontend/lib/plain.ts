@@ -10,6 +10,29 @@
 // Strategy identity: friendly names, colors ("muted palette"), and copy
 // ---------------------------------------------------------------------------
 
+export function planStatusText(reason: string): string {
+  const messages: Record<string, string> = {
+    CALENDAR_UNAVAILABLE_OR_CLOSED: "Market closed today.",
+    OPERATOR_PAUSED: "Paused by you.",
+    MISSING_OPENING_RANGE_BAR: "Skipped today because the opening price data was incomplete.",
+    MISSING_REQUIRED_BAR: "Skipped today because required price data was missing.",
+    MISSED_ENTRY_WINDOW: "The entry window passed before an order could be sent.",
+    SYMBOL_ALREADY_COMMITTED: "Another strategy is already trading this stock.",
+    PAPER_BROKER_OR_SIP_UNAVAILABLE: "Waiting for the paper broker and live price feed.",
+    ENTRY_NOT_FILLED: "The entry order did not fill.",
+    INSUFFICIENT_RISK_OR_BUYING_POWER: "There was not enough buying power or risk budget for this trade.",
+    NON_POSITIVE_RISK: "The price was already beyond the planned safety exit.",
+    PROTECTION_REJECTED: "The broker could not accept the safety exits. Closing the trade.",
+  };
+  return messages[reason] || "A required trading check did not pass.";
+}
+
+export function historyDateLabel(day: string): string {
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", {
+    timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric", year: "numeric",
+  });
+}
+
 export interface StrategyTheme {
   name: string;
   band: string; // card header background

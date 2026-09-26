@@ -34,6 +34,10 @@ log = logging.getLogger("tri_execution")
 FILL_RISK_TOLERANCE = 1.5
 
 
+def transient_error(exc: Exception) -> bool:
+    return isinstance(exc, httpx.HTTPError) or (isinstance(exc, BrokerError) and not exc.hard)
+
+
 def validate_tri_state(s, account, engine) -> None:
     phases = ACTIVE_PHASES | {"WAITING_SESSION", "BUILDING_RANGE", "WAITING_BREAKOUT", "WAITING_RETEST",
                             "WAITING_ENTRY", "SKIPPED", "NO_SIGNAL", "CLOSED"}
@@ -99,6 +103,8 @@ class TriExecutionController:
         self._pool = None
         self._jobs = {}
         self._last_start = {}
+        self._io_errors = {}
+        self._retry_after = {}
         self.inline_io = False  # deterministic HTTP transport tests only
 
     def shutdown(self) -> None:
@@ -107,6 +113,8 @@ class TriExecutionController:
         self._pool = None
         self._jobs.clear()
         self._last_start.clear()
+        self._io_errors.clear()
+        self._retry_after.clear()
 
     def _io(self, key: str, work, now: datetime | None = None, every: float = 0.):
         """Return (finished, result); exceptions are handled by the owning state.
@@ -116,22 +124,33 @@ class TriExecutionController:
         """
         future = self._jobs.get(key)
         if future is None:
+            if now is not None and key in self._retry_after and now < self._retry_after[key]:
+                return False, None
             last = self._last_start.get(key)
             if now is not None and last is not None and (now-last).total_seconds() < every:
                 return False, None
             if now is not None:
                 self._last_start[key] = now
-        if self.inline_io:
-            return True, work()
-        if future is None:
+        if not self.inline_io and future is None:
             if self._pool is None:
                 self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="TriPaperIO")
             self._jobs[key] = self._pool.submit(work)
             return False, None
-        if not future.done():
+        if not self.inline_io and not future.done():
             return False, None
-        del self._jobs[key]
-        return True, future.result()
+        if not self.inline_io:
+            del self._jobs[key]
+        try:
+            result = work() if self.inline_io else future.result()
+        except Exception as exc:
+            self._io_errors[key] = f"{type(exc).__name__}: {exc}"
+            retry = getattr(exc, "retry_sec", None)
+            if now is not None and retry is not None and math.isfinite(retry) and retry > 0:
+                self._retry_after[key] = now + timedelta(seconds=retry)
+            raise
+        self._io_errors.pop(key, None)
+        self._retry_after.pop(key, None)
+        return True, result
 
     def owns(self, symbol: str) -> bool:
         pos = self.r.account.positions.get(symbol.upper())
@@ -153,9 +172,7 @@ class TriExecutionController:
         each). Other arms keep their own risk limits and are not counted.
         """
         r = self.r
-        total = 0.0
-        for s in self.strategies:
-            total += sum(max(0, t["qty"] - t["closed_qty"]) * t["risk_per_share"] for t in s.tranches)
+        total = sum(self._filled_risk(s) for s in self.strategies)
         for order in r.engine.working_orders.values():
             if (order.id == exclude_order or order.strategy_id not in TRI_IDS
                     or r.engine._reduces_position(order)):
@@ -165,6 +182,24 @@ class TriExecutionController:
                 return math.inf
             total += order.remaining_qty * abs(price - order.stop_price)
         return total
+
+    def _filled_risk(self, s) -> float:
+        total = sum(max(0, t["qty"] - t["closed_qty"]) * t["risk_per_share"] for t in s.tranches)
+        entry = self.r.engine.orders.get(s.entry_order_id)
+        allocated = sum(t["qty"] for t in s.tranches)
+        if entry and entry.filled_qty > allocated:
+            # A partial fill owns shares before the rest is canceled and the
+            # tranches are cut. Include their actual, not quoted, stop risk.
+            notional = sum(f.qty * f.price for f in entry.fills) - sum(t["qty"] * t["entry_price"] for t in s.tranches)
+            qty = entry.filled_qty - allocated
+            total += max(0., (1 if s.side == "LONG" else -1) * (notional - qty * s.stop))
+        return total
+
+    def _refresh_risk(self, s) -> None:
+        s.risk_reserved = self._filled_risk(s)
+        entry = self.r.engine.orders.get(s.entry_order_id)
+        if entry and not s.entry_terminal:
+            s.risk_reserved += entry.remaining_qty * abs((entry.limit_price or entry.estimated_price) - s.stop)
 
     def validate_entry(self, order) -> tuple[bool, str]:
         if order.strategy_id not in TRI_IDS:
@@ -225,7 +260,7 @@ class TriExecutionController:
     @staticmethod
     def _signature(s) -> tuple:
         return (s.phase, s.reason, s.exit_reason, s.incomplete, s.entry_terminal, len(s.audit),
-                s.quantity, repr(s.tranches),
+                s.quantity, s.last_error, repr(s.tranches),
                 repr(sorted((k, n.get("id"), n.get("status"), n.get("booked_qty")) for k, n in s.native.items())))
 
     def tick(self, now: datetime) -> None:
@@ -240,11 +275,13 @@ class TriExecutionController:
         for s, old in zip(self.strategies, before):
             try:
                 self._tick_one(s, now)
+                errors = [error for key, error in self._io_errors.items() if key.startswith(s.strategy_id + ":")]
+                s.last_error = errors[-1] if errors and s.phase in ACTIVE_PHASES else None
             except Exception as exc:
                 s.last_error = f"{type(exc).__name__}: {exc}"
                 # Network blips and 429/5xx are retried; the native OCO keeps
                 # protecting meanwhile. Only integrity failures end the trade.
-                transient = isinstance(exc, httpx.HTTPError) or (isinstance(exc, BrokerError) and not exc.hard)
+                transient = transient_error(exc)
                 log.warning("%s lifecycle (%s): %s", s.symbol, "retry" if transient else "exit", s.last_error)
                 if s.phase in ACTIVE_PHASES and not transient:
                     s.incomplete = True
@@ -266,8 +303,12 @@ class TriExecutionController:
         # A feed outage does not close a trade: stop/target rest at Alpaca and
         # time exits run on the clock.
         s.last_poll = now
+        errors = []
         if not s.entry_terminal:
-            self._entry_poll(s, now)
+            try:
+                self._entry_poll(s, now)
+            except Exception as exc:
+                errors.append(exc)
         for t in s.tranches:
             if now >= t["exit_due"]:
                 bounds = session_bounds(s.session_day)
@@ -275,7 +316,15 @@ class TriExecutionController:
                     "FORCED_FLAT" if bounds and t["exit_due"] == bounds[1]-timedelta(minutes=5) else "TIME_LIMIT")
             if s.exit_reason:
                 t["exit_reason"] = t.get("exit_reason") or s.exit_reason
-            self._manage_tranche(s, t, now)
+            try:
+                self._manage_tranche(s, t, now)
+            except Exception as exc:
+                errors.append(exc)
+        self._refresh_risk(s)
+        if errors:
+            # Each already-owned tranche still needs its protection and exits
+            # even when another tranche or the pending entry cannot be polled.
+            raise next((e for e in errors if not transient_error(e)), errors[0])
         self._maybe_complete(s, now)
 
     def _prepare_entry(self, s, price: float, now: datetime) -> None:
@@ -462,7 +511,7 @@ class TriExecutionController:
                 s.exit_reason = "BROKER_OCO_OVERFILL"
                 self.r.broker_state["mismatch"] = True
                 self.r.broker_state["mismatch_detail"] = "Native OCO filled beyond its tranche"
-        s.risk_reserved = sum(max(0, t["qty"]-t["closed_qty"])*t["risk_per_share"] for t in s.tranches)
+        self._refresh_risk(s)
 
     def _open_tranches(self, s, order, late: bool = False) -> None:
         """Split the finished entry into its fixed tranches (once).
@@ -474,11 +523,23 @@ class TriExecutionController:
             # Shares that filled after the tranches were cut: close them.
             extra = order.filled_qty-sum(t["qty"] for t in s.tranches)
             base = s.tranches[-1]
+            notional = sum(f.qty*f.price for f in order.fills) - sum(t["qty"]*t["entry_price"] for t in s.tranches)
+            price = notional / extra
+            at = max(f.timestamp for f in order.fills)
+            direction = 1 if s.side == "LONG" else -1
+            risk = direction * (price-s.stop)
+            minutes = 240 if s.symbol == "TSLA" and base["target_r"] == 2 else 180
+            bounds = session_bounds(s.session_day)
             tid = len(s.tranches)+1
             s.tranches.append({**base, "id": tid, "qty": extra, "closed_qty": 0, "exit_reason": "LATE_ENTRY_FILL",
+                "entry_price": price, "entry_at": at, "risk_per_share": max(0., risk),
+                "target": price+direction*base["target_r"]*risk,
+                "exit_due": min(at+timedelta(minutes=minutes), bounds[1]-timedelta(minutes=5)),
                 "protection_cid": f"adt-tri-{s.symbol}-{s.session_day.isoformat()}-t{tid}",
                 "protection_confirmed": False, "protection_terminal": False, "stop_order_id": None,
                 "target_order_id": None, "close_order_ids": [], "realized_pnl": 0., "exit_notional": 0.})
+            for key in ("exit_at", "broker_stop", "broker_target"):
+                s.tranches[-1].pop(key, None)
             s.note("LATE_ENTRY_FILL", self.r.or15_now(), extra=extra)
             s.risk_reserved = sum(max(0, t["qty"]-t["closed_qty"])*t["risk_per_share"] for t in s.tranches)
             return
@@ -555,7 +616,7 @@ class TriExecutionController:
                 return broker.submit_oco(s.symbol, remaining, t["protection_cid"],
                     broker_price(t["stop"], direction),
                     broker_price(t["target"], "down" if s.side == "LONG" else "up"),
-                    side="sell" if s.side == "LONG" else "buy")
+                    side="sell" if s.side == "LONG" else "buy", time_in_force="gtc")
             try:
                 ready, group = self._io(f"{s.strategy_id}:protect:{t['id']}", protect, now, 1.)
             except BrokerReject as exc:
@@ -591,7 +652,7 @@ class TriExecutionController:
         if t["protection_confirmed"] and not t["protection_terminal"]:
             target_n = s.native[t["target_order_id"]]
             def poll():
-                if exiting:
+                if exiting and not self.r._broker_gate(self.r.engine.orders[s.entry_order_id], True):
                     broker.request_cancel(target_n["id"])
                 return broker.get_order(target_n["id"])
             ready, group = self._io(f"{s.strategy_id}:group:{t['id']}", poll, now, 1. if exiting else self.POLL_SECONDS)

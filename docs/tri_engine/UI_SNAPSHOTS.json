@@ -216,6 +216,7 @@
           "phase": "HOLDING",
           "reason": null,
           "quantity": 124,
+          "last_error": null,
           "side": "LONG",
           "mode": "offline_raw_open",
           "risk_reserved": 372.0,
@@ -321,6 +322,7 @@
           "phase": "SKIPPED",
           "reason": "MISSING_OPENING_RANGE_BAR",
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "offline_raw_open",
           "risk_reserved": 0.0,
@@ -679,8 +681,8 @@
     "recent_news": [],
     "recent_activity": [
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "TSLA",
@@ -690,8 +692,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "TSLA",
@@ -701,8 +703,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "TSLA",
@@ -712,8 +714,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "TSLA",
@@ -1114,6 +1116,7 @@
           "phase": "HOLDING",
           "reason": null,
           "quantity": 124,
+          "last_error": null,
           "side": "LONG",
           "mode": "offline_raw_open",
           "risk_reserved": 186.0,
@@ -1144,7 +1147,7 @@
               "stop_order_id": null,
               "target_order_id": null,
               "close_order_ids": [
-                "ord_3fadbfc20a9e"
+                "ord_9b1566ad4dc2"
               ],
               "realized_pnl": 279.0,
               "exit_notional": 6603.0,
@@ -1222,6 +1225,7 @@
           "phase": "SKIPPED",
           "reason": "MISSING_OPENING_RANGE_BAR",
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "offline_raw_open",
           "risk_reserved": 0.0,
@@ -1311,7 +1315,7 @@
           "stop_order_id": null,
           "target_order_id": null,
           "close_order_ids": [
-            "ord_3fadbfc20a9e"
+            "ord_9b1566ad4dc2"
           ],
           "realized_pnl": 279.0,
           "exit_notional": 6603.0,
@@ -1543,7 +1547,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_3fadbfc20a9e"
+              "ord_9b1566ad4dc2"
             ],
             "realized_pnl": 279.0,
             "exit_notional": 6603.0,
@@ -1594,8 +1598,8 @@
     "recent_news": [],
     "recent_activity": [
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "TSLA",
@@ -1605,8 +1609,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "TSLA",
@@ -1616,8 +1620,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "TSLA",
@@ -1627,8 +1631,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "TSLA",
@@ -1638,8 +1642,8 @@
         "quantity": 124
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "TSLA",
@@ -1649,8 +1653,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "TSLA",
@@ -1660,8 +1664,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "TSLA",
@@ -1671,8 +1675,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "TSLA",
@@ -2073,6 +2077,7 @@
           "phase": "CLOSED",
           "reason": null,
           "quantity": 124,
+          "last_error": null,
           "side": "LONG",
           "mode": "offline_raw_open",
           "risk_reserved": 0.0,
@@ -2103,7 +2108,7 @@
               "stop_order_id": null,
               "target_order_id": null,
               "close_order_ids": [
-                "ord_3fadbfc20a9e"
+                "ord_9b1566ad4dc2"
               ],
               "realized_pnl": 279.0,
               "exit_notional": 6603.0,
@@ -2127,7 +2132,7 @@
               "stop_order_id": null,
               "target_order_id": null,
               "close_order_ids": [
-                "ord_171fa8adc780"
+                "ord_a7c74a713803"
               ],
               "realized_pnl": 372.0,
               "exit_notional": 6696.0,
@@ -2184,6 +2189,7 @@
           "phase": "SKIPPED",
           "reason": "MISSING_OPENING_RANGE_BAR",
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "offline_raw_open",
           "risk_reserved": 0.0,
@@ -2256,8 +2262,8 @@
     "recent_news": [],
     "recent_activity": [
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "TSLA",
@@ -2267,8 +2273,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "TSLA",
@@ -2278,8 +2284,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "TSLA",
@@ -2289,8 +2295,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_e54a6d24d94c",
-        "timestamp": "05:46:12",
+        "id": "ord_1486dff98e5e",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "TSLA",
@@ -2300,8 +2306,8 @@
         "quantity": 124
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "TSLA",
@@ -2311,8 +2317,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "TSLA",
@@ -2322,8 +2328,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "TSLA",
@@ -2333,8 +2339,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_3fadbfc20a9e",
-        "timestamp": "05:46:13",
+        "id": "ord_9b1566ad4dc2",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "TSLA",
@@ -2344,8 +2350,8 @@
         "quantity": 62
       },
       {
-        "id": "ord_171fa8adc780",
-        "timestamp": "05:46:13",
+        "id": "ord_a7c74a713803",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "TSLA",
@@ -2355,8 +2361,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_171fa8adc780",
-        "timestamp": "05:46:13",
+        "id": "ord_a7c74a713803",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "TSLA",
@@ -2366,8 +2372,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_171fa8adc780",
-        "timestamp": "05:46:13",
+        "id": "ord_a7c74a713803",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "TSLA",
@@ -2377,8 +2383,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_171fa8adc780",
-        "timestamp": "05:46:13",
+        "id": "ord_a7c74a713803",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "TSLA",
@@ -2779,6 +2785,7 @@
           "phase": "SKIPPED",
           "reason": "MISSING_OPENING_RANGE_BAR",
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "offline_raw_open",
           "risk_reserved": 0.0,
@@ -2842,6 +2849,7 @@
           "phase": "HOLDING",
           "reason": null,
           "quantity": 3124,
+          "last_error": null,
           "side": "SHORT",
           "mode": "offline_raw_open",
           "risk_reserved": 374.88000000000034,
@@ -3179,8 +3187,8 @@
     "recent_news": [],
     "recent_activity": [
       {
-        "id": "ord_60e581f1889c",
-        "timestamp": "05:46:13",
+        "id": "ord_c42cc9e11f30",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "CDE",
@@ -3190,8 +3198,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_60e581f1889c",
-        "timestamp": "05:46:13",
+        "id": "ord_c42cc9e11f30",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "CDE",
@@ -3201,8 +3209,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_60e581f1889c",
-        "timestamp": "05:46:13",
+        "id": "ord_c42cc9e11f30",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "CDE",
@@ -3212,8 +3220,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_60e581f1889c",
-        "timestamp": "05:46:13",
+        "id": "ord_c42cc9e11f30",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "CDE",
@@ -3614,6 +3622,7 @@
           "phase": "HOLDING",
           "reason": null,
           "quantity": 124,
+          "last_error": null,
           "side": "LONG",
           "mode": "offline_raw_open",
           "risk_reserved": 372.0,
@@ -3719,6 +3728,7 @@
           "phase": "HOLDING",
           "reason": null,
           "quantity": 2083,
+          "last_error": null,
           "side": "LONG",
           "mode": "offline_raw_open",
           "risk_reserved": 374.94000000000125,
@@ -3968,8 +3978,8 @@
     "recent_news": [],
     "recent_activity": [
       {
-        "id": "ord_daca10ea04d2",
-        "timestamp": "05:46:13",
+        "id": "ord_6d2eadd4b1f8",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "CDE",
@@ -3979,8 +3989,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_daca10ea04d2",
-        "timestamp": "05:46:13",
+        "id": "ord_6d2eadd4b1f8",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "CDE",
@@ -3990,8 +4000,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_daca10ea04d2",
-        "timestamp": "05:46:13",
+        "id": "ord_6d2eadd4b1f8",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "CDE",
@@ -4001,8 +4011,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_daca10ea04d2",
-        "timestamp": "05:46:13",
+        "id": "ord_6d2eadd4b1f8",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "CDE",
@@ -4012,8 +4022,8 @@
         "quantity": 2083
       },
       {
-        "id": "ord_395064554862",
-        "timestamp": "05:46:13",
+        "id": "ord_73bc2886316f",
+        "timestamp": "06:31:21",
         "type": "ORDER_CREATED",
         "event_type": "ORDER_CREATED",
         "symbol": "TSLA",
@@ -4023,8 +4033,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_395064554862",
-        "timestamp": "05:46:13",
+        "id": "ord_73bc2886316f",
+        "timestamp": "06:31:21",
         "type": "SUBMITTED",
         "event_type": "SUBMITTED",
         "symbol": "TSLA",
@@ -4034,8 +4044,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_395064554862",
-        "timestamp": "05:46:13",
+        "id": "ord_73bc2886316f",
+        "timestamp": "06:31:21",
         "type": "ACCEPTED",
         "event_type": "ACCEPTED",
         "symbol": "TSLA",
@@ -4045,8 +4055,8 @@
         "quantity": 0
       },
       {
-        "id": "ord_395064554862",
-        "timestamp": "05:46:13",
+        "id": "ord_73bc2886316f",
+        "timestamp": "06:31:21",
         "type": "FULL_FILL",
         "event_type": "FULL_FILL",
         "symbol": "TSLA",
@@ -4443,6 +4453,7 @@
           "phase": "WAITING_SESSION",
           "reason": null,
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "alpaca_paper",
           "risk_reserved": 0.0,
@@ -4503,6 +4514,7 @@
           "phase": "WAITING_SESSION",
           "reason": null,
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "alpaca_paper",
           "risk_reserved": 0.0,
@@ -4962,6 +4974,7 @@
           "phase": "SKIPPED",
           "reason": "MISSING_REQUIRED_BAR",
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "alpaca_paper",
           "risk_reserved": 0.0,
@@ -5024,6 +5037,7 @@
           "phase": "SKIPPED",
           "reason": "MISSING_REQUIRED_BAR",
           "quantity": 0,
+          "last_error": null,
           "side": null,
           "mode": "alpaca_paper",
           "risk_reserved": 0.0,

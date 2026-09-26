@@ -15,6 +15,7 @@ import {
   formatMoney,
   etTimeLabel,
   trancheName,
+  planStatusText,
 } from "@/lib/plain";
 
 const ICONS: Record<string, typeof Sunrise> = {
@@ -115,13 +116,19 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
               ? (showPro ? "Half at 1.5R / 3 hours · Half at 2R / 4 hours" : "Half aims for 1.5× its risk within 3 hours, half for 2× within 4 hours")
               : (showPro ? "Full position at 2R / 3 hours" : "Aims for 2× its risk within 3 hours")}</div>
             {strategy.tri_engine.risk_budget != null && <div>Risk budget: {formatMoney(strategy.tri_engine.risk_budget)}</div>}
+            {strategy.tri_engine.last_error && (
+              <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
+                Broker issue: check the paper account. Order management will keep retrying.
+                {showPro && <div className="mt-1 text-xs">{strategy.tri_engine.last_error}</div>}
+              </div>
+            )}
             {strategy.tri_engine.tranches.map((t, i, all) => (
               <div key={t.id} className="mt-2 border-t pt-2" style={{ borderColor: theme.track }}>
                 <span className="font-semibold">{showPro ? `${t.target_r}R part` : trancheName(i, all.length)} · {t.qty - t.closed_qty} of {t.qty} shares open</span>
-                <div>Sells at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
+                <div>{strategy.tri_engine?.side === "SHORT" ? "Buys back" : "Sells"} at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
               </div>
             ))}
-            {showPro && strategy.tri_engine.reason && <div className="mt-2 break-words">Reason: {strategy.tri_engine.reason}</div>}
+            {showPro && strategy.tri_engine.reason && <div className="mt-2 break-words">{planStatusText(strategy.tri_engine.reason)}</div>}
           </div>
         )}
         {strategy.or15 && (
@@ -129,7 +136,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
             <span className="font-semibold">1 share · {strategy.or15.mode === "offline_raw_open" ? "Offline replay" : "Paper account"}</span>
             <div>Watches 9:45–11:30 AM ET</div>
             {strategy.or15.phase === "HOLDING" && <div>{strategy.or15.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : strategy.or15.protection_confirmed ? "Safety exit and target held at the broker." : "Confirming protection with the broker."}</div>}
-            {showPro && strategy.or15.reason && <div className="break-words">Reason: {strategy.or15.reason}</div>}
+            {showPro && strategy.or15.reason && <div className="break-words">{planStatusText(strategy.or15.reason)}</div>}
           </div>
         )}
 

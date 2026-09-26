@@ -441,12 +441,16 @@ class TradingStateStore:
         start_date: Optional[str],
         limit: int = 25,
         cursor: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
         clauses: List[str] = []
         params: List[Any] = []
         if start_date:
             clauses.append("session_date >= ?")
             params.append(start_date)
+        if end_date:
+            clauses.append("session_date <= ?")
+            params.append(end_date)
         if cursor:
             try:
                 cursor_values = json.loads(
@@ -455,14 +459,14 @@ class TradingStateStore:
                 cursor_closed_at, cursor_trade_id = cursor_values
             except Exception as exc:
                 raise PersistenceError("Invalid trade history cursor") from exc
-            clauses.append("(closed_at < ? OR (closed_at = ? AND trade_id < ?))")
+            clauses.append("(julianday(closed_at) < julianday(?) OR (julianday(closed_at) = julianday(?) AND trade_id < ?))")
             params.extend([cursor_closed_at, cursor_closed_at, cursor_trade_id])
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(limit + 1)
         with self._lock:
             rows = self._connection.execute(
                 f"SELECT payload, closed_at, trade_id FROM completed_trades {where} "
-                "ORDER BY closed_at DESC, trade_id DESC LIMIT ?",
+                "ORDER BY julianday(closed_at) DESC, trade_id DESC LIMIT ?",
                 tuple(params),
             ).fetchall()
         selected = rows[:limit]
@@ -475,12 +479,15 @@ class TradingStateStore:
             next_cursor = base64.urlsafe_b64encode(marker).decode("ascii")
         return [json.loads(row["payload"]) for row in selected], next_cursor
 
-    def list_session_summaries(self, start_date: Optional[str]) -> List[Dict[str, Any]]:
+    def list_session_summaries(self, start_date: Optional[str], end_date: Optional[str] = None) -> List[Dict[str, Any]]:
         query = "SELECT payload FROM session_summaries"
         params: Tuple[Any, ...] = ()
         if start_date:
             query += " WHERE session_date >= ?"
             params = (start_date,)
+        if end_date:
+            query += (" AND" if start_date else " WHERE") + " session_date <= ?"
+            params += (end_date,)
         query += " ORDER BY session_date DESC"
         with self._lock:
             rows = self._connection.execute(query, params).fetchall()
@@ -494,12 +501,15 @@ class TradingStateStore:
             ).fetchall()
         return [json.loads(row["payload"]) for row in rows]
 
-    def aggregate_trade_stats(self, start_date: Optional[str]) -> Dict[str, Any]:
+    def aggregate_trade_stats(self, start_date: Optional[str], end_date: Optional[str] = None) -> Dict[str, Any]:
         query = "SELECT payload FROM completed_trades"
         params: Tuple[Any, ...] = ()
         if start_date:
             query += " WHERE session_date >= ?"
             params = (start_date,)
+        if end_date:
+            query += (" AND" if start_date else " WHERE") + " session_date <= ?"
+            params += (end_date,)
         with self._lock:
             rows = self._connection.execute(query, params).fetchall()
         pnl_values: List[float] = []

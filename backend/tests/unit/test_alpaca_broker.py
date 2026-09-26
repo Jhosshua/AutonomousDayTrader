@@ -396,6 +396,8 @@ def test_swing_unresolved_entry_reuses_one_alpaca_order_and_late_fill_gets_stop(
     first = swing.execute_market_open({"MU": 100.0}, opened)
     assert first["entries"] == [] and swing.staged_manager.is_staged_for_entry("MU")
     assert staged.execution_order_id in engine.orders and len(fake.posts) == 1
+    # Order acceptance and broker fills must share this synthetic session clock.
+    engine.orders[staged.execution_order_id].accepted_at = opened
     assert engine.process_bar("MU", 100, 101, 99, 100, 50000, opened) == []
     assert len(fake.posts) == 1, "generic bar matching must not own staged Swing entries"
 
@@ -404,6 +406,7 @@ def test_swing_unresolved_entry_reuses_one_alpaca_order_and_late_fill_gets_stop(
     assert len(fake.posts) == 1, "a second local id would buy twice if the first order fills late"
 
     fake.fill_later("a1")
+    fake.orders["a1"]["filled_at"] = opened.replace(minute=31).isoformat()
     late = engine.settle_broker_orders()
     assert len(late) == 1
     swing.on_entry_fill(engine.orders[late[0].order_id], late[0])

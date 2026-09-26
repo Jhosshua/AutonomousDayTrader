@@ -23,7 +23,9 @@ import httpx
 log = logging.getLogger("broker")
 
 PAPER_BASE_URL = "https://paper-api.alpaca.markets"
-TERMINAL_STATES = {"filled", "canceled", "expired", "rejected", "done_for_day", "stopped", "suspended"}
+# done_for_day resumes next session; stopped/suspended can still execute.
+# Treating them as final can release a second exit while the first is live.
+TERMINAL_STATES = {"filled", "canceled", "expired", "rejected"}
 
 
 class BrokerError(Exception):
@@ -171,7 +173,8 @@ class AlpacaBroker:
             response.raise_for_status()
 
     def submit_oco(self, symbol: str, qty: int, client_order_id: str,
-                   stop: float, target: float, side: str = "sell") -> Dict[str, Any]:
+                   stop: float, target: float, side: str = "sell",
+                   time_in_force: str = "day") -> Dict[str, Any]:
         """Rest a fixed sell stop and target at Alpaca. Caller persists id FIRST.
 
         An uncertain response only permits lookup of this id, never a second
@@ -179,9 +182,11 @@ class AlpacaBroker:
         """
         if side.lower() not in ("buy", "sell"):
             raise ValueError("OCO exit side must be buy or sell")
+        if time_in_force not in ("day", "gtc"):
+            raise ValueError("OCO time in force must be day or gtc")
         decimals = 2 if min(stop, target) >= 1 else 4
         body = {"symbol": symbol, "qty": str(qty), "side": side.lower(), "type": "limit",
-                "time_in_force": "day", "order_class": "oco", "client_order_id": client_order_id,
+                "time_in_force": time_in_force, "order_class": "oco", "client_order_id": client_order_id,
                 "take_profit": {"limit_price": f"{target:.{decimals}f}"},
                 "stop_loss": {"stop_price": f"{stop:.{decimals}f}"}}
         self.status.orders_sent += 1
@@ -192,13 +197,21 @@ class AlpacaBroker:
             found = self.find_by_client_id(client_order_id)
             if found is not None:
                 return self.get_order(found["id"])
-            raise BrokerError("OR15 protection POST outcome unknown")
+            raise BrokerError("OCO protection POST outcome unknown")
         if resp.status_code in (200, 201):
             return resp.json()
         found = self.find_by_client_id(client_order_id)
         if found is not None:
             return self.get_order(found["id"])
-        raise BrokerReject(f"OR15 protection rejected: HTTP {resp.status_code}", hard=resp.status_code < 500)
+        retry_sec = None
+        if resp.status_code == 429:
+            try:
+                retry_sec = max(5., float(resp.headers.get("Retry-After", "5")))
+            except ValueError:
+                retry_sec = 5.
+        raise BrokerReject(f"OCO protection rejected: HTTP {resp.status_code}",
+                           hard=resp.status_code < 500 and resp.status_code not in (408, 429),
+                           retry_sec=retry_sec)
 
     def submit(
         self,

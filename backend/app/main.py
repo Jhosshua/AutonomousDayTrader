@@ -2953,22 +2953,25 @@ async def get_trade_history(
     """Paginated durable completed-trade history and aggregate-only recoveries."""
     if state_store is None:
         raise HTTPException(status_code=503, detail="Durable trade history is not enabled")
-    if range not in {"today", "7d", "all"}:
-        raise HTTPException(status_code=400, detail="range must be today, 7d, or all")
+    if range not in {"today", "yesterday", "7d", "all"}:
+        raise HTTPException(status_code=400, detail="range must be today, yesterday, 7d, or all")
     limit = max(1, min(limit, 100))
     today_et = datetime.now(ET_TZ).date()
     start_date = None
+    end_date = None
     if range == "today":
         start_date = today_et.isoformat()
+    elif range == "yesterday":
+        start_date = end_date = (today_et - timedelta(days=1)).isoformat()
     elif range == "7d":
         start_date = (today_et - timedelta(days=6)).isoformat()
 
     try:
-        items, next_cursor = state_store.list_trades(start_date, limit=limit, cursor=cursor)
+        items, next_cursor = state_store.list_trades(start_date, limit=limit, cursor=cursor, end_date=end_date)
     except PersistenceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    trade_stats = state_store.aggregate_trade_stats(start_date)
-    all_summaries = state_store.list_session_summaries(start_date)
+    trade_stats = state_store.aggregate_trade_stats(start_date, end_date=end_date)
+    all_summaries = state_store.list_session_summaries(start_date, end_date=end_date)
     recovered_sessions = [
         summary
         for summary in all_summaries
@@ -3014,6 +3017,10 @@ async def get_trade_history(
         },
         "items": items,
         "recovered_sessions": recovered_sessions,
+        "sessions": [{key: summary.get(key) for key in (
+            "session_date", "opening_equity", "closing_equity", "realized_pnl",
+            "trades_count", "fees", "source", "aggregate_only", "note",
+        )} for summary in all_summaries],
         "next_cursor": next_cursor,
     }
 

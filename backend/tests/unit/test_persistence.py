@@ -165,6 +165,52 @@ def test_trade_cursor_is_stable_when_close_timestamps_match(tmp_path):
     assert next_cursor is None
 
 
+def test_history_pagination_orders_mixed_timezones_by_actual_close_time(tmp_path):
+    store = TradingStateStore(str(tmp_path / "mixed.sqlite3"))
+    try:
+        times = ["2026-09-25T19:02:00+00:00", "2026-09-25T15:55:00-04:00",
+                 "2026-09-25T19:55:00+00:00", "2026-09-24T20:00:00+00:00"]
+        trades = [{"trade_id": str(i), "session_date": at[:10], "closed_at": at} for i, at in enumerate(times)]
+        store.save_checkpoint({"runtime_state_version": 1}, "TEST", trades=trades)
+        first, cursor = store.list_trades(None, limit=2)
+        second, cursor = store.list_trades(None, limit=2, cursor=cursor)
+        assert [t["trade_id"] for t in first + second] == ["2", "1", "0", "3"]
+        assert cursor is None
+    finally:
+        store.close()
+
+
+@pytest.mark.asyncio
+async def test_history_exposes_recent_days_and_yesterday_excludes_today(tmp_path, monkeypatch):
+    from backend.app import main
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 26, 6, tzinfo=timezone.utc).astimezone(tz)
+    store = TradingStateStore(str(tmp_path / "history.sqlite3"))
+    monkeypatch.setattr(main, "state_store", store)
+    monkeypatch.setattr(main, "datetime", Clock)
+    try:
+        trades = [{"trade_id": str(day), "session_date": f"2026-09-{day}",
+                   "closed_at": f"2026-09-{day}T15:00:00+00:00", "realized_pnl": float(day), "fees": 0.}
+                  for day in (24, 25, 26)]
+        summaries = [{"session_date": f"2026-09-{day}", "aggregate_only": False,
+                      "opening_equity": 50000., "closing_equity": 50000.+(day if day > 23 else 0),
+                      "realized_pnl": float(day) if day > 23 else 0., "trades_count": int(day > 23)}
+                     for day in (23, 24, 25)]
+        store.save_checkpoint({"runtime_state_version": 1}, "TEST", trades=trades, session_summaries=summaries)
+        week = await main.get_trade_history("7d")
+        assert [s["session_date"] for s in week["sessions"]] == ["2026-09-25", "2026-09-24", "2026-09-23"]
+        assert week["sessions"][-1]["trades_count"] == 0
+        assert week["recovered_sessions"] == []
+        yesterday = await main.get_trade_history("yesterday")
+        assert [t["trade_id"] for t in yesterday["items"]] == ["25"]
+        assert yesterday["summary"]["trades_count"] == 1 and yesterday["summary"]["realized_pnl"] == 25.
+        assert [s["session_date"] for s in yesterday["sessions"]] == ["2026-09-25"]
+    finally:
+        store.close()
+
+
 def test_checkpoint_checksum_corruption_fails_closed(tmp_path):
     database = tmp_path / "state.sqlite3"
     store = TradingStateStore(str(database))

@@ -280,6 +280,7 @@ class AsymmetricDualStrategy(Strategy):
         result["tri_engine"] = {
             "version": VERSION, "source_sha256": SOURCE_SHA256, "symbol": self.symbol,
             "phase": self.phase, "reason": self.reason, "quantity": self.quantity,
+            "last_error": self.last_error,
             "side": self.side, "mode": self.execution_mode, "risk_reserved": self.risk_reserved,
             "risk_budget": self.session_equity * .0075 if self.session_equity else None,
             "or_high": self.or_high, "or_low": self.or_low, "or_mid": self.or_mid,

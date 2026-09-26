@@ -1,5 +1,9 @@
 # TSLA / CDE Morning Plan: build evidence (2026-09-25/26)
 
+Follow-up review and fixes: [REVIEW_2026-09-26.md](REVIEW_2026-09-26.md).
+The updated implementation passes 791 backend tests and all 29 synthetic replay
+cases. The original build evidence below is retained as historical context.
+
 Source: `/Users/mo/multi_stock_edge_lab_3yr/EXECUTION_PLAN.md`, frozen as
 `SOURCE_EXECUTION_PLAN.md` (sha256 `f89a762e...642bb`, checked at startup).
 Two arms on the existing Alpaca **paper** account, no shadow period:
@@ -75,7 +79,10 @@ were chosen from; treat them as an upper bound.
 ## Known limits (not fixed)
 
 - Alpaca OCO cannot guarantee stop-first on a bar touching both levels; live can differ from replay there.
-- If Alpaca hard-rejects a close after its OCO was canceled, the bot retries every second with no alert (shown on the card as last error).
-- A DAY OCO expires at 16:00; a trade still open then (bot down at 15:55) is unprotected overnight and closed by SESSION_RECOVERY at the next open.
+- If Alpaca rejects a close after its OCO was canceled, the bot retries and now
+  shows a broker warning on the strategy card. Broker refusal can still delay an exit.
+- New tri-engine protection uses GTC and is retained outside regular market
+  hours while a market exit is unavailable. This preserves resting orders for
+  the next session; it does not enable overnight execution or guarantee a stop price.
 - Two OCOs splitting one TSLA position were not tested against real Alpaca; if the second is refused the plan closes both halves (`PROTECTION_REJECTED`).
 - Nothing here proves a real session fill, 3 trades a week, or future profit.

@@ -481,3 +481,146 @@ def test_unrelated_broker_shares_do_not_stall_entry_forever(tri_paper):
     x.now = s.entry_due + timedelta(seconds=7)
     r.tri_controller.tick(x.now)
     assert s.phase == "SKIPPED" and x.positions["CDE"] == 7 and not r.broker_state["mismatch"]
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_transient_protection_post_retries_without_abandoning_trade(tri_paper, status):
+    r, x = tri_paper
+    original = x.handler
+    def unavailable(request):
+        if request.method == "POST" and json.loads(request.content).get("order_class") == "oco":
+            return httpx.Response(status, json={"message": "temporarily unavailable"})
+        return original(request)
+    r.engine.broker._client._transport = httpx.MockTransport(unavailable)
+    s = arm(r, x, "CDE")
+    assert not s.incomplete and not s.exit_reason
+    assert not s.tranches[0]["protection_terminal"]
+    assert s.to_dict()["tri_engine"]["last_error"]
+    r.engine.broker._client._transport = httpx.MockTransport(original)
+    advance(r, x)
+    assert s.phase == "HOLDING" and s.tranches[0]["protection_confirmed"]
+    assert not s.last_error and not x.cancels
+
+
+@pytest.mark.parametrize("symbol,side", [("TSLA", "LONG"), ("TSLA", "SHORT"), ("CDE", "LONG"), ("CDE", "SHORT")])
+def test_partial_entry_risk_includes_filled_and_unfilled_shares_after_restart(tri_paper, symbol, side):
+    r, x = tri_paper
+    x.entry_mode = "partial"
+    s = arm(r, x, symbol, side)
+    order = r.engine.orders[s.entry_order_id]
+    expected = order.filled_qty * abs(order.avg_fill_price - s.stop) + order.remaining_qty * abs(order.estimated_price - s.stop)
+    assert r.tri_controller.open_risk() == pytest.approx(expected)
+    assert s.risk_reserved == pytest.approx(expected)
+    r.reset_runtime_state()
+    r._restore_checkpoint()
+    assert r.tri_controller.open_risk() == pytest.approx(expected)
+    advance(r, x)
+    assert r.tri_controller.open_risk() == pytest.approx(sum(t["qty"] * t["risk_per_share"] for t in s.tranches))
+
+
+def test_first_tranche_poll_failure_does_not_block_second_tranche_exit(tri_paper):
+    r, x = tri_paper
+    s = arm(r, x)
+    first, second = s.tranches
+    first_native = s.native[first["target_order_id"]]["id"]
+    original = x.handler
+    def unavailable(request):
+        if request.method == "GET" and request.url.path == f"/v2/orders/{first_native}":
+            return httpx.Response(503, json={"message": "unavailable"})
+        return original(request)
+    r.engine.broker._client._transport = httpx.MockTransport(unavailable)
+    x.now = second["exit_due"]
+    r.tri_controller.tick(x.now)
+    assert second["closed_qty"] == second["qty"], s.last_error
+    assert first["closed_qty"] == 0 and s.last_error
+    assert x.positions["TSLA"] == first["qty"]
+
+
+def test_protection_survives_closed_market_and_recovers_next_session(tri_paper, monkeypatch):
+    r, x = tri_paper
+    s = arm(r, x, "CDE")
+    assert x.posts[1]["time_in_force"] == "gtc"
+    monkeypatch.setattr(r, "_broker_gate", lambda _o, _e: ("MARKET_CLOSED", False, 60))
+    x.now = START.replace(hour=16, minute=5)
+    r.tri_controller.tick(x.now)
+    assert not x.cancels and len(x.posts) == 2
+    r.reset_runtime_state()
+    r._restore_checkpoint()
+    x.now = START + timedelta(days=1)
+    monkeypatch.setattr(r, "_broker_gate", lambda _o, _e: None)
+    r.tri_controller.tick(x.now)
+    assert s.phase == "CLOSED" and not x.positions and not r.account.positions
+
+
+@pytest.mark.parametrize("status", ["done_for_day", "suspended", "stopped"])
+def test_nonfinal_protection_state_cannot_release_duplicate_exit(tri_paper, status):
+    r, x = tri_paper
+    s = arm(r, x, "CDE")
+    for row in x.orders.values():
+        if not row["client_order_id"].endswith("-entry"):
+            row["status"] = status
+    x.cancel_pending = True
+    r.tri_controller.request_exit("CDE", "MANUAL_FLATTEN", x.now)
+    advance(r, x)
+    assert len(x.posts) == 2 and not s.tranches[0]["protection_terminal"]
+    x.cancel_pending = False
+    advance(r, x)
+    assert s.phase == "CLOSED" and not x.positions
+
+
+def test_worker_pool_entry_protection_and_exit_use_same_native_identities(tri_paper):
+    r, x = tri_paper
+    r.tri_controller.inline_io = False
+    s = arm(r, x)
+    def drain_until(predicate):
+        for _ in range(60):
+            for future in list(r.tri_controller._jobs.values()):
+                future.result(timeout=2)
+            advance(r, x, seconds=.1)
+            if predicate():
+                return
+        pytest.fail(f"Worker pool did not settle: {s.phase}, {s.last_error}")
+    drain_until(lambda: len(s.tranches) == 2 and all(t["protection_confirmed"] for t in s.tranches))
+    assert len(x.posts) == 3
+    r.tri_controller.request_exit("TSLA", "MANUAL_FLATTEN", x.now)
+    drain_until(lambda: s.phase == "CLOSED")
+    assert len(x.posts) == 5 and not x.positions and not r.account.positions
+    assert not s.last_error
+
+
+def test_late_entry_remainder_records_its_own_fill_price_and_time(tri_paper):
+    r, x = tri_paper
+    x.entry_mode, x.cancel_pending = "partial", True
+    s = arm(r, x, "CDE")
+    advance(r, x, seconds=20)
+    assert len(s.tranches) == 1 and s.tranches[0]["protection_confirmed"]
+    entry = r.engine.orders[s.entry_order_id]
+    x.now += timedelta(seconds=2)
+    x.fill(s.native[entry.id]["id"], price=103)
+    r.tri_controller.tick(x.now)
+    late = s.tranches[-1]
+    assert late["exit_reason"] == "LATE_ENTRY_FILL"
+    assert late["entry_price"] == pytest.approx(103)
+    assert late["entry_at"] == x.now
+    assert late["risk_per_share"] == pytest.approx(103 - s.stop)
+    r.reset_runtime_state()
+    r._restore_checkpoint()
+    assert s.tranches[-1]["entry_price"] == pytest.approx(103)
+
+
+def test_protection_rate_limit_waits_for_retry_after_during_quote_storm(tri_paper):
+    r, x = tri_paper
+    original, attempts = x.handler, []
+    def limited(request):
+        if request.method == "POST" and json.loads(request.content).get("order_class") == "oco":
+            attempts.append(request)
+            if len(attempts) == 1:
+                return httpx.Response(429, headers={"Retry-After": "10"}, json={"message": "rate limit"})
+        return original(request)
+    r.engine.broker._client._transport = httpx.MockTransport(limited)
+    s = arm(r, x, "CDE")
+    for _ in range(90):
+        advance(r, x, seconds=.1)
+    assert len(attempts) == 1 and s.last_error and not s.incomplete
+    advance(r, x, seconds=2)
+    assert len(attempts) == 2 and s.tranches[0]["protection_confirmed"] and not s.last_error

@@ -64,6 +64,7 @@ export interface StrategyState {
     symbol: string;
     phase: string;
     reason: string | null;
+    last_error?: string | null;
     quantity: number;
     side: string | null;
     mode: string;
@@ -211,6 +212,7 @@ export interface TradeHistoryResponse {
   };
   items: TradeRecord[];
   recovered_sessions: RecoveredSessionSummary[];
+  sessions?: RecoveredSessionSummary[];
   next_cursor: string | null;
 }
 

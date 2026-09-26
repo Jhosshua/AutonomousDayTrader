@@ -1,22 +1,22 @@
 {
   "status": "PASS",
-  "created_at": "2026-09-26T05:46:13.345533+00:00",
+  "created_at": "2026-09-26T06:31:21.570717+00:00",
   "execution_mode": "offline_raw_open",
   "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
   "implementation_sha256": {
-    "backend/app/main.py": "5bad5a0411cdd3955d506721fe4e8b38840225d9360932c7dbd5f7b692231979",
-    "backend/app/core/tri_execution.py": "60c7e6d7e115b32fe4964c6ebbeae48f50315caa33e5d283f7f6cf0f3f477e3c",
-    "backend/app/strategies/tri_engine.py": "2b9e0c460100c0e9c561c93091e00a36572e41180db71a01180b0c62e272476e",
+    "backend/app/main.py": "e8c5f75f046ff2abac895a694712a0721c61c44b41908a5d36ab99bb0638ea37",
+    "backend/app/core/tri_execution.py": "24d7d9c42cb50ae21601031d97460e712f763071a296533c6a4307cd1946c5fc",
+    "backend/app/strategies/tri_engine.py": "96412e7694ad6338e0e2430b318e21377a52f5cc0e0d8deafdf8cce206b94c07",
     "backend/app/core/engine.py": "eb407f340900110823f3ae0978e16bb0d5f9cb4d422d32954010d3d7e97c73d6",
     "backend/app/core/risk.py": "ce80dfacaddb63cfab3a111a7a04c0430db2db74516b965f04d04a2c6ce319c6",
-    "backend/app/core/broker.py": "bf00969493a2c26163160cb94960a03fd9ac2ca38bc8decb97e836fb95bf4023"
+    "backend/app/core/broker.py": "b2a8f34b7546d5de4b4a92d23f9b453e9fad1ca491770c37adc3b76c4d50470f"
   },
   "cases": [
     {
       "case": "TSLA_LONG_target",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_e54a6d24d94c",
+        "trade_id": "tri_ord_1486dff98e5e",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -57,7 +57,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_3fadbfc20a9e"
+              "ord_9b1566ad4dc2"
             ],
             "realized_pnl": 279.0,
             "exit_notional": 6603.0,
@@ -81,7 +81,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_171fa8adc780"
+              "ord_a7c74a713803"
             ],
             "realized_pnl": 372.0,
             "exit_notional": 6696.0,
@@ -90,8 +90,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_b232fec39b",
-            "order_id": "ord_e54a6d24d94c",
+            "fill_id": "fl_6fb2bf32bf",
+            "order_id": "ord_1486dff98e5e",
             "side": "BUY",
             "qty": 124,
             "price": 102.0,
@@ -100,8 +100,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_e51566f28d",
-            "order_id": "ord_3fadbfc20a9e",
+            "fill_id": "fl_f6c68fdf5b",
+            "order_id": "ord_9b1566ad4dc2",
             "side": "SELL",
             "qty": 62,
             "price": 106.5,
@@ -110,8 +110,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_28b7906477",
-            "order_id": "ord_171fa8adc780",
+            "fill_id": "fl_6f89c796d4",
+            "order_id": "ord_a7c74a713803",
             "side": "SELL",
             "qty": 62,
             "price": 108.0,
@@ -213,7 +213,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_e54a6d24d94c",
+            "order_id": "ord_1486dff98e5e",
             "price": 102.0,
             "qty": 124,
             "side": "BUY",
@@ -222,7 +222,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_3fadbfc20a9e",
+            "order_id": "ord_9b1566ad4dc2",
             "price": 106.5,
             "qty": 62,
             "side": "SELL",
@@ -231,7 +231,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:50:00-04:00",
-            "order_id": "ord_171fa8adc780",
+            "order_id": "ord_a7c74a713803",
             "price": 108.0,
             "qty": 62,
             "side": "SELL",
@@ -240,7 +240,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:50:00-04:00",
-            "trade_id": "tri_ord_e54a6d24d94c",
+            "trade_id": "tri_ord_1486dff98e5e",
             "realized_pnl": 651.0
           }
         ],
@@ -263,7 +263,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_3fadbfc20a9e"
+              "ord_9b1566ad4dc2"
             ],
             "realized_pnl": 279.0,
             "exit_notional": 6603.0,
@@ -287,7 +287,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_171fa8adc780"
+              "ord_a7c74a713803"
             ],
             "realized_pnl": 372.0,
             "exit_notional": 6696.0,
@@ -302,7 +302,7 @@
       "case": "TSLA_LONG_stop",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_1442f8842275",
+        "trade_id": "tri_ord_e3b89c82679c",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -343,7 +343,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_c43bcbaca898"
+              "ord_3f7ed7375bfa"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -367,7 +367,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_eeba5c51e5cb"
+              "ord_8b04c6a0a51d"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -376,8 +376,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_bc03ed14b6",
-            "order_id": "ord_1442f8842275",
+            "fill_id": "fl_1f75dcda4f",
+            "order_id": "ord_e3b89c82679c",
             "side": "BUY",
             "qty": 124,
             "price": 102.0,
@@ -386,8 +386,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_9d35a604fd",
-            "order_id": "ord_c43bcbaca898",
+            "fill_id": "fl_a9a349437a",
+            "order_id": "ord_3f7ed7375bfa",
             "side": "SELL",
             "qty": 62,
             "price": 99.0,
@@ -396,8 +396,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_bb3cf5d296",
-            "order_id": "ord_eeba5c51e5cb",
+            "fill_id": "fl_711508c49b",
+            "order_id": "ord_8b04c6a0a51d",
             "side": "SELL",
             "qty": 62,
             "price": 99.0,
@@ -499,7 +499,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_1442f8842275",
+            "order_id": "ord_e3b89c82679c",
             "price": 102.0,
             "qty": 124,
             "side": "BUY",
@@ -508,7 +508,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_c43bcbaca898",
+            "order_id": "ord_3f7ed7375bfa",
             "price": 99.0,
             "qty": 62,
             "side": "SELL",
@@ -517,7 +517,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_eeba5c51e5cb",
+            "order_id": "ord_8b04c6a0a51d",
             "price": 99.0,
             "qty": 62,
             "side": "SELL",
@@ -526,7 +526,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_1442f8842275",
+            "trade_id": "tri_ord_e3b89c82679c",
             "realized_pnl": -372.0
           }
         ],
@@ -549,7 +549,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_c43bcbaca898"
+              "ord_3f7ed7375bfa"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -573,7 +573,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_eeba5c51e5cb"
+              "ord_8b04c6a0a51d"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -588,7 +588,7 @@
       "case": "TSLA_LONG_collision",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_5b356c4d4492",
+        "trade_id": "tri_ord_bd9855384cb4",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -629,7 +629,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_919494505ea7"
+              "ord_40a989f05c7c"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -653,7 +653,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_8617b2a5a021"
+              "ord_e5951aaaac36"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -662,8 +662,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_e2671685d8",
-            "order_id": "ord_5b356c4d4492",
+            "fill_id": "fl_5265b9e455",
+            "order_id": "ord_bd9855384cb4",
             "side": "BUY",
             "qty": 124,
             "price": 102.0,
@@ -672,8 +672,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_b750fc3b95",
-            "order_id": "ord_919494505ea7",
+            "fill_id": "fl_61c3235fbd",
+            "order_id": "ord_40a989f05c7c",
             "side": "SELL",
             "qty": 62,
             "price": 99.0,
@@ -682,8 +682,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_1b8da9a793",
-            "order_id": "ord_8617b2a5a021",
+            "fill_id": "fl_29b6a59d31",
+            "order_id": "ord_e5951aaaac36",
             "side": "SELL",
             "qty": 62,
             "price": 99.0,
@@ -785,7 +785,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_5b356c4d4492",
+            "order_id": "ord_bd9855384cb4",
             "price": 102.0,
             "qty": 124,
             "side": "BUY",
@@ -794,7 +794,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_919494505ea7",
+            "order_id": "ord_40a989f05c7c",
             "price": 99.0,
             "qty": 62,
             "side": "SELL",
@@ -803,7 +803,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_8617b2a5a021",
+            "order_id": "ord_e5951aaaac36",
             "price": 99.0,
             "qty": 62,
             "side": "SELL",
@@ -812,7 +812,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_5b356c4d4492",
+            "trade_id": "tri_ord_bd9855384cb4",
             "realized_pnl": -372.0
           }
         ],
@@ -835,7 +835,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_919494505ea7"
+              "ord_40a989f05c7c"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -859,7 +859,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_8617b2a5a021"
+              "ord_e5951aaaac36"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 6138.0,
@@ -874,7 +874,7 @@
       "case": "TSLA_LONG_gap",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_5b53ca25dd4c",
+        "trade_id": "tri_ord_ef536ee03f69",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -915,7 +915,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_a6d28d45ac7d"
+              "ord_247e93728680"
             ],
             "realized_pnl": -310.0,
             "exit_notional": 6014.0,
@@ -939,7 +939,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_f1f5a6b1d368"
+              "ord_f093871ed2c1"
             ],
             "realized_pnl": -310.0,
             "exit_notional": 6014.0,
@@ -948,8 +948,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_3193b522d1",
-            "order_id": "ord_5b53ca25dd4c",
+            "fill_id": "fl_05f94a0478",
+            "order_id": "ord_ef536ee03f69",
             "side": "BUY",
             "qty": 124,
             "price": 102.0,
@@ -958,8 +958,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_b391b668d7",
-            "order_id": "ord_a6d28d45ac7d",
+            "fill_id": "fl_69be0d5871",
+            "order_id": "ord_247e93728680",
             "side": "SELL",
             "qty": 62,
             "price": 97.0,
@@ -968,8 +968,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_11363da519",
-            "order_id": "ord_f1f5a6b1d368",
+            "fill_id": "fl_935fbe853d",
+            "order_id": "ord_f093871ed2c1",
             "side": "SELL",
             "qty": 62,
             "price": 97.0,
@@ -1071,7 +1071,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_5b53ca25dd4c",
+            "order_id": "ord_ef536ee03f69",
             "price": 102.0,
             "qty": 124,
             "side": "BUY",
@@ -1080,7 +1080,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_a6d28d45ac7d",
+            "order_id": "ord_247e93728680",
             "price": 97.0,
             "qty": 62,
             "side": "SELL",
@@ -1089,7 +1089,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_f1f5a6b1d368",
+            "order_id": "ord_f093871ed2c1",
             "price": 97.0,
             "qty": 62,
             "side": "SELL",
@@ -1098,7 +1098,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_5b53ca25dd4c",
+            "trade_id": "tri_ord_ef536ee03f69",
             "realized_pnl": -620.0
           }
         ],
@@ -1121,7 +1121,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_a6d28d45ac7d"
+              "ord_247e93728680"
             ],
             "realized_pnl": -310.0,
             "exit_notional": 6014.0,
@@ -1145,7 +1145,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_f1f5a6b1d368"
+              "ord_f093871ed2c1"
             ],
             "realized_pnl": -310.0,
             "exit_notional": 6014.0,
@@ -1160,7 +1160,7 @@
       "case": "TSLA_LONG_time",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_83fd8562d90e",
+        "trade_id": "tri_ord_808ffc995de6",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "LONG",
@@ -1201,7 +1201,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_5b3fa160b044"
+              "ord_b9ed39d3464a"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -1225,7 +1225,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_855555c05f9b"
+              "ord_5d83bb26db88"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -1234,8 +1234,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_14d3faebee",
-            "order_id": "ord_83fd8562d90e",
+            "fill_id": "fl_32b1ed39d0",
+            "order_id": "ord_808ffc995de6",
             "side": "BUY",
             "qty": 124,
             "price": 102.0,
@@ -1244,8 +1244,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_f562eb2b2b",
-            "order_id": "ord_5b3fa160b044",
+            "fill_id": "fl_6c44399f23",
+            "order_id": "ord_b9ed39d3464a",
             "side": "SELL",
             "qty": 62,
             "price": 104.0,
@@ -1254,8 +1254,8 @@
             "timestamp": "2026-09-28T12:48:00-04:00"
           },
           {
-            "fill_id": "fl_065f2580e5",
-            "order_id": "ord_855555c05f9b",
+            "fill_id": "fl_1cdb0658b8",
+            "order_id": "ord_5d83bb26db88",
             "side": "SELL",
             "qty": 62,
             "price": 104.0,
@@ -1357,7 +1357,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_83fd8562d90e",
+            "order_id": "ord_808ffc995de6",
             "price": 102.0,
             "qty": 124,
             "side": "BUY",
@@ -1366,7 +1366,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T12:48:00-04:00",
-            "order_id": "ord_5b3fa160b044",
+            "order_id": "ord_b9ed39d3464a",
             "price": 104.0,
             "qty": 62,
             "side": "SELL",
@@ -1375,7 +1375,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T13:48:00-04:00",
-            "order_id": "ord_855555c05f9b",
+            "order_id": "ord_5d83bb26db88",
             "price": 104.0,
             "qty": 62,
             "side": "SELL",
@@ -1384,7 +1384,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T13:48:00-04:00",
-            "trade_id": "tri_ord_83fd8562d90e",
+            "trade_id": "tri_ord_808ffc995de6",
             "realized_pnl": 248.0
           }
         ],
@@ -1407,7 +1407,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_5b3fa160b044"
+              "ord_b9ed39d3464a"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -1431,7 +1431,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_855555c05f9b"
+              "ord_5d83bb26db88"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -1446,7 +1446,7 @@
       "case": "TSLA_LONG_early_close",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_024ad4c80b15",
+        "trade_id": "tri_ord_9fb30e6dab13",
         "session_date": "2026-11-27",
         "symbol": "TSLA",
         "side": "LONG",
@@ -1487,7 +1487,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_576581fbd55f"
+              "ord_fc21da8a2380"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -1511,7 +1511,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_0e34074f4401"
+              "ord_57f12e9b2b9d"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -1520,8 +1520,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_b8953631b2",
-            "order_id": "ord_024ad4c80b15",
+            "fill_id": "fl_31715f2c8d",
+            "order_id": "ord_9fb30e6dab13",
             "side": "BUY",
             "qty": 124,
             "price": 102.0,
@@ -1530,8 +1530,8 @@
             "timestamp": "2026-11-27T11:32:00-05:00"
           },
           {
-            "fill_id": "fl_a0f3eed1bb",
-            "order_id": "ord_576581fbd55f",
+            "fill_id": "fl_068fcc06dd",
+            "order_id": "ord_fc21da8a2380",
             "side": "SELL",
             "qty": 62,
             "price": 104.0,
@@ -1540,8 +1540,8 @@
             "timestamp": "2026-11-27T12:55:00-05:00"
           },
           {
-            "fill_id": "fl_bb3314cb0b",
-            "order_id": "ord_0e34074f4401",
+            "fill_id": "fl_7f95258df5",
+            "order_id": "ord_57f12e9b2b9d",
             "side": "SELL",
             "qty": 62,
             "price": 104.0,
@@ -3827,7 +3827,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T11:32:00-05:00",
-            "order_id": "ord_024ad4c80b15",
+            "order_id": "ord_9fb30e6dab13",
             "price": 102.0,
             "qty": 124,
             "side": "BUY",
@@ -3836,7 +3836,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T12:55:00-05:00",
-            "order_id": "ord_576581fbd55f",
+            "order_id": "ord_fc21da8a2380",
             "price": 104.0,
             "qty": 62,
             "side": "SELL",
@@ -3845,7 +3845,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T12:55:00-05:00",
-            "order_id": "ord_0e34074f4401",
+            "order_id": "ord_57f12e9b2b9d",
             "price": 104.0,
             "qty": 62,
             "side": "SELL",
@@ -3854,7 +3854,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-11-27T12:55:00-05:00",
-            "trade_id": "tri_ord_024ad4c80b15",
+            "trade_id": "tri_ord_9fb30e6dab13",
             "realized_pnl": 248.0
           }
         ],
@@ -3877,7 +3877,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_576581fbd55f"
+              "ord_fc21da8a2380"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -3901,7 +3901,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_0e34074f4401"
+              "ord_57f12e9b2b9d"
             ],
             "realized_pnl": 124.0,
             "exit_notional": 6448.0,
@@ -3916,7 +3916,7 @@
       "case": "TSLA_SHORT_target",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_630d9cf62997",
+        "trade_id": "tri_ord_2e4ffbe5c984",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "SHORT",
@@ -3957,7 +3957,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_20777964535f"
+              "ord_1e014208aae9"
             ],
             "realized_pnl": 279.0,
             "exit_notional": 8835.0,
@@ -3981,7 +3981,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_24e55a69c1f1"
+              "ord_1f5796ea1df9"
             ],
             "realized_pnl": 372.0,
             "exit_notional": 8742.0,
@@ -3990,8 +3990,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_1bbb9766e7",
-            "order_id": "ord_630d9cf62997",
+            "fill_id": "fl_97de2d76d1",
+            "order_id": "ord_2e4ffbe5c984",
             "side": "SELL",
             "qty": 186,
             "price": 98.0,
@@ -4000,8 +4000,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_ab363714dd",
-            "order_id": "ord_20777964535f",
+            "fill_id": "fl_838fd84159",
+            "order_id": "ord_1e014208aae9",
             "side": "BUY",
             "qty": 93,
             "price": 95.0,
@@ -4010,8 +4010,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_6dc4eed6b2",
-            "order_id": "ord_24e55a69c1f1",
+            "fill_id": "fl_7bc254c49d",
+            "order_id": "ord_1f5796ea1df9",
             "side": "BUY",
             "qty": 93,
             "price": 94.0,
@@ -4108,7 +4108,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_630d9cf62997",
+            "order_id": "ord_2e4ffbe5c984",
             "price": 98.0,
             "qty": 186,
             "side": "SELL",
@@ -4117,7 +4117,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_20777964535f",
+            "order_id": "ord_1e014208aae9",
             "price": 95.0,
             "qty": 93,
             "side": "BUY",
@@ -4126,7 +4126,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:50:00-04:00",
-            "order_id": "ord_24e55a69c1f1",
+            "order_id": "ord_1f5796ea1df9",
             "price": 94.0,
             "qty": 93,
             "side": "BUY",
@@ -4135,7 +4135,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:50:00-04:00",
-            "trade_id": "tri_ord_630d9cf62997",
+            "trade_id": "tri_ord_2e4ffbe5c984",
             "realized_pnl": 651.0
           }
         ],
@@ -4158,7 +4158,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_20777964535f"
+              "ord_1e014208aae9"
             ],
             "realized_pnl": 279.0,
             "exit_notional": 8835.0,
@@ -4182,7 +4182,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_24e55a69c1f1"
+              "ord_1f5796ea1df9"
             ],
             "realized_pnl": 372.0,
             "exit_notional": 8742.0,
@@ -4197,7 +4197,7 @@
       "case": "TSLA_SHORT_stop",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_ae3ff751c676",
+        "trade_id": "tri_ord_b5b73edcb5b7",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "SHORT",
@@ -4238,7 +4238,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_b1335acedd01"
+              "ord_bf208fd46180"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4262,7 +4262,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_fbcf337b846b"
+              "ord_20014cd99e54"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4271,8 +4271,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_6afb3168e4",
-            "order_id": "ord_ae3ff751c676",
+            "fill_id": "fl_3e6aa0fd4d",
+            "order_id": "ord_b5b73edcb5b7",
             "side": "SELL",
             "qty": 186,
             "price": 98.0,
@@ -4281,8 +4281,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_c398d699ed",
-            "order_id": "ord_b1335acedd01",
+            "fill_id": "fl_4358401b01",
+            "order_id": "ord_bf208fd46180",
             "side": "BUY",
             "qty": 93,
             "price": 100.0,
@@ -4291,8 +4291,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_bc0b544d31",
-            "order_id": "ord_fbcf337b846b",
+            "fill_id": "fl_63c64d66de",
+            "order_id": "ord_20014cd99e54",
             "side": "BUY",
             "qty": 93,
             "price": 100.0,
@@ -4389,7 +4389,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_ae3ff751c676",
+            "order_id": "ord_b5b73edcb5b7",
             "price": 98.0,
             "qty": 186,
             "side": "SELL",
@@ -4398,7 +4398,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_b1335acedd01",
+            "order_id": "ord_bf208fd46180",
             "price": 100.0,
             "qty": 93,
             "side": "BUY",
@@ -4407,7 +4407,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_fbcf337b846b",
+            "order_id": "ord_20014cd99e54",
             "price": 100.0,
             "qty": 93,
             "side": "BUY",
@@ -4416,7 +4416,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_ae3ff751c676",
+            "trade_id": "tri_ord_b5b73edcb5b7",
             "realized_pnl": -372.0
           }
         ],
@@ -4439,7 +4439,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_b1335acedd01"
+              "ord_bf208fd46180"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4463,7 +4463,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_fbcf337b846b"
+              "ord_20014cd99e54"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4478,7 +4478,7 @@
       "case": "TSLA_SHORT_collision",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_d577277ae374",
+        "trade_id": "tri_ord_4d23d4dc0e03",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "SHORT",
@@ -4519,7 +4519,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_97f6d5a5ba6f"
+              "ord_1398af20ff6f"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4543,7 +4543,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_eca2b082adcf"
+              "ord_121593101160"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4552,8 +4552,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_f86d271a50",
-            "order_id": "ord_d577277ae374",
+            "fill_id": "fl_b601dc0072",
+            "order_id": "ord_4d23d4dc0e03",
             "side": "SELL",
             "qty": 186,
             "price": 98.0,
@@ -4562,8 +4562,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_9e8a911a59",
-            "order_id": "ord_97f6d5a5ba6f",
+            "fill_id": "fl_59fd7c884e",
+            "order_id": "ord_1398af20ff6f",
             "side": "BUY",
             "qty": 93,
             "price": 100.0,
@@ -4572,8 +4572,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_c68b95fbce",
-            "order_id": "ord_eca2b082adcf",
+            "fill_id": "fl_f8f4b7f254",
+            "order_id": "ord_121593101160",
             "side": "BUY",
             "qty": 93,
             "price": 100.0,
@@ -4670,7 +4670,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_d577277ae374",
+            "order_id": "ord_4d23d4dc0e03",
             "price": 98.0,
             "qty": 186,
             "side": "SELL",
@@ -4679,7 +4679,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_97f6d5a5ba6f",
+            "order_id": "ord_1398af20ff6f",
             "price": 100.0,
             "qty": 93,
             "side": "BUY",
@@ -4688,7 +4688,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_eca2b082adcf",
+            "order_id": "ord_121593101160",
             "price": 100.0,
             "qty": 93,
             "side": "BUY",
@@ -4697,7 +4697,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_d577277ae374",
+            "trade_id": "tri_ord_4d23d4dc0e03",
             "realized_pnl": -372.0
           }
         ],
@@ -4720,7 +4720,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_97f6d5a5ba6f"
+              "ord_1398af20ff6f"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4744,7 +4744,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_eca2b082adcf"
+              "ord_121593101160"
             ],
             "realized_pnl": -186.0,
             "exit_notional": 9300.0,
@@ -4759,7 +4759,7 @@
       "case": "TSLA_SHORT_gap",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_00f2852c4d56",
+        "trade_id": "tri_ord_1ea05b09f5c1",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "SHORT",
@@ -4800,7 +4800,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_08516bf876ae"
+              "ord_0e5b23ea2f95"
             ],
             "realized_pnl": -465.0,
             "exit_notional": 9579.0,
@@ -4824,7 +4824,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_f3681cd5a4bb"
+              "ord_1ca74d9a07e3"
             ],
             "realized_pnl": -465.0,
             "exit_notional": 9579.0,
@@ -4833,8 +4833,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_538bd74147",
-            "order_id": "ord_00f2852c4d56",
+            "fill_id": "fl_3ddd5e4af3",
+            "order_id": "ord_1ea05b09f5c1",
             "side": "SELL",
             "qty": 186,
             "price": 98.0,
@@ -4843,8 +4843,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_b45d03e726",
-            "order_id": "ord_08516bf876ae",
+            "fill_id": "fl_d2ed0e7786",
+            "order_id": "ord_0e5b23ea2f95",
             "side": "BUY",
             "qty": 93,
             "price": 103.0,
@@ -4853,8 +4853,8 @@
             "timestamp": "2026-09-28T09:49:00-04:00"
           },
           {
-            "fill_id": "fl_bbfd469f27",
-            "order_id": "ord_f3681cd5a4bb",
+            "fill_id": "fl_7512e80949",
+            "order_id": "ord_1ca74d9a07e3",
             "side": "BUY",
             "qty": 93,
             "price": 103.0,
@@ -4951,7 +4951,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_00f2852c4d56",
+            "order_id": "ord_1ea05b09f5c1",
             "price": 98.0,
             "qty": 186,
             "side": "SELL",
@@ -4960,7 +4960,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_08516bf876ae",
+            "order_id": "ord_0e5b23ea2f95",
             "price": 103.0,
             "qty": 93,
             "side": "BUY",
@@ -4969,7 +4969,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_f3681cd5a4bb",
+            "order_id": "ord_1ca74d9a07e3",
             "price": 103.0,
             "qty": 93,
             "side": "BUY",
@@ -4978,7 +4978,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_00f2852c4d56",
+            "trade_id": "tri_ord_1ea05b09f5c1",
             "realized_pnl": -930.0
           }
         ],
@@ -5001,7 +5001,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_08516bf876ae"
+              "ord_0e5b23ea2f95"
             ],
             "realized_pnl": -465.0,
             "exit_notional": 9579.0,
@@ -5025,7 +5025,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_f3681cd5a4bb"
+              "ord_1ca74d9a07e3"
             ],
             "realized_pnl": -465.0,
             "exit_notional": 9579.0,
@@ -5040,7 +5040,7 @@
       "case": "TSLA_SHORT_time",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_b849f6b4b3c5",
+        "trade_id": "tri_ord_97423cf939a8",
         "session_date": "2026-09-28",
         "symbol": "TSLA",
         "side": "SHORT",
@@ -5081,7 +5081,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_914e0b9dfb20"
+              "ord_2e46f1ac3589"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -5105,7 +5105,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_064453320585"
+              "ord_07169f9ae151"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -5114,8 +5114,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_ecb0c3a384",
-            "order_id": "ord_b849f6b4b3c5",
+            "fill_id": "fl_8c6387d3e0",
+            "order_id": "ord_97423cf939a8",
             "side": "SELL",
             "qty": 186,
             "price": 98.0,
@@ -5124,8 +5124,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_ef723082ce",
-            "order_id": "ord_914e0b9dfb20",
+            "fill_id": "fl_f48fb2406c",
+            "order_id": "ord_2e46f1ac3589",
             "side": "BUY",
             "qty": 93,
             "price": 97.0,
@@ -5134,8 +5134,8 @@
             "timestamp": "2026-09-28T12:48:00-04:00"
           },
           {
-            "fill_id": "fl_3ee1170f2b",
-            "order_id": "ord_064453320585",
+            "fill_id": "fl_48cc32157e",
+            "order_id": "ord_07169f9ae151",
             "side": "BUY",
             "qty": 93,
             "price": 97.0,
@@ -5232,7 +5232,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_b849f6b4b3c5",
+            "order_id": "ord_97423cf939a8",
             "price": 98.0,
             "qty": 186,
             "side": "SELL",
@@ -5241,7 +5241,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T12:48:00-04:00",
-            "order_id": "ord_914e0b9dfb20",
+            "order_id": "ord_2e46f1ac3589",
             "price": 97.0,
             "qty": 93,
             "side": "BUY",
@@ -5250,7 +5250,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T13:48:00-04:00",
-            "order_id": "ord_064453320585",
+            "order_id": "ord_07169f9ae151",
             "price": 97.0,
             "qty": 93,
             "side": "BUY",
@@ -5259,7 +5259,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T13:48:00-04:00",
-            "trade_id": "tri_ord_b849f6b4b3c5",
+            "trade_id": "tri_ord_97423cf939a8",
             "realized_pnl": 186.0
           }
         ],
@@ -5282,7 +5282,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_914e0b9dfb20"
+              "ord_2e46f1ac3589"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -5306,7 +5306,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_064453320585"
+              "ord_07169f9ae151"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -5321,7 +5321,7 @@
       "case": "TSLA_SHORT_early_close",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_e37123807de8",
+        "trade_id": "tri_ord_7c2c0cbbd847",
         "session_date": "2026-11-27",
         "symbol": "TSLA",
         "side": "SHORT",
@@ -5362,7 +5362,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_733ecde35d9c"
+              "ord_1f0259027766"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -5386,7 +5386,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_5c31bce8d8a2"
+              "ord_5d1a4eead69c"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -5395,8 +5395,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_7aa4cd5236",
-            "order_id": "ord_e37123807de8",
+            "fill_id": "fl_89a617ef1c",
+            "order_id": "ord_7c2c0cbbd847",
             "side": "SELL",
             "qty": 186,
             "price": 98.0,
@@ -5405,8 +5405,8 @@
             "timestamp": "2026-11-27T11:01:00-05:00"
           },
           {
-            "fill_id": "fl_6e80271a0c",
-            "order_id": "ord_733ecde35d9c",
+            "fill_id": "fl_63f51551da",
+            "order_id": "ord_1f0259027766",
             "side": "BUY",
             "qty": 93,
             "price": 97.0,
@@ -5415,8 +5415,8 @@
             "timestamp": "2026-11-27T12:55:00-05:00"
           },
           {
-            "fill_id": "fl_b1c3e0b9dc",
-            "order_id": "ord_5c31bce8d8a2",
+            "fill_id": "fl_f53f3824c4",
+            "order_id": "ord_5d1a4eead69c",
             "side": "BUY",
             "qty": 93,
             "price": 97.0,
@@ -7046,7 +7046,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T11:01:00-05:00",
-            "order_id": "ord_e37123807de8",
+            "order_id": "ord_7c2c0cbbd847",
             "price": 98.0,
             "qty": 186,
             "side": "SELL",
@@ -7055,7 +7055,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T12:55:00-05:00",
-            "order_id": "ord_733ecde35d9c",
+            "order_id": "ord_1f0259027766",
             "price": 97.0,
             "qty": 93,
             "side": "BUY",
@@ -7064,7 +7064,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T12:55:00-05:00",
-            "order_id": "ord_5c31bce8d8a2",
+            "order_id": "ord_5d1a4eead69c",
             "price": 97.0,
             "qty": 93,
             "side": "BUY",
@@ -7073,7 +7073,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-11-27T12:55:00-05:00",
-            "trade_id": "tri_ord_e37123807de8",
+            "trade_id": "tri_ord_7c2c0cbbd847",
             "realized_pnl": 186.0
           }
         ],
@@ -7096,7 +7096,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_733ecde35d9c"
+              "ord_1f0259027766"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -7120,7 +7120,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_5c31bce8d8a2"
+              "ord_5d1a4eead69c"
             ],
             "realized_pnl": 93.0,
             "exit_notional": 9021.0,
@@ -7135,7 +7135,7 @@
       "case": "CDE_LONG_target",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_5f6d9beb50a9",
+        "trade_id": "tri_ord_1962b3a2eb0c",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "LONG",
@@ -7176,7 +7176,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_a24674c3dbe6"
+              "ord_3d1c37ae098d"
             ],
             "realized_pnl": 749.88,
             "exit_notional": 13497.840000000002,
@@ -7185,8 +7185,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_9530fb410d",
-            "order_id": "ord_5f6d9beb50a9",
+            "fill_id": "fl_8967ebad8b",
+            "order_id": "ord_1962b3a2eb0c",
             "side": "BUY",
             "qty": 2083,
             "price": 6.12,
@@ -7195,8 +7195,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_08bc726f89",
-            "order_id": "ord_a24674c3dbe6",
+            "fill_id": "fl_1d7de1a4fb",
+            "order_id": "ord_3d1c37ae098d",
             "side": "SELL",
             "qty": 2083,
             "price": 6.480000000000001,
@@ -7298,7 +7298,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_5f6d9beb50a9",
+            "order_id": "ord_1962b3a2eb0c",
             "price": 6.12,
             "qty": 2083,
             "side": "BUY",
@@ -7307,7 +7307,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_a24674c3dbe6",
+            "order_id": "ord_3d1c37ae098d",
             "price": 6.480000000000001,
             "qty": 2083,
             "side": "SELL",
@@ -7316,7 +7316,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_5f6d9beb50a9",
+            "trade_id": "tri_ord_1962b3a2eb0c",
             "realized_pnl": 749.88
           }
         ],
@@ -7339,7 +7339,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_a24674c3dbe6"
+              "ord_3d1c37ae098d"
             ],
             "realized_pnl": 749.88,
             "exit_notional": 13497.840000000002,
@@ -7354,7 +7354,7 @@
       "case": "CDE_LONG_stop",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_05b4a14ce89b",
+        "trade_id": "tri_ord_ee1d0779d86f",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "LONG",
@@ -7395,7 +7395,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_6d16b1f383c5"
+              "ord_a19e00433160"
             ],
             "realized_pnl": -374.94,
             "exit_notional": 12373.019999999999,
@@ -7404,8 +7404,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_c1109d84ef",
-            "order_id": "ord_05b4a14ce89b",
+            "fill_id": "fl_7cf30990b1",
+            "order_id": "ord_ee1d0779d86f",
             "side": "BUY",
             "qty": 2083,
             "price": 6.12,
@@ -7414,8 +7414,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_ccd1a30c02",
-            "order_id": "ord_6d16b1f383c5",
+            "fill_id": "fl_a497ca7ea9",
+            "order_id": "ord_a19e00433160",
             "side": "SELL",
             "qty": 2083,
             "price": 5.9399999999999995,
@@ -7517,7 +7517,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_05b4a14ce89b",
+            "order_id": "ord_ee1d0779d86f",
             "price": 6.12,
             "qty": 2083,
             "side": "BUY",
@@ -7526,7 +7526,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_6d16b1f383c5",
+            "order_id": "ord_a19e00433160",
             "price": 5.9399999999999995,
             "qty": 2083,
             "side": "SELL",
@@ -7535,7 +7535,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_05b4a14ce89b",
+            "trade_id": "tri_ord_ee1d0779d86f",
             "realized_pnl": -374.94
           }
         ],
@@ -7558,7 +7558,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_6d16b1f383c5"
+              "ord_a19e00433160"
             ],
             "realized_pnl": -374.94,
             "exit_notional": 12373.019999999999,
@@ -7573,7 +7573,7 @@
       "case": "CDE_LONG_collision",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_ec89bebd20a3",
+        "trade_id": "tri_ord_e55a37dca9aa",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "LONG",
@@ -7614,7 +7614,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_a2b504ba2aa0"
+              "ord_ea43d5d5ae1f"
             ],
             "realized_pnl": -374.94,
             "exit_notional": 12373.019999999999,
@@ -7623,8 +7623,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_4f6689e7d5",
-            "order_id": "ord_ec89bebd20a3",
+            "fill_id": "fl_0d72fe99e0",
+            "order_id": "ord_e55a37dca9aa",
             "side": "BUY",
             "qty": 2083,
             "price": 6.12,
@@ -7633,8 +7633,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_8c8a6cc1fd",
-            "order_id": "ord_a2b504ba2aa0",
+            "fill_id": "fl_2ecaf43d8f",
+            "order_id": "ord_ea43d5d5ae1f",
             "side": "SELL",
             "qty": 2083,
             "price": 5.9399999999999995,
@@ -7736,7 +7736,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_ec89bebd20a3",
+            "order_id": "ord_e55a37dca9aa",
             "price": 6.12,
             "qty": 2083,
             "side": "BUY",
@@ -7745,7 +7745,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_a2b504ba2aa0",
+            "order_id": "ord_ea43d5d5ae1f",
             "price": 5.9399999999999995,
             "qty": 2083,
             "side": "SELL",
@@ -7754,7 +7754,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_ec89bebd20a3",
+            "trade_id": "tri_ord_e55a37dca9aa",
             "realized_pnl": -374.94
           }
         ],
@@ -7777,7 +7777,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_a2b504ba2aa0"
+              "ord_ea43d5d5ae1f"
             ],
             "realized_pnl": -374.94,
             "exit_notional": 12373.019999999999,
@@ -7792,7 +7792,7 @@
       "case": "CDE_LONG_gap",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_fa1e0f937289",
+        "trade_id": "tri_ord_4a9436707169",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "LONG",
@@ -7833,7 +7833,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_7ae4b65042b2"
+              "ord_a6bdcf356a41"
             ],
             "realized_pnl": -624.9,
             "exit_notional": 12123.06,
@@ -7842,8 +7842,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_756e42604c",
-            "order_id": "ord_fa1e0f937289",
+            "fill_id": "fl_fc3aa855a1",
+            "order_id": "ord_4a9436707169",
             "side": "BUY",
             "qty": 2083,
             "price": 6.12,
@@ -7852,8 +7852,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_ebb49c8bfc",
-            "order_id": "ord_7ae4b65042b2",
+            "fill_id": "fl_7c19e2a1dc",
+            "order_id": "ord_a6bdcf356a41",
             "side": "SELL",
             "qty": 2083,
             "price": 5.819999999999999,
@@ -7955,7 +7955,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_fa1e0f937289",
+            "order_id": "ord_4a9436707169",
             "price": 6.12,
             "qty": 2083,
             "side": "BUY",
@@ -7964,7 +7964,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_7ae4b65042b2",
+            "order_id": "ord_a6bdcf356a41",
             "price": 5.819999999999999,
             "qty": 2083,
             "side": "SELL",
@@ -7973,7 +7973,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_fa1e0f937289",
+            "trade_id": "tri_ord_4a9436707169",
             "realized_pnl": -624.9
           }
         ],
@@ -7996,7 +7996,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_7ae4b65042b2"
+              "ord_a6bdcf356a41"
             ],
             "realized_pnl": -624.9,
             "exit_notional": 12123.06,
@@ -8011,7 +8011,7 @@
       "case": "CDE_LONG_time",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_1717079bb492",
+        "trade_id": "tri_ord_f27c724800d0",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "LONG",
@@ -8052,7 +8052,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_f90a7ac38fe8"
+              "ord_a46818cf8806"
             ],
             "realized_pnl": 249.96,
             "exit_notional": 12997.92,
@@ -8061,8 +8061,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_8774869b76",
-            "order_id": "ord_1717079bb492",
+            "fill_id": "fl_0680a9cd64",
+            "order_id": "ord_f27c724800d0",
             "side": "BUY",
             "qty": 2083,
             "price": 6.12,
@@ -8071,8 +8071,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_89db67a8d5",
-            "order_id": "ord_f90a7ac38fe8",
+            "fill_id": "fl_8862c0072c",
+            "order_id": "ord_a46818cf8806",
             "side": "SELL",
             "qty": 2083,
             "price": 6.24,
@@ -8174,7 +8174,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_1717079bb492",
+            "order_id": "ord_f27c724800d0",
             "price": 6.12,
             "qty": 2083,
             "side": "BUY",
@@ -8183,7 +8183,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T12:48:00-04:00",
-            "order_id": "ord_f90a7ac38fe8",
+            "order_id": "ord_a46818cf8806",
             "price": 6.24,
             "qty": 2083,
             "side": "SELL",
@@ -8192,7 +8192,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T12:48:00-04:00",
-            "trade_id": "tri_ord_1717079bb492",
+            "trade_id": "tri_ord_f27c724800d0",
             "realized_pnl": 249.96
           }
         ],
@@ -8215,7 +8215,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_f90a7ac38fe8"
+              "ord_a46818cf8806"
             ],
             "realized_pnl": 249.96,
             "exit_notional": 12997.92,
@@ -8230,7 +8230,7 @@
       "case": "CDE_LONG_early_close",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_b7a1b0104654",
+        "trade_id": "tri_ord_8b276482c3c3",
         "session_date": "2026-11-27",
         "symbol": "CDE",
         "side": "LONG",
@@ -8271,7 +8271,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_4bca4cf3ae2f"
+              "ord_316e28e12d29"
             ],
             "realized_pnl": 249.96,
             "exit_notional": 12997.92,
@@ -8280,8 +8280,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_f9ea3f322d",
-            "order_id": "ord_b7a1b0104654",
+            "fill_id": "fl_eec475a77f",
+            "order_id": "ord_8b276482c3c3",
             "side": "BUY",
             "qty": 2083,
             "price": 6.12,
@@ -8290,8 +8290,8 @@
             "timestamp": "2026-11-27T11:59:00-05:00"
           },
           {
-            "fill_id": "fl_50ddada09b",
-            "order_id": "ord_4bca4cf3ae2f",
+            "fill_id": "fl_2ceea416b1",
+            "order_id": "ord_316e28e12d29",
             "side": "SELL",
             "qty": 2083,
             "price": 6.24,
@@ -11144,7 +11144,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T11:59:00-05:00",
-            "order_id": "ord_b7a1b0104654",
+            "order_id": "ord_8b276482c3c3",
             "price": 6.12,
             "qty": 2083,
             "side": "BUY",
@@ -11153,7 +11153,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T12:55:00-05:00",
-            "order_id": "ord_4bca4cf3ae2f",
+            "order_id": "ord_316e28e12d29",
             "price": 6.24,
             "qty": 2083,
             "side": "SELL",
@@ -11162,7 +11162,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-11-27T12:55:00-05:00",
-            "trade_id": "tri_ord_b7a1b0104654",
+            "trade_id": "tri_ord_8b276482c3c3",
             "realized_pnl": 249.96
           }
         ],
@@ -11185,7 +11185,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_4bca4cf3ae2f"
+              "ord_316e28e12d29"
             ],
             "realized_pnl": 249.96,
             "exit_notional": 12997.92,
@@ -11200,7 +11200,7 @@
       "case": "CDE_SHORT_target",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_60e581f1889c",
+        "trade_id": "tri_ord_c42cc9e11f30",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "SHORT",
@@ -11241,7 +11241,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_e38258f25f1a"
+              "ord_13c10881f3e4"
             ],
             "realized_pnl": 749.76,
             "exit_notional": 17619.36,
@@ -11250,8 +11250,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_cff4a7cf61",
-            "order_id": "ord_60e581f1889c",
+            "fill_id": "fl_fa6d8547d2",
+            "order_id": "ord_c42cc9e11f30",
             "side": "SELL",
             "qty": 3124,
             "price": 5.88,
@@ -11260,8 +11260,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_4522f68bfb",
-            "order_id": "ord_e38258f25f1a",
+            "fill_id": "fl_b42187d614",
+            "order_id": "ord_13c10881f3e4",
             "side": "BUY",
             "qty": 3124,
             "price": 5.64,
@@ -11358,7 +11358,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_60e581f1889c",
+            "order_id": "ord_c42cc9e11f30",
             "price": 5.88,
             "qty": 3124,
             "side": "SELL",
@@ -11367,7 +11367,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_e38258f25f1a",
+            "order_id": "ord_13c10881f3e4",
             "price": 5.64,
             "qty": 3124,
             "side": "BUY",
@@ -11376,7 +11376,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_60e581f1889c",
+            "trade_id": "tri_ord_c42cc9e11f30",
             "realized_pnl": 749.76
           }
         ],
@@ -11399,7 +11399,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_e38258f25f1a"
+              "ord_13c10881f3e4"
             ],
             "realized_pnl": 749.76,
             "exit_notional": 17619.36,
@@ -11414,7 +11414,7 @@
       "case": "CDE_SHORT_stop",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_01e93a3b7e82",
+        "trade_id": "tri_ord_e50ed5cbe864",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "SHORT",
@@ -11455,7 +11455,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_9984e147c4a3"
+              "ord_e39b0767c009"
             ],
             "realized_pnl": -374.88,
             "exit_notional": 18744.0,
@@ -11464,8 +11464,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_1480a19211",
-            "order_id": "ord_01e93a3b7e82",
+            "fill_id": "fl_143f85b4f7",
+            "order_id": "ord_e50ed5cbe864",
             "side": "SELL",
             "qty": 3124,
             "price": 5.88,
@@ -11474,8 +11474,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_7450e8fc72",
-            "order_id": "ord_9984e147c4a3",
+            "fill_id": "fl_2bad79bd82",
+            "order_id": "ord_e39b0767c009",
             "side": "BUY",
             "qty": 3124,
             "price": 6.0,
@@ -11572,7 +11572,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_01e93a3b7e82",
+            "order_id": "ord_e50ed5cbe864",
             "price": 5.88,
             "qty": 3124,
             "side": "SELL",
@@ -11581,7 +11581,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_9984e147c4a3",
+            "order_id": "ord_e39b0767c009",
             "price": 6.0,
             "qty": 3124,
             "side": "BUY",
@@ -11590,7 +11590,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_01e93a3b7e82",
+            "trade_id": "tri_ord_e50ed5cbe864",
             "realized_pnl": -374.88
           }
         ],
@@ -11613,7 +11613,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_9984e147c4a3"
+              "ord_e39b0767c009"
             ],
             "realized_pnl": -374.88,
             "exit_notional": 18744.0,
@@ -11628,7 +11628,7 @@
       "case": "CDE_SHORT_collision",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_fc669495f694",
+        "trade_id": "tri_ord_9b86c23afd49",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "SHORT",
@@ -11669,7 +11669,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_2e98abda3397"
+              "ord_5df3e67adb8f"
             ],
             "realized_pnl": -374.88,
             "exit_notional": 18744.0,
@@ -11678,8 +11678,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_a8bdd7705e",
-            "order_id": "ord_fc669495f694",
+            "fill_id": "fl_bee0e670d7",
+            "order_id": "ord_9b86c23afd49",
             "side": "SELL",
             "qty": 3124,
             "price": 5.88,
@@ -11688,8 +11688,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_444167f28e",
-            "order_id": "ord_2e98abda3397",
+            "fill_id": "fl_c16bb6c1f6",
+            "order_id": "ord_5df3e67adb8f",
             "side": "BUY",
             "qty": 3124,
             "price": 6.0,
@@ -11786,7 +11786,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_fc669495f694",
+            "order_id": "ord_9b86c23afd49",
             "price": 5.88,
             "qty": 3124,
             "side": "SELL",
@@ -11795,7 +11795,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_2e98abda3397",
+            "order_id": "ord_5df3e67adb8f",
             "price": 6.0,
             "qty": 3124,
             "side": "BUY",
@@ -11804,7 +11804,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_fc669495f694",
+            "trade_id": "tri_ord_9b86c23afd49",
             "realized_pnl": -374.88
           }
         ],
@@ -11827,7 +11827,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_2e98abda3397"
+              "ord_5df3e67adb8f"
             ],
             "realized_pnl": -374.88,
             "exit_notional": 18744.0,
@@ -11842,7 +11842,7 @@
       "case": "CDE_SHORT_gap",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_6f0ae50dcb74",
+        "trade_id": "tri_ord_b17c232dbb8d",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "SHORT",
@@ -11883,7 +11883,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_1c1485719f77"
+              "ord_b8bf6336e3e3"
             ],
             "realized_pnl": -937.2,
             "exit_notional": 19306.32,
@@ -11892,8 +11892,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_eef7ee7095",
-            "order_id": "ord_6f0ae50dcb74",
+            "fill_id": "fl_b1afbc0860",
+            "order_id": "ord_b17c232dbb8d",
             "side": "SELL",
             "qty": 3124,
             "price": 5.88,
@@ -11902,8 +11902,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_3ab23d690e",
-            "order_id": "ord_1c1485719f77",
+            "fill_id": "fl_654dc0d9c1",
+            "order_id": "ord_b8bf6336e3e3",
             "side": "BUY",
             "qty": 3124,
             "price": 6.18,
@@ -12000,7 +12000,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_6f0ae50dcb74",
+            "order_id": "ord_b17c232dbb8d",
             "price": 5.88,
             "qty": 3124,
             "side": "SELL",
@@ -12009,7 +12009,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:49:00-04:00",
-            "order_id": "ord_1c1485719f77",
+            "order_id": "ord_b8bf6336e3e3",
             "price": 6.18,
             "qty": 3124,
             "side": "BUY",
@@ -12018,7 +12018,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T09:49:00-04:00",
-            "trade_id": "tri_ord_6f0ae50dcb74",
+            "trade_id": "tri_ord_b17c232dbb8d",
             "realized_pnl": -937.2
           }
         ],
@@ -12041,7 +12041,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_1c1485719f77"
+              "ord_b8bf6336e3e3"
             ],
             "realized_pnl": -937.2,
             "exit_notional": 19306.32,
@@ -12056,7 +12056,7 @@
       "case": "CDE_SHORT_time",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_22a866619159",
+        "trade_id": "tri_ord_7b9838ef2418",
         "session_date": "2026-09-28",
         "symbol": "CDE",
         "side": "SHORT",
@@ -12097,7 +12097,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_68ff3e53fb08"
+              "ord_45f1d6057444"
             ],
             "realized_pnl": 187.44,
             "exit_notional": 18181.679999999997,
@@ -12106,8 +12106,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_ddd1c94dd3",
-            "order_id": "ord_22a866619159",
+            "fill_id": "fl_0b96c567a4",
+            "order_id": "ord_7b9838ef2418",
             "side": "SELL",
             "qty": 3124,
             "price": 5.88,
@@ -12116,8 +12116,8 @@
             "timestamp": "2026-09-28T09:48:00-04:00"
           },
           {
-            "fill_id": "fl_25a67936da",
-            "order_id": "ord_68ff3e53fb08",
+            "fill_id": "fl_02d3d86ef4",
+            "order_id": "ord_45f1d6057444",
             "side": "BUY",
             "qty": 3124,
             "price": 5.819999999999999,
@@ -12214,7 +12214,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T09:48:00-04:00",
-            "order_id": "ord_22a866619159",
+            "order_id": "ord_7b9838ef2418",
             "price": 5.88,
             "qty": 3124,
             "side": "SELL",
@@ -12223,7 +12223,7 @@
           {
             "kind": "FILL",
             "at": "2026-09-28T12:48:00-04:00",
-            "order_id": "ord_68ff3e53fb08",
+            "order_id": "ord_45f1d6057444",
             "price": 5.819999999999999,
             "qty": 3124,
             "side": "BUY",
@@ -12232,7 +12232,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-09-28T12:48:00-04:00",
-            "trade_id": "tri_ord_22a866619159",
+            "trade_id": "tri_ord_7b9838ef2418",
             "realized_pnl": 187.44
           }
         ],
@@ -12255,7 +12255,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_68ff3e53fb08"
+              "ord_45f1d6057444"
             ],
             "realized_pnl": 187.44,
             "exit_notional": 18181.679999999997,
@@ -12270,7 +12270,7 @@
       "case": "CDE_SHORT_early_close",
       "passed": true,
       "trade": {
-        "trade_id": "tri_ord_4ea3b057db25",
+        "trade_id": "tri_ord_390ae2990795",
         "session_date": "2026-11-27",
         "symbol": "CDE",
         "side": "SHORT",
@@ -12311,7 +12311,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_c77b61e08242"
+              "ord_5e4243fc1473"
             ],
             "realized_pnl": 187.44,
             "exit_notional": 18181.679999999997,
@@ -12320,8 +12320,8 @@
         ],
         "fill_legs": [
           {
-            "fill_id": "fl_c168a5d5ff",
-            "order_id": "ord_4ea3b057db25",
+            "fill_id": "fl_8198d3cab7",
+            "order_id": "ord_390ae2990795",
             "side": "SELL",
             "qty": 3124,
             "price": 5.88,
@@ -12330,8 +12330,8 @@
             "timestamp": "2026-11-27T11:31:00-05:00"
           },
           {
-            "fill_id": "fl_9f557c8efa",
-            "order_id": "ord_c77b61e08242",
+            "fill_id": "fl_93ca0ea828",
+            "order_id": "ord_5e4243fc1473",
             "side": "BUY",
             "qty": 3124,
             "price": 5.819999999999999,
@@ -14591,7 +14591,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T11:31:00-05:00",
-            "order_id": "ord_4ea3b057db25",
+            "order_id": "ord_390ae2990795",
             "price": 5.88,
             "qty": 3124,
             "side": "SELL",
@@ -14600,7 +14600,7 @@
           {
             "kind": "FILL",
             "at": "2026-11-27T12:55:00-05:00",
-            "order_id": "ord_c77b61e08242",
+            "order_id": "ord_5e4243fc1473",
             "price": 5.819999999999999,
             "qty": 3124,
             "side": "BUY",
@@ -14609,7 +14609,7 @@
           {
             "kind": "CLOSED",
             "at": "2026-11-27T12:55:00-05:00",
-            "trade_id": "tri_ord_4ea3b057db25",
+            "trade_id": "tri_ord_390ae2990795",
             "realized_pnl": 187.44
           }
         ],
@@ -14632,7 +14632,7 @@
             "stop_order_id": null,
             "target_order_id": null,
             "close_order_ids": [
-              "ord_c77b61e08242"
+              "ord_5e4243fc1473"
             ],
             "realized_pnl": 187.44,
             "exit_notional": 18181.679999999997,
@@ -14654,7 +14654,7 @@
           "case": "coexist_TSLA_forward",
           "passed": true,
           "trade": {
-            "trade_id": "tri_ord_45766532de16",
+            "trade_id": "tri_ord_018a6b95ccb2",
             "session_date": "2026-09-28",
             "symbol": "TSLA",
             "side": "LONG",
@@ -14695,7 +14695,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_f3d4015568c8"
+                  "ord_66c1fc7c4a3d"
                 ],
                 "realized_pnl": 279.0,
                 "exit_notional": 6603.0,
@@ -14719,7 +14719,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_95295c4992be"
+                  "ord_b4074e40b195"
                 ],
                 "realized_pnl": 372.0,
                 "exit_notional": 6696.0,
@@ -14728,8 +14728,8 @@
             ],
             "fill_legs": [
               {
-                "fill_id": "fl_c0cac0cc67",
-                "order_id": "ord_45766532de16",
+                "fill_id": "fl_893b478c39",
+                "order_id": "ord_018a6b95ccb2",
                 "side": "BUY",
                 "qty": 124,
                 "price": 102.0,
@@ -14738,8 +14738,8 @@
                 "timestamp": "2026-09-28T09:48:00-04:00"
               },
               {
-                "fill_id": "fl_9b8a72fa49",
-                "order_id": "ord_f3d4015568c8",
+                "fill_id": "fl_1130877c8c",
+                "order_id": "ord_66c1fc7c4a3d",
                 "side": "SELL",
                 "qty": 62,
                 "price": 106.5,
@@ -14748,8 +14748,8 @@
                 "timestamp": "2026-09-28T09:49:00-04:00"
               },
               {
-                "fill_id": "fl_4ea003accd",
-                "order_id": "ord_95295c4992be",
+                "fill_id": "fl_06d51e8545",
+                "order_id": "ord_b4074e40b195",
                 "side": "SELL",
                 "qty": 62,
                 "price": 108.0,
@@ -14851,7 +14851,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:48:00-04:00",
-                "order_id": "ord_45766532de16",
+                "order_id": "ord_018a6b95ccb2",
                 "price": 102.0,
                 "qty": 124,
                 "side": "BUY",
@@ -14860,7 +14860,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:49:00-04:00",
-                "order_id": "ord_f3d4015568c8",
+                "order_id": "ord_66c1fc7c4a3d",
                 "price": 106.5,
                 "qty": 62,
                 "side": "SELL",
@@ -14869,7 +14869,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:49:00-04:00",
-                "order_id": "ord_95295c4992be",
+                "order_id": "ord_b4074e40b195",
                 "price": 108.0,
                 "qty": 62,
                 "side": "SELL",
@@ -14878,7 +14878,7 @@
               {
                 "kind": "CLOSED",
                 "at": "2026-09-28T09:49:00-04:00",
-                "trade_id": "tri_ord_45766532de16",
+                "trade_id": "tri_ord_018a6b95ccb2",
                 "realized_pnl": 651.0
               }
             ],
@@ -14901,7 +14901,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_f3d4015568c8"
+                  "ord_66c1fc7c4a3d"
                 ],
                 "realized_pnl": 279.0,
                 "exit_notional": 6603.0,
@@ -14925,7 +14925,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_95295c4992be"
+                  "ord_b4074e40b195"
                 ],
                 "realized_pnl": 372.0,
                 "exit_notional": 6696.0,
@@ -14940,7 +14940,7 @@
           "case": "coexist_CDE_forward",
           "passed": true,
           "trade": {
-            "trade_id": "tri_ord_1b3d96f064cf",
+            "trade_id": "tri_ord_8f8f91e1c195",
             "session_date": "2026-09-28",
             "symbol": "CDE",
             "side": "LONG",
@@ -14981,7 +14981,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_ec8b40dc17bb"
+                  "ord_8c44efd66ef9"
                 ],
                 "realized_pnl": 749.88,
                 "exit_notional": 13497.840000000002,
@@ -14990,8 +14990,8 @@
             ],
             "fill_legs": [
               {
-                "fill_id": "fl_47417df113",
-                "order_id": "ord_1b3d96f064cf",
+                "fill_id": "fl_976ce8d274",
+                "order_id": "ord_8f8f91e1c195",
                 "side": "BUY",
                 "qty": 2083,
                 "price": 6.12,
@@ -15000,8 +15000,8 @@
                 "timestamp": "2026-09-28T09:48:00-04:00"
               },
               {
-                "fill_id": "fl_77c5dc937e",
-                "order_id": "ord_ec8b40dc17bb",
+                "fill_id": "fl_d13a3f5922",
+                "order_id": "ord_8c44efd66ef9",
                 "side": "SELL",
                 "qty": 2083,
                 "price": 6.480000000000001,
@@ -15103,7 +15103,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:48:00-04:00",
-                "order_id": "ord_1b3d96f064cf",
+                "order_id": "ord_8f8f91e1c195",
                 "price": 6.12,
                 "qty": 2083,
                 "side": "BUY",
@@ -15112,7 +15112,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:49:00-04:00",
-                "order_id": "ord_ec8b40dc17bb",
+                "order_id": "ord_8c44efd66ef9",
                 "price": 6.480000000000001,
                 "qty": 2083,
                 "side": "SELL",
@@ -15121,7 +15121,7 @@
               {
                 "kind": "CLOSED",
                 "at": "2026-09-28T09:49:00-04:00",
-                "trade_id": "tri_ord_1b3d96f064cf",
+                "trade_id": "tri_ord_8f8f91e1c195",
                 "realized_pnl": 749.88
               }
             ],
@@ -15144,7 +15144,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_ec8b40dc17bb"
+                  "ord_8c44efd66ef9"
                 ],
                 "realized_pnl": 749.88,
                 "exit_notional": 13497.840000000002,
@@ -15168,7 +15168,7 @@
           "case": "coexist_TSLA_reverse",
           "passed": true,
           "trade": {
-            "trade_id": "tri_ord_395064554862",
+            "trade_id": "tri_ord_73bc2886316f",
             "session_date": "2026-09-28",
             "symbol": "TSLA",
             "side": "LONG",
@@ -15209,7 +15209,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_9c33d8711972"
+                  "ord_df9deba126cc"
                 ],
                 "realized_pnl": 279.0,
                 "exit_notional": 6603.0,
@@ -15233,7 +15233,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_a00016058432"
+                  "ord_bbd519684ddc"
                 ],
                 "realized_pnl": 372.0,
                 "exit_notional": 6696.0,
@@ -15242,8 +15242,8 @@
             ],
             "fill_legs": [
               {
-                "fill_id": "fl_b1a3a99f6c",
-                "order_id": "ord_395064554862",
+                "fill_id": "fl_e3af4a994d",
+                "order_id": "ord_73bc2886316f",
                 "side": "BUY",
                 "qty": 124,
                 "price": 102.0,
@@ -15252,8 +15252,8 @@
                 "timestamp": "2026-09-28T09:48:00-04:00"
               },
               {
-                "fill_id": "fl_9fbe383f12",
-                "order_id": "ord_9c33d8711972",
+                "fill_id": "fl_14e652fa3e",
+                "order_id": "ord_df9deba126cc",
                 "side": "SELL",
                 "qty": 62,
                 "price": 106.5,
@@ -15262,8 +15262,8 @@
                 "timestamp": "2026-09-28T09:49:00-04:00"
               },
               {
-                "fill_id": "fl_4fb0e82f29",
-                "order_id": "ord_a00016058432",
+                "fill_id": "fl_af89db0dda",
+                "order_id": "ord_bbd519684ddc",
                 "side": "SELL",
                 "qty": 62,
                 "price": 108.0,
@@ -15365,7 +15365,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:48:00-04:00",
-                "order_id": "ord_395064554862",
+                "order_id": "ord_73bc2886316f",
                 "price": 102.0,
                 "qty": 124,
                 "side": "BUY",
@@ -15374,7 +15374,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:49:00-04:00",
-                "order_id": "ord_9c33d8711972",
+                "order_id": "ord_df9deba126cc",
                 "price": 106.5,
                 "qty": 62,
                 "side": "SELL",
@@ -15383,7 +15383,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:49:00-04:00",
-                "order_id": "ord_a00016058432",
+                "order_id": "ord_bbd519684ddc",
                 "price": 108.0,
                 "qty": 62,
                 "side": "SELL",
@@ -15392,7 +15392,7 @@
               {
                 "kind": "CLOSED",
                 "at": "2026-09-28T09:49:00-04:00",
-                "trade_id": "tri_ord_395064554862",
+                "trade_id": "tri_ord_73bc2886316f",
                 "realized_pnl": 651.0
               }
             ],
@@ -15415,7 +15415,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_9c33d8711972"
+                  "ord_df9deba126cc"
                 ],
                 "realized_pnl": 279.0,
                 "exit_notional": 6603.0,
@@ -15439,7 +15439,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_a00016058432"
+                  "ord_bbd519684ddc"
                 ],
                 "realized_pnl": 372.0,
                 "exit_notional": 6696.0,
@@ -15454,7 +15454,7 @@
           "case": "coexist_CDE_reverse",
           "passed": true,
           "trade": {
-            "trade_id": "tri_ord_daca10ea04d2",
+            "trade_id": "tri_ord_6d2eadd4b1f8",
             "session_date": "2026-09-28",
             "symbol": "CDE",
             "side": "LONG",
@@ -15495,7 +15495,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_5ac68180b7ce"
+                  "ord_d4cceead8aea"
                 ],
                 "realized_pnl": 749.88,
                 "exit_notional": 13497.840000000002,
@@ -15504,8 +15504,8 @@
             ],
             "fill_legs": [
               {
-                "fill_id": "fl_54f55c1745",
-                "order_id": "ord_daca10ea04d2",
+                "fill_id": "fl_3c0e0ee97d",
+                "order_id": "ord_6d2eadd4b1f8",
                 "side": "BUY",
                 "qty": 2083,
                 "price": 6.12,
@@ -15514,8 +15514,8 @@
                 "timestamp": "2026-09-28T09:48:00-04:00"
               },
               {
-                "fill_id": "fl_0695374a21",
-                "order_id": "ord_5ac68180b7ce",
+                "fill_id": "fl_e7386e441c",
+                "order_id": "ord_d4cceead8aea",
                 "side": "SELL",
                 "qty": 2083,
                 "price": 6.480000000000001,
@@ -15617,7 +15617,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:48:00-04:00",
-                "order_id": "ord_daca10ea04d2",
+                "order_id": "ord_6d2eadd4b1f8",
                 "price": 6.12,
                 "qty": 2083,
                 "side": "BUY",
@@ -15626,7 +15626,7 @@
               {
                 "kind": "FILL",
                 "at": "2026-09-28T09:49:00-04:00",
-                "order_id": "ord_5ac68180b7ce",
+                "order_id": "ord_d4cceead8aea",
                 "price": 6.480000000000001,
                 "qty": 2083,
                 "side": "SELL",
@@ -15635,7 +15635,7 @@
               {
                 "kind": "CLOSED",
                 "at": "2026-09-28T09:49:00-04:00",
-                "trade_id": "tri_ord_daca10ea04d2",
+                "trade_id": "tri_ord_6d2eadd4b1f8",
                 "realized_pnl": 749.88
               }
             ],
@@ -15658,7 +15658,7 @@
                 "stop_order_id": null,
                 "target_order_id": null,
                 "close_order_ids": [
-                  "ord_5ac68180b7ce"
+                  "ord_d4cceead8aea"
                 ],
                 "realized_pnl": 749.88,
                 "exit_notional": 13497.840000000002,

@@ -1,7 +1,9 @@
 "use client";
 
-import { TradeRecord } from "@/types/trading";
-import { companyName, etTimeLabel, formatMoney, strategyTheme } from "@/lib/plain";
+import { useEffect, useState } from "react";
+import { RecoveredSessionSummary, TradeHistoryResponse, TradeRecord } from "@/types/trading";
+import { companyName, etTimeLabel, formatMoney, formatSignedMoney, historyDateLabel, strategyTheme } from "@/lib/plain";
+import { apiBase } from "@/lib/apiBase";
 
 interface RecentTradesProps {
   items: TradeRecord[];
@@ -11,6 +13,18 @@ interface RecentTradesProps {
 }
 
 export default function RecentTrades({ items, loading, error, onSeeAll }: RecentTradesProps) {
+  const [recentDays, setRecentDays] = useState<RecoveredSessionSummary[]>([]);
+  useEffect(() => {
+    if (loading || items.length) return;
+    const controller = new AbortController();
+    void fetch(`${apiBase()}/api/trades?range=7d&limit=1`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("History unavailable");
+        const history = await response.json() as TradeHistoryResponse;
+        setRecentDays((history.sessions ?? []).slice(0, 3));
+      }).catch(() => { /* The history button still offers a retryable full view. */ });
+    return () => controller.abort();
+  }, [loading, items.length]);
   const sorted = [...items].sort((a, b) => new Date(b.closed_at).getTime() - new Date(a.closed_at).getTime());
   const top6 = sorted.slice(0, 6);
 
@@ -24,7 +38,7 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
           className="min-h-[44px] px-1 text-sm font-semibold underline-offset-2 hover:underline"
           style={{ color: "#4A5190" }}
         >
-          See all trades
+          Trade history
         </button>
       </div>
 
@@ -35,7 +49,17 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
           Couldn't load today's trades
         </div>
       ) : top6.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted">No finished trades yet today</div>
+        <div className="py-3 text-sm text-muted">
+          <p className="mb-3">No finished trades today. Your previous days are saved in Trade history.</p>
+          {recentDays.map((day) => (
+            <button key={day.session_date} type="button" onClick={onSeeAll}
+              className="mt-2 flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border border-line p-3 text-left hover:bg-[#FAF8F2]">
+              <span><span className="block font-semibold text-ink">{historyDateLabel(day.session_date)}</span>
+                <span className="text-xs">{day.trades_count} finished {day.trades_count === 1 ? "trade" : "trades"}</span></span>
+              <span className="font-bold tabular-nums" style={{ color: day.realized_pnl < 0 ? "#8F4424" : "#2F6B4C" }}>{formatSignedMoney(day.realized_pnl)}</span>
+            </button>
+          ))}
+        </div>
       ) : (
         top6.map((t) => {
           const theme = strategyTheme(t.strategy_id, t.strategy_id);

@@ -5,14 +5,13 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, ChevronRight, RefreshCw, ShieldCheck, X } from "lucide-react";
 import {
   PersistenceStatus,
-  RecoveredSessionSummary,
   TradeHistoryResponse,
   TradeRecord,
 } from "@/types/trading";
 import { apiBase } from "@/lib/apiBase";
-import { companyName, formatMoney, formatSignedMoney } from "@/lib/plain";
+import { companyName, dedupeTrades, formatMoney, formatSignedMoney, historyDateLabel, strategyTheme } from "@/lib/plain";
 
-type HistoryRange = "today" | "7d" | "all";
+type HistoryRange = "today" | "yesterday" | "7d" | "all";
 
 interface TradeHistoryProps {
   open: boolean;
@@ -25,7 +24,7 @@ function formatTime(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime())
     ? value
-    : parsed.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    : parsed.toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }) + " ET";
 }
 
 export default function TradeHistory({ open, onClose, ledgerRevision, streamPersistence }: TradeHistoryProps) {
@@ -36,28 +35,35 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
   const [selected, setSelected] = useState<TradeRecord | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const requestGeneration = useRef(0);
   const reduceMotion = useReducedMotion();
 
   const load = useCallback(async (cursor?: string, append = false) => {
+    const generation = ++requestGeneration.current;
     append ? setLoadingMore(true) : setLoading(true);
     try {
-      const params = new URLSearchParams({ range, limit: "25" });
+      const params = new URLSearchParams({ range, limit: "100" });
       if (cursor) params.set("cursor", cursor);
       const response = await fetch(`${apiBase()}/api/trades?${params.toString()}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`History request failed (${response.status})`);
       const next = (await response.json()) as TradeHistoryResponse;
-      setData((previous) => (append && previous ? { ...next, items: [...previous.items, ...next.items] } : next));
+      if (generation !== requestGeneration.current) return;
+      setData((previous) => (append && previous ? { ...next, items: dedupeTrades([...previous.items, ...next.items]) } : next));
       setError(null);
     } catch (requestError) {
+      if (generation !== requestGeneration.current) return;
       setError(requestError instanceof Error ? requestError.message : "History unavailable");
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (generation === requestGeneration.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, [range]);
 
   useEffect(() => {
     if (open) void load();
+    return () => { requestGeneration.current += 1; };
   }, [load, ledgerRevision, open]);
 
   useEffect(() => {
@@ -76,6 +82,14 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
   const durable = persistence.status === "durable";
   const disabled = persistence.status === "disabled";
   const summary = data?.summary;
+  const sessions = new Map((data?.sessions ?? data?.recovered_sessions ?? []).map((session) => [session.session_date, session]));
+  const tradesByDay = new Map<string, TradeRecord[]>();
+  for (const trade of dedupeTrades(data?.items ?? []).sort((a, b) => Date.parse(b.closed_at) - Date.parse(a.closed_at))) {
+    const trades = tradesByDay.get(trade.session_date) ?? [];
+    trades.push(trade);
+    tradesByDay.set(trade.session_date, trades);
+  }
+  const days = [...new Set([...sessions.keys(), ...tradesByDay.keys()])].sort().reverse();
 
   return (
     <AnimatePresence>
@@ -99,7 +113,7 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 id="trade-history-title" className="font-display text-xl sm:text-2xl font-semibold text-ink">
-                All finished trades
+                Trade history
               </h2>
               <span
                 className="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -122,17 +136,17 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
 
           <div className="mt-4 flex items-center justify-between gap-3">
             <div className="inline-flex rounded-xl border border-line bg-white p-1" aria-label="History range">
-              {(["today", "7d", "all"] as HistoryRange[]).map((value) => (
+              {(["today", "yesterday", "7d", "all"] as HistoryRange[]).map((value) => (
                 <button
                   key={value}
                   type="button"
                   aria-pressed={range === value}
-                  onClick={() => setRange(value)}
+                  onClick={() => { if (range !== value) { setData(null); setSelected(null); setRange(value); } }}
                   className={`min-h-[36px] rounded-lg px-3 text-xs font-bold uppercase tracking-wide ${
                     range === value ? "bg-darkcard text-white" : "text-muted hover:text-ink"
                   }`}
                 >
-                  {value === "7d" ? "7 days" : value === "today" ? "Today" : "All"}
+                  {value === "7d" ? "7 days" : value === "today" ? "Today" : value === "yesterday" ? "Yesterday" : "All"}
                 </button>
               ))}
             </div>
@@ -159,43 +173,64 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
               </div>
             )}
 
-            {data?.recovered_sessions.map((session) => (
-              <RecoveredSession key={session.session_date} session={session} />
-            ))}
-
             {loading && !data ? (
               <div className="py-8 text-center text-sm text-muted">Loading…</div>
-            ) : data && data.items.length > 0 ? (
-              <div className="max-h-96 space-y-1.5 overflow-y-auto pr-1">
-                {data.items.map((trade) => (
-                  <button
-                    type="button"
-                    key={trade.trade_id}
-                    onClick={() => setSelected(trade)}
-                    className="grid w-full grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr_auto] items-center gap-3 rounded-2xl border border-line bg-white p-3 text-left hover:bg-[#FAF8F2]"
-                  >
-                    <div>
-                      <div className="text-sm font-semibold text-ink">
-                        {companyName(trade.symbol)} <span className="text-xs font-medium text-muted">{trade.symbol}</span>
+            ) : days.length > 0 ? (
+              <div className="space-y-3" data-testid="history-days">
+                {days.map((day) => {
+                  const session = sessions.get(day);
+                  const trades = tradesByDay.get(day) ?? [];
+                  const count = session?.trades_count ?? trades.length;
+                  const pnl = session?.realized_pnl ?? trades.reduce((sum, trade) => sum + trade.realized_pnl, 0);
+                  return (
+                    <details key={day} open={range === "today" || range === "yesterday"} className="rounded-2xl border border-line bg-white p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-ink">
+                        <span>{historyDateLabel(day)}</span>
+                        <span className="mt-1 flex items-center justify-between pl-4 text-xs font-normal text-muted">
+                          <span>{count} finished {count === 1 ? "trade" : "trades"}{session?.aggregate_only ? " · daily total only" : ""}</span>
+                          <span className="font-bold tabular-nums" style={{ color: pnl < 0 ? "#8F4424" : "#2F6B4C" }}>{formatSignedMoney(pnl)}</span>
+                        </span>
+                      </summary>
+                      {session?.aggregate_only ? (
+                        <p className="mt-3 text-xs text-muted">The daily total was recovered. Individual trade details are unavailable.</p>
+                      ) : count === 0 ? (
+                        <p className="mt-3 text-xs text-muted">No finished trades on this day.</p>
+                      ) : null}
+                      <div className="mt-3 space-y-1.5">
+                        {trades.map((trade) => (
+                          <button
+                            type="button"
+                            key={trade.trade_id}
+                            onClick={() => setSelected(trade)}
+                            className="grid w-full grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr_auto] items-center gap-3 rounded-2xl border border-line bg-white p-3 text-left hover:bg-[#FAF8F2]"
+                          >
+                            <div>
+                              <div className="text-sm font-semibold text-ink">
+                                {companyName(trade.symbol)} <span className="text-xs font-medium text-muted">{trade.symbol}</span>
+                              </div>
+                              <time className="text-xs text-muted" dateTime={trade.closed_at}>{formatTime(trade.closed_at)}</time>
+                            </div>
+                            <div className="hidden sm:block text-xs text-muted">{strategyTheme(trade.strategy_id, trade.strategy_id).name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
+                                style={trade.realized_pnl >= 0 ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
+                              >
+                                {formatSignedMoney(trade.realized_pnl)}
+                              </span>
+                              <ChevronRight className="h-3.5 w-3.5 text-muted" />
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                      <time className="text-xs text-muted" dateTime={trade.closed_at}>{formatTime(trade.closed_at)}</time>
-                    </div>
-                    <div className="hidden sm:block text-xs text-muted">{trade.strategy_id.replaceAll("_", " ")}</div>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
-                        style={trade.realized_pnl >= 0 ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
-                      >
-                        {formatSignedMoney(trade.realized_pnl)}
-                      </span>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted" />
-                    </div>
-                  </button>
-                ))}
+                      {!session?.aggregate_only && count > trades.length && <p className="mt-3 text-xs text-muted">More trades from this day are available. Use “Load older trades” below.</p>}
+                    </details>
+                  );
+                })}
               </div>
-            ) : !data?.recovered_sessions.length ? (
+            ) : (
               <div className="py-8 text-center text-sm text-muted">No finished trades in this range.</div>
-            ) : null}
+            )}
 
             {data?.next_cursor && (
               <button
@@ -234,11 +269,11 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
                     </button>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                    <Detail label="Bought at" value={formatMoney(selected.avg_entry_price)} />
-                    <Detail label="Sold at" value={formatMoney(selected.avg_exit_price)} />
+                    <Detail label={selected.side === "SHORT" ? "Sold at" : "Bought at"} value={formatMoney(selected.avg_entry_price)} />
+                    <Detail label={selected.side === "SHORT" ? "Bought back at" : "Sold at"} value={formatMoney(selected.avg_exit_price)} />
                     <Detail label="Shares" value={`${selected.quantity}`} />
                     <Detail label="Result" value={formatSignedMoney(selected.realized_pnl)} />
-                    <Detail label="Playbook" value={selected.strategy_id.replaceAll("_", " ")} />
+                    <Detail label="Playbook" value={strategyTheme(selected.strategy_id, selected.strategy_id).name} />
                     <Detail label="Why it exited" value={selected.exit_reason.replaceAll("_", " ")} />
                   </div>
                 </div>
@@ -258,22 +293,6 @@ function Tile({ label, value, tone }: { label: string; value: string; tone?: "ga
       <span className="tabular-nums text-sm font-bold" style={tone === "loss" ? { color: "#8F4424" } : tone === "gain" ? { color: "#2F6B4C" } : { color: "#1D1A33" }}>
         {value}
       </span>
-    </div>
-  );
-}
-
-function RecoveredSession({ session }: { session: RecoveredSessionSummary }) {
-  return (
-    <div className="rounded-2xl border p-3 text-sm" style={{ borderColor: "#D9DCEB", background: "#EEEFF7" }}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-semibold text-ink">{session.session_date} &middot; older, recovered day</span>
-        <span className="tabular-nums font-bold" style={session.realized_pnl >= 0 ? { color: "#2F6B4C" } : { color: "#8F4424" }}>
-          {formatSignedMoney(session.realized_pnl)}
-        </span>
-      </div>
-      <p className="mt-1 text-xs text-muted">
-        {session.trades_count} trades &middot; {formatMoney(session.opening_equity)} &rarr; {formatMoney(session.closing_equity)}. Some older details unavailable.
-      </p>
     </div>
   );
 }
