@@ -10,3 +10,13 @@ Source: `scripts/run_ride_the_trend_v2_dry_run.py` replaying every SIP print, NB
 Reading: impulse aggression at +0.15 would reject 18 of 22 (most impulse bars show |delta| between 0.04 and 0.13); resumption aggression at +0.10 about half; the rolling 30-minute delta about a third; sector direction 3 and sector relative strength 4. These are per-evaluation observations, not an enforcement replay (enforcing one gate removes the later evaluations of the same setup). Thresholds are for the operator to set from more sessions.
 
 Every evaluation row is in `docs/ride_the_trend_v2/dry_run_<date>.json` under `diagnostics.rows`.
+
+## Add-ons (enforced live from 2026-09-28), per-evaluation observations on the same 22 evaluations
+- Would fail: {'IMPULSE_DELTA': 18, 'RESUMPTION_DELTA': 10, 'ROLLING_DELTA': 8, 'SECTOR_AGAINST': 3, 'SESSION_DELTA_AGAINST': 15, 'HVN_NO_SUPPORT': 17, 'HVN_OVERHEAD': 6, 'SECTOR_RS_FILTER': 4, 'SPREAD_WIDE': 2}. Unavailable: {'RESUMPTION_DELTA': 4, 'SPREAD': 1}.
+- Session cumulative delta was against the trade on 15 of 22 evaluations (the longs mostly ran into a day of
+  net selling; the PLTR shorts on 09-23 ran into net buying).
+- Spread: 2 of 22 above 1.5x the trailing median (both PLTR 09-23, 1.83x and 1.57x); 1 unavailable.
+- Volume profile: nodes per stock per day {"2026-09-25": {"AAPL": 2, "NVDA": 4, "AMD": 4, "MSFT": 1, "AMZN": 4, "META": 6, "GOOGL": 5, "PLTR": 7, "COIN": 3}, "2026-09-24": {"AAPL": 4, "NVDA": 5, "AMD": 5, "MSFT": 1, "AMZN": 3, "META": 5, "GOOGL": 5, "PLTR": 5, "COIN": 6}, "2026-09-23": {"AAPL": 2, "NVDA": 7, "AMD": 6, "MSFT": 2, "AMZN": 4, "META": 5, "GOOGL": 5, "PLTR": 3, "COIN": 10}}. The pullback extreme sat on a prior node
+  on 5 of 22 evaluations; a node blocked the road to the first target on 6.
+These are observations at evaluations the earlier gates had already rejected; they are not an enforcement
+replay. With all gates enforced, none of the three sessions produced a signal.

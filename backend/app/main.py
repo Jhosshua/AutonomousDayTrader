@@ -28,6 +28,7 @@ from backend.app.core.market_filter import MarketTrendFilter
 from backend.app.core.tick_tape import TickTape
 from backend.app.core.macro_calendar import macro_calendar
 from backend.app.core.regime_feed import RegimeFeed
+from backend.app.core.volume_profile import ProfileStore
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
 from backend.app.core.event_bus import event_bus
 from backend.app.core.flattening import ET_TZ, FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
@@ -104,6 +105,7 @@ vwap_strategy = VWAPPullbackV2Strategy(
     excluded_symbols=list(settings.RIDE_THE_TREND_EXCLUDE),
     require_tick_layers=settings.RIDE_THE_TREND_REQUIRE_TICKS,
     enforced_gates=sorted(g for g in RIDE_THE_TREND_ENFORCED if g in vwap_pullback_v2.PART2_GATES),
+    addons_enforced=settings.RIDE_THE_TREND_ADDONS_ENFORCED,
 )
 # Layers 1-3 for Ride the Trend v2: every SIP print and NBBO quote folds into this tape.
 tick_tape = TickTape()
@@ -111,6 +113,14 @@ vwap_pullback_v2.TAPE = tick_tape
 # Layer 4: sector, dollar and rates ETFs (bars only). The evaluator records its evidence at decision time.
 regime_feed = RegimeFeed(list(settings.REGIME_SYMBOLS))
 vwap_pullback_v2.REGIME = regime_feed
+# Add-on C: volume profiles of the prior sessions, rebuilt from the relay at startup and each session boundary.
+profile_store = ProfileStore(sessions=settings.VOLUME_PROFILE_SESSIONS, min_sessions=settings.VOLUME_PROFILE_SESSIONS)
+vwap_pullback_v2.PROFILE = profile_store
+PROFILE_SYMBOLS = sorted({s.upper() for s in settings.WATCHLIST_SYMBOLS} - {x.upper() for x in settings.RIDE_THE_TREND_EXCLUDE})
+profile_task: Optional[asyncio.Task] = None
+profile_generation = 0
+PROFILE_FETCH_MAX_PAGES = 50
+PROFILE_BUILD_DEADLINE_S = 300.0
 REGIME_GATE_OUTCOMES = {"SECTOR_DIRECTION": "SECTOR_AGAINST", "SECTOR_RS": "SECTOR_RS_FILTER",
                         "DOLLAR_WIND": "MACRO_WIND_AGAINST:dollar", "RATES_WIND": "MACRO_WIND_AGAINST:yields"}
 news_strategy = NewsMomentumStrategy()
@@ -1371,6 +1381,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
     last_session_date = session_date
     market_filter.reset_session(session_date)
     regime_feed.reset_session()
+    _schedule_profile_rebuild(session_date)
     daily_bar_aggregator.reset_for_new_session()
     risk_engine.reset_daily_metrics(account.equity)
     risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.equity)
@@ -1619,6 +1630,12 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
             macro_ok, macro_reason = macro_calendar.check(now)
             if not macro_ok:
                 extra_blockers.append("Macro release blackout." if macro_reason.startswith("MACRO_BLACKOUT") else "Macro calendar unavailable.")
+            if settings.RIDE_THE_TREND_ADDONS_ENFORCED and not simulation_mode:
+                today = now.astimezone(ET_TZ).date().isoformat()
+                missing = [sym for sym in PROFILE_SYMBOLS if profile_store.get(sym, today) is None]
+                if len(missing) == len(PROFILE_SYMBOLS):
+                    extra_blockers.append("Waiting for the prior-days volume profiles.")
+                card["profiles_ready"] = {"ready": len(PROFILE_SYMBOLS) - len(missing), "total": len(PROFILE_SYMBOLS), "missing": missing}
         card["window"] = strategy_window(
             s.strategy_id,
             now,
@@ -1636,6 +1653,11 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
         if s.strategy_id == "vwap_pullback":
             card["window"]["notes"].append(macro_calendar.today_text(now.astimezone(ET_TZ).date()))
             card["window"]["notes"].append(regime_feed.wind_text(now))
+            pr = card.get("profiles_ready")
+            if pr is not None:
+                card["window"]["notes"].append(
+                    f"Prior-days volume profiles ready for {pr['ready']} of {pr['total']} stocks"
+                    + (f" (missing: {', '.join(pr['missing'])})." if pr["missing"] else "."))
         if s.strategy_id in FIXED_IDS:
             blockers = []
             if risk_engine.status != BreakerStatus.ARMED:
@@ -1901,6 +1923,83 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             orb_strategy.notify_signal_rejected(sym)
         log.warning("Entry order %s rejected by execution engine: %s", submitted.id, submitted.reject_reason)
         _record_decision(signal, "ENGINE_REJECT", str(submitted.reject_reason), stages)
+
+
+async def _fetch_relay_bars(symbol: str, start_iso: str, end_iso: str) -> List[BarEvent]:
+    """Historical 1-minute bars from the relay's data endpoint (paginated, bounded). Raises on failure."""
+    import httpx
+    sym = symbol.upper()
+    out: List[BarEvent] = []
+    token = None
+    seen_tokens = set()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for _page in range(PROFILE_FETCH_MAX_PAGES):
+            params = {"symbols": sym, "start": start_iso, "end": end_iso, "timeframe": "1Min", "limit": 10000}
+            if token:
+                params["page_token"] = token
+            resp = await client.get(settings.RELAY_HTTP_URL.rstrip("/") + "/data/v2/stocks/bars", params=params,
+                                    headers={"X-Relay-Token": settings.RELAY_TOKEN})
+            resp.raise_for_status()
+            data = resp.json()
+            bars_by_symbol = {str(k).upper(): v for k, v in (data.get("bars") or {}).items()}
+            for row in bars_by_symbol.get(sym, []):
+                out.append(BarEvent.from_relay_dict(dict(row, S=sym)))
+            token = data.get("next_page_token")
+            if not token:
+                return out
+            if token in seen_tokens:
+                raise RuntimeError("relay pagination repeated a page token")
+            seen_tokens.add(token)
+    raise RuntimeError(f"relay pagination exceeded {PROFILE_FETCH_MAX_PAGES} pages")
+
+
+async def rebuild_volume_profiles(for_session: Optional[date] = None, generation: Optional[int] = None) -> Dict[str, Any]:
+    """Build every tradable symbol's profile for `for_session` (default: today in ET) from the prior
+    sessions' bars. Fetch is async and bounded; the CPU build runs in a worker thread; results publish
+    only while `generation` is still current. Never raises; failures are recorded per symbol."""
+    session = (for_session or datetime.now(ET_TZ).date())
+    start = (session - timedelta(days=14)).isoformat() + "T00:00:00Z"
+    end = session.isoformat() + "T00:00:00Z"
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + PROFILE_BUILD_DEADLINE_S
+    for sym in PROFILE_SYMBOLS:
+        if generation is not None and generation != profile_generation:
+            log.info("volume profile rebuild for %s superseded", session)
+            return profile_store.health()
+        try:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise TimeoutError("profile build deadline exceeded")
+            bars = await asyncio.wait_for(_fetch_relay_bars(sym, start, end), timeout=remaining)
+            prof = await loop.run_in_executor(None, profile_store.build, sym, bars, session.isoformat())
+            if generation is not None and generation != profile_generation:
+                profile_store.profiles.pop(sym, None)   # never publish a superseded build
+                return profile_store.health()
+            if prof is None:
+                log.warning("volume profile unavailable for %s: %s", sym, profile_store.errors.get(sym))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            profile_store.errors[sym] = f"{type(exc).__name__}: {exc}"
+            profile_store.profiles.pop(sym, None)
+            log.warning("volume profile build failed for %s: %s", sym, exc)
+    log.info("volume profiles rebuilt for %s: %s", session, profile_store.health())
+    return profile_store.health()
+
+
+def _schedule_profile_rebuild(for_session: Optional[date] = None) -> None:
+    """Start a rebuild for `for_session`; a running rebuild is cancelled and superseded (generation token)."""
+    global profile_task, profile_generation
+    profile_generation += 1
+    if simulation_mode or not settings.RELAY_TOKEN:
+        return
+    if profile_task is not None and not profile_task.done():
+        profile_task.cancel()
+    try:
+        profile_task = asyncio.get_running_loop().create_task(rebuild_volume_profiles(for_session, profile_generation))
+    except RuntimeError:
+        profile_task = None
+        log.error("volume profile rebuild could not be scheduled: no running event loop")
 
 
 def _record_setup_event(ev: Dict[str, Any]) -> None:
@@ -2711,6 +2810,10 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     pending_trade_records.clear()
     tick_tape.reset()
     regime_feed.reset_session()
+    profile_store.profiles.clear()
+    profile_store.errors.clear()
+    global profile_generation
+    profile_generation += 1
     pending_session_summaries.clear()
     pending_processed_events.clear()
     inflight_event_keys.clear()
@@ -2765,6 +2868,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "Production requires PERSISTENCE_ENABLED=true and PERSISTENCE_REQUIRED=true"
         )
     _restore_checkpoint()
+    _schedule_profile_rebuild()
     global alpaca_broker
     if settings.BROKER_MODE.lower() == "alpaca_paper":
         alpaca_broker = AlpacaBroker(
@@ -2961,7 +3065,7 @@ async def get_health() -> Dict[str, Any]:
         },
         "relay": relay_statuses,
         "research": research_recorder.health(),
-        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
+        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "profiles": profile_store.health(), "addons_enforced": settings.RIDE_THE_TREND_ADDONS_ENFORCED, "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
         "broker": _broker_health(),
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
@@ -3133,7 +3237,7 @@ async def get_research_rows(
         "rows": rows,
         "next_after": f"{last.get('session_date')}|{last.get('row_id')}" if last and len(rows) >= max(1, min(limit, 1000)) else None,
         "research": research_recorder.health(),
-        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
+        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "profiles": profile_store.health(), "addons_enforced": settings.RIDE_THE_TREND_ADDONS_ENFORCED, "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
     }
 
 

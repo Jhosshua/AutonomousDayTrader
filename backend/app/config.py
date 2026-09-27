@@ -165,6 +165,11 @@ class Settings(BaseSettings):
         description="Part-2 measures enforced as gates: IMPULSE_DELTA, RESUMPTION_DELTA, ROLLING_DELTA, SECTOR_DIRECTION, SECTOR_RS, DOLLAR_WIND, RATES_WIND"
     )
     RIDE_THE_TREND_ENFORCE_ALL: bool = Field(default=False, description="Enforce every part-2 measure as a gate from day one")
+    RIDE_THE_TREND_ADDONS_ENFORCED: bool = Field(
+        default=True,
+        description="Session cumulative delta, spread proxy and volume-profile node gates are enforced (operator decision 2026-09-27)"
+    )
+    VOLUME_PROFILE_SESSIONS: int = Field(default=5, description="Prior regular sessions in each volume profile")
     RIDE_THE_TREND_EXCLUDE: List[str] = Field(
         default=["TSLA", "CDE", "SPY", "QQQ"],
         description="Symbols Ride the Trend v2 never evaluates: the Morning Plan owns TSLA/CDE; SPY/QQQ are the regime instruments"

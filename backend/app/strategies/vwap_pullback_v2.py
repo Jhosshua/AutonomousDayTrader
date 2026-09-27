@@ -52,6 +52,8 @@ EVENTS = (
     "EMISSION_DISABLED", "STOP_TOO_WIDE", "SIGNAL",
     # part 2 (recorded on every candidate; gates only when enforced)
     "IMPULSE_NOT_AGGRESSIVE", "RESUMPTION_NOT_AGGRESSIVE", "CUM_DELTA_AGAINST", "RESUMPTION_MEASURED",
+    # add-ons (enforced from day one): session cumulative delta, spread proxy, volume-profile nodes
+    "SESSION_DELTA_AGAINST", "SPREAD_WIDE", "HVN_NO_SUPPORT", "HVN_OVERHEAD", "PROFILE_UNAVAILABLE",
 )
 PART2_GATES = ("IMPULSE_DELTA", "RESUMPTION_DELTA", "ROLLING_DELTA")
 
@@ -64,6 +66,8 @@ TAPE: Optional[Any] = None
 # The live regime feed (backend/app/core/regime_feed.RegimeFeed), installed by main.py, so every
 # resumption evaluation records the Layer 4 evidence as of decision time.
 REGIME: Optional[Any] = None
+# The volume-profile store (backend/app/core/volume_profile.ProfileStore), installed by main.py.
+PROFILE: Optional[Any] = None
 NS = 1_000_000_000
 
 
@@ -129,6 +133,13 @@ class V2Params:
     resumption_delta_min: float = 0.10     # and again on the resumption bars
     rolling_window_s: int = 1800           # flow over the last 30 minutes agrees with the trend
     enforced_gates: Tuple[str, ...] = ()
+    # add-ons, enforced when addons_enforced (operator decision 2026-09-27: live from day one)
+    addons_enforced: bool = True
+    session_delta_min_minutes: float = 30.0
+    spread_ratio_max: float = 1.5
+    spread_abs_max_bps: float = 30.0
+    hvn_support_below_atr: float = 0.25
+    hvn_support_above_atr: float = 0.50
 
 
 @dataclass
@@ -468,6 +479,24 @@ def evaluate_bar(
             m_roll = _ok(_safe(tape.rolling_delta, symbol, bar_end_ns, p.rolling_window_s))
             if st.ext_i > st.impulse_i:
                 m_leg = _ok(_safe(tape.delta, symbol, _ns(bars[st.impulse_i + 1].timestamp), _ns(bars[st.ext_i].timestamp) + 60 * NS))
+        m_sess = m_spread = None
+        if tick_gates and tape is not None:
+            m_sess = _ok(_safe(tape.session_delta, symbol, bar_end_ns, p.session_delta_min_minutes), "delta")
+            m_spread = _ok(_safe(tape.spread_stats, symbol, bar_end_ns), "ratio")
+        prof = _safe(PROFILE.get, symbol, st.session_date) if PROFILE is not None else None
+        m_support = m_overhead = None
+        profile_error: Optional[str] = None
+        ext_price = ext.low if is_long else ext.high
+        levels = executable_levels(bar.close, ext_price, atr, vix_stop_mult, is_long, p)
+        _target = levels["target"] if levels else None
+        if prof is not None and levels is not None:
+            # profile queries must fail CLOSED: an error is recorded as unavailable, never as "clear"
+            try:
+                m_support = prof.support_node(ext_price, atr, is_long, p.hvn_support_below_atr, p.hvn_support_above_atr)
+                m_overhead = prof.path_obstacle(bar.close, _target, is_long, m_support)
+            except Exception as exc:
+                profile_error = f"{type(exc).__name__}: {exc}"
+                m_support = m_overhead = None
         if REGIME is not None:
             t30 = bar.timestamp - timedelta(minutes=30)
             past = next((b.close for b in reversed(bars) if b.timestamp <= t30), None)
@@ -483,6 +512,18 @@ def evaluate_bar(
                              rolling_signed=(m_roll["delta"] if m_roll else None),
                              tick_velocity_atr_per_min=((sgn * float(m_vel["per_second"]) * 60.0 / atr) if m_vel else None),
                              book_imbalance=(float(m_book["imbalance"]) if m_book else None),
+                             session_delta=(m_sess["delta"] if m_sess else None),
+                             session_delta_ratio=(float(m_sess["delta_ratio"]) if m_sess else None),
+                             session_delta_partial=(bool(m_sess["partial"]) if m_sess else None),
+                             session_delta_since_ns=(m_sess["since_ns"] if m_sess else None),
+                             session_delta_cutoff_ns=(m_sess["cutoff_ns"] if m_sess else None),
+                             profile_error=profile_error, executable_target=_target,
+                             spread_now_bps=(float(m_spread["spread_now_bps"]) if m_spread else None),
+                             spread_ref_bps=(float(m_spread["spread_ref_bps"]) if m_spread else None),
+                             spread_ratio=(float(m_spread["ratio"]) if m_spread else None),
+                             profile_sessions=(len(prof.sessions) if prof else None),
+                             hvn_support=(m_support.as_dict() if m_support else None),
+                             hvn_overhead=(m_overhead.as_dict() if m_overhead else None),
                              regime=({"failed": m_regime["failed"], "unavailable": m_regime["unavailable"],
                                       "sector_rs_30m": m_regime["measures"].get("sector_rs_30m"),
                                       "dollar_30m": (m_regime["measures"].get("dollar_return_30m") or {}).get("return"),
@@ -575,6 +616,45 @@ def evaluate_bar(
                 events.append(_event(st, symbol, i, bar, "CUM_DELTA_AGAINST", "RESUMING", "RESUMING", age=age,
                                      rolling_signed=roll_d["delta"]))
                 return events, None
+        if p.addons_enforced and tick_gates:
+            # Add-on A: net session flow must agree with the trade.
+            if m_sess is None:
+                events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "RESUMING", "IDLE", where="session_delta"))
+                _to_idle(st)
+                return events, None
+            if sgn * float(m_sess["delta"]) <= 0:
+                events.append(_event(st, symbol, i, bar, "SESSION_DELTA_AGAINST", "RESUMING", "RESUMING", age=age,
+                                     session_delta=m_sess["delta"], session_delta_ratio=float(m_sess["delta_ratio"])))
+                return events, None
+            # Add-on B: the spread must not be widening (liquidity drying up) and must be tight in absolute terms.
+            if m_spread is None:
+                events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "RESUMING", "IDLE", where="spread"))
+                _to_idle(st)
+                return events, None
+            if float(m_spread["ratio"]) > p.spread_ratio_max or float(m_spread["spread_now_bps"]) > p.spread_abs_max_bps:
+                events.append(_event(st, symbol, i, bar, "SPREAD_WIDE", "RESUMING", "RESUMING", age=age,
+                                     spread_now_bps=float(m_spread["spread_now_bps"]), spread_ref_bps=float(m_spread["spread_ref_bps"]),
+                                     ratio=float(m_spread["ratio"])))
+                return events, None
+        if p.addons_enforced and tick_gates:
+            # Add-on C: the dip must sit on prior liquidity and the road to 1R must be clear of a node.
+            if levels is None:
+                events.append(_event(st, symbol, i, bar, "STOP_TOO_WIDE", "RESUMING", "IDLE", entry=bar.close, before_profile=True))
+                _to_idle(st)
+                return events, None
+            if prof is None or profile_error is not None:
+                events.append(_event(st, symbol, i, bar, "PROFILE_UNAVAILABLE", "RESUMING", "IDLE", error=profile_error))
+                _to_idle(st)
+                return events, None
+            if m_support is None:
+                events.append(_event(st, symbol, i, bar, "HVN_NO_SUPPORT", "RESUMING", "IDLE", age=age,
+                                     extreme=(ext.low if is_long else ext.high), nodes=len(prof.nodes)))
+                _to_idle(st)
+                return events, None
+            if m_overhead is not None:
+                events.append(_event(st, symbol, i, bar, "HVN_OVERHEAD", "RESUMING", "RESUMING", age=age,
+                                     entry=bar.close, target=_target, node=m_overhead.as_dict()))
+                return events, None
         if t_end < WINDOW_OPEN:
             events.append(_event(st, symbol, i, bar, "WINDOW_CLOSED", "RESUMING", "IDLE", before_open=True))
             _to_idle(st)
@@ -588,23 +668,12 @@ def evaluate_bar(
 
         entry = bar.close
         structure = sgn * (entry - (ext.low if is_long else ext.high)) + p.stop_structure_atr * atr
-        dist = max(p.stop_atr_mult * atr * vix_stop_mult, structure, MIN_STOP_DISTANCE_PCT * entry)
-        if dist > MAX_STOP_DISTANCE_PCT * entry:
-            events.append(_event(st, symbol, i, bar, "STOP_TOO_WIDE", "RESUMING", "IDLE", dist=dist, entry=entry))
+        if levels is None:
+            raw_dist = max(p.stop_atr_mult * atr * vix_stop_mult, structure, MIN_STOP_DISTANCE_PCT * entry)
+            events.append(_event(st, symbol, i, bar, "STOP_TOO_WIDE", "RESUMING", "IDLE", entry=entry, dist=raw_dist))
             _to_idle(st)
             return events, None
-        # Round away from entry so the realised distance never lands under the floor, then
-        # check the executable distance against the cap again.
-        if is_long:
-            stop = math.floor((entry - dist) * 10000) / 10000
-        else:
-            stop = math.ceil((entry + dist) * 10000) / 10000
-        dist = abs(entry - stop)
-        if not (MIN_STOP_DISTANCE_PCT * entry * (1 - 1e-9) <= dist <= MAX_STOP_DISTANCE_PCT * entry) or stop <= 0:
-            events.append(_event(st, symbol, i, bar, "STOP_TOO_WIDE", "RESUMING", "IDLE", dist=dist, entry=entry, after_rounding=True))
-            _to_idle(st)
-            return events, None
-        tp1 = round(entry + sgn * p.target_1_r * dist, 4)
+        stop, dist, tp1 = levels["stop"], levels["dist"], levels["target"]
         signal = SignalEvent(
             symbol=symbol,
             side=OrderSide.BUY if is_long else OrderSide.SELL,
@@ -652,13 +721,22 @@ def evaluate_bar(
             "layer3_rolling_signed_volume": (roll_d["delta"] if roll_d else None),
             "layer3_advance_since_extreme_atr": round(advance_atr, 4),
             "enforced_gates": list(p.enforced_gates),
+            "addons_enforced": bool(p.addons_enforced),
+            "addon_session_delta": ({k: m_sess[k] for k in ("delta", "delta_ratio", "quote_share", "minutes_continuous", "partial", "since_ns", "cutoff_ns")} if m_sess else None),
+            "addon_spread": ({k: m_spread[k] for k in ("spread_now_bps", "spread_ref_bps", "ratio", "ref_seconds")} if m_spread else None),
+            "addon_hvn_support": (m_support.as_dict() if m_support else None),
+            "addon_hvn_overhead": (m_overhead.as_dict() if m_overhead else None),
+            "addon_profile": ({"sessions": prof.sessions, "nodes": len(prof.nodes), "bucket_width": round(prof.bucket_width, 4)} if prof else None),
             "params": {"pvr_thin_max": p.pvr_thin_max, "pvr_heavy_min": p.pvr_heavy_min, "slope_min": p.slope_min,
                        "resume_max_age": p.resume_max_age, "chase_max_std": p.chase_max_std,
                        "stop_atr_mult": p.stop_atr_mult, "stop_structure_atr": p.stop_structure_atr,
                        "target_1_r": p.target_1_r, "pullback_delta_min": p.pullback_delta_min,
                        "tick_velocity_min_atr_per_min": p.tick_velocity_min_atr_per_min,
                        "book_imbalance_min": p.book_imbalance_min, "impulse_delta_min": p.impulse_delta_min,
-                       "resumption_delta_min": p.resumption_delta_min, "rolling_window_s": p.rolling_window_s},
+                       "resumption_delta_min": p.resumption_delta_min, "rolling_window_s": p.rolling_window_s,
+                       "spread_ratio_max": p.spread_ratio_max, "spread_abs_max_bps": p.spread_abs_max_bps,
+                       "session_delta_min_minutes": p.session_delta_min_minutes,
+                       "hvn_support_below_atr": p.hvn_support_below_atr, "hvn_support_above_atr": p.hvn_support_above_atr},
         }
         attach_features(signal, lambda: feats)
         events.append(_event(st, symbol, i, bar, "SIGNAL", "RESUMING", "IDLE", entry=entry, stop=stop, tp1=tp1,
@@ -675,6 +753,22 @@ def evaluate_bar(
 
 def sgn_side(side: Optional[str]) -> float:
     return 1.0 if side == "LONG" else -1.0
+
+
+def executable_levels(entry: float, extreme: float, atr: float, vix_stop_mult: float, is_long: bool,
+                      p: "V2Params") -> Optional[Dict[str, float]]:
+    """The stop and first target exactly as the signal will carry them (rounded away from entry, floor
+    and cap applied). None when the stop would be too wide (or otherwise invalid)."""
+    sgn = 1.0 if is_long else -1.0
+    structure = sgn * (entry - extreme) + p.stop_structure_atr * atr
+    dist = max(p.stop_atr_mult * atr * vix_stop_mult, structure, MIN_STOP_DISTANCE_PCT * entry)
+    if not math.isfinite(dist) or dist > MAX_STOP_DISTANCE_PCT * entry:
+        return None
+    stop = math.floor((entry - dist) * 10000) / 10000 if is_long else math.ceil((entry + dist) * 10000) / 10000
+    dist = abs(entry - stop)
+    if not (MIN_STOP_DISTANCE_PCT * entry * (1 - 1e-9) <= dist <= MAX_STOP_DISTANCE_PCT * entry) or stop <= 0:
+        return None
+    return {"stop": stop, "dist": dist, "target": round(entry + sgn * p.target_1_r * dist, 4)}
 
 
 def _to_idle(st: V2SymbolState) -> None:
@@ -720,8 +814,24 @@ class VWAPPullbackV2Strategy(Strategy):
         enforced_gates: Optional[List[str]] = None,
         impulse_delta_min: float = 0.15,
         resumption_delta_min: float = 0.10,
+        addons_enforced: Optional[bool] = None,   # None = follow require_tick_layers (add-ons need the tape)
+        spread_ratio_max: float = 1.5,
+        spread_abs_max_bps: float = 30.0,
+        session_delta_min_minutes: float = 30.0,
+        hvn_support_below_atr: float = 0.25,
+        hvn_support_above_atr: float = 0.50,
     ):
         super().__init__(strategy_id=strategy_id, name=name)
+        if addons_enforced is None:
+            addons_enforced = bool(require_tick_layers)
+        if addons_enforced and not require_tick_layers:
+            raise ValueError("the add-on gates need require_tick_layers=True")
+        self.addons_enforced = bool(addons_enforced)
+        self.spread_ratio_max = spread_ratio_max
+        self.spread_abs_max_bps = spread_abs_max_bps
+        self.session_delta_min_minutes = session_delta_min_minutes
+        self.hvn_support_below_atr = hvn_support_below_atr
+        self.hvn_support_above_atr = hvn_support_above_atr
         names = [str(g).strip().upper() for g in (enforced_gates or [])]
         unknown = [g for g in names if g not in PART2_GATES]
         if unknown:
@@ -757,6 +867,7 @@ class VWAPPullbackV2Strategy(Strategy):
         self.last_evaluated_bar: Optional[str] = None
         self.restored_from: Optional[str] = None
         self.emission_blocked_reason: Optional[str] = None  # set when a restore could not be trusted
+        self.last_block_by_symbol: Dict[str, Dict[str, Any]] = {}
 
     # ----------------------------------------------------------------- params
     def params(self) -> V2Params:
@@ -772,6 +883,10 @@ class VWAPPullbackV2Strategy(Strategy):
             impulse_delta_min=self.impulse_delta_min,
             resumption_delta_min=self.resumption_delta_min,
             enforced_gates=tuple(self.enforced_gates),
+            addons_enforced=self.addons_enforced,
+            spread_ratio_max=self.spread_ratio_max, spread_abs_max_bps=self.spread_abs_max_bps,
+            session_delta_min_minutes=self.session_delta_min_minutes,
+            hvn_support_below_atr=self.hvn_support_below_atr, hvn_support_above_atr=self.hvn_support_above_atr,
         )
 
     def _get_state(self, symbol: str) -> V2SymbolState:
@@ -786,6 +901,7 @@ class VWAPPullbackV2Strategy(Strategy):
         super().reset_daily_stats()
         self.symbol_states.clear()
         self.event_counts_today = {}
+        self.last_block_by_symbol = {}
 
     # ----------------------------------------------------------------- bars
     def on_bar(self, bar: BarEvent) -> List[SignalEvent]:
@@ -813,6 +929,9 @@ class VWAPPullbackV2Strategy(Strategy):
         self.last_evaluated_bar = bar.timestamp.isoformat()
         for ev in events:
             self.event_counts_today[ev["event"]] = self.event_counts_today.get(ev["event"], 0) + 1
+            if ev["event"] not in ("RESUMPTION_MEASURED", "FEATURE_UNAVAILABLE", "IMPULSE", "PULLBACK", "RESUMING", "NEW_EXTREME", "SIGNAL"):
+                self.last_block_by_symbol[sym] = {"event": ev["event"], "bar": bar.timestamp.isoformat(),
+                                                  "detail": {k: v for k, v in (ev.get("detail") or {}).items() if isinstance(v, (int, float, str, bool)) or v is None}}
             sink = EVENT_SINK
             if sink is not None:
                 try:
@@ -921,6 +1040,8 @@ class VWAPPullbackV2Strategy(Strategy):
             "signals_emitted_today": int(self.event_counts_today.get("SIGNAL", 0)),
             "data_layers": self.data_layers(),
             "enforced_gates": list(self.enforced_gates),
+            "addons_enforced": self.addons_enforced,
+            "last_block_by_symbol": dict(self.last_block_by_symbol),
         })
         return d
 

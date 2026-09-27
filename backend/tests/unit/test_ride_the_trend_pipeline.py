@@ -14,7 +14,7 @@ import pytest
 from backend.app.core.bracket import BracketStatus
 from backend.app.models.events import BarEvent, OrderType
 from backend.app.strategies import vwap_pullback_v2 as v2
-from backend.tests.unit.test_ride_the_trend_data_layers import FakeTape
+from backend.tests.unit.test_ride_the_trend_data_layers import FakeProfileStore, FakeTape
 from backend.tests.unit.test_vwap_pullback_v2 import Scenario, T0, _base as _base_bar
 # main must be imported BEFORE the fixture swaps v2.TAPE: importing main installs the real tape.
 from backend.app import main as r  # noqa: E402
@@ -61,11 +61,12 @@ def _session(r):
 
 @pytest.fixture
 def fake_tape():
-    old = v2.TAPE
+    old, old_prof = v2.TAPE, v2.PROFILE
     tape = FakeTape(delta_ratio=0.15, per_second=0.02, imbalance=0.35)
     v2.TAPE = tape
+    v2.PROFILE = FakeProfileStore()
     yield tape
-    v2.TAPE = old
+    v2.TAPE, v2.PROFILE = old, old_prof
 
 
 def test_full_fake_session_market_entry_trail_only_runner_and_flatten(fake_tape):

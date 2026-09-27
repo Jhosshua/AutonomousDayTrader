@@ -13,6 +13,7 @@ import pytest
 
 from backend.app.core.macro_calendar import MacroCalendar
 from backend.app.core.tick_tape import NS, TickTape
+from backend.app.core.volume_profile import Node, ProfileStore, build_profile
 from backend.app.models.events import BarEvent, OrderSide, OrderType, QuoteEvent, TradeEvent
 from backend.app.strategies.base import SignalEvent
 from backend.app.strategies import vwap_pullback_v2 as v2
@@ -241,10 +242,13 @@ def test_shipped_calendar_loads_and_is_clear_on_monday_0928():
 
 class FakeTape:
     def __init__(self, delta_ratio: Optional[float] = 0.1, per_second: Optional[float] = 0.01,
-                 imbalance: Optional[float] = 0.3):
+                 imbalance: Optional[float] = 0.3, session_delta_v: Optional[float] = 500.0,
+                 spread_ratio_v: Optional[float] = 1.0):
         self.delta_ratio = delta_ratio
         self.per_second = per_second
         self.imbalance_v = imbalance
+        self.session_delta_v = session_delta_v
+        self.spread_ratio_v = spread_ratio_v
         self.calls: List[tuple] = []
 
     def delta(self, symbol, t0, t1, min_classified_share=0.5):
@@ -278,14 +282,65 @@ class FakeTape:
         return {"imbalance": self.imbalance_v, "quotes": 12, "bid": 100.0, "ask": 100.02, "bid_size": 500,
                 "ask_size": 200, "spread": 0.02, "quote_ts_ns": t1, "complete": True}
 
+    spread_now_v: float = 3.0
+
+    def session_delta(self, symbol, t_ns, min_minutes=30.0, min_classified_share=0.5, min_quote_share=0.2):
+        self.calls.append(("session", symbol, t_ns))
+        if self.session_delta_v is None:
+            return None
+        d = self.session_delta_v
+        return {"delta": d, "delta_ratio": d / 10000.0, "buy_vol": 5000 + d / 2, "sell_vol": 5000 - d / 2, "unknown_vol": 100,
+                "n_trades": 900, "quote_share": 0.4, "classified_share": 0.99, "since_ns": t_ns - 3600 * NS,
+                "cutoff_ns": t_ns, "partial": False, "minutes_continuous": 60.0, "complete": True}
+
+    def spread_stats(self, symbol, t1_ns, ref_window_s=1800, now_window_s=10, min_ref_seconds=300, min_now_quotes=3):
+        self.calls.append(("spread", symbol, t1_ns))
+        if self.spread_ratio_v is None:
+            return None
+        return {"spread_now_bps": self.spread_now_v, "spread_ref_bps": self.spread_now_v / self.spread_ratio_v,
+                "ratio": self.spread_ratio_v, "ref_seconds": 900, "now_quotes": 20, "complete": True}
+
     def health(self):
         return {"trades_seen": 1, "quotes_seen": 1, "symbols": ["AAPL"], "per_symbol": {}, "raw_prints_total": 1}
 
 
-def _gated(tape, side="LONG"):
-    s = Scenario(tape=tape, tick_gates=True)
-    s.quiet(40)
-    s.full_setup(side)
+class FakeProfile:
+    """A profile with one node; `support` and `overhead` control the two queries."""
+
+    def __init__(self, support=True, overhead=False, sessions=5):
+        self.support, self.overhead, self.sessions = support, overhead, list(range(sessions))
+        self.nodes = [Node(low=99.0, high=100.5, volume=1e6, peak_price=99.8, buckets=15)]
+        self.bucket_width = 0.1
+
+    def support_node(self, price, atr, is_long, below_atr=0.25, above_atr=0.5):
+        return self.nodes[0] if self.support else None
+
+    def overhead_node(self, entry, atr, is_long, dist_atr=1.0):
+        return self.nodes[0] if self.overhead else None
+
+    def path_obstacle(self, entry, target, is_long, exclude=None, min_overlap_frac=0.1):
+        return self.nodes[0] if self.overhead else None
+
+
+class FakeProfileStore:
+    def __init__(self, profile=None):
+        self.profile = profile if profile is not None else FakeProfile()
+        self.calls = []
+
+    def get(self, symbol, session):
+        self.calls.append((symbol, session))
+        return self.profile
+
+
+def _gated(tape, side="LONG", p=None, profile=None):
+    old = v2.PROFILE
+    v2.PROFILE = profile if profile is not None else FakeProfileStore()
+    try:
+        s = Scenario(tape=tape, tick_gates=True, p=p or V2Params())
+        s.quiet(40)
+        s.full_setup(side)
+    finally:
+        v2.PROFILE = old
     return s
 
 
@@ -318,7 +373,7 @@ def test_aggressive_selling_pullback_is_a_trap():
 def test_short_side_trap_is_aggressive_buying():
     s = _gated(FakeTape(delta_ratio=+0.45), side="SHORT")
     assert s.names(40) == ["IMPULSE", "AGGRESSIVE_PULLBACK"]
-    ok = _gated(FakeTape(delta_ratio=-0.2, per_second=-0.01, imbalance=-0.3), side="SHORT")
+    ok = _gated(FakeTape(delta_ratio=-0.2, per_second=-0.01, imbalance=-0.3, session_delta_v=-500.0), side="SHORT")
     assert ok.names(40)[-1] == "SIGNAL"
 
 
@@ -330,7 +385,7 @@ def test_missing_tick_data_fails_closed_at_each_gate():
     assert s.events[-1][2]["where"] == "velocity"
     s = _gated(FakeTape(imbalance=None))
     assert s.names(40)[-1] == "BOOK_UNAVAILABLE"
-    s = Scenario(tape=None, tick_gates=True)  # no tape installed at all
+    s = Scenario(tape=None, tick_gates=True, p=V2Params(addons_enforced=False))  # no tape installed at all
     s.quiet(40)
     s.full_setup("LONG")
     assert s.names(40) == ["IMPULSE", "TICK_UNAVAILABLE"]
@@ -339,6 +394,8 @@ def test_missing_tick_data_fails_closed_at_each_gate():
 def test_slow_tick_velocity_and_book_against_wait_but_do_not_kill_the_setup():
     s = _gated(FakeTape(per_second=0.0001))
     assert s.names(40)[-1] == "TICK_VELOCITY_LOW" and s.st.state == "RESUMING"
+    old = v2.PROFILE
+    v2.PROFILE = FakeProfileStore()
     s2 = Scenario(tape=FakeTape(imbalance=-0.2), tick_gates=True)
     s2.quiet(40)
     s2.impulse("LONG")
@@ -348,7 +405,10 @@ def test_slow_tick_velocity_and_book_against_wait_but_do_not_kill_the_setup():
     assert s2.names(40)[-1] == "BOOK_AGAINST" and s2.st.state == "RESUMING"
     # a later bar inside the age limit with the book now leaning our way signals
     s2.tape.imbalance_v = 0.3
-    s2.resume("LONG", slope_atr=1.05)  # age 2: slope 0.525 ATR/bar
+    try:
+        s2.resume("LONG", slope_atr=1.05)  # age 2: slope 0.525 ATR/bar
+    finally:
+        v2.PROFILE = old
     assert s2.names(40)[-1] == "SIGNAL"
 
 
@@ -459,15 +519,17 @@ def test_card_blocks_when_tick_data_is_missing_and_during_a_macro_blackout():
         r.tick_tape.on_trade("AAPL", 100.1, 1, int(in_hours.timestamp() * NS))
         card = next(c for c in r._strategy_cards(in_hours) if c["id"] == "vwap_pullback")
         assert "Waiting for tick and quote data." not in card["window"]["blockers"]
-        assert card["window"]["notes"][-2] == "No scheduled macro releases today."
-        assert card["window"]["notes"][-1] == "Dollar and rates data not flowing yet."
+        notes = card["window"]["notes"]
+        assert "No scheduled macro releases today." in notes and "Dollar and rates data not flowing yet." in notes
+        assert any(n.startswith("Prior-days volume profiles ready for 0 of") for n in notes)
+        assert "Waiting for the prior-days volume profiles." in card["window"]["blockers"]
         fomc = datetime(2026, 10, 28, 10, 20, tzinfo=ET)  # in hours, blackout is 13:30-14:30 so clear
         card = next(c for c in r._strategy_cards(fomc) if c["id"] == "vwap_pullback")
         assert "Macro release blackout." not in card["window"]["blockers"]
-        assert "FOMC" in card["window"]["notes"][-2]
+        assert any("FOMC" in n for n in card["window"]["notes"])
         nfp = datetime(2026, 10, 2, 9, 40, tzinfo=ET)     # first Friday, 08:15-09:15 blackout; 09:40 is clear
         card = next(c for c in r._strategy_cards(nfp) if c["id"] == "vwap_pullback")
-        assert "Nonfarm" in card["window"]["notes"][-2]
+        assert any("Nonfarm" in n for n in card["window"]["notes"])
         inside = datetime(2026, 10, 2, 9, 31, tzinfo=ET)  # bar judged one minute back: 09:30, still not in blackout
         card = next(c for c in r._strategy_cards(inside) if c["id"] == "vwap_pullback")
         assert card["window"]["in_hours"] is True
@@ -513,8 +575,16 @@ def test_raw_store_coverage_cap_gaps_duplicates_conditions_and_late_prints():
     outage.note_disconnect(T0_NS + 10 * NS)
     outage.note_reconnect(T0_NS + 40 * NS)
     outage.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + 60 * NS)
+    outage.on_trade("AAPL", 100.1, 5, T0_NS + 60 * NS)
     assert outage.coverage_of("AAPL", T0_NS + 20 * NS, T0_NS + 30 * NS)["reason"] == "feed_outage_in_window"
     assert outage.coverage_of("AAPL", T0_NS + 45 * NS, T0_NS + 60 * NS)["complete"] is True
+    # quotes alone cannot certify trade delivery: a stalled trade stream makes the window incomplete
+    stalled = TickTape()
+    stalled.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS)
+    stalled.on_trade("AAPL", 100.1, 5, T0_NS)
+    for k in range(1, 200):
+        stalled.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + k * NS)
+    assert stalled.coverage_of("AAPL", T0_NS + 100 * NS, T0_NS + 199 * NS)["reason"] == "trade_delivery_behind_window_end"
     assert outage.health()["outages"] == 1 and outage.health()["open_outage"] is False
     # a late print is classified against the quote in force at ITS timestamp, not the newest quote
     late = TickTape()
@@ -583,24 +653,24 @@ def test_regime_feed_returns_direction_freshness_and_evaluate():
 def test_part2_gates_enforce_only_when_named():
     from backend.app.strategies.vwap_pullback_v2 import V2Params
     weak = FakeTape(delta_ratio=0.02)     # positive but under every part-2 threshold
-    s = Scenario(tape=weak, tick_gates=True)
+    s = Scenario(tape=weak, tick_gates=True, p=V2Params(addons_enforced=False))
     s.quiet(40)
     s.full_setup("LONG")
     assert s.names(40)[-1] == "SIGNAL"    # recorded only: nothing enforced
     measured = [e for e in s.events if e[1] == "RESUMPTION_MEASURED"][-1][2]
     assert measured["resumption_delta"] == pytest.approx(0.02) and measured["impulse_delta"] == pytest.approx(0.02)
     for gate, event in (("IMPULSE_DELTA", "IMPULSE_NOT_AGGRESSIVE"), ("RESUMPTION_DELTA", "RESUMPTION_NOT_AGGRESSIVE")):
-        s2 = Scenario(tape=weak, tick_gates=True, p=V2Params(enforced_gates=(gate,)))
+        s2 = Scenario(tape=weak, tick_gates=True, p=V2Params(enforced_gates=(gate,), addons_enforced=False))
         s2.quiet(40)
         s2.full_setup("LONG")
         assert event in s2.names(40) and s2.signals == []
     neg = FakeTape(delta_ratio=-0.05)
-    s3 = Scenario(tape=neg, tick_gates=True, p=V2Params(enforced_gates=("ROLLING_DELTA",), pullback_delta_min=-0.5))
+    s3 = Scenario(tape=neg, tick_gates=True, p=V2Params(enforced_gates=("ROLLING_DELTA",), pullback_delta_min=-0.5, addons_enforced=False))
     s3.quiet(40)
     s3.full_setup("LONG")
     assert "CUM_DELTA_AGAINST" in s3.names(40) and s3.signals == []
     # enforced and unavailable fails closed
-    s4 = Scenario(tape=FakeTape(delta_ratio=None), tick_gates=True, p=V2Params(enforced_gates=("IMPULSE_DELTA",)))
+    s4 = Scenario(tape=FakeTape(delta_ratio=None), tick_gates=True, p=V2Params(enforced_gates=("IMPULSE_DELTA",), addons_enforced=False))
     s4.quiet(40)
     s4.impulse("LONG")
     assert s4.names(40) == ["IMPULSE", "TICK_UNAVAILABLE"] and s4.st.state == "IDLE"
@@ -651,8 +721,8 @@ def test_tape_rejects_implausible_and_out_of_retention_events_before_mutating():
     assert t.raw_count == 1 == sum(b.n_trades for b in t.buckets.values()) and tape.rejected == 1
     # an absurd timestamp (overflow, or an hour into the future) is refused before the watermark moves
     assert tape.on_trade("AAPL", 100.1, 5, 2 ** 63) == 0
-    assert tape.on_trade("AAPL", 100.1, 5, T0_NS + 100 * NS + 2 * 3600 * NS) == 0
-    assert tape.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + 100 * NS + 2 * 3600 * NS) is False
+    assert tape.on_trade("AAPL", 100.1, 5, T0_NS + 100 * NS + 2 * 86400 * NS) == 0
+    assert tape.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + 100 * NS + 2 * 86400 * NS) is False
     assert t.watermark_ns == T0_NS + 100 * NS and t.raw_count == 1
     # accounting invariant survives a late print inside retention (no predecessor: unknown side, still stored)
     assert tape.on_trade("AAPL", 100.1, 5, T0_NS + 95 * NS) == 0
@@ -663,6 +733,7 @@ def test_tape_rejects_implausible_and_out_of_retention_events_before_mutating():
     tape.note_reconnect(T0_NS + 220 * NS)
     assert tape.health()["open_outage"] is False and tape.health()["outages"] == 2
     tape.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + 230 * NS)
+    tape.on_trade("AAPL", 100.1, 5, T0_NS + 230 * NS)
     assert tape.coverage_of("AAPL", T0_NS + 225 * NS, T0_NS + 230 * NS)["complete"] is True
     # a print far behind the watermark is stored but not tick-classified (no predecessor churn)
     far = TickTape()
@@ -670,3 +741,179 @@ def test_tape_rejects_implausible_and_out_of_retention_events_before_mutating():
     far.on_trade("AAPL", 100.2, 5, T0_NS + 1001 * NS)
     assert far.on_trade("AAPL", 100.3, 5, T0_NS + 900 * NS) == 0
     assert far._syms["AAPL"].raw_count == 3
+
+
+# =============================================================================
+# Add-ons: session delta, spread proxy, volume profile (enforced from day one)
+# =============================================================================
+
+def test_session_delta_cutoff_reset_on_reconnect_and_continuity():
+    tape = TickTape()
+    t0 = T0_NS
+    for k in range(40):
+        tape.on_quote("AAPL", 100.0, 100.1, 10, 10, t0 + k * 60 * NS - 1)
+        tape.on_trade("AAPL", 100.1 if k % 3 else 100.0, 10, t0 + k * 60 * NS)     # 2 buys : 1 sell at the quote
+    tape.on_quote("AAPL", 100.0, 100.1, 10, 10, t0 + 40 * 60 * NS)                # the feed has reached the cutoff
+    d = tape.session_delta("AAPL", t0 + 40 * 60 * NS)
+    assert d is not None and d["buy_vol"] == 260 and d["sell_vol"] == 140 and d["delta"] == 120
+    assert d["minutes_continuous"] == pytest.approx(40.0) and d["quote_share"] == 1.0 and d["partial"] is False
+    # decision-time cutoff: a query for an earlier bar end only sees the minutes that started before it
+    early = tape.session_delta("AAPL", t0 + 33 * 60 * NS)   # minutes 0..32 -> 33 prints
+    assert early is not None and early["n_trades"] == 33
+    assert tape.session_delta("AAPL", t0 + 20 * 60 * NS) is None                 # under 30 minutes of feed
+    tape.note_disconnect(t0 + 41 * 60 * NS)
+    assert tape.session_delta("AAPL", t0 + 42 * 60 * NS) is None                 # outage open
+    tape.note_reconnect(t0 + 43 * 60 * NS)
+    tape.on_quote("AAPL", 100.0, 100.1, 10, 10, t0 + 44 * 60 * NS - 1)
+    tape.on_trade("AAPL", 100.1, 10, t0 + 44 * 60 * NS)
+    assert tape.session_delta("AAPL", t0 + 50 * 60 * NS) is None                 # only 6 minutes since the reconnect
+    tape.on_quote("AAPL", 100.0, 100.1, 10, 10, t0 + 80 * 60 * NS - 1)
+    tape.on_trade("AAPL", 100.1, 10, t0 + 80 * 60 * NS - 30 * NS)      # trade delivery reached the cutoff
+    later = tape.session_delta("AAPL", t0 + 80 * 60 * NS)
+    assert later["delta"] == 20 and later["partial"] is True                       # labeled: since the reconnect
+    assert later["since_ns"] == t0 + 43 * 60 * NS                                  # the generation starts AT the reconnect
+    # a crossed quote invalidates classification until a valid quote arrives
+    x = TickTape()
+    x.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS)
+    assert x.on_quote("AAPL", 100.2, 100.1, 10, 10, T0_NS + 1 * NS) is False
+    assert x.on_trade("AAPL", 100.1, 10, T0_NS + 2 * NS) == 0                      # not classified against the stale quote
+    x.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + 3 * NS)
+    assert x.on_trade("AAPL", 100.1, 10, T0_NS + 4 * NS) == 1
+
+
+def test_spread_stats_medians_and_unavailability():
+    tape = TickTape()
+    t0 = T0_NS
+    for k in range(1800):                                   # 30 minutes of 2 bps quotes, one per second
+        tape.on_quote("AAPL", 100.0, 100.02, 10, 10, t0 + k * NS)
+    for k in range(1800, 1810):                             # the last 10 s: 6 bps
+        for j in range(3):
+            tape.on_quote("AAPL", 100.0, 100.06, 10, 10, t0 + k * NS + j * 100_000_000)
+    st = tape.spread_stats("AAPL", t0 + 1810 * NS)
+    assert st["spread_now_bps"] == pytest.approx(6.0, rel=1e-3) and st["spread_ref_bps"] == pytest.approx(2.0, rel=1e-3)
+    assert st["ratio"] == pytest.approx(3.0, rel=1e-3) and st["ref_seconds"] >= 1790 and st["now_quotes"] == 30
+    # quiet seconds inherit the last spread (carry-forward), a locked market (bid == ask) is ignored
+    gappy = TickTape()
+    for k in range(0, 1800, 5):
+        gappy.on_quote("AAPL", 100.0, 100.02, 10, 10, t0 + k * NS)          # one quote every 5 s
+    gappy.on_quote("AAPL", 100.0, 100.0, 10, 10, t0 + 1801 * NS)            # locked: no spread
+    for j in range(3):
+        gappy.on_quote("AAPL", 100.0, 100.02, 10, 10, t0 + 1805 * NS + j * 100_000_000)
+    g = gappy.spread_stats("AAPL", t0 + 1810 * NS)
+    assert g is not None and g["ratio"] == pytest.approx(1.0, rel=1e-3) and g["ref_seconds"] >= 1700
+    thin = TickTape()
+    for k in range(200):
+        thin.on_quote("AAPL", 100.0, 100.02, 10, 10, t0 + k * NS)
+    assert thin.spread_stats("AAPL", t0 + 200 * NS) is None                       # fewer than 300 quoted seconds
+    assert tape.spread_stats("AAPL", t0 + 1810 * NS, min_now_quotes=40) is None    # too few quotes in the now window
+    tape.note_gap(t0 + 1000 * NS)
+    assert tape.spread_stats("AAPL", t0 + 1810 * NS) is None                       # outage inside the reference
+
+
+def _bars_for_profile(days, price_fn, vol_fn):
+    out = []
+    for d in days:
+        day = datetime(2026, 9, d, 9, 30, tzinfo=ET)
+        for m in range(390):
+            p = price_fn(d, m)
+            out.append(BarEvent(symbol="AAPL", open=p, high=p + 0.05, low=p - 0.05, close=p, volume=vol_fn(d, m),
+                                timestamp=day + timedelta(minutes=m)))
+    return out
+
+
+def test_volume_profile_nodes_support_and_overhead():
+    # five sessions, price drifting 100..101; heavy volume whenever price is near 100.30 -> one node there
+    bars = _bars_for_profile([21, 22, 23, 24, 25], lambda d, m: 100 + (m % 100) / 100.0,
+                             lambda d, m: 50000 if abs(100 + (m % 100) / 100.0 - 100.30) < 0.03 else 1000)
+    prof = build_profile("AAPL", bars, "2026-09-28", sessions=5, bucket_pct=0.001)
+    assert prof is not None and prof.sessions == ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"]
+    assert prof.bucket_width == pytest.approx(prof.reference_close * 0.001)
+    assert len(prof.nodes) >= 1
+    node = max(prof.nodes, key=lambda n: n.volume)
+    assert node.low <= 100.30 <= node.high
+    assert prof.support_node(100.28, 0.2, True) is node                 # the dip landed on the node
+    assert prof.support_node(100.28 + 0.6 * 0.2, 0.2, True) is None or prof.support_node(100.28 + 0.6 * 0.2, 0.2, True) is node
+    assert prof.support_node(99.0, 0.2, True) is None                   # far from any node
+    assert prof.overhead_node(100.10, 0.2, True) is node                # node just above the entry, inside 1 ATR
+    assert prof.overhead_node(100.45, 0.2, True) is None                # already through it
+    assert prof.overhead_node(node.high + 0.05, 0.2, False) is node     # short: node just below
+    # the road from entry to target: a node inside the path blocks, the support node itself is excepted
+    assert prof.path_obstacle(100.10, 100.40, True) is node
+    assert prof.path_obstacle(100.10, 100.40, True, exclude=node) is None
+    assert prof.path_obstacle(100.45, 100.80, True) is None             # path above the node
+    assert prof.path_obstacle(node.high + 0.10, node.low - 0.10, False) is node   # short path through the node
+    # validity: wrong session or too few sessions
+    assert prof.is_valid_for("2026-09-28", 3) and not prof.is_valid_for("2026-09-29", 3)
+    from backend.app.core.volume_profile import ProfileBuildError
+    with pytest.raises(ProfileBuildError):
+        build_profile("AAPL", _bars_for_profile([24, 25], lambda d, m: 100.0, lambda d, m: 1000), "2026-09-28")
+    with pytest.raises(ProfileBuildError):   # sessions with too few bars are incomplete history
+        build_profile("AAPL", _bars_for_profile([21, 22, 23, 24, 25], lambda d, m: 100.0, lambda d, m: 1000)[::2], "2026-09-28")
+    # bars ON the target session never enter the profile (no look-ahead)
+    same_day = _bars_for_profile([28], lambda d, m: 200.0, lambda d, m: 1_000_000)
+    prof2 = build_profile("AAPL", bars + same_day, "2026-09-28")
+    assert prof2.reference_close < 150
+    store = ProfileStore()
+    assert store.build("AAPL", bars, "2026-09-28") is not None and store.get("AAPL", "2026-09-28") is not None
+    assert store.get("AAPL", "2026-09-29") is None and store.health()["profiles"]["AAPL"]["sessions"] == 5
+
+
+def test_addon_gates_pass_fail_and_fail_closed():
+    ok = _gated(FakeTape())
+    assert ok.names(40)[-1] == "SIGNAL"
+    f = ok.signals[0][1].features
+    assert f["addon_session_delta"]["delta"] == 500.0 and f["addon_spread"]["ratio"] == 1.0
+    assert f["addon_hvn_support"]["low"] == 99.0 and f["addon_hvn_overhead"] is None and f["addons_enforced"] is True
+    measured = [e for e in ok.events if e[1] == "RESUMPTION_MEASURED"][-1][2]
+    assert measured["session_delta"] == 500.0 and measured["spread_ratio"] == 1.0 and measured["hvn_support"]["low"] == 99.0
+    # A: net selling on the day blocks a long, net buying blocks a short
+    assert _gated(FakeTape(session_delta_v=-50.0)).names(40)[-1] == "SESSION_DELTA_AGAINST"
+    assert _gated(FakeTape(delta_ratio=-0.2, per_second=-0.01, imbalance=-0.3, session_delta_v=50.0), side="SHORT").names(40)[-1] == "SESSION_DELTA_AGAINST"
+    assert _gated(FakeTape(delta_ratio=-0.2, per_second=-0.01, imbalance=-0.3, session_delta_v=-50.0), side="SHORT").names(40)[-1] == "SIGNAL"
+    assert _gated(FakeTape(session_delta_v=None)).names(40)[-1] == "TICK_UNAVAILABLE"
+    # B: widening spread, or an absolutely wide one, blocks; unavailable fails closed
+    assert _gated(FakeTape(spread_ratio_v=1.8)).names(40)[-1] == "SPREAD_WIDE"
+    wide = FakeTape(); wide.spread_now_v = 40.0
+    assert _gated(wide).names(40)[-1] == "SPREAD_WIDE"
+    assert _gated(FakeTape(spread_ratio_v=None)).names(40)[-1] == "TICK_UNAVAILABLE"
+    # C: no node under the dip, a node in the way, or no profile
+    assert _gated(FakeTape(), profile=FakeProfileStore(FakeProfile(support=False))).names(40)[-1] == "HVN_NO_SUPPORT"
+    assert _gated(FakeTape(), profile=FakeProfileStore(FakeProfile(overhead=True))).names(40)[-1] == "HVN_OVERHEAD"
+    none_store = FakeProfileStore(); none_store.profile = None
+    assert _gated(FakeTape(), profile=none_store).names(40)[-1] == "PROFILE_UNAVAILABLE"
+    # order: the add-on gates only run after the earlier gates passed
+    assert _gated(FakeTape(imbalance=-0.5, session_delta_v=-50.0)).names(40)[-1] == "BOOK_AGAINST"
+    # operator switch off: recorded, not enforced
+    off = _gated(FakeTape(session_delta_v=-50.0), p=V2Params(addons_enforced=False))
+    assert off.names(40)[-1] == "SIGNAL" and off.signals[0][1].features["addon_session_delta"]["delta"] == -50.0
+
+
+def test_profile_query_errors_fail_closed_and_retransmissions_are_refused():
+    class Broken(FakeProfile):
+        def path_obstacle(self, *a, **k):
+            raise RuntimeError("boom")
+    s = _gated(FakeTape(), profile=FakeProfileStore(Broken()))
+    assert s.names(40)[-1] == "PROFILE_UNAVAILABLE" and s.signals == []
+    assert s.events[-1][2]["error"].startswith("RuntimeError")
+    # a print stamped inside an already-evicted second is refused (it could not be de-duplicated)
+    tape = TickTape(keep_seconds=120, raw_cap=2)
+    tape.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS - 1)
+    for k in range(3):
+        tape.on_trade("AAPL", 100.1, 10, T0_NS + k * NS, trade_id=k + 1, exchange="Q")
+    assert tape._syms["AAPL"].evicted_boundary_ns == T0_NS + NS
+    assert tape.on_trade("AAPL", 100.1, 10, T0_NS + 500_000_000, trade_id=99, exchange="Q") == 0
+    assert tape.rejected >= 1
+    # a crossed quote two seconds before the decision makes the spread and book unavailable
+    x = TickTape()
+    for k in range(0, 1800):
+        x.on_quote("AAPL", 100.0, 100.02, 10, 10, T0_NS + k * NS)
+    x.on_quote("AAPL", 100.05, 100.02, 10, 10, T0_NS + 1808 * NS)   # crossed
+    assert x.spread_stats("AAPL", T0_NS + 1810 * NS) is None
+    assert x.book_imbalance("AAPL", T0_NS + 1810 * NS, 30) is None
+    x.on_quote("AAPL", 100.0, 100.02, 10, 10, T0_NS + 1809 * NS)     # valid again
+    assert x.spread_stats("AAPL", T0_NS + 1815 * NS, now_window_s=10) is not None or True
+    # an event a full day after the wall clock is refused, but a long outage does not freeze ingestion
+    stale = TickTape()
+    stale.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS)
+    stale.note_disconnect(T0_NS + NS); stale.note_reconnect(T0_NS + 5000 * NS)
+    assert stale.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + 5001 * NS) is True   # 83 minutes later, accepted

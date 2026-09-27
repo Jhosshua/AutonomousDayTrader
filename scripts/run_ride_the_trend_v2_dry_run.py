@@ -50,6 +50,24 @@ def no_network():
         yield
 
 
+def load_prior_bars(sym: str, day: str, sessions: int = 5) -> List[BarEvent]:
+    """Bars of the `sessions` regular sessions strictly before `day` (for the volume profile)."""
+    days: Dict[str, List[BarEvent]] = {}
+    with open(DATA / "bars" / f"{sym}.jsonl") as f:
+        for line in f:
+            b = json.loads(line)
+            ts = datetime.fromisoformat(b["t"].replace("Z", "+00:00"))
+            et = ts.astimezone(ET)
+            d = et.date().isoformat()
+            if d >= day or et.time() < datetime.min.time().replace(hour=9, minute=30) or et.time() >= datetime.min.time().replace(hour=16):
+                continue
+            days.setdefault(d, []).append(BarEvent(symbol=sym, open=b["o"], high=b["h"], low=b["l"], close=b["c"], volume=int(b["v"]), timestamp=ts))
+    out = []
+    for d in sorted(days)[-sessions:]:
+        out.extend(days[d])
+    return out
+
+
 def load_bars(sym: str, day: str) -> List[BarEvent]:
     out = []
     with open(DATA / "bars" / f"{sym}.jsonl") as f:
@@ -95,6 +113,10 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
         else:
             s.pause()
     r.vwap_strategy.reset_daily_stats()
+    # Add-on C: profiles from the five sessions before the replay day, exactly as the live rebuild would
+    r.profile_store.profiles.clear(); r.profile_store.errors.clear()
+    for sym in symbols:
+        r.profile_store.build(sym, load_prior_bars(sym, day), day)
     setup_events: List[Dict[str, Any]] = []
     old_sink = r.vwap_pullback_v2.EVENT_SINK
 
@@ -215,6 +237,9 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
                "impulse_delta": d.get("impulse_delta"), "pullback_delta": d.get("pullback_delta"),
                "resumption_delta": d.get("resumption_delta"), "rolling_delta": d.get("rolling_delta"),
                "tick_velocity_atr_per_min": d.get("tick_velocity_atr_per_min"), "book_imbalance": d.get("book_imbalance"),
+               "session_delta": d.get("session_delta"), "spread_ratio": d.get("spread_ratio"),
+               "spread_now_bps": d.get("spread_now_bps"), "hvn_support": bool(d.get("hvn_support")),
+               "hvn_overhead": bool(d.get("hvn_overhead")), "profile_sessions": d.get("profile_sessions"),
                "regime_failed": reg["failed"], "regime_unavailable": reg["unavailable"],
                "sector_rs_30m": reg["measures"].get("sector_rs_30m"),
                "dollar_30m": (reg["measures"].get("dollar_return_30m") or {}).get("return"),
@@ -233,6 +258,22 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
             would_fail[g] += 1
         for g in reg["unavailable"]:
             unavailable[g] += 1
+        # add-ons (enforced live; counted here per evaluation for the record)
+        if d.get("session_delta") is None:
+            unavailable["SESSION_DELTA"] += 1
+        elif sgn * d["session_delta"] <= 0:
+            would_fail["SESSION_DELTA_AGAINST"] += 1
+        if d.get("spread_ratio") is None:
+            unavailable["SPREAD"] += 1
+        elif d["spread_ratio"] > 1.5 or (d.get("spread_now_bps") or 0) > 30:
+            would_fail["SPREAD_WIDE"] += 1
+        if d.get("profile_sessions") is None:
+            unavailable["PROFILE"] += 1
+        else:
+            if not d.get("hvn_support"):
+                would_fail["HVN_NO_SUPPORT"] += 1
+            if d.get("hvn_overhead"):
+                would_fail["HVN_OVERHEAD"] += 1
     quote_share = {}
     for sym in symbols:
         t0 = int(datetime.fromisoformat(f"{day}T09:45:00").replace(tzinfo=ET).timestamp() * 1e9)
@@ -273,6 +314,7 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
                                       "signals_emitted_today", "data_layers")},
         "failures": failures,
         "regime": r.regime_feed.health(),
+        "profiles": r.profile_store.health(),
         "diagnostics": diagnostics,
         "setup_events": [e for e in setup_events if e["event"] != "FEATURE_UNAVAILABLE"],
     }
@@ -312,7 +354,8 @@ def write_md(rep: Dict[str, Any], path: Path) -> None:
     for row in dg["rows"]:
         lines.append(f"  - {row['time_et']} {row['symbol']} {row['side']} age {row['age']} slope {row['slope']:.2f} chase {row['chase_std']:.2f} feasible {row['feasible_price_interval']} "
                      f"imp {row['impulse_delta']} pull {row['pullback_delta']} res {row['resumption_delta']} roll {row['rolling_delta']} "
-                     f"vel {row['tick_velocity_atr_per_min']} book {row['book_imbalance']} regime_failed {row['regime_failed']} unavailable {row['regime_unavailable']}")
+                     f"vel {row['tick_velocity_atr_per_min']} book {row['book_imbalance']} sess {row['session_delta']} spread {row['spread_ratio']} "
+                     f"hvn_support {row['hvn_support']} hvn_overhead {row['hvn_overhead']} regime_failed {row['regime_failed']} unavailable {row['regime_unavailable']}")
     lines.append("")
     lines.append("## Invariants")
     lines.append("PASS: all invariants held." if not rep["failures"] else "FAIL:\n" + "\n".join(f"- {f}" for f in rep["failures"]))

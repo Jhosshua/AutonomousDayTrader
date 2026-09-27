@@ -1,6 +1,6 @@
 # Ride the Trend v2 dry run, 2026-09-25 (all arms)
 
-Replayed 7176 bars, 2,804,461 trade prints and 1,948,463 quotes for AAPL, NVDA, AMD, MSFT, AMZN, META, GOOGL, PLTR, COIN in 32.7 s, simulation mode, no broker, no network.
+Replayed 7176 bars, 2,804,461 trade prints and 1,948,463 quotes for AAPL, NVDA, AMD, MSFT, AMZN, META, GOOGL, PLTR, COIN in 49.3 s, simulation mode, no broker, no network.
 
 ## Funnel (every setup transition and rejection)
 - CHASED: 2
@@ -29,16 +29,16 @@ Data layers on the card: {"required": true, "layer1_ticks": {"live": true, "trad
 ## Part-2 diagnostics (measures recorded on every resumption evaluation)
 - Resumption evaluations: 8; impulses that pre-empted a live setup: 1
 - Feasible entry price interval (slope vs chase cap): {'True': 1, 'False': 7}
-- Would fail if enforced: {'IMPULSE_DELTA': 7, 'RESUMPTION_DELTA': 4, 'ROLLING_DELTA': 4, 'SECTOR_AGAINST': 1}; unavailable: {'RESUMPTION_DELTA': 4}
-- Quote-classified share of volume 09:45-11:30: {'AAPL': {'quote': 0.411, 'classified': 1.0, 'complete': True}, 'NVDA': {'quote': 0.439, 'classified': 1.0, 'complete': True}, 'AMD': {'quote': 0.244, 'classified': 1.0, 'complete': True}, 'MSFT': {'quote': 0.38, 'classified': 1.0, 'complete': True}, 'AMZN': {'quote': 0.37, 'classified': 1.0, 'complete': True}, 'META': {'quote': 0.38, 'classified': 1.0, 'complete': True}, 'GOOGL': {'quote': 0.297, 'classified': 1.0, 'complete': True}, 'PLTR': {'quote': 0.33, 'classified': 1.0, 'complete': True}, 'COIN': {'quote': 0.283, 'classified': 1.0, 'complete': True}}
-  - 10:13 META LONG age 1 slope 0.10 chase -0.52 feasible True imp 0.1274026045387109 pull -0.21774237266857452 res -0.19482835488185465 roll -0.0747857935534589 vel 0.09970319253668854 book 0.056910569105691054 regime_failed ['SECTOR_AGAINST'] unavailable []
-  - 10:28 COIN SHORT age 1 slope 0.88 chase 0.73 feasible False imp -0.3397387623672388 pull -0.05222236905863178 res None roll -0.053455789465815855 vel 0.7621963460130987 book -0.1276595744680851 regime_failed [] unavailable []
-  - 10:40 AMD SHORT age 1 slope 0.36 chase 0.95 feasible False imp -0.10787716413972274 pull -0.06573785517873511 res None roll -0.09511646520781891 vel 0.4670532089755021 book 0.024390243902439025 regime_failed [] unavailable []
-  - 10:41 AMD SHORT age 2 slope 0.50 chase 1.43 feasible False imp -0.10787716413972274 pull -0.06573785517873511 res None roll -0.09988447130239808 vel 0.37613660211498123 book 0.12698412698412698 regime_failed [] unavailable []
-  - 10:42 AMD SHORT age 3 slope 0.63 chase 2.09 feasible False imp -0.10787716413972274 pull -0.06573785517873511 res None roll -0.11159246413155746 vel 0.7231035408231408 book 0.26436781609195403 regime_failed [] unavailable []
-  - 11:13 AMZN LONG age 1 slope 0.03 chase 0.43 feasible False imp -0.3615231894244879 pull -0.22422744992919869 res -0.05541850969717591 roll -0.3470717169190457 vel -0.019257425826678783 book 0.034482758620689655 regime_failed [] unavailable []
-  - 11:14 AMZN LONG age 2 slope 0.09 chase 0.49 feasible False imp -0.3615231894244879 pull -0.22422744992919869 res -0.10793966631216623 roll -0.34531766901936023 vel 0.31420693366239 book 0.1958762886597938 regime_failed [] unavailable []
-  - 11:15 AMZN LONG age 3 slope 0.24 chase 0.74 feasible False imp -0.3615231894244879 pull -0.22422744992919869 res -0.11882619860879104 roll -0.34052343964746745 vel 0.5566908746952561 book -0.046153846153846156 regime_failed [] unavailable []
+- Would fail if enforced: {'IMPULSE_DELTA': 7, 'RESUMPTION_DELTA': 4, 'ROLLING_DELTA': 4, 'SECTOR_AGAINST': 1, 'SESSION_DELTA_AGAINST': 4, 'HVN_NO_SUPPORT': 6, 'HVN_OVERHEAD': 5}; unavailable: {'RESUMPTION_DELTA': 4, 'SPREAD': 1}
+- Quote-classified share of volume 09:45-11:30: {'AAPL': {'quote': 0.426, 'classified': 0.999, 'complete': True}, 'NVDA': {'quote': 0.452, 'classified': 1.0, 'complete': True}, 'AMD': {'quote': 0.244, 'classified': 1.0, 'complete': True}, 'MSFT': {'quote': 0.383, 'classified': 0.998, 'complete': True}, 'AMZN': {'quote': 0.374, 'classified': 1.0, 'complete': True}, 'META': {'quote': 0.381, 'classified': 1.0, 'complete': True}, 'GOOGL': {'quote': 0.299, 'classified': 1.0, 'complete': True}, 'PLTR': {'quote': 0.329, 'classified': 0.997, 'complete': True}, 'COIN': {'quote': 0.284, 'classified': 1.0, 'complete': True}}
+  - 10:13 META LONG age 1 slope 0.10 chase -0.52 feasible True imp 0.1274026045387109 pull -0.2184218121754736 res -0.19482835488185465 roll -0.07679921867782338 vel 0.09970319253668854 book 0.056910569105691054 sess -428453 spread 0.9997375738902177 hvn_support True hvn_overhead False regime_failed ['SECTOR_AGAINST'] unavailable []
+  - 10:28 COIN SHORT age 1 slope 0.88 chase 0.73 feasible False imp -0.3397387623672388 pull -0.05222236905863178 res None roll -0.05408298164754667 vel 0.7621963460130987 book -0.1276595744680851 sess -143050 spread 0.6490636818616816 hvn_support True hvn_overhead False regime_failed [] unavailable []
+  - 10:40 AMD SHORT age 1 slope 0.36 chase 0.95 feasible False imp -0.10990683797113804 pull -0.06573785517873511 res None roll -0.09526644328406443 vel 0.4670532089755021 book 0.024390243902439025 sess -221950 spread None hvn_support False hvn_overhead False regime_failed [] unavailable []
+  - 10:41 AMD SHORT age 2 slope 0.50 chase 1.43 feasible False imp -0.10990683797113804 pull -0.06573785517873511 res None roll -0.10003612399761605 vel 0.37613660211498123 book 0.12698412698412698 sess -225909 spread 0.7401195764273782 hvn_support False hvn_overhead True regime_failed [] unavailable []
+  - 10:42 AMD SHORT age 3 slope 0.63 chase 2.09 feasible False imp -0.10990683797113804 pull -0.06573785517873511 res None roll -0.11174481014028721 vel 0.7231035408231408 book 0.26436781609195403 sess -247918 spread 1.058701981276403 hvn_support False hvn_overhead True regime_failed [] unavailable []
+  - 11:13 AMZN LONG age 1 slope 0.03 chase 0.43 feasible False imp -0.3615231894244879 pull -0.22400601374069823 res -0.05541850969717591 roll -0.3474293083568007 vel -0.019257425826678783 book 0.034482758620689655 sess -2452541 spread 0.999074546255214 hvn_support False hvn_overhead True regime_failed [] unavailable []
+  - 11:14 AMZN LONG age 2 slope 0.09 chase 0.49 feasible False imp -0.3615231894244879 pull -0.22400601374069823 res -0.10793966631216623 roll -0.3456747482760831 vel 0.31420693366239 book 0.1958762886597938 sess -2459374 spread 1.1991551675588887 hvn_support False hvn_overhead True regime_failed [] unavailable []
+  - 11:15 AMZN LONG age 3 slope 0.24 chase 0.74 feasible False imp -0.3615231894244879 pull -0.22400601374069823 res -0.11952399960083825 roll -0.34092313569121685 vel 0.5566908746952561 book -0.046153846153846156 sess -2469099 spread 0.9989547108362665 hvn_support False hvn_overhead True regime_failed [] unavailable []
 
 ## Invariants
 PASS: all invariants held.

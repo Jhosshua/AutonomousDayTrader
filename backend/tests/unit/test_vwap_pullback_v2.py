@@ -53,7 +53,8 @@ class Scenario:
         self.tape = tape
         self.tick_gates = tick_gates
         self.sym = sym
-        self.p = p or V2Params()
+        # bar-only scenarios test the price machine; the add-on gates get their own tests with fakes
+        self.p = p or V2Params(addons_enforced=False)
         self.st = V2SymbolState()
         self.bars: List[BarEvent] = []
         self.events: List[Tuple[int, str, dict]] = []
@@ -488,7 +489,7 @@ def _long_day_bars() -> List[BarEvent]:
     return s.bars
 
 
-def _replay(bars: List[BarEvent], p=V2Params()):
+def _replay(bars: List[BarEvent], p=V2Params(addons_enforced=False)):
     st = V2SymbolState()
     out: List[Tuple[int, str]] = []
     sigs: List[int] = []
@@ -513,7 +514,7 @@ def test_prefix_invariance_appending_bars_never_changes_earlier_events():
 def test_restart_at_every_bar_reproduces_the_uninterrupted_run():
     bars = _long_day_bars()
     full_st, full_ev, full_sigs = _replay(bars)
-    p = V2Params()
+    p = V2Params(addons_enforced=False)
     for r in range(1, len(bars)):
         st = V2SymbolState()
         for b in bars[:r]:  # what after_restore does: replay the stored session bars

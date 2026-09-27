@@ -422,3 +422,8 @@ right. Run the mutation check.
 - **What did not work**: packed columns for a whole symbol with front deletion on every eviction: at 1,000,000 prints each eviction shifted about 38 MB of arrays, on the ingestion path, on every trade. Also the cap was checked before the append, so it lagged by one print.
 - **What worked instead**: one bucket of arrays per exchange second; retention and the cap pop whole seconds from the front (O(1)); the cap is enforced after the append.
 - **Note for next time**: any "rolling" store on a hot path needs O(1) eviction; test it with the cap set tiny so eviction actually runs in the unit tests.
+
+## 2026-09-27: a running session total is not a decision-time measurement
+- **What did not work**: the first session-delta design kept running sums updated as prints arrived, so a query for a bar could include prints from later bars (and a replay that preloads the tape would hand an early candidate the whole day). Codex caught it in the plan review.
+- **What worked instead**: per-minute aggregates keyed by exchange minute, queried over [since, bar end); only minutes that start before the cutoff count, and the feed watermark must have reached the cutoff.
+- **Note for next time**: every measure the strategy reads must take the decision time as an argument. A method with no cutoff parameter is a look-ahead waiting to happen.
