@@ -901,14 +901,17 @@ class VWAPPullbackV2Strategy(Strategy):
                 report["failed"].append({"symbol": key, "error": f"{type(exc).__name__}: {exc}"})
         self.symbol_states = rebuilt
         self.restored_from = "rebuilt_from_session_bars"
+        self.version, self.policy_id = VERSION, POLICY_ID   # a checkpoint never carries the policy identity
         return report
 
     # ----------------------------------------------------------------- ui
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
+        # Identity comes from the code, never from a restored checkpoint's copy of these attributes.
+        self.version, self.policy_id = VERSION, POLICY_ID
         d.update({
-            "version": self.version,
-            "policy_id": self.policy_id,
+            "version": VERSION,
+            "policy_id": POLICY_ID,
             "mode": self.mode,
             "excluded_symbols": list(self.excluded_symbols),
             "first_possible_signal": FIRST_POSSIBLE_SIGNAL,

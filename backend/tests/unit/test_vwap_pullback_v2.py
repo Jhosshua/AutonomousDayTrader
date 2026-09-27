@@ -563,6 +563,10 @@ def test_checkpoint_roundtrip_of_strategy_state():
     fresh = VWAPPullbackV2Strategy(require_tick_layers=False)
     fresh.__dict__.update(decoded)
     fresh.after_restore()
+    assert fresh.policy_id == v2.POLICY_ID and fresh.to_dict()["policy_id"] == v2.POLICY_ID
+    stale = VWAPPullbackV2Strategy(require_tick_layers=False)
+    stale.policy_id = "OLD_POLICY_FROM_CHECKPOINT"
+    assert stale.to_dict()["policy_id"] == v2.POLICY_ID       # identity always comes from the code
     assert isinstance(fresh.symbol_states["AAPL"], V2SymbolState)
     assert len(fresh.symbol_states["AAPL"].bars) == 50
     assert fresh.symbol_states["AAPL"].state == strat.symbol_states["AAPL"].state
