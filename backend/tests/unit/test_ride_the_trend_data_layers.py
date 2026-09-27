@@ -77,7 +77,14 @@ def test_book_imbalance_is_quote_weighted_over_the_window():
     tape.on_quote("AAPL", 100.0, 100.1, 900, 100, T0_NS)             # bid-heavy
     tape.on_quote("AAPL", 100.0, 100.1, 100, 900, T0_NS + 10 * NS)   # ask-heavy
     b = tape.book_imbalance("AAPL", T0_NS + 12 * NS, 30)
-    assert b["quotes"] == 2 and b["imbalance"] == pytest.approx(0.0)
+    assert b["quotes"] == 2 and b["seconds"] == 2 and b["imbalance"] == pytest.approx(0.0)
+    # time-weighted: 50 identical bid-heavy updates inside one second do not outweigh one quiet ask-heavy second
+    burst = TickTape()
+    for k in range(50):
+        burst.on_quote("AAPL", 100.0, 100.1, 900, 100, T0_NS + k * 1_000_000)
+    burst.on_quote("AAPL", 100.0, 100.1, 100, 900, T0_NS + 1 * NS)
+    bb = burst.book_imbalance("AAPL", T0_NS + 2 * NS, 30)
+    assert bb["quotes"] == 51 and bb["imbalance"] == pytest.approx(0.0)
     only_first = tape.book_imbalance("AAPL", T0_NS + 5 * NS, 30)     # [t-30, t): the 10 s quote is later
     assert only_first["imbalance"] == pytest.approx(0.8)
     assert tape.book_imbalance("AAPL", T0_NS + 30 * NS, 30) is None   # newest quote is 20 s old: stale
@@ -112,6 +119,15 @@ def test_tape_never_uses_a_later_quote_or_partial_second_data():
     for k in range(6):
         tape3.on_trade("AAPL", 100.0 + 0.05 * k, 10, T0_NS + k * 100_000_000)   # a 0.5 s burst
     assert tape3.velocity("AAPL", T0_NS + 60 * NS, 60) is None
+
+
+def test_late_second_is_kept_in_order_and_trimmed():
+    tape = TickTape(keep_seconds=60)
+    tape.on_trade("AAPL", 100.0, 1, T0_NS + 100 * NS)
+    tape.on_trade("AAPL", 100.0, 1, T0_NS + 50 * NS)    # a late second, still inside retention
+    assert list(tape._buckets["AAPL"].keys()) == sorted(tape._buckets["AAPL"].keys())
+    tape.on_trade("AAPL", 100.0, 1, T0_NS + 200 * NS)   # watermark 200: cutoff 140 evicts 50 AND 100
+    assert list(tape._buckets["AAPL"].keys()) == [T0_NS // NS + 200]
 
 
 def test_tape_trims_old_seconds_and_rejects_bad_input():

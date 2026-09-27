@@ -82,9 +82,10 @@ class TickTape:
         b = series.get(sec)
         if b is None:
             b = SecondBucket()
+            late = bool(series) and sec < next(reversed(series))
             series[sec] = b
-            if len(series) > 1 and next(reversed(series)) != sec:
-                # a late second: keep the dict ordered by second
+            if late:
+                # a late second: keep the dict ordered by second so head trimming stays correct
                 series = OrderedDict(sorted(series.items()))
                 self._buckets[symbol] = series
         wm = max(self._watermark.get(symbol, 0), ts_ns)
@@ -243,15 +244,17 @@ class TickTape:
 
     def book_imbalance(self, symbol: str, t1_ns: int, window_s: int = 30,
                        max_last_age_s: float = 5.0) -> Optional[Dict[str, Any]]:
-        """Top-of-book imbalance (bid size - ask size) / (bid + ask), quote-weighted over
-        [t1 - window, t1). Unavailable without quotes, or when the newest quote in the
-        window is older than `max_last_age_s`. Quote details are as of the query cutoff."""
+        """Top-of-book imbalance (bid size - ask size) / (bid + ask), TIME-weighted at one-second
+        resolution over [t1 - window, t1): each second contributes the book as it stood at the
+        end of that second, so a burst of repeated quote updates cannot outweigh a longer, quieter
+        state. Unavailable without quotes, or when the newest quote in the window is older than
+        `max_last_age_s`. Quote details are as of the query cutoff."""
         t0_ns = t1_ns - int(window_s) * NS
         buckets = [b for b in self._seconds(symbol, t0_ns, t1_ns) if b.quote_n > 0 and b.last_quote_ns < t1_ns]
         if not buckets:
             return None
-        bid = sum(b.bid_size_sum for b in buckets)
-        ask = sum(b.ask_size_sum for b in buckets)
+        bid = float(sum(b.last_bid_size for b in buckets))
+        ask = float(sum(b.last_ask_size for b in buckets))
         n = sum(b.quote_n for b in buckets)
         if n == 0 or bid + ask <= 0:
             return None
@@ -262,7 +265,7 @@ class TickTape:
         if not math.isfinite(imb):
             return None
         return {
-            "imbalance": imb, "quotes": n,
+            "imbalance": imb, "quotes": n, "seconds": len(buckets),
             "bid": newest.last_bid, "ask": newest.last_ask,
             "bid_size": newest.last_bid_size, "ask_size": newest.last_ask_size,
             "spread": newest.last_ask - newest.last_bid, "quote_ts_ns": newest.last_quote_ns,
