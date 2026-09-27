@@ -12,9 +12,9 @@
   "PLTR",
   "COIN"
  ],
- "elapsed_s": 13.7,
+ "elapsed_s": 31.6,
  "events_replayed": {
-  "bars": 4290,
+  "bars": 6786,
   "trades": 2804461,
   "quotes": 1948463
  },
@@ -32,6 +32,7 @@
   "PULLBACK": 4,
   "PVR_NOT_THIN": 3,
   "RESUMING": 4,
+  "RESUMPTION_MEASURED": 8,
   "RESUMPTION_TOO_OLD": 1,
   "SLOPE_TOO_SLOW": 6,
   "TOUCH_TOO_EARLY": 7,
@@ -73,6 +74,7 @@
    "PVR_NOT_THIN": 3,
    "NEW_EXTREME": 3,
    "RESUMING": 4,
+   "RESUMPTION_MEASURED": 8,
    "SLOPE_TOO_SLOW": 6,
    "CHASED": 2,
    "HIGH_VOLUME_PULLBACK": 1,
@@ -94,7 +96,8 @@
    },
    "layer3_timestamps": {
     "source": "exchange_nanoseconds",
-    "velocity_window_s": 60
+    "velocity_window_s": 60,
+    "raw_prints": 1117967
    },
    "layer4_macro": {
     "calendar_loaded": true,
@@ -104,6 +107,301 @@
   }
  },
  "failures": [],
+ "regime": {
+  "symbols": [
+   "XLK",
+   "XLC",
+   "XLY",
+   "XLF",
+   "UUP",
+   "SHY",
+   "IEF"
+  ],
+  "sector_map": {
+   "AAPL": "XLK",
+   "NVDA": "XLK",
+   "AMD": "XLK",
+   "MSFT": "XLK",
+   "PLTR": "XLK",
+   "META": "XLC",
+   "GOOGL": "XLC",
+   "AMZN": "XLY",
+   "COIN": "XLF"
+  },
+  "bars_seen": 2496,
+  "per_symbol": {
+   "XLK": {
+    "bars": 390,
+    "session": "2026-09-25",
+    "last_bar": "2026-09-25T19:59:00+00:00",
+    "last_bar_age_s": 175202.935994
+   },
+   "XLC": {
+    "bars": 390,
+    "session": "2026-09-25",
+    "last_bar": "2026-09-25T19:59:00+00:00",
+    "last_bar_age_s": 175202.935994
+   },
+   "XLY": {
+    "bars": 390,
+    "session": "2026-09-25",
+    "last_bar": "2026-09-25T19:59:00+00:00",
+    "last_bar_age_s": 175202.935994
+   },
+   "XLF": {
+    "bars": 390,
+    "session": "2026-09-25",
+    "last_bar": "2026-09-25T19:59:00+00:00",
+    "last_bar_age_s": 175202.935994
+   },
+   "UUP": {
+    "bars": 156,
+    "session": "2026-09-25",
+    "last_bar": "2026-09-25T19:59:00+00:00",
+    "last_bar_age_s": 175202.935994
+   },
+   "SHY": {
+    "bars": 390,
+    "session": "2026-09-25",
+    "last_bar": "2026-09-25T19:59:00+00:00",
+    "last_bar_age_s": 175202.935994
+   },
+   "IEF": {
+    "bars": 390,
+    "session": "2026-09-25",
+    "last_bar": "2026-09-25T19:59:00+00:00",
+    "last_bar_age_s": 175202.935994
+   }
+  }
+ },
+ "diagnostics": {
+  "resumption_evaluations": 8,
+  "impulses_pre_empting_a_setup": 1,
+  "feasible_price_interval": {
+   "True": 1,
+   "False": 7
+  },
+  "would_fail_if_enforced": {
+   "IMPULSE_DELTA": 7,
+   "RESUMPTION_DELTA": 4,
+   "ROLLING_DELTA": 4,
+   "SECTOR_AGAINST": 1
+  },
+  "unavailable": {
+   "RESUMPTION_DELTA": 4
+  },
+  "quote_classified_share_0945_1130": {
+   "AAPL": {
+    "quote": 0.411,
+    "classified": 1.0,
+    "complete": true
+   },
+   "NVDA": {
+    "quote": 0.439,
+    "classified": 1.0,
+    "complete": true
+   },
+   "AMD": {
+    "quote": 0.244,
+    "classified": 1.0,
+    "complete": true
+   },
+   "MSFT": {
+    "quote": 0.38,
+    "classified": 1.0,
+    "complete": true
+   },
+   "AMZN": {
+    "quote": 0.37,
+    "classified": 1.0,
+    "complete": true
+   },
+   "META": {
+    "quote": 0.38,
+    "classified": 1.0,
+    "complete": true
+   },
+   "GOOGL": {
+    "quote": 0.297,
+    "classified": 1.0,
+    "complete": true
+   },
+   "PLTR": {
+    "quote": 0.33,
+    "classified": 1.0,
+    "complete": true
+   },
+   "COIN": {
+    "quote": 0.283,
+    "classified": 1.0,
+    "complete": true
+   }
+  },
+  "rows": [
+   {
+    "symbol": "META",
+    "side": "LONG",
+    "time_et": "10:13",
+    "age": 1,
+    "slope": 0.10215574158659756,
+    "chase_std": -0.5246274543928549,
+    "feasible_price_interval": true,
+    "impulse_delta": 0.1274026045387109,
+    "pullback_delta": -0.21774237266857452,
+    "resumption_delta": -0.19482835488185465,
+    "rolling_delta": -0.0747857935534589,
+    "tick_velocity_atr_per_min": 0.09970319253668854,
+    "book_imbalance": 0.056910569105691054,
+    "regime_failed": [
+     "SECTOR_AGAINST"
+    ],
+    "regime_unavailable": [],
+    "sector_rs_30m": 0.004735906255959543,
+    "dollar_30m": 0.0006991784653032074,
+    "ief_30m": -0.0013919821826280376
+   },
+   {
+    "symbol": "COIN",
+    "side": "SHORT",
+    "time_et": "10:28",
+    "age": 1,
+    "slope": 0.8766396325762934,
+    "chase_std": 0.7270986098114255,
+    "feasible_price_interval": false,
+    "impulse_delta": -0.3397387623672388,
+    "pullback_delta": -0.05222236905863178,
+    "resumption_delta": null,
+    "rolling_delta": -0.053455789465815855,
+    "tick_velocity_atr_per_min": 0.7621963460130987,
+    "book_imbalance": -0.1276595744680851,
+    "regime_failed": [],
+    "regime_unavailable": [],
+    "sector_rs_30m": -0.004543901648788151,
+    "dollar_30m": 0.00034946706272931394,
+    "ief_30m": -0.0014484679665737188
+   },
+   {
+    "symbol": "AMD",
+    "side": "SHORT",
+    "time_et": "10:40",
+    "age": 1,
+    "slope": 0.35982528713981626,
+    "chase_std": 0.9453074131295814,
+    "feasible_price_interval": false,
+    "impulse_delta": -0.10787716413972274,
+    "pullback_delta": -0.06573785517873511,
+    "resumption_delta": null,
+    "rolling_delta": -0.09511646520781891,
+    "tick_velocity_atr_per_min": 0.4670532089755021,
+    "book_imbalance": 0.024390243902439025,
+    "regime_failed": [],
+    "regime_unavailable": [],
+    "sector_rs_30m": -0.004704712702513936,
+    "dollar_30m": -3.144104803498582e-05,
+    "ief_30m": -0.0008363068688671538
+   },
+   {
+    "symbol": "AMD",
+    "side": "SHORT",
+    "time_et": "10:41",
+    "age": 2,
+    "slope": 0.496882733927375,
+    "chase_std": 1.4256584961258332,
+    "feasible_price_interval": false,
+    "impulse_delta": -0.10787716413972274,
+    "pullback_delta": -0.06573785517873511,
+    "resumption_delta": null,
+    "rolling_delta": -0.09988447130239808,
+    "tick_velocity_atr_per_min": 0.37613660211498123,
+    "book_imbalance": 0.12698412698412698,
+    "regime_failed": [],
+    "regime_unavailable": [],
+    "sector_rs_30m": -0.004860109605656859,
+    "dollar_30m": -3.144104803498582e-05,
+    "ief_30m": -0.0010035682426405845
+   },
+   {
+    "symbol": "AMD",
+    "side": "SHORT",
+    "time_et": "10:42",
+    "age": 3,
+    "slope": 0.6274808059047854,
+    "chase_std": 2.0879257490895293,
+    "feasible_price_interval": false,
+    "impulse_delta": -0.10787716413972274,
+    "pullback_delta": -0.06573785517873511,
+    "resumption_delta": null,
+    "rolling_delta": -0.11159246413155746,
+    "tick_velocity_atr_per_min": 0.7231035408231408,
+    "book_imbalance": 0.26436781609195403,
+    "regime_failed": [],
+    "regime_unavailable": [],
+    "sector_rs_30m": -0.007614861108112159,
+    "dollar_30m": 0.0003493449781659663,
+    "ief_30m": -0.0010604950538108948
+   },
+   {
+    "symbol": "AMZN",
+    "side": "LONG",
+    "time_et": "11:13",
+    "age": 1,
+    "slope": 0.03069404237953584,
+    "chase_std": 0.4323719586781591,
+    "feasible_price_interval": false,
+    "impulse_delta": -0.3615231894244879,
+    "pullback_delta": -0.22422744992919869,
+    "resumption_delta": -0.05541850969717591,
+    "rolling_delta": -0.3470717169190457,
+    "tick_velocity_atr_per_min": -0.019257425826678783,
+    "book_imbalance": 0.034482758620689655,
+    "regime_failed": [],
+    "regime_unavailable": [],
+    "sector_rs_30m": 0.0009154797117707503,
+    "dollar_30m": 0.0,
+    "ief_30m": 0.0006709094339243382
+   },
+   {
+    "symbol": "AMZN",
+    "side": "LONG",
+    "time_et": "11:14",
+    "age": 2,
+    "slope": 0.08827783372162902,
+    "chase_std": 0.49463441546921166,
+    "feasible_price_interval": false,
+    "impulse_delta": -0.3615231894244879,
+    "pullback_delta": -0.22422744992919869,
+    "resumption_delta": -0.10793966631216623,
+    "rolling_delta": -0.34531766901936023,
+    "tick_velocity_atr_per_min": 0.31420693366239,
+    "book_imbalance": 0.1958762886597938,
+    "regime_failed": [],
+    "regime_unavailable": [],
+    "sector_rs_30m": 0.00010825240996803487,
+    "dollar_30m": -8.0328859365153e-05,
+    "ief_30m": 0.0008251414687741043
+   },
+   {
+    "symbol": "AMZN",
+    "side": "LONG",
+    "time_et": "11:15",
+    "age": 3,
+    "slope": 0.2420336429903165,
+    "chase_std": 0.7410544003252629,
+    "feasible_price_interval": false,
+    "impulse_delta": -0.3615231894244879,
+    "pullback_delta": -0.22422744992919869,
+    "resumption_delta": -0.11882619860879104,
+    "rolling_delta": -0.34052343964746745,
+    "tick_velocity_atr_per_min": 0.5566908746952561,
+    "book_imbalance": -0.046153846153846156,
+    "regime_failed": [],
+    "regime_unavailable": [],
+    "sector_rs_30m": 0.0004214918892786468,
+    "dollar_30m": 0.0001711485464599427,
+    "ief_30m": 0.0009490844126842646
+   }
+  ]
+ },
  "setup_events": [
   {
    "symbol": "NVDA",
@@ -115,10 +413,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 279378.4666666667,
-    "impulse_price": 224.08
+    "impulse_price": 224.08,
+    "impulse_delta": -0.12695178643199154,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -130,10 +430,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 92206.86666666667,
-    "impulse_price": 247.62
+    "impulse_price": 247.62,
+    "impulse_delta": -0.2978231538058284,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -145,10 +447,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 61403.26666666667,
-    "impulse_price": 342
+    "impulse_price": 342,
+    "impulse_delta": -0.2084593339262773,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -160,10 +464,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 28105.366666666665,
-    "impulse_price": 193.07
+    "impulse_price": 193.07,
+    "impulse_delta": -0.29506920197935244,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -175,10 +481,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 269983.0333333333,
-    "impulse_price": 224.04
+    "impulse_price": 224.04,
+    "impulse_delta": -0.17775434763277906,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -190,10 +498,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 90450.9,
-    "impulse_price": 247.52
+    "impulse_price": 247.52,
+    "impulse_delta": 0.034079896629697425,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -205,10 +515,12 @@
    "side": "LONG",
    "detail": {
     "ref": 122654.76666666666,
-    "impulse_price": 761.33
+    "impulse_price": 761.33,
+    "impulse_delta": 0.1274026045387109,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -220,10 +532,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 55967.0,
-    "impulse_price": 341.77
+    "impulse_price": 341.77,
+    "impulse_delta": -0.2185101708938404,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -235,10 +549,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 64120.13333333333,
-    "impulse_price": 190.985
+    "impulse_price": 190.985,
+    "impulse_delta": -0.2887487266185491,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -250,10 +566,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 28417.3,
-    "impulse_price": 192.92
+    "impulse_price": 192.92,
+    "impulse_delta": 0.09124495427489794,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -265,10 +583,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 203160.63333333333,
-    "impulse_price": 509.06
+    "impulse_price": 509.06,
+    "impulse_delta": -0.01149267447633333,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -280,10 +600,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 90970.63333333333,
-    "impulse_price": 247.51
+    "impulse_price": 247.51,
+    "impulse_delta": -0.012703001968503937,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -297,7 +619,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -310,11 +632,11 @@
    "detail": {
     "pvr": 0.5342800918458666,
     "leg_bars": 3,
-    "delta_ratio": -0.25074772630165415,
+    "delta_ratio": -0.2764872964169381,
     "ext_i": 39
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -329,7 +651,7 @@
     "leg_bars": 4
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -341,10 +663,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 89635.53333333334,
-    "impulse_price": 247.2984
+    "impulse_price": 247.2984,
+    "impulse_delta": -0.08388829152087257,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -356,7 +680,7 @@
    "side": "LONG",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -368,10 +692,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 53479.7,
-    "impulse_price": 334.74
+    "impulse_price": 334.74,
+    "impulse_delta": 0.02283576312733841,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -383,7 +709,7 @@
    "side": "LONG",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -397,7 +723,45 @@
     "age": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "META",
+   "i": 42,
+   "bar_ts": "2026-09-25T14:12:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 1,
+    "up_close": true,
+    "slope": 0.10215574158659756,
+    "chase_std": -0.5246274543928549,
+    "advance_atr": 0.10215574158659756,
+    "vwap": 757.4547162485034,
+    "std": 3.3637512366667703,
+    "atr": 1.9577949990261214,
+    "ext_close": 755.49,
+    "impulse_delta": 0.1274026045387109,
+    "pullback_delta": -0.21774237266857452,
+    "resumption_delta": -0.19482835488185465,
+    "rolling_delta": -0.0747857935534589,
+    "rolling_signed": -215378,
+    "tick_velocity_atr_per_min": 0.09970319253668854,
+    "book_imbalance": 0.056910569105691054,
+    "regime": {
+     "failed": [
+      "SECTOR_AGAINST"
+     ],
+     "unavailable": [],
+     "sector_rs_30m": 0.004735906255959543,
+     "dollar_30m": 0.0006991784653032074,
+     "ief_30m": -0.0013919821826280376
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -412,7 +776,7 @@
     "slope": 0.10215574158659756
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -424,7 +788,7 @@
    "side": "LONG",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -436,10 +800,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 47574.433333333334,
-    "impulse_price": 341.68
+    "impulse_price": 341.68,
+    "impulse_delta": -0.34163403581327817,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -451,10 +817,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 228338.76666666666,
-    "impulse_price": 224.03
+    "impulse_price": 224.03,
+    "impulse_delta": -0.20949892289454564,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -466,10 +834,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 94252.83333333333,
-    "impulse_price": 752.33
+    "impulse_price": 752.33,
+    "impulse_delta": -0.11742732574346852,
+    "pre_empted": true
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -481,10 +851,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 47495.333333333336,
-    "impulse_price": 341.65
+    "impulse_price": 341.65,
+    "impulse_delta": -0.37683026824411386,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -496,10 +868,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 46353.03333333333,
-    "impulse_price": 334.62
+    "impulse_price": 334.62,
+    "impulse_delta": -0.03885113142202432,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -511,10 +885,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 233573.26666666666,
-    "impulse_price": 223.64
+    "impulse_price": 223.64,
+    "impulse_delta": -0.27020514290841996,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -526,10 +902,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 69615.86666666667,
-    "impulse_price": 630.6111
+    "impulse_price": 630.6111,
+    "impulse_delta": -0.025877026290133352,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -541,10 +919,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 91468.36666666667,
-    "impulse_price": 247.18
+    "impulse_price": 247.18,
+    "impulse_delta": -0.3132350593369166,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -556,10 +936,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 93403.0,
-    "impulse_price": 751.74
+    "impulse_price": 751.74,
+    "impulse_delta": -0.14661269160613138,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -571,10 +953,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 45729.6,
-    "impulse_price": 341.11
+    "impulse_price": 341.11,
+    "impulse_delta": -0.2556019542018068,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -589,7 +973,7 @@
     "leg_bars": 2
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -601,10 +985,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 240678.0,
-    "impulse_price": 223.5801
+    "impulse_price": 223.5801,
+    "impulse_delta": -0.18684332009971377,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -616,10 +1002,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 70085.13333333333,
-    "impulse_price": 629.98
+    "impulse_price": 629.98,
+    "impulse_delta": -0.3224905628604707,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -631,10 +1019,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 51172.8,
-    "impulse_price": 190.8401
+    "impulse_price": 190.8401,
+    "impulse_delta": -0.30828860220211185,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -646,10 +1036,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 29100.0,
-    "impulse_price": 192.78
+    "impulse_price": 192.78,
+    "impulse_delta": -0.3397387623672388,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -661,10 +1053,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 93734.7,
-    "impulse_price": 751.6
+    "impulse_price": 751.6,
+    "impulse_delta": -0.08897006595636732,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -676,10 +1070,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 240694.86666666667,
-    "impulse_price": 223.45
+    "impulse_price": 223.45,
+    "impulse_delta": -0.2788848933841658,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -691,10 +1087,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 92592.73333333334,
-    "impulse_price": 750.54
+    "impulse_price": 750.54,
+    "impulse_delta": -0.32745363086400603,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -706,10 +1104,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 71623.6,
-    "impulse_price": 629.7072
+    "impulse_price": 629.7072,
+    "impulse_delta": -0.2036769286831,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -721,10 +1121,12 @@
    "side": "LONG",
    "detail": {
     "ref": 46647.566666666666,
-    "impulse_price": 336.25
+    "impulse_price": 336.25,
+    "impulse_delta": -0.05274928799818287,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -737,11 +1139,11 @@
    "detail": {
     "pvr": 0.7070599465444827,
     "leg_bars": 9,
-    "delta_ratio": -0.03244968381943957,
+    "delta_ratio": -0.05222236905863178,
     "ext_i": 56
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -755,7 +1157,43 @@
     "age": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "COIN",
+   "i": 57,
+   "bar_ts": "2026-09-25T14:27:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 1,
+    "up_close": true,
+    "slope": 0.8766396325762934,
+    "chase_std": 0.7270986098114255,
+    "advance_atr": 0.8766396325762934,
+    "vwap": 195.405448542733,
+    "std": 1.7679150054576385,
+    "atr": 0.5703597937165877,
+    "ext_close": 194.62,
+    "impulse_delta": -0.3397387623672388,
+    "pullback_delta": -0.05222236905863178,
+    "resumption_delta": null,
+    "rolling_delta": -0.053455789465815855,
+    "rolling_signed": -42908,
+    "tick_velocity_atr_per_min": 0.7621963460130987,
+    "book_imbalance": -0.1276595744680851,
+    "regime": {
+     "failed": [],
+     "unavailable": [],
+     "sector_rs_30m": -0.004543901648788151,
+     "dollar_30m": 0.00034946706272931394,
+     "ief_30m": -0.0014484679665737188
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -770,7 +1208,7 @@
     "chase_std": 0.7270986098114255
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -782,10 +1220,12 @@
    "side": "LONG",
    "detail": {
     "ref": 46692.4,
-    "impulse_price": 336.4
+    "impulse_price": 336.4,
+    "impulse_delta": -0.07253224189317255,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -797,10 +1237,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 232502.86666666667,
-    "impulse_price": 223.25
+    "impulse_price": 223.25,
+    "impulse_delta": -0.29548283282080634,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -812,10 +1254,12 @@
    "side": "LONG",
    "detail": {
     "ref": 48148.666666666664,
-    "impulse_price": 336.505
+    "impulse_price": 336.505,
+    "impulse_delta": 0.0165097454668956,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -827,10 +1271,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 237699.96666666667,
-    "impulse_price": 223.213
+    "impulse_price": 223.213,
+    "impulse_delta": -0.27704597642732065,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -842,10 +1288,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 62359.833333333336,
-    "impulse_price": 629.62
+    "impulse_price": 629.62,
+    "impulse_delta": -0.11336777526638682,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -857,10 +1305,12 @@
    "side": "LONG",
    "detail": {
     "ref": 48888.96666666667,
-    "impulse_price": 336.589
+    "impulse_price": 336.589,
+    "impulse_delta": -0.15452895468209404,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -872,10 +1322,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 237568.03333333333,
-    "impulse_price": 223.1329
+    "impulse_price": 223.1329,
+    "impulse_delta": -0.2110574114398003,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -887,10 +1339,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 62500.433333333334,
-    "impulse_price": 629
+    "impulse_price": 629,
+    "impulse_delta": -0.10787716413972274,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -902,10 +1356,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 76581.93333333333,
-    "impulse_price": 750.48
+    "impulse_price": 750.48,
+    "impulse_delta": 0.11105231066576166,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -917,10 +1373,12 @@
    "side": "LONG",
    "detail": {
     "ref": 50656.6,
-    "impulse_price": 336.99
+    "impulse_price": 336.99,
+    "impulse_delta": 0.13650234741784037,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -932,10 +1390,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 77366.86666666667,
-    "impulse_price": 750.38
+    "impulse_price": 750.38,
+    "impulse_delta": -0.14818485729164918,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -950,7 +1410,7 @@
     "leg_bars": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -964,7 +1424,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -976,10 +1436,12 @@
    "side": "LONG",
    "detail": {
     "ref": 53461.6,
-    "impulse_price": 337
+    "impulse_price": 337,
+    "impulse_delta": -0.1353291612636485,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -991,10 +1453,12 @@
    "side": "LONG",
    "detail": {
     "ref": 53051.833333333336,
-    "impulse_price": 337.19
+    "impulse_price": 337.19,
+    "impulse_delta": 0.050431015621581414,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1006,10 +1470,12 @@
    "side": "LONG",
    "detail": {
     "ref": 105179.4,
-    "impulse_price": 514.53
+    "impulse_price": 514.53,
+    "impulse_delta": -0.11836403033586132,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1023,7 +1489,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1035,10 +1501,12 @@
    "side": "LONG",
    "detail": {
     "ref": 54558.6,
-    "impulse_price": 337.3499
+    "impulse_price": 337.3499,
+    "impulse_delta": -0.10464208242950108,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1051,11 +1519,11 @@
    "detail": {
     "pvr": 0.7221069933915125,
     "leg_bars": 8,
-    "delta_ratio": -0.07163431711424266,
+    "delta_ratio": -0.06573785517873511,
     "ext_i": 68
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1067,10 +1535,12 @@
    "side": "LONG",
    "detail": {
     "ref": 101369.46666666666,
-    "impulse_price": 514.74
+    "impulse_price": 514.74,
+    "impulse_delta": 0.000722761959189162,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1084,7 +1554,43 @@
     "age": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "AMD",
+   "i": 69,
+   "bar_ts": "2026-09-25T14:39:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 1,
+    "up_close": true,
+    "slope": 0.35982528713981626,
+    "chase_std": 0.9453074131295814,
+    "advance_atr": 0.35982528713981626,
+    "vwap": 633.9786270772587,
+    "std": 1.7757472901872131,
+    "atr": 1.4104067116407308,
+    "ext_close": 632.8075,
+    "impulse_delta": -0.10787716413972274,
+    "pullback_delta": -0.06573785517873511,
+    "resumption_delta": null,
+    "rolling_delta": -0.09511646520781891,
+    "rolling_signed": -167798,
+    "tick_velocity_atr_per_min": 0.4670532089755021,
+    "book_imbalance": 0.024390243902439025,
+    "regime": {
+     "failed": [],
+     "unavailable": [],
+     "sector_rs_30m": -0.004704712702513936,
+     "dollar_30m": -3.144104803498582e-05,
+     "ief_30m": -0.0008363068688671538
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1099,7 +1605,7 @@
     "slope": 0.35982528713981626
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1111,10 +1617,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 68503.96666666666,
-    "impulse_price": 750.3
+    "impulse_price": 750.3,
+    "impulse_delta": -0.1306386939710726,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1126,10 +1634,48 @@
    "side": "LONG",
    "detail": {
     "ref": 56317.76666666667,
-    "impulse_price": 337.43
+    "impulse_price": 337.43,
+    "impulse_delta": -0.0067155923277084405,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "AMD",
+   "i": 70,
+   "bar_ts": "2026-09-25T14:40:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 2,
+    "up_close": true,
+    "slope": 0.496882733927375,
+    "chase_std": 1.4256584961258332,
+    "advance_atr": 0.99376546785475,
+    "vwap": 633.9658925333223,
+    "std": 1.7787517418887626,
+    "atr": 1.386141946523535,
+    "ext_close": 632.8075,
+    "impulse_delta": -0.10787716413972274,
+    "pullback_delta": -0.06573785517873511,
+    "resumption_delta": null,
+    "rolling_delta": -0.09988447130239808,
+    "rolling_signed": -175338,
+    "tick_velocity_atr_per_min": 0.37613660211498123,
+    "book_imbalance": 0.12698412698412698,
+    "regime": {
+     "failed": [],
+     "unavailable": [],
+     "sector_rs_30m": -0.004860109605656859,
+     "dollar_30m": -3.144104803498582e-05,
+     "ief_30m": -0.0010035682426405845
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1144,7 +1690,7 @@
     "slope": 0.496882733927375
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1156,10 +1702,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 68156.73333333334,
-    "impulse_price": 750.05
+    "impulse_price": 750.05,
+    "impulse_delta": -0.24040347436256654,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1171,10 +1719,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 52579.3,
-    "impulse_price": 190.69
+    "impulse_price": 190.69,
+    "impulse_delta": -0.21828577135295732,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1186,10 +1736,48 @@
    "side": "LONG",
    "detail": {
     "ref": 57135.6,
-    "impulse_price": 337.47
+    "impulse_price": 337.47,
+    "impulse_delta": -0.22972444944592926,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "AMD",
+   "i": 71,
+   "bar_ts": "2026-09-25T14:41:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 3,
+    "up_close": true,
+    "slope": 0.6274808059047854,
+    "chase_std": 2.0879257490895293,
+    "advance_atr": 1.8824424177143562,
+    "vwap": 633.9281678331737,
+    "std": 1.8047422590659103,
+    "atr": 1.406417521771851,
+    "ext_close": 632.8075,
+    "impulse_delta": -0.10787716413972274,
+    "pullback_delta": -0.06573785517873511,
+    "resumption_delta": null,
+    "rolling_delta": -0.11159246413155746,
+    "rolling_signed": -197932,
+    "tick_velocity_atr_per_min": 0.7231035408231408,
+    "book_imbalance": 0.26436781609195403,
+    "regime": {
+     "failed": [],
+     "unavailable": [],
+     "sector_rs_30m": -0.007614861108112159,
+     "dollar_30m": 0.0003493449781659663,
+     "ief_30m": -0.0010604950538108948
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1204,7 +1792,7 @@
     "chase_std": 2.0879257490895293
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1216,10 +1804,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 67515.6,
-    "impulse_price": 749.1905
+    "impulse_price": 749.1905,
+    "impulse_delta": -0.35447980582231536,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1231,10 +1821,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 54096.833333333336,
-    "impulse_price": 190.61
+    "impulse_price": 190.61,
+    "impulse_delta": -0.2953485016114291,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1246,10 +1838,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 68861.4,
-    "impulse_price": 748.88
+    "impulse_price": 748.88,
+    "impulse_delta": -0.2685618422259794,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1261,10 +1855,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 52373.433333333334,
-    "impulse_price": 190.39
+    "impulse_price": 190.39,
+    "impulse_delta": -0.3665919723237803,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1276,10 +1872,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 68141.3,
-    "impulse_price": 748.41
+    "impulse_price": 748.41,
+    "impulse_delta": 0.07874968169085816,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1291,10 +1889,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 53869.6,
-    "impulse_price": 190.32
+    "impulse_price": 190.32,
+    "impulse_delta": -0.16810383952074068,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1306,10 +1906,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 66357.2,
-    "impulse_price": 748
+    "impulse_price": 748,
+    "impulse_delta": -0.13348427506651903,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1321,10 +1923,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 65055.13333333333,
-    "impulse_price": 747.49
+    "impulse_price": 747.49,
+    "impulse_delta": -0.06316026606276899,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1336,10 +1940,12 @@
    "side": "LONG",
    "detail": {
     "ref": 59066.066666666666,
-    "impulse_price": 337.6
+    "impulse_price": 337.6,
+    "impulse_delta": -0.07364745857817541,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1351,10 +1957,12 @@
    "side": "LONG",
    "detail": {
     "ref": 91458.9,
-    "impulse_price": 515.3
+    "impulse_price": 515.3,
+    "impulse_delta": 0.3118456214132387,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1368,7 +1976,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1380,10 +1988,12 @@
    "side": "LONG",
    "detail": {
     "ref": 60996.4,
-    "impulse_price": 337.63
+    "impulse_price": 337.63,
+    "impulse_delta": -0.3421425200566305,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1395,10 +2005,12 @@
    "side": "LONG",
    "detail": {
     "ref": 93319.53333333334,
-    "impulse_price": 515.49
+    "impulse_price": 515.49,
+    "impulse_delta": -0.260091667126843,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1410,10 +2022,12 @@
    "side": "LONG",
    "detail": {
     "ref": 61548.2,
-    "impulse_price": 337.7295
+    "impulse_price": 337.7295,
+    "impulse_delta": -0.1715867704971427,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1425,10 +2039,12 @@
    "side": "LONG",
    "detail": {
     "ref": 93849.53333333334,
-    "impulse_price": 516.165
+    "impulse_price": 516.165,
+    "impulse_delta": 0.3739339615228862,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1440,10 +2056,12 @@
    "side": "LONG",
    "detail": {
     "ref": 31660.166666666668,
-    "impulse_price": 343.66
+    "impulse_price": 343.66,
+    "impulse_delta": -0.10208645387228117,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1455,10 +2073,12 @@
    "side": "LONG",
    "detail": {
     "ref": 94215.8,
-    "impulse_price": 516.91
+    "impulse_price": 516.91,
+    "impulse_delta": 0.1257978201876182,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1470,10 +2090,12 @@
    "side": "LONG",
    "detail": {
     "ref": 77464.06666666667,
-    "impulse_price": 248.5791
+    "impulse_price": 248.5791,
+    "impulse_delta": -0.10902783821755835,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1485,10 +2107,12 @@
    "side": "LONG",
    "detail": {
     "ref": 32505.1,
-    "impulse_price": 343.92
+    "impulse_price": 343.92,
+    "impulse_delta": 0.19168082444971343,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1500,10 +2124,12 @@
    "side": "LONG",
    "detail": {
     "ref": 95279.53333333334,
-    "impulse_price": 517.18
+    "impulse_price": 517.18,
+    "impulse_delta": 0.1968016911498449,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1517,7 +2143,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1531,7 +2157,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1543,10 +2169,12 @@
    "side": "LONG",
    "detail": {
     "ref": 71062.2,
-    "impulse_price": 249.199
+    "impulse_price": 249.199,
+    "impulse_delta": 0.0876677038178535,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1558,10 +2186,12 @@
    "side": "LONG",
    "detail": {
     "ref": 59213.76666666667,
-    "impulse_price": 337.73
+    "impulse_price": 337.73,
+    "impulse_delta": -0.21382217167324546,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1573,10 +2203,12 @@
    "side": "LONG",
    "detail": {
     "ref": 37421.1,
-    "impulse_price": 634.5
+    "impulse_price": 634.5,
+    "impulse_delta": 0.01898762858567091,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1591,7 +2223,7 @@
     "leg_bars": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1603,10 +2235,12 @@
    "side": "LONG",
    "detail": {
     "ref": 36944.566666666666,
-    "impulse_price": 634.66
+    "impulse_price": 634.66,
+    "impulse_delta": 0.13728652055999413,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1620,7 +2254,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1632,10 +2266,12 @@
    "side": "LONG",
    "detail": {
     "ref": 54843.53333333333,
-    "impulse_price": 337.76
+    "impulse_price": 337.76,
+    "impulse_delta": 0.001479166085233457,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1647,10 +2283,12 @@
    "side": "LONG",
    "detail": {
     "ref": 97406.73333333334,
-    "impulse_price": 249.21
+    "impulse_price": 249.21,
+    "impulse_delta": -0.12228214063307408,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1664,7 +2302,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1676,10 +2314,12 @@
    "side": "LONG",
    "detail": {
     "ref": 52993.9,
-    "impulse_price": 337.85
+    "impulse_price": 337.85,
+    "impulse_delta": -0.19240896780018055,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1691,10 +2331,12 @@
    "side": "LONG",
    "detail": {
     "ref": 96545.06666666667,
-    "impulse_price": 249.27
+    "impulse_price": 249.27,
+    "impulse_delta": -0.3615231894244879,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1706,10 +2348,12 @@
    "side": "LONG",
    "detail": {
     "ref": 43321.76666666667,
-    "impulse_price": 192.1845
+    "impulse_price": 192.1845,
+    "impulse_delta": 0.003830569271306158,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1721,10 +2365,12 @@
    "side": "LONG",
    "detail": {
     "ref": 11796.633333333333,
-    "impulse_price": 195.33
+    "impulse_price": 195.33,
+    "impulse_delta": null,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1736,10 +2382,12 @@
    "side": "LONG",
    "detail": {
     "ref": 43783.23333333333,
-    "impulse_price": 192.2798
+    "impulse_price": 192.2798,
+    "impulse_delta": -0.07176192671122378,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1753,7 +2401,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1766,11 +2414,11 @@
    "detail": {
     "pvr": 0.6087174487078918,
     "leg_bars": 3,
-    "delta_ratio": -0.2075936156455254,
+    "delta_ratio": -0.22422744992919869,
     "ext_i": 101
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1784,7 +2432,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1798,7 +2446,43 @@
     "age": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 102,
+   "bar_ts": "2026-09-25T15:12:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 1,
+    "up_close": true,
+    "slope": 0.03069404237953584,
+    "chase_std": 0.4323719586781591,
+    "advance_atr": 0.03069404237953584,
+    "vwap": 248.30150322677844,
+    "std": 0.5816676317086635,
+    "atr": 0.26063689823219544,
+    "ext_close": 248.545,
+    "impulse_delta": -0.3615231894244879,
+    "pullback_delta": -0.22422744992919869,
+    "resumption_delta": -0.05541850969717591,
+    "rolling_delta": -0.3470717169190457,
+    "rolling_signed": -1004538,
+    "tick_velocity_atr_per_min": -0.019257425826678783,
+    "book_imbalance": 0.034482758620689655,
+    "regime": {
+     "failed": [],
+     "unavailable": [],
+     "sector_rs_30m": 0.0009154797117707503,
+     "dollar_30m": 0.0,
+     "ief_30m": 0.0006709094339243382
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1813,7 +2497,43 @@
     "slope": 0.03069404237953584
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 103,
+   "bar_ts": "2026-09-25T15:13:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 2,
+    "up_close": true,
+    "slope": 0.08827783372162902,
+    "chase_std": 0.49463441546921166,
+    "advance_atr": 0.17655566744325804,
+    "vwap": 248.30266145057095,
+    "std": 0.5809109524990926,
+    "atr": 0.2548771197870391,
+    "ext_close": 248.545,
+    "impulse_delta": -0.3615231894244879,
+    "pullback_delta": -0.22422744992919869,
+    "resumption_delta": -0.10793966631216623,
+    "rolling_delta": -0.34531766901936023,
+    "rolling_signed": -997486,
+    "tick_velocity_atr_per_min": 0.31420693366239,
+    "book_imbalance": 0.1958762886597938,
+    "regime": {
+     "failed": [],
+     "unavailable": [],
+     "sector_rs_30m": 0.00010825240996803487,
+     "dollar_30m": -8.0328859365153e-05,
+     "ief_30m": 0.0008251414687741043
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1828,7 +2548,7 @@
     "slope": 0.08827783372162902
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1840,10 +2560,12 @@
    "side": "LONG",
    "detail": {
     "ref": 11438.5,
-    "impulse_price": 195.42
+    "impulse_price": 195.42,
+    "impulse_delta": null,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1855,10 +2577,48 @@
    "side": "LONG",
    "detail": {
     "ref": 47703.833333333336,
-    "impulse_price": 337.86
+    "impulse_price": 337.86,
+    "impulse_delta": 0.4966622328853971,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 104,
+   "bar_ts": "2026-09-25T15:14:00+00:00",
+   "event": "RESUMPTION_MEASURED",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 3,
+    "up_close": true,
+    "slope": 0.2420336429903165,
+    "chase_std": 0.7410544003252629,
+    "advance_atr": 0.7261009289709495,
+    "vwap": 248.30525829744224,
+    "std": 0.5799057429105817,
+    "atr": 0.2616716112308236,
+    "ext_close": 248.545,
+    "impulse_delta": -0.3615231894244879,
+    "pullback_delta": -0.22422744992919869,
+    "resumption_delta": -0.11882619860879104,
+    "rolling_delta": -0.34052343964746745,
+    "rolling_signed": -984867,
+    "tick_velocity_atr_per_min": 0.5566908746952561,
+    "book_imbalance": -0.046153846153846156,
+    "regime": {
+     "failed": [],
+     "unavailable": [],
+     "sector_rs_30m": 0.0004214918892786468,
+     "dollar_30m": 0.0001711485464599427,
+     "ief_30m": 0.0009490844126842646
+    }
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1873,7 +2633,7 @@
     "slope": 0.2420336429903165
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1885,10 +2645,12 @@
    "side": "LONG",
    "detail": {
     "ref": 11663.833333333334,
-    "impulse_price": 195.5567
+    "impulse_price": 195.5567,
+    "impulse_delta": 0.22570086808026185,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1900,10 +2662,12 @@
    "side": "LONG",
    "detail": {
     "ref": 48586.96666666667,
-    "impulse_price": 337.965
+    "impulse_price": 337.965,
+    "impulse_delta": -0.2344062912128169,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1917,7 +2681,7 @@
     "age": 4
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1929,10 +2693,12 @@
    "side": "LONG",
    "detail": {
     "ref": 11973.833333333334,
-    "impulse_price": 195.56
+    "impulse_price": 195.56,
+    "impulse_delta": 0.208374272541758,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1946,7 +2712,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1958,10 +2724,12 @@
    "side": "LONG",
    "detail": {
     "ref": 47286.53333333333,
-    "impulse_price": 338.22
+    "impulse_price": 338.22,
+    "impulse_delta": 0.03748067588458503,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1975,7 +2743,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1987,10 +2755,12 @@
    "side": "LONG",
    "detail": {
     "ref": 48087.9,
-    "impulse_price": 338.43
+    "impulse_price": 338.43,
+    "impulse_delta": 0.27225924976501753,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2002,10 +2772,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 35994.2,
-    "impulse_price": 630.19
+    "impulse_price": 630.19,
+    "impulse_delta": -0.12465775122756997,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2017,10 +2789,12 @@
    "side": "LONG",
    "detail": {
     "ref": 49067.333333333336,
-    "impulse_price": 338.49
+    "impulse_price": 338.49,
+    "impulse_delta": -0.16866781017724414,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2032,10 +2806,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 36805.9,
-    "impulse_price": 629.84
+    "impulse_price": 629.84,
+    "impulse_delta": -0.4344036261054233,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -2047,10 +2823,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 10924.833333333334,
-    "impulse_price": 194.19
+    "impulse_price": 194.19,
+    "impulse_delta": null,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2062,10 +2840,12 @@
    "side": "LONG",
    "detail": {
     "ref": 49029.1,
-    "impulse_price": 338.64
+    "impulse_price": 338.64,
+    "impulse_delta": 0.036126401630988784,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2077,10 +2857,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 36435.4,
-    "impulse_price": 629.25
+    "impulse_price": 629.25,
+    "impulse_delta": -0.2072951711228594,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -2092,10 +2874,12 @@
    "side": "LONG",
    "detail": {
     "ref": 92029.46666666666,
-    "impulse_price": 249.3799
+    "impulse_price": 249.3799,
+    "impulse_delta": -0.08866010828948372,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -2107,10 +2891,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 10738.0,
-    "impulse_price": 193.9018
+    "impulse_price": 193.9018,
+    "impulse_delta": -0.18245472837022134,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2122,10 +2908,12 @@
    "side": "SHORT",
    "detail": {
     "ref": 36601.76666666667,
-    "impulse_price": 628.88
+    "impulse_price": 628.88,
+    "impulse_delta": -0.22059185179113042,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -2137,10 +2925,12 @@
    "side": "LONG",
    "detail": {
     "ref": 91378.33333333333,
-    "impulse_price": 249.455
+    "impulse_price": 249.455,
+    "impulse_delta": -0.15481072368265106,
+    "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2152,7 +2942,7 @@
    "side": "LONG",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2164,7 +2954,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -2176,7 +2966,7 @@
    "side": "LONG",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -2188,7 +2978,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_2026_09_27"
+   "policy_id": "V2_FULL_L2_2026_09_28"
   }
  ]
 }

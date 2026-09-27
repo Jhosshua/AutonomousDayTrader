@@ -80,7 +80,8 @@ class Scenario:
             self.feed(_base(self.i, v, self.sym))
 
     def names(self, since: int = 0) -> List[str]:
-        return [e[1] for e in self.events if e[0] >= since and e[1] != "FEATURE_UNAVAILABLE"]
+        # FEATURE_UNAVAILABLE (warm-up) and RESUMPTION_MEASURED (a measurement record) are not transitions.
+        return [e[1] for e in self.events if e[0] >= since and e[1] not in ("FEATURE_UNAVAILABLE", "RESUMPTION_MEASURED")]
 
     # --- building blocks relative to the live features ------------------------------
     def _feat(self):

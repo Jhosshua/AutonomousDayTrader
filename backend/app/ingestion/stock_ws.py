@@ -193,9 +193,10 @@ class StockWebSocketClient:
     async def _send_initial_subscriptions(self, ws: Any) -> None:
         """Transmit initial channel subscriptions."""
         sym_list = sorted(list(self.symbols))
+        regime = sorted({s.upper() for s in getattr(settings, "REGIME_SYMBOLS", [])} - set(sym_list))
         cmd: Dict[str, Any] = {"action": "subscribe"}
         if settings.SUBSCRIBE_BARS:
-            cmd["bars"] = sym_list
+            cmd["bars"] = sym_list + regime   # regime ETFs: bars only, never quotes or prints
         if settings.SUBSCRIBE_QUOTES:
             cmd["quotes"] = sym_list
         if settings.SUBSCRIBE_TRADES:

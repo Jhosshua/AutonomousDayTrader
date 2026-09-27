@@ -154,6 +154,17 @@ class Settings(BaseSettings):
         default=True,
         description="Layers 1-3 (tick aggression, book imbalance, tick velocity) are required gates; missing data rejects the trade"
     )
+    # Layer 4 regime symbols (bars only) and which of the part-2 measures are enforced as gates.
+    # Data-integrity failures of enforced gates fail closed; a measure not listed here is recorded only.
+    REGIME_SYMBOLS: List[str] = Field(
+        default=["XLK", "XLC", "XLY", "XLF", "UUP", "SHY", "IEF"],
+        description="Sector, dollar and rates ETFs streamed as bars for the regime filters"
+    )
+    RIDE_THE_TREND_ENFORCED_GATES: List[str] = Field(
+        default=[],
+        description="Part-2 measures enforced as gates: IMPULSE_DELTA, RESUMPTION_DELTA, ROLLING_DELTA, SECTOR_DIRECTION, SECTOR_RS, DOLLAR_WIND, RATES_WIND"
+    )
+    RIDE_THE_TREND_ENFORCE_ALL: bool = Field(default=False, description="Enforce every part-2 measure as a gate from day one")
     RIDE_THE_TREND_EXCLUDE: List[str] = Field(
         default=["TSLA", "CDE", "SPY", "QQQ"],
         description="Symbols Ride the Trend v2 never evaluates: the Morning Plan owns TSLA/CDE; SPY/QQQ are the regime instruments"

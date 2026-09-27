@@ -27,6 +27,7 @@ from backend.app.core.bracket import BracketChildType, BracketStatus, DynamicBra
 from backend.app.core.market_filter import MarketTrendFilter
 from backend.app.core.tick_tape import TickTape
 from backend.app.core.macro_calendar import macro_calendar
+from backend.app.core.regime_feed import RegimeFeed
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
 from backend.app.core.event_bus import event_bus
 from backend.app.core.flattening import ET_TZ, FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
@@ -90,14 +91,28 @@ market_filter = MarketTrendFilter()
 
 # Strategies & Dynamic Self-Adaptation Engine
 orb_strategy = OpeningRangeBreakoutStrategy()
+PART2_ALL_GATES = ("IMPULSE_DELTA", "RESUMPTION_DELTA", "ROLLING_DELTA", "SECTOR_DIRECTION", "SECTOR_RS", "DOLLAR_WIND", "RATES_WIND")
+_enforced_names = [str(g).strip().upper() for g in settings.RIDE_THE_TREND_ENFORCED_GATES]
+_unknown_gates = [g for g in _enforced_names if g not in PART2_ALL_GATES]
+if _unknown_gates:
+    raise ValueError(f"RIDE_THE_TREND_ENFORCED_GATES has unknown gate(s) {_unknown_gates}; valid: {PART2_ALL_GATES}")
+RIDE_THE_TREND_ENFORCED: Set[str] = set(PART2_ALL_GATES) if settings.RIDE_THE_TREND_ENFORCE_ALL else set(_enforced_names)
+if RIDE_THE_TREND_ENFORCED and not settings.RIDE_THE_TREND_REQUIRE_TICKS:
+    raise ValueError("RIDE_THE_TREND_ENFORCED_GATES needs RIDE_THE_TREND_REQUIRE_TICKS=true")
 vwap_strategy = VWAPPullbackV2Strategy(
     mode=settings.RIDE_THE_TREND_MODE,
     excluded_symbols=list(settings.RIDE_THE_TREND_EXCLUDE),
     require_tick_layers=settings.RIDE_THE_TREND_REQUIRE_TICKS,
+    enforced_gates=sorted(g for g in RIDE_THE_TREND_ENFORCED if g in vwap_pullback_v2.PART2_GATES),
 )
 # Layers 1-3 for Ride the Trend v2: every SIP print and NBBO quote folds into this tape.
 tick_tape = TickTape()
 vwap_pullback_v2.TAPE = tick_tape
+# Layer 4: sector, dollar and rates ETFs (bars only). The evaluator records its evidence at decision time.
+regime_feed = RegimeFeed(list(settings.REGIME_SYMBOLS))
+vwap_pullback_v2.REGIME = regime_feed
+REGIME_GATE_OUTCOMES = {"SECTOR_DIRECTION": "SECTOR_AGAINST", "SECTOR_RS": "SECTOR_RS_FILTER",
+                        "DOLLAR_WIND": "MACRO_WIND_AGAINST:dollar", "RATES_WIND": "MACRO_WIND_AGAINST:yields"}
 news_strategy = NewsMomentumStrategy()
 mean_reversion_strategy = MeanReversionStrategy()
 tsla_or15_strategy = TSLAOR15RetestStrategy()
@@ -1355,6 +1370,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
     decision_log.reset_for_session(session_date.isoformat() if hasattr(session_date, "isoformat") else str(session_date))
     last_session_date = session_date
     market_filter.reset_session(session_date)
+    regime_feed.reset_session()
     daily_bar_aggregator.reset_for_new_session()
     risk_engine.reset_daily_metrics(account.equity)
     risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.equity)
@@ -1619,6 +1635,7 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
         card["decisions"] = decision_log.summary(s.strategy_id)
         if s.strategy_id == "vwap_pullback":
             card["window"]["notes"].append(macro_calendar.today_text(now.astimezone(ET_TZ).date()))
+            card["window"]["notes"].append(regime_feed.wind_text(now))
         if s.strategy_id in FIXED_IDS:
             blockers = []
             if risk_engine.status != BreakerStatus.ARMED:
@@ -1759,6 +1776,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         rs_ok, rs_detail = _ride_the_trend_rs(signal, stages)
         if not rs_ok:
             _record_decision(signal, "RS_FILTER", rs_detail, stages)
+            return
+        regime_outcome, regime_detail = _ride_the_trend_regime(signal, stages)
+        if regime_outcome is not None:
+            _record_decision(signal, regime_outcome, regime_detail, stages)
             return
     adapted_stop = adaptation_engine.calculate_adapted_stop(signal)
     target_1_override, target_2_override, target_error = _intraday_target_overrides(signal, adapted_stop)
@@ -1942,6 +1963,30 @@ def _ride_the_trend_rs(signal: SignalEvent, stages: Dict[str, Any]) -> Tuple[boo
     return ok, f"{verdict} SPY: rs_day={rs_day * 100:.3f}% rs_30={rs_30 * 100:.3f}%"
 
 
+def _ride_the_trend_regime(signal: SignalEvent, stages: Dict[str, Any]) -> Tuple[Optional[str], str]:
+    """Layer 4 measures at decision time (bar completion). Recorded always; a gate only when enforced."""
+    sym = signal.symbol.upper()
+    is_buy = signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY"
+    inputs = vwap_strategy.rs_inputs(sym) or {}
+    t_end = signal.timestamp + timedelta(minutes=1)
+    try:
+        ev = regime_feed.evaluate(sym, is_buy, t_end, inputs.get("return_30m"))
+    except Exception as exc:  # regime evidence failed: unavailable for every gate, never a crash
+        log.exception("regime evaluation failed for %s", sym)
+        ev = {"measures": {"error": f"{type(exc).__name__}: {exc}"}, "failed": [],
+              "unavailable": ["SECTOR_DIRECTION", "SECTOR_RS", "DOLLAR_WIND", "RATES_WIND"]}
+    stages.update(regime=ev, regime_enforced=sorted(RIDE_THE_TREND_ENFORCED))
+    for gate in ("SECTOR_DIRECTION", "SECTOR_RS", "DOLLAR_WIND", "RATES_WIND"):
+        if gate not in RIDE_THE_TREND_ENFORCED:
+            continue
+        if gate in ev["unavailable"]:
+            return "REGIME_UNAVAILABLE", f"{gate} unavailable: {ev['measures'].get('sector_etf')}"
+        code = REGIME_GATE_OUTCOMES[gate]
+        if code in ev["failed"]:
+            return code.split(":")[0] if code.startswith("MACRO_WIND") else code, f"{code} {ev['measures'].get('sector_etf')}"
+    return None, "regime recorded"
+
+
 # Event Bus Handlers
 async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     """Ingest bar, update clocks, match orders, process strategies, check risk, update trailing stops."""
@@ -1970,6 +2015,8 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     _mark_feed_event("bar")
     if bar.symbol.upper() in ("SPY", "QQQ"):
         market_filter.on_bar(bar)
+    if bar.symbol.upper() in regime_feed.symbols:
+        regime_feed.on_bar(bar)
     history = market_history.setdefault(bar.symbol.upper(), [])
     history.append({
         "time": bar.timestamp.isoformat(),
@@ -2592,6 +2639,8 @@ async def handle_trade_event(trade: TradeEvent) -> None:
         tick_tape.on_trade(
             trade.symbol, trade.price, trade.size,
             trade.timestamp_ns or int(trade.timestamp.timestamp() * 1_000_000_000),
+            trade_id=int(getattr(trade, "trade_id", 0) or 0), exchange=str(getattr(trade, "exchange", "") or ""),
+            conditions=list(getattr(trade, "conditions", []) or []),
         )
     except Exception:
         log.exception("tick tape trade fold failed")
@@ -2616,6 +2665,14 @@ async def _verify_or15_sip_loop() -> None:
 
 
 async def _handle_relay_status(status: RelayStatusEvent) -> None:
+    if status.feed_type == "stock":
+        # Stock-feed outages are intervals: any tick window overlapping one is incomplete.
+        prev = relay_statuses.get("stock")
+        now_ns = int(status.timestamp.timestamp() * 1_000_000_000)
+        if status.status != "connected" and prev == "connected":
+            tick_tape.note_disconnect(now_ns)
+        elif status.status == "connected" and prev not in (None, "connected"):
+            tick_tape.note_reconnect(now_ns)
     relay_statuses[status.feed_type] = status.status
     bounds = or15_session_bounds(status.timestamp.astimezone(ET_TZ).date())
     if status.feed_type == "stock" and status.status != "connected" and bounds and bounds[0] <= status.timestamp < bounds[1]:
@@ -2653,6 +2710,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     completed_brackets_recorded.clear()
     pending_trade_records.clear()
     tick_tape.reset()
+    regime_feed.reset_session()
     pending_session_summaries.clear()
     pending_processed_events.clear()
     inflight_event_keys.clear()
@@ -2903,7 +2961,7 @@ async def get_health() -> Dict[str, Any]:
         },
         "relay": relay_statuses,
         "research": research_recorder.health(),
-        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
+        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
         "broker": _broker_health(),
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
@@ -3075,7 +3133,7 @@ async def get_research_rows(
         "rows": rows,
         "next_after": f"{last.get('session_date')}|{last.get('row_id')}" if last and len(rows) >= max(1, min(limit, 1000)) else None,
         "research": research_recorder.health(),
-        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
+        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
     }
 
 

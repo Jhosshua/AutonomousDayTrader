@@ -407,3 +407,18 @@ right. Run the mutation check.
 ## 2026-09-27: backgrounded codex review died when the Claude Code session ended
 - **What did not work**: `codex exec` launched with `run_in_background` was killed with the session; the output file held only the echoed prompt.
 - **What worked instead**: relaunch in the new session; check that the output file has content after the `codex` marker line before reading it as a review.
+
+## 2026-09-27: a "half the volume must be quote-classified" floor turned every pullback check off
+- **What did not work**: the part-2 plan required >= 50% of a window's volume to be classified against the NBBO. On the live feed only 25% to 51% of volume prints at the bid or ask (the rest prints inside the spread: midpoint, off-exchange, odd lots), so `delta()` returned unavailable for every pullback and the resumption test was never reached. Extending quote validity from 2 s to 10 s changed nothing.
+- **What worked instead**: measure the share on the cached real sessions first, then set the floor from the data (quote-classified >= 20%, any classification >= 50%) and report both shares in every row.
+- **Note for next time**: a data-quality threshold copied from a review comment is a hypothesis; measure it on real prints before it becomes a gate.
+
+## 2026-09-27: a measurement record placed after the gates measured nothing
+- **What did not work**: `RESUMPTION_MEASURED` was emitted after the slope, chase, velocity and book gates, so every candidate those gates rejected was never measured and the funnel diagnostic showed zero evaluations.
+- **What worked instead**: compute and record the measures right after the age check, before any gate decides; the gates then re-query and fail closed on their own.
+- **Note for next time**: a "record on every candidate" promise must be the first thing in the branch, not the last.
+
+## 2026-09-27: the first raw print store would have stalled the live process once full
+- **What did not work**: packed columns for a whole symbol with front deletion on every eviction: at 1,000,000 prints each eviction shifted about 38 MB of arrays, on the ingestion path, on every trade. Also the cap was checked before the append, so it lagged by one print.
+- **What worked instead**: one bucket of arrays per exchange second; retention and the cap pop whole seconds from the front (O(1)); the cap is enforced after the append.
+- **Note for next time**: any "rolling" store on a hot path needs O(1) eviction; test it with the cap set tiny so eviction actually runs in the unit tests.

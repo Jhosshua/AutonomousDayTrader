@@ -39,6 +39,7 @@ DATA = ROOT / "research" / "vwap_trend_2026_09_27" / "data"
 OUT = ROOT / "docs" / "ride_the_trend_v2"
 V2_SYMBOLS = ["AAPL", "NVDA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "PLTR", "COIN"]
 INDEX = ["SPY", "QQQ"]
+REGIME = ["XLK", "XLC", "XLY", "XLF", "UUP", "SHY", "IEF"]
 
 
 @contextmanager
@@ -103,10 +104,13 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
     r.vwap_pullback_v2.EVENT_SINK = sink
 
     events: List[Tuple[int, int, Any]] = []  # (time_ns, priority, event); bars arrive at bar end
-    bar_syms = list(dict.fromkeys(INDEX + symbols + (["TSLA"] if all_arms else [])))
+    bar_syms = list(dict.fromkeys(INDEX + REGIME + symbols + (["TSLA"] if all_arms else [])))
+    stock_bars: Dict[str, List[BarEvent]] = {}
     for sym in bar_syms:
-        for b in load_bars(sym, day):
-            events.append((int(b.timestamp.timestamp() * 1e9) + 60_000_000_000, 2 if sym in INDEX else 3, b))
+        bars = load_bars(sym, day)
+        stock_bars[sym] = bars
+        for b in bars:
+            events.append((int(b.timestamp.timestamp() * 1e9) + 60_000_000_000, 2 if sym in INDEX + REGIME else 3, b))
     n_tr = n_q = 0
     for sym in symbols:
         trades, quotes = load_ticks(sym, day)
@@ -115,14 +119,19 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
         events.extend((q.timestamp_ns, 0, q) for q in quotes)
     events.sort(key=lambda e: (e[0], e[1]))
     t0 = time.time()
+    from backend.app.core.tick_tape import TickTape
+    audit_tape = TickTape(keep_seconds=8 * 3600)   # diagnostics only: keeps the whole morning
     try:
         with no_network():
             for _, _, ev in events:
                 if isinstance(ev, BarEvent):
                     await r.handle_bar_event(ev)
                 elif isinstance(ev, TradeEvent):
+                    audit_tape.on_trade(ev.symbol, ev.price, ev.size, ev.timestamp_ns, trade_id=ev.trade_id,
+                                        exchange=ev.exchange, conditions=ev.conditions)
                     await r.handle_trade_event(ev)
                 else:
+                    audit_tape.on_quote(ev.symbol, ev.bid_price, ev.ask_price, ev.bid_size, ev.ask_size, ev.timestamp_ns)
                     await r.handle_quote_event(ev)
             close = datetime.fromisoformat(f"{day}T16:05:00").replace(tzinfo=ET)
             r.flattening_engine.clock.set_simulated_time(close)
@@ -168,6 +177,8 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
         failures.append("setup events on excluded symbols")
     if n_tr == 0 or n_q == 0:
         failures.append("no ticks were replayed")
+    if r.regime_feed.bars_seen == 0:
+        failures.append("no regime ETF bars were replayed")
     n_bars = sum(1 for e in events if isinstance(e[2], BarEvent))
     if n_bars < 300 * len(symbols):
         failures.append(f"only {n_bars} bars were replayed")
@@ -176,6 +187,67 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
     if all_arms is False and setup_events and not any(e["event"] in ("PULLBACK", "PVR_NOT_THIN", "HIGH_VOLUME_PULLBACK", "TICK_UNAVAILABLE", "AGGRESSIVE_PULLBACK", "NO_TOUCH", "TOUCH_TOO_EARLY") for e in setup_events):
         failures.append("no impulse ever resolved: touch logic never ran")
     tape_h = r.tick_tape.health()
+
+    # ---- funnel diagnostics (plan part 2, step 0) --------------------------------------
+    measured = [e for e in setup_events if e["event"] == "RESUMPTION_MEASURED"]
+    pre_empted = sum(1 for e in setup_events if e["event"] == "IMPULSE" and (e["detail"] or {}).get("pre_empted"))
+    diag_rows = []
+    would_fail = Counter()
+    unavailable = Counter()
+    for e in measured:
+        d = e["detail"] or {}
+        sym, side = e["symbol"], e["side"]
+        sgn = 1.0 if side == "LONG" else -1.0
+        feasible = None
+        if all(d.get(k) is not None for k in ("ext_close", "atr", "vwap", "std", "age")):
+            need = d["ext_close"] + sgn * 0.5 * d["age"] * d["atr"]      # slope requires at least this close
+            cap = d["vwap"] + sgn * 0.5 * d["std"]                      # chase cap allows at most this close
+            feasible = (need <= cap) if side == "LONG" else (need >= cap)
+        t_end = datetime.fromisoformat(e["bar_ts"]) + timedelta(minutes=1)
+        # Layer 4 evidence exactly as the evaluator recorded it at decision time (no hindsight)
+        rec = d.get("regime") or {}
+        reg = {"failed": rec.get("failed", []), "unavailable": rec.get("unavailable", []) if rec else ["NOT_RECORDED"],
+               "measures": {"sector_rs_30m": rec.get("sector_rs_30m"),
+                            "dollar_return_30m": {"return": rec.get("dollar_30m")} if rec.get("dollar_30m") is not None else None,
+                            "ief_return_30m": {"return": rec.get("ief_30m")} if rec.get("ief_30m") is not None else None}}
+        row = {"symbol": sym, "side": side, "time_et": t_end.astimezone(ET).strftime("%H:%M"), "age": d.get("age"),
+               "slope": d.get("slope"), "chase_std": d.get("chase_std"), "feasible_price_interval": feasible,
+               "impulse_delta": d.get("impulse_delta"), "pullback_delta": d.get("pullback_delta"),
+               "resumption_delta": d.get("resumption_delta"), "rolling_delta": d.get("rolling_delta"),
+               "tick_velocity_atr_per_min": d.get("tick_velocity_atr_per_min"), "book_imbalance": d.get("book_imbalance"),
+               "regime_failed": reg["failed"], "regime_unavailable": reg["unavailable"],
+               "sector_rs_30m": reg["measures"].get("sector_rs_30m"),
+               "dollar_30m": (reg["measures"].get("dollar_return_30m") or {}).get("return"),
+               "ief_30m": (reg["measures"].get("ief_return_30m") or {}).get("return")}
+        diag_rows.append(row)
+        for name, val, thr in (("IMPULSE_DELTA", d.get("impulse_delta"), 0.15), ("RESUMPTION_DELTA", d.get("resumption_delta"), 0.10)):
+            if val is None:
+                unavailable[name] += 1
+            elif sgn * val < thr:
+                would_fail[name] += 1
+        if d.get("rolling_delta") is None:
+            unavailable["ROLLING_DELTA"] += 1
+        elif sgn * d["rolling_delta"] <= 0:
+            would_fail["ROLLING_DELTA"] += 1
+        for g in reg["failed"]:
+            would_fail[g] += 1
+        for g in reg["unavailable"]:
+            unavailable[g] += 1
+    quote_share = {}
+    for sym in symbols:
+        t0 = int(datetime.fromisoformat(f"{day}T09:45:00").replace(tzinfo=ET).timestamp() * 1e9)
+        t1 = int(datetime.fromisoformat(f"{day}T11:30:00").replace(tzinfo=ET).timestamp() * 1e9)
+        dd = audit_tape.delta(sym, t0, t1, min_classified_share=0.0, min_quote_share=0.0)
+        quote_share[sym] = {"quote": round(dd["quote_share"], 3), "classified": round(dd["classified_share"], 3),
+                            "complete": dd["complete"]} if dd else None
+    diagnostics = {
+        "resumption_evaluations": len(measured),
+        "impulses_pre_empting_a_setup": pre_empted,
+        "feasible_price_interval": Counter(str(r_["feasible_price_interval"]) for r_ in diag_rows),
+        "would_fail_if_enforced": dict(would_fail), "unavailable": dict(unavailable),
+        "quote_classified_share_0945_1130": quote_share,
+        "rows": diag_rows,
+    }
 
     report = {
         "date": day, "all_arms": all_arms, "symbols": symbols, "elapsed_s": round(elapsed, 1),
@@ -200,6 +272,8 @@ async def run(day: str, all_arms: bool, symbols: List[str]) -> Dict[str, Any]:
         "card": {k: card[k] for k in ("id", "version", "mode", "excluded_symbols", "first_possible_signal", "today_counts",
                                       "signals_emitted_today", "data_layers")},
         "failures": failures,
+        "regime": r.regime_feed.health(),
+        "diagnostics": diagnostics,
         "setup_events": [e for e in setup_events if e["event"] != "FEATURE_UNAVAILABLE"],
     }
     r.reset_runtime_state()
@@ -228,6 +302,17 @@ def write_md(rep: Dict[str, Any], path: Path) -> None:
     lines.append(f"Account: {rep['account']}. Trades by strategy: {rep['trades_by_strategy']}.")
     lines.append(f"Decision summary: {rep['decision_summary']}.")
     lines.append(f"Data layers on the card: {json.dumps(rep['card']['data_layers'])}")
+    lines.append("")
+    dg = rep["diagnostics"]
+    lines.append("## Part-2 diagnostics (measures recorded on every resumption evaluation)")
+    lines.append(f"- Resumption evaluations: {dg['resumption_evaluations']}; impulses that pre-empted a live setup: {dg['impulses_pre_empting_a_setup']}")
+    lines.append(f"- Feasible entry price interval (slope vs chase cap): {dict(dg['feasible_price_interval'])}")
+    lines.append(f"- Would fail if enforced: {dg['would_fail_if_enforced']}; unavailable: {dg['unavailable']}")
+    lines.append(f"- Quote-classified share of volume 09:45-11:30: {dg['quote_classified_share_0945_1130']}")
+    for row in dg["rows"]:
+        lines.append(f"  - {row['time_et']} {row['symbol']} {row['side']} age {row['age']} slope {row['slope']:.2f} chase {row['chase_std']:.2f} feasible {row['feasible_price_interval']} "
+                     f"imp {row['impulse_delta']} pull {row['pullback_delta']} res {row['resumption_delta']} roll {row['rolling_delta']} "
+                     f"vel {row['tick_velocity_atr_per_min']} book {row['book_imbalance']} regime_failed {row['regime_failed']} unavailable {row['regime_unavailable']}")
     lines.append("")
     lines.append("## Invariants")
     lines.append("PASS: all invariants held." if not rep["failures"] else "FAIL:\n" + "\n".join(f"- {f}" for f in rep["failures"]))

@@ -1,7 +1,8 @@
 # PLAN 2026-09-27: Ride the Trend data layers, part 2 (raw feed, real-time delta, macro/correlation)
 
-Status: DRAFT v2 after the Codex attack (27 findings, 8 P0; review in
-`docs/ride_the_trend_v2/codex_attack_data_layers_2.md`). Not built yet. Scope = items 1, 3 and 4 of the
+Status: v3, BUILT 2026-09-27 night (recorded-only rollout; every gate promotable by config). Plan attack:
+`docs/ride_the_trend_v2/codex_attack_data_layers_2.md`; code review: `docs/ride_the_trend_v2/codex_part2_code_review.md`;
+step-0 diagnostics: `docs/ride_the_trend_v2/step0_diagnostics_2026-09-27.md`. Scope = items 1, 3 and 4 of the
 operator's four-item data list. Item 2 (full order-book depth) is deferred pending the vendor decision.
 Builds on the live v2 build: `backend/app/strategies/vwap_pullback_v2.py`, `backend/app/core/tick_tape.py`,
 `backend/app/core/macro_calendar.py`.
@@ -121,3 +122,53 @@ in step 1, not assumed.
 ## 7. Not in this plan
 Order-book depth beyond the NBBO (vendor decision), real DXY and cash yields, any change to entries, exits,
 sizing, windows or exclusions.
+
+## 8. As built (2026-09-27 night)
+- `backend/app/core/tick_tape.py` (redesigned after Codex round 1): one `SecondBucket` per symbol per
+  exchange second holding that second's prints in packed `array.array` columns plus its quote aggregates;
+  retention (60 minutes) and the 1,000,000-print cap evict whole seconds from the front, so nothing shifts
+  and no window is split by an eviction. Coverage on every query: complete only when the window starts
+  after the held data, the feed watermark has reached the window end (5 s slack) and no outage interval
+  overlaps it. Time-bounded quote history (10 s) classifies late prints against the quote in force at
+  their own timestamp; late prints never touch the live tick state; tick direction is tracked separately
+  from the aggressor side. Trade-id de-duplication per second; ineligible sale conditions counted, never
+  stored. `delta()` reports quote-classified and tick-inferred volume separately, `rolling_delta()` needs a
+  complete window, `velocity()` runs on the raw prints, `book_imbalance()` is time-weighted per second with
+  carry-forward (30 s) and needs 80% coverage.
+- Data-quality floor set FROM THE DATA, not the plan: 25% to 51% of volume prints at the bid or ask on the
+  live feed (the rest prints inside the spread), so `delta()` requires classified >= 50% and quote-classified
+  >= 20%. The plan's 50% quote floor would have failed every pullback check closed.
+- `backend/app/core/regime_feed.py`: seven ETFs, bars only, wall-clock 30-minute returns, UUP 5-minute
+  freshness, per-candidate dependency (own sector + UUP + IEF), `evaluate()` and the card's wind sentence.
+- Evaluator: impulse delta at IMPULSE, one measurement snapshot per resumption evaluation (queried once,
+  complete-and-finite only, exceptions become unavailable) recorded as `RESUMPTION_MEASURED` before any gate
+  decides, then the same snapshot feeds the gates; Layer 4 evidence recorded in the same event at decision
+  time; gates `IMPULSE_DELTA`,
+  `RESUMPTION_DELTA`, `ROLLING_DELTA` enforced only when named in `RIDE_THE_TREND_ENFORCED_GATES`
+  (or `RIDE_THE_TREND_ENFORCE_ALL=true`); the live pullback delta gate now requires a complete window.
+- `main.py`: regime feed on every regime bar, `_ride_the_trend_regime` in admission (recorded in the research
+  stages; `SECTOR_DIRECTION`, `SECTOR_RS`, `DOLLAR_WIND`, `RATES_WIND` enforced only when named), gap marks
+  from stock-feed status changes, trade ids and conditions passed to the tape, `/health.ride_the_trend.regime`
+  and `enforced_gates`, card wind line. Subscriptions: regime ETFs get bars only.
+- Policy id `V2_FULL_L2_2026_09_28`.
+- Step-0 diagnostics (three real sessions): 22 resumption evaluations, 14 with no feasible entry price under
+  the existing slope-versus-chase rules, 1 restart pre-emption; would-fail counts per measure are in the
+  diagnostics file. Nothing is enforced until the operator picks thresholds from more sessions.
+- Codex code review round 1 (34 findings, 13 P0) drove the per-second redesign, completeness on every
+  gate, the snapshot, regime hardening (UTC storage, validation, session filter, as-of VWAP, strict shorts,
+  fresh endpoints), outage intervals, startup validation of gate names. Round 2 review:
+  `docs/ride_the_trend_v2/codex_part2_code_review_round2.md`.
+- Replay cost with the raw store: 18 to 33 s per real morning (about 4.7M events), 1.1M prints retained.
+
+## 9. Known limits after two Codex rounds (acceptance criteria before any gate is promoted)
+- The feed watermark cannot prove the trade tail of a window is complete; the 5-second slack is an
+  allowance, not a wait. Before promoting a delta gate, measure the trade-arrival lag on the deployed host.
+- A late print does not repair the tick classification of prints already stored after it; prints more
+  than 30 s behind the watermark are stored unclassified.
+- Book state is per second (the quote in force at the start of each second); sub-second boundaries are not
+  answerable. Crossed quotes do not invalidate the quote history.
+- The regime evidence recorded on `RESUMPTION_MEASURED` and the admission-time evaluation are two calls;
+  they can differ if a regime bar lands between them (both are recorded in the research rows).
+- `notify_admitted` carries no signal identity; a duplicate notification would double-count the budget.
+- Three real-session replays produced no signal, so the real-tick path to an order is proved only by the
+  fake full session; the first live order will be the first end-to-end proof.

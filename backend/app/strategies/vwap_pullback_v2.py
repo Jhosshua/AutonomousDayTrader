@@ -29,7 +29,7 @@ from backend.app.strategies.base import (
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 
 VERSION = "v2"
-POLICY_ID = "V2_FULL_2026_09_27"
+POLICY_ID = "V2_FULL_L2_2026_09_28"
 STRATEGY_ID = "vwap_pullback"
 
 # Session bars are only accepted inside the regular session.
@@ -50,7 +50,10 @@ EVENTS = (
     "RESUMING", "NEW_EXTREME", "RESUMPTION_TOO_OLD", "NO_UP_CLOSE", "SLOPE_TOO_SLOW", "CHASED",
     "TICK_VELOCITY_LOW", "BOOK_UNAVAILABLE", "BOOK_AGAINST", "WINDOW_CLOSED",
     "EMISSION_DISABLED", "STOP_TOO_WIDE", "SIGNAL",
+    # part 2 (recorded on every candidate; gates only when enforced)
+    "IMPULSE_NOT_AGGRESSIVE", "RESUMPTION_NOT_AGGRESSIVE", "CUM_DELTA_AGAINST", "RESUMPTION_MEASURED",
 )
+PART2_GATES = ("IMPULSE_DELTA", "RESUMPTION_DELTA", "ROLLING_DELTA")
 
 # Optional research sink: main.py installs a callable that receives every event dict.
 # Kept at module level (not on the strategy object) so the checkpoint never sees it.
@@ -58,7 +61,30 @@ EVENT_SINK: Optional[Callable[[Dict[str, Any]], None]] = None
 # The live tick tape (backend/app/core/tick_tape.TickTape), installed by main.py. Module
 # level for the same reason. Layers 1-3 read from it; without it every setup fails closed.
 TAPE: Optional[Any] = None
+# The live regime feed (backend/app/core/regime_feed.RegimeFeed), installed by main.py, so every
+# resumption evaluation records the Layer 4 evidence as of decision time.
+REGIME: Optional[Any] = None
 NS = 1_000_000_000
+
+
+def _safe(fn, *args, **kwargs):
+    """Measurement only: a failure is recorded as unavailable, never raised into the bar loop."""
+    try:
+        return fn(*args, **kwargs)
+    except Exception:
+        return None
+
+
+def _ok(d: Optional[Dict[str, Any]], key: str = "delta_ratio") -> Optional[Dict[str, Any]]:
+    """A tape result usable as evidence: present, complete, finite."""
+    if not d or not d.get("complete", False):
+        return None
+    try:
+        if not math.isfinite(float(d[key])):
+            return None
+    except (KeyError, TypeError, ValueError):
+        return None
+    return d
 
 
 def _ns(ts: datetime) -> int:
@@ -98,6 +124,11 @@ class V2Params:
     # trade's direction (bid-heavy for longs, ask-heavy for shorts).
     book_window_s: int = 30
     book_imbalance_min: float = 0.10
+    # part 2 measures (Layer 3 stream); enforced only when named in `enforced_gates`
+    impulse_delta_min: float = 0.15        # buyers hit the ask on the impulse bar
+    resumption_delta_min: float = 0.10     # and again on the resumption bars
+    rolling_window_s: int = 1800           # flow over the last 30 minutes agrees with the trend
+    enforced_gates: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -121,6 +152,8 @@ class V2SymbolState:
     pullback_delta_detail: Optional[Dict[str, Any]] = None
     gap_i: int = -1                     # index of the first bar after the last feed gap
     last_emitted_i: int = -1
+    impulse_delta: Optional[float] = None
+    impulse_delta_detail: Optional[Dict[str, Any]] = None
     # incremental features
     cum_pv: float = 0.0
     cum_v: float = 0.0
@@ -300,8 +333,24 @@ def evaluate_bar(
         st.impulse_i = i
         st.ref = ref
         st.blocked_until_restart = False
+        sgn_r = 1.0 if restart_side == "LONG" else -1.0
+        imp = None
+        if tick_gates and tape is not None:
+            imp = _ok(_safe(tape.delta, symbol, _ns(bar.timestamp), _ns(bar.timestamp) + 60 * NS))
+        st.impulse_delta = float(imp["delta_ratio"]) if imp else None
+        st.impulse_delta_detail = ({k: imp[k] for k in ("buy_vol", "sell_vol", "unknown_vol", "n_trades", "quote_share")}
+                                   if imp else None)
         events.append(_event(st, symbol, i, bar, "IMPULSE", from_state, "IMPULSE", ref=ref,
-                             impulse_price=bar.high if restart_side == "LONG" else bar.low))
+                             impulse_price=bar.high if restart_side == "LONG" else bar.low,
+                             impulse_delta=st.impulse_delta, pre_empted=from_state in ("PULLBACK", "RESUMING")))
+        if "IMPULSE_DELTA" in p.enforced_gates and tick_gates:
+            if imp is None:
+                events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "IMPULSE", "IDLE", where="impulse_delta"))
+                _to_idle(st)
+            elif sgn_r * st.impulse_delta < p.impulse_delta_min:
+                events.append(_event(st, symbol, i, bar, "IMPULSE_NOT_AGGRESSIVE", "IMPULSE", "IDLE",
+                                     delta_ratio=st.impulse_delta))
+                _to_idle(st)
         return events, None
 
     if st.state == "IDLE":
@@ -344,7 +393,7 @@ def evaluate_bar(
                 return events, None
             if tick_gates:
                 # Layer 1: who was hitting during the pullback leg (impulse bar end .. touch bar end).
-                d = tape.delta(symbol, _ns(leg[0].timestamp), _ns(bar.timestamp) + 60 * NS) if tape is not None else None
+                d = _ok(_safe(tape.delta, symbol, _ns(leg[0].timestamp), _ns(bar.timestamp) + 60 * NS)) if tape is not None else None
                 if d is None:
                     events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "IMPULSE", "IDLE", where="pullback_delta"))
                     _to_idle(st)
@@ -404,14 +453,47 @@ def evaluate_bar(
             _to_idle(st)
             return events, None
         prev = bars[i - 1]
+        slope = sgn * (bar.close - ext.close) / age / atr
+        chase = sgn * (bar.close - vwap) / std
+        advance_atr = sgn * (bar.close - ext.close) / atr
+        # ---- measurement record: every resumption evaluation, before any gate decides -------------
+        # One snapshot, queried once, complete-and-finite only; the gates below use these same values.
+        bar_end_ns = _ns(bar.timestamp) + 60 * NS
+        m_vel = m_book = m_res = m_roll = m_leg = None
+        m_regime = None
+        if tick_gates and tape is not None:
+            m_vel = _ok(_safe(tape.velocity, symbol, bar_end_ns, p.tick_velocity_window_s), "per_second")
+            m_book = _ok(_safe(tape.book_imbalance, symbol, bar_end_ns, p.book_window_s), "imbalance")
+            m_res = _ok(_safe(tape.delta, symbol, _ns(ext.timestamp) + 60 * NS, bar_end_ns))
+            m_roll = _ok(_safe(tape.rolling_delta, symbol, bar_end_ns, p.rolling_window_s))
+            if st.ext_i > st.impulse_i:
+                m_leg = _ok(_safe(tape.delta, symbol, _ns(bars[st.impulse_i + 1].timestamp), _ns(bars[st.ext_i].timestamp) + 60 * NS))
+        if REGIME is not None:
+            t30 = bar.timestamp - timedelta(minutes=30)
+            past = next((b.close for b in reversed(bars) if b.timestamp <= t30), None)
+            ret30 = (bar.close / past - 1.0) if past else None
+            m_regime = _safe(REGIME.evaluate, symbol, is_long, bar.timestamp + timedelta(minutes=1), ret30)
+        events.append(_event(st, symbol, i, bar, "RESUMPTION_MEASURED", "RESUMING", "RESUMING", age=age,
+                             up_close=bool(sgn * (bar.close - prev.close) > 0), slope=slope, chase_std=chase,
+                             advance_atr=advance_atr, vwap=vwap, std=std, atr=atr, ext_close=ext.close,
+                             impulse_delta=st.impulse_delta,
+                             pullback_delta=(float(m_leg["delta_ratio"]) if m_leg else st.pullback_delta),
+                             resumption_delta=(float(m_res["delta_ratio"]) if m_res else None),
+                             rolling_delta=(float(m_roll["delta_ratio"]) if m_roll else None),
+                             rolling_signed=(m_roll["delta"] if m_roll else None),
+                             tick_velocity_atr_per_min=((sgn * float(m_vel["per_second"]) * 60.0 / atr) if m_vel else None),
+                             book_imbalance=(float(m_book["imbalance"]) if m_book else None),
+                             regime=({"failed": m_regime["failed"], "unavailable": m_regime["unavailable"],
+                                      "sector_rs_30m": m_regime["measures"].get("sector_rs_30m"),
+                                      "dollar_30m": (m_regime["measures"].get("dollar_return_30m") or {}).get("return"),
+                                      "ief_30m": (m_regime["measures"].get("ief_return_30m") or {}).get("return")}
+                                     if m_regime else None)))
         if sgn * (bar.close - prev.close) <= 0:
             events.append(_event(st, symbol, i, bar, "NO_UP_CLOSE", "RESUMING", "RESUMING", age=age))
             return events, None
-        slope = sgn * (bar.close - ext.close) / age / atr
         if slope < p.slope_min:
             events.append(_event(st, symbol, i, bar, "SLOPE_TOO_SLOW", "RESUMING", "RESUMING", age=age, slope=slope))
             return events, None
-        chase = sgn * (bar.close - vwap) / std
         if chase > p.chase_max_std:
             events.append(_event(st, symbol, i, bar, "CHASED", "RESUMING", "IDLE", age=age, chase_std=chase))
             _to_idle(st)
@@ -431,11 +513,9 @@ def evaluate_bar(
         book: Optional[Dict[str, Any]] = None
         vel_atr_min: Optional[float] = None
         if tick_gates:
-            bar_end_ns = _ns(bar.timestamp) + 60 * NS
-            # Layer 1 again, over the whole pullback through the extreme bar's end.
-            d = tape.delta(symbol, _ns(bars[st.impulse_i + 1].timestamp), _ns(bars[st.ext_i].timestamp) + 60 * NS) \
-                if (tape is not None and st.ext_i > st.impulse_i) else None
-            if d is None or not math.isfinite(float(d["delta_ratio"])):
+            # Layer 1 again, over the whole pullback through the extreme bar's end (from the snapshot).
+            d = m_leg
+            if d is None:
                 events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "RESUMING", "IDLE", where="full_leg_delta"))
                 _to_idle(st)
                 return events, None
@@ -446,8 +526,8 @@ def evaluate_bar(
                                      delta_ratio=st.pullback_delta, where="full_leg"))
                 _to_idle(st)
                 return events, None
-            # Layer 3: velocity on the prints' own timestamps over the last window.
-            tick_vel = tape.velocity(symbol, bar_end_ns, p.tick_velocity_window_s) if tape is not None else None
+            # Layer 3: velocity on the prints' own timestamps over the last window (complete window only).
+            tick_vel = m_vel
             if tick_vel is None:
                 events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "RESUMING", "IDLE", where="velocity"))
                 _to_idle(st)
@@ -461,8 +541,8 @@ def evaluate_bar(
                 events.append(_event(st, symbol, i, bar, "TICK_VELOCITY_LOW", "RESUMING", "RESUMING", age=age,
                                      tick_velocity_atr_per_min=vel_atr_min, n_trades=tick_vel["n_trades"]))
                 return events, None
-            # Layer 2: the book must lean the trade's way at the inside.
-            book = tape.book_imbalance(symbol, bar_end_ns, p.book_window_s) if tape is not None else None
+            # Layer 2: the book must lean the trade's way at the inside (covered window only).
+            book = m_book
             if book is None:
                 events.append(_event(st, symbol, i, bar, "BOOK_UNAVAILABLE", "RESUMING", "IDLE"))
                 _to_idle(st)
@@ -474,6 +554,26 @@ def evaluate_bar(
             if sgn * float(book["imbalance"]) < p.book_imbalance_min:
                 events.append(_event(st, symbol, i, bar, "BOOK_AGAINST", "RESUMING", "RESUMING", age=age,
                                      imbalance=book["imbalance"], quotes=book["quotes"]))
+                return events, None
+        # ---- part 2 measures: recorded on every candidate, gates only when enforced ----------
+        res_d, roll_d = m_res, m_roll
+        if "RESUMPTION_DELTA" in p.enforced_gates and tick_gates:
+            if res_d is None:
+                events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "RESUMING", "IDLE", where="resumption_delta"))
+                _to_idle(st)
+                return events, None
+            if sgn * float(res_d["delta_ratio"]) < p.resumption_delta_min:
+                events.append(_event(st, symbol, i, bar, "RESUMPTION_NOT_AGGRESSIVE", "RESUMING", "RESUMING",
+                                     age=age, delta_ratio=float(res_d["delta_ratio"])))
+                return events, None
+        if "ROLLING_DELTA" in p.enforced_gates and tick_gates:
+            if roll_d is None:
+                events.append(_event(st, symbol, i, bar, "TICK_UNAVAILABLE", "RESUMING", "IDLE", where="rolling_delta"))
+                _to_idle(st)
+                return events, None
+            if sgn * float(roll_d["delta"]) <= 0:
+                events.append(_event(st, symbol, i, bar, "CUM_DELTA_AGAINST", "RESUMING", "RESUMING", age=age,
+                                     rolling_signed=roll_d["delta"]))
                 return events, None
         if t_end < WINDOW_OPEN:
             events.append(_event(st, symbol, i, bar, "WINDOW_CLOSED", "RESUMING", "IDLE", before_open=True))
@@ -544,12 +644,21 @@ def evaluate_bar(
             "layer3_tick_velocity_atr_per_min": (round(vel_atr_min, 4) if vel_atr_min is not None else None),
             "layer3_tick_velocity": ({k: tick_vel.get(k) for k in ("price_change", "elapsed_s", "per_second", "n_trades")} if tick_vel else None),
             "tick_gates": bool(tick_gates),
+            "layer3_impulse_delta_ratio": st.impulse_delta,
+            "layer3_impulse_delta": st.impulse_delta_detail,
+            "layer3_resumption_delta_ratio": (round(float(res_d["delta_ratio"]), 4) if res_d else None),
+            "layer3_resumption_delta": ({k: res_d[k] for k in ("buy_vol", "sell_vol", "n_trades", "quote_share")} if res_d else None),
+            "layer3_rolling_delta_ratio": (round(float(roll_d["delta_ratio"]), 4) if roll_d else None),
+            "layer3_rolling_signed_volume": (roll_d["delta"] if roll_d else None),
+            "layer3_advance_since_extreme_atr": round(advance_atr, 4),
+            "enforced_gates": list(p.enforced_gates),
             "params": {"pvr_thin_max": p.pvr_thin_max, "pvr_heavy_min": p.pvr_heavy_min, "slope_min": p.slope_min,
                        "resume_max_age": p.resume_max_age, "chase_max_std": p.chase_max_std,
                        "stop_atr_mult": p.stop_atr_mult, "stop_structure_atr": p.stop_structure_atr,
                        "target_1_r": p.target_1_r, "pullback_delta_min": p.pullback_delta_min,
                        "tick_velocity_min_atr_per_min": p.tick_velocity_min_atr_per_min,
-                       "book_imbalance_min": p.book_imbalance_min},
+                       "book_imbalance_min": p.book_imbalance_min, "impulse_delta_min": p.impulse_delta_min,
+                       "resumption_delta_min": p.resumption_delta_min, "rolling_window_s": p.rolling_window_s},
         }
         attach_features(signal, lambda: feats)
         events.append(_event(st, symbol, i, bar, "SIGNAL", "RESUMING", "IDLE", entry=entry, stop=stop, tp1=tp1,
@@ -580,6 +689,8 @@ def _to_idle(st: V2SymbolState) -> None:
     st.blocked_until_restart = False
     st.pullback_delta = None
     st.pullback_delta_detail = None
+    st.impulse_delta = None
+    st.impulse_delta_detail = None
 
 
 class VWAPPullbackV2Strategy(Strategy):
@@ -606,8 +717,20 @@ class VWAPPullbackV2Strategy(Strategy):
         pullback_delta_min: float = -0.30,
         tick_velocity_min_atr_per_min: float = 0.25,
         book_imbalance_min: float = 0.10,
+        enforced_gates: Optional[List[str]] = None,
+        impulse_delta_min: float = 0.15,
+        resumption_delta_min: float = 0.10,
     ):
         super().__init__(strategy_id=strategy_id, name=name)
+        names = [str(g).strip().upper() for g in (enforced_gates or [])]
+        unknown = [g for g in names if g not in PART2_GATES]
+        if unknown:
+            raise ValueError(f"unknown Ride the Trend gate(s) {unknown}; valid: {PART2_GATES}")
+        if names and not require_tick_layers:
+            raise ValueError("enforced tape gates require require_tick_layers=True")
+        self.enforced_gates: List[str] = sorted(set(names))
+        self.impulse_delta_min = impulse_delta_min
+        self.resumption_delta_min = resumption_delta_min
         self.require_tick_layers = bool(require_tick_layers)
         self.pullback_delta_min = pullback_delta_min
         self.tick_velocity_min_atr_per_min = tick_velocity_min_atr_per_min
@@ -646,6 +769,9 @@ class VWAPPullbackV2Strategy(Strategy):
             pullback_delta_min=self.pullback_delta_min,
             tick_velocity_min_atr_per_min=self.tick_velocity_min_atr_per_min,
             book_imbalance_min=self.book_imbalance_min,
+            impulse_delta_min=self.impulse_delta_min,
+            resumption_delta_min=self.resumption_delta_min,
+            enforced_gates=tuple(self.enforced_gates),
         )
 
     def _get_state(self, symbol: str) -> V2SymbolState:
@@ -707,12 +833,20 @@ class VWAPPullbackV2Strategy(Strategy):
                 and not self.emission_blocked_reason)
 
     def rs_inputs(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Stock-side inputs for the relative-strength gate (admission step)."""
+        """Stock-side inputs for the relative-strength and regime gates (admission step)."""
         st = self.symbol_states.get(symbol.upper())
         if not isinstance(st, V2SymbolState) or not st.bars:
             return None
         bars = st.bars
+        # wall-clock 30-minute return: the last bar that started at or before now - 30 minutes
+        t30 = bars[-1].timestamp - timedelta(minutes=30)
+        close_30m = None
+        for b in reversed(bars):
+            if b.timestamp <= t30:
+                close_30m = b.close
+                break
         return {
+            "return_30m": (bars[-1].close / close_30m - 1.0) if close_30m else None,
             "open_0930": bars[0].open,
             "open_ts": bars[0].timestamp,
             "close_now": bars[-1].close,
@@ -783,6 +917,7 @@ class VWAPPullbackV2Strategy(Strategy):
             "setups_today": int(self.event_counts_today.get("IMPULSE", 0)),
             "signals_emitted_today": int(self.event_counts_today.get("SIGNAL", 0)),
             "data_layers": self.data_layers(),
+            "enforced_gates": list(self.enforced_gates),
         })
         return d
 
@@ -800,6 +935,7 @@ class VWAPPullbackV2Strategy(Strategy):
             "layer1_ticks": {"live": bool(th and th["trades_seen"] > 0), "trades_seen": th["trades_seen"] if th else 0},
             "layer2_book": {"live": bool(th and th["quotes_seen"] > 0), "quotes_seen": th["quotes_seen"] if th else 0,
                             "depth": "top_of_book_nbbo"},
-            "layer3_timestamps": {"source": "exchange_nanoseconds", "velocity_window_s": self.params().tick_velocity_window_s},
+            "layer3_timestamps": {"source": "exchange_nanoseconds", "velocity_window_s": self.params().tick_velocity_window_s,
+                                  "raw_prints": th["raw_prints_total"] if th else 0},
             "layer4_macro": {"calendar_loaded": macro_ok, "error": macro_err, "regime": "spy_qqq_vwap_ema+vix"},
         }
