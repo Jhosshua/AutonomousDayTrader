@@ -16,6 +16,7 @@ import {
   etTimeLabel,
   trancheName,
   planStatusText,
+  trendBlockText,
 } from "@/lib/plain";
 
 const ICONS: Record<string, typeof Sunrise> = {
@@ -108,6 +109,25 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
           </div>
         )}
         <p className="text-sm leading-relaxed text-[#3E3A57]">{theme.what}</p>
+        {strategy.id === "vwap_pullback" && (
+          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="trend-details">
+            <div className="font-semibold">{strategy.mode === "off" ? "New entries switched off" : "Paper account · Morning entries"}</div>
+            <div>{strategy.addons_enforced ? "Flow, spread and prior-volume checks enforced." : "Extra flow, spread and prior-volume checks switched off."}</div>
+            {win?.notes?.slice(1).map((line) => <div key={line} className="mt-1">{line}</div>)}
+            <details className="mt-2">
+              <summary className="cursor-pointer font-semibold">Latest refused setup by stock</summary>
+              {Object.keys(strategy.last_block_by_symbol || {}).length === 0 ? (
+                <div className="mt-1">No refused setups recorded this session.</div>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {Object.entries(strategy.last_block_by_symbol || {}).sort(([a], [b]) => a.localeCompare(b)).map(([symbol, block]) => (
+                    <li key={symbol}><span className="font-semibold">{symbol}</span> · {etTimeLabel(block.bar)} ET<br />{trendBlockText(block.event)}</li>
+                  ))}
+                </ul>
+              )}
+            </details>
+          </div>
+        )}
         {strategy.tri_engine && (
           <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="tri-engine-details">
             <div className="font-semibold">{strategy.tri_engine.mode === "offline_raw_open" ? "Offline replay" : "Paper account"} · {strategy.tri_engine.quantity ? `${strategy.tri_engine.quantity} shares` : "Size follows the risk budget"}</div>

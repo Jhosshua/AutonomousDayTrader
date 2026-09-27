@@ -67,6 +67,7 @@ class IndexState:
     last_price: float = 0.0
     last_timestamp: Optional[datetime] = None
     first_open: Optional[float] = None
+    first_timestamp: Optional[datetime] = None
     bars_count: int = 0
     closes: List[float] = field(default_factory=list)
 
@@ -82,6 +83,7 @@ class IndexState:
         self.last_timestamp = bar.timestamp
         if self.bars_count == 0:
             self.first_open = bar.open
+            self.first_timestamp = bar.timestamp
         self.bars_count += 1
         self.closes.append(bar.close)
         if len(self.closes) > 60:

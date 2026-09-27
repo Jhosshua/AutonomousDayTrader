@@ -911,7 +911,11 @@ def test_profile_query_errors_fail_closed_and_retransmissions_are_refused():
     assert x.spread_stats("AAPL", T0_NS + 1810 * NS) is None
     assert x.book_imbalance("AAPL", T0_NS + 1810 * NS, 30) is None
     x.on_quote("AAPL", 100.0, 100.02, 10, 10, T0_NS + 1809 * NS)     # valid again
-    assert x.spread_stats("AAPL", T0_NS + 1815 * NS, now_window_s=10) is not None or True
+    assert x.spread_stats("AAPL", T0_NS + 1815 * NS, now_window_s=10) is None  # only one fresh quote
+    for k in range(1810, 1831):
+        x.on_quote("AAPL", 100.0, 100.02, 10, 10, T0_NS + k * NS)
+    assert x.spread_stats("AAPL", T0_NS + 1831 * NS) is not None
+    assert x.book_imbalance("AAPL", T0_NS + 1831 * NS) is not None
     # an event a full day after the wall clock is refused, but a long outage does not freeze ingestion
     stale = TickTape()
     stale.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS)

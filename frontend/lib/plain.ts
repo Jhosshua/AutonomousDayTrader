@@ -33,6 +33,29 @@ export function historyDateLabel(day: string): string {
   });
 }
 
+export function trendBlockText(event: string): string {
+  const reasons: Record<string, string> = {
+    DUP_BAR: "Repeated price bar ignored.", LATE_BAR: "Delayed price bar ignored.",
+    BAD_BAR: "Price data failed validation.", FEED_GAP: "Price feed gap; waiting for fresh history.",
+    ZERO_VOLUME_BAR: "No volume in this minute.", AMBIGUOUS_BAR: "Price broke both sides of the range.",
+    TOUCH_TOO_EARLY: "Pullback arrived too soon.", NO_TOUCH: "Price did not return to the entry zone in time.",
+    HIGH_VOLUME_PULLBACK: "Too much volume in the pullback.", PVR_NOT_THIN: "Pullback volume was not low enough.",
+    TICK_UNAVAILABLE: "Trade data was incomplete.", AGGRESSIVE_PULLBACK: "Too much trading against the pullback.",
+    PULLBACK_TIMEOUT: "Pullback lasted too long.", RESUMPTION_TOO_OLD: "The bounce took too long.",
+    NO_UP_CLOSE: "Price did not resume in the trade's direction.", SLOPE_TOO_SLOW: "The bounce was too slow.",
+    CHASED: "Price moved too far from the entry zone.", TICK_VELOCITY_LOW: "Recent trades did not show enough speed.",
+    BOOK_UNAVAILABLE: "Bid and ask data was incomplete.", BOOK_AGAINST: "Bid and ask sizes opposed the trade.",
+    WINDOW_CLOSED: "The morning entry window closed.", EMISSION_DISABLED: "Strategy paused, cooling down, or at its daily limit.",
+    STOP_TOO_WIDE: "The required safety exit was too far away.",
+    IMPULSE_NOT_AGGRESSIVE: "Trading flow did not support the initial move.",
+    RESUMPTION_NOT_AGGRESSIVE: "Trading flow did not support the bounce.", CUM_DELTA_AGAINST: "Recent net trading opposed the move.",
+    SESSION_DELTA_AGAINST: "Net buying and selling opposed this trade.", SPREAD_WIDE: "The bid–ask spread was too wide.",
+    HVN_NO_SUPPORT: "The dip missed prior trading support.", HVN_OVERHEAD: "A prior trading level blocked the path to the target.",
+    PROFILE_UNAVAILABLE: "Prior-session volume history was unavailable.",
+  };
+  return reasons[event] || "A required entry check did not pass.";
+}
+
 export interface StrategyTheme {
   name: string;
   band: string; // card header background

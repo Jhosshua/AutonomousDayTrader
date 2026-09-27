@@ -1,5 +1,7 @@
 # PLAN 2026-09-27: Ride the Trend v2, as built (four data layers, live from day one)
 
+Current audit corrections and release evidence: [AUDIT_2026_09_27](docs/ride_the_trend_v2/AUDIT_2026_09_27.md). The historical build notes below describe the earlier revision.
+
 Status: draft v5 = what is implemented in the working tree on 2026-09-27. Operator requirements: the five
 principles (momentum velocity, pullback volume profile, volatility stops, relative strength + regime, sizing
 and tail) executed with all four data layers (tick aggression, order book, high-resolution timestamps,

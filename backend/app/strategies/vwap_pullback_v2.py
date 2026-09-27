@@ -29,7 +29,7 @@ from backend.app.strategies.base import (
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 
 VERSION = "v2"
-POLICY_ID = "V2_FULL_L2_2026_09_28"
+POLICY_ID = "V2_NBBO_ADDONS_AUDIT_2026_09_28"
 STRATEGY_ID = "vwap_pullback"
 
 # Session bars are only accepted inside the regular session.
@@ -902,6 +902,7 @@ class VWAPPullbackV2Strategy(Strategy):
         self.symbol_states.clear()
         self.event_counts_today = {}
         self.last_block_by_symbol = {}
+        self.emission_blocked_reason = None
 
     # ----------------------------------------------------------------- bars
     def on_bar(self, bar: BarEvent) -> List[SignalEvent]:

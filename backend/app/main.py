@@ -28,7 +28,7 @@ from backend.app.core.market_filter import MarketTrendFilter
 from backend.app.core.tick_tape import TickTape
 from backend.app.core.macro_calendar import macro_calendar
 from backend.app.core.regime_feed import RegimeFeed
-from backend.app.core.volume_profile import ProfileStore
+from backend.app.core.volume_profile import ProfileStore, build_profile
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
 from backend.app.core.event_bus import event_bus
 from backend.app.core.flattening import ET_TZ, FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
@@ -1621,6 +1621,10 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
         card = s.to_dict()
         extra_blockers: List[str] = []
         if s.strategy_id == "vwap_pullback":
+            if vwap_strategy.mode != "v2_live":
+                extra_blockers.append("New entries switched off.")
+            if vwap_strategy.emission_blocked_reason:
+                extra_blockers.append("Session recovery incomplete; new entries blocked.")
             # The four data layers are gates: no ticks or quotes, or a macro blackout, blocks new trades.
             layers = card.get("data_layers") or {}
             ticks_live = bool((layers.get("layer1_ticks") or {}).get("live"))
@@ -1971,15 +1975,25 @@ async def rebuild_volume_profiles(for_session: Optional[date] = None, generation
             if remaining <= 0:
                 raise TimeoutError("profile build deadline exceeded")
             bars = await asyncio.wait_for(_fetch_relay_bars(sym, start, end), timeout=remaining)
-            prof = await loop.run_in_executor(None, profile_store.build, sym, bars, session.isoformat())
+            # A cancelled executor future does not stop its thread. Build privately;
+            # only the event-loop task for the current generation may mutate the store.
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise TimeoutError("profile build deadline exceeded")
+            prof = await asyncio.wait_for(loop.run_in_executor(
+                None, build_profile, sym, bars, session.isoformat(), profile_store.sessions,
+                profile_store.bucket_pct, profile_store.threshold, profile_store.min_sessions,
+            ), timeout=remaining)
             if generation is not None and generation != profile_generation:
-                profile_store.profiles.pop(sym, None)   # never publish a superseded build
                 return profile_store.health()
-            if prof is None:
-                log.warning("volume profile unavailable for %s: %s", sym, profile_store.errors.get(sym))
+            profile_store.profiles[sym] = prof
+            profile_store.errors.pop(sym, None)
+            profile_store.last_build = prof.built_at
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            if generation is not None and generation != profile_generation:
+                return profile_store.health()
             profile_store.errors[sym] = f"{type(exc).__name__}: {exc}"
             profile_store.profiles.pop(sym, None)
             log.warning("volume profile build failed for %s: %s", sym, exc)
@@ -2041,6 +2055,9 @@ def _ride_the_trend_rs(signal: SignalEvent, stages: Dict[str, Any]) -> Tuple[boo
         return False, "RS_UNAVAILABLE: the stock's first session bar is not the 09:30 bar"
     if spy.bars_count < 31 or spy.first_open in (None, 0) or spy.last_timestamp is None or len(spy.closes) < 31:
         return False, "RS_UNAVAILABLE: SPY needs 31 session bars"
+    spy_open_ts = getattr(spy, "first_timestamp", None)
+    if spy_open_ts is None or spy_open_ts.astimezone(ET_TZ).time() != time(9, 30):
+        return False, "RS_UNAVAILABLE: SPY's first session bar is not the 09:30 bar"
     for name, val in (("stock_open", inputs["open_0930"]), ("stock_close_30", inputs["close_30_ago"]),
                       ("spy_open", spy.first_open), ("spy_close_30", spy.closes[-31]), ("spy_last", spy.last_price)):
         if not (isinstance(val, (int, float)) and math.isfinite(val) and val > 0):

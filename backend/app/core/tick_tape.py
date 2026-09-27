@@ -127,6 +127,8 @@ class SymbolTape:
     minutes: Dict[int, List[int]] = field(default_factory=dict)   # minute -> [buy_q, sell_q, buy_t, sell_t, unknown, n]
     quote_invalid_ns: int = 0        # a crossed quote at this stamp: nothing is classified until a valid quote arrives
     trade_watermark_ns: int = 0      # newest eligible print (trade delivery progress)
+    health_spread_sec: int = -1
+    health_spread: Optional[Dict[str, Any]] = None
 
 
 def _median(values: List[float]) -> float:
@@ -167,9 +169,10 @@ class TickTape:
             self._outages.append([self._open_outage_ns, int(ts_ns)])
             self._open_outage_ns = None
             del self._outages[:-500]
-        # a new feed generation starts AT the reconnect: only minutes starting after it count
+        # A new feed generation starts AT reconnect, including its partial minute.
         for t in self._syms.values():
             t.since_ns = int(ts_ns)
+            t.minutes.clear()
 
     def note_gap(self, ts_ns: int) -> None:
         """A point mark (unknown duration): treated as a zero-length outage; the session totals restart."""
@@ -177,6 +180,7 @@ class TickTape:
         del self._outages[:-500]
         for t in self._syms.values():
             t.since_ns = int(ts_ns)
+            t.minutes.clear()
 
     def _outage_in(self, t0_ns: int, t1_ns: int) -> bool:
         if self._open_outage_ns is not None and self._open_outage_ns < t1_ns:
@@ -264,9 +268,16 @@ class TickTape:
             # crossed: the inside is unusable until a good quote arrives, for classification too
             t.quote = None
             t.quote_invalid_ns = ts_ns
-            t.quote_hist.clear()
+            # Retain invalid states in history and in their seconds. A single
+            # latest-cross timestamp cannot reconstruct multiple invalid intervals.
+            t.quote_hist.append((ts_ns, 0.0, 0.0))
+            while t.quote_hist and ts_ns - t.quote_hist[0][0] > self.quote_history_ns:
+                t.quote_hist.popleft()
+            b = self._bucket(t, ts_ns)
+            b.last_quote_ns = ts_ns
+            b.last_bid = b.last_ask = b.last_spread_bps = 0.0
+            b.last_bid_size = b.last_ask_size = 0
             self.rejected += 1
-            self._advance(t, ts_ns)
             return False
         self.quotes_seen += 1
         b = self._bucket(t, ts_ns)
@@ -307,8 +318,6 @@ class TickTape:
     def _quote_for(self, t: SymbolTape, ts_ns: int) -> Optional[Tuple[float, float]]:
         for q_ts, bid, ask in reversed(t.quote_hist):
             if q_ts <= ts_ns:
-                if q_ts < t.quote_invalid_ns <= ts_ns:
-                    return None  # a crossed quote sat between this quote and the print
                 if ts_ns - q_ts <= self.stale_quote_ns and ask > bid:
                     return bid, ask
                 return None
@@ -355,11 +364,12 @@ class TickTape:
             self.duplicates += 1
             return SIDE_UNKNOWN
         self.trades_seen += 1
-        if tid:
-            b.ids.add(tid)
         if conds & INELIGIBLE_CONDITIONS:
             self.ineligible += 1
             return SIDE_UNKNOWN
+        # IDs for discarded prints otherwise grow outside the raw-print cap.
+        if tid:
+            b.ids.add(tid)
         flags = FLAG_ODD_LOT if ODD_LOT in conds else 0
         late = ts_ns < t.last_print_ns
         side = SIDE_UNKNOWN
@@ -370,7 +380,9 @@ class TickTape:
                 side = SIDE_QUOTE_BUY
             elif price <= bid:
                 side = SIDE_QUOTE_SELL
-        invalid_period = t.quote_invalid_ns and ts_ns >= t.quote_invalid_ns and (t.quote is None or t.quote.ts_ns < t.quote_invalid_ns)
+        prior_quote = next((q for q in reversed(t.quote_hist) if q[0] <= ts_ns), None)
+        invalid_period = (prior_quote is not None and prior_quote[2] <= prior_quote[1]) or (
+            t.quote_invalid_ns and ts_ns >= t.quote_invalid_ns and (t.quote is None or t.quote.ts_ns < t.quote_invalid_ns))
         if side == SIDE_UNKNOWN and not invalid_period:
             if late and t.last_print_ns - ts_ns > LATE_CLASSIFY_NS:
                 ref = None  # too far behind to reconstruct a predecessor cheaply: unknown, still stored
@@ -399,7 +411,7 @@ class TickTape:
             self._evict_oldest(t, "cap")
         if ts_ns > t.trade_watermark_ns:
             t.trade_watermark_ns = ts_ns
-        if self._touch_session(t, ts_ns):
+        if self._touch_session(t, ts_ns) and ts_ns >= t.since_ns:
             m = t.minutes.setdefault(ts_ns // (60 * NS), [0, 0, 0, 0, 0, 0])
             m[5] += 1
             if side == SIDE_QUOTE_BUY:
@@ -547,9 +559,10 @@ class TickTape:
     def session_delta(self, symbol: str, t_ns: int, min_minutes: float = 30.0, min_classified_share: float = 0.5,
                       min_quote_share: float = 0.20) -> Optional[Dict[str, Any]]:
         """Cumulative signed volume over [since, t) where `since` is the start of continuous feed (the
-        session's first event, or the last reconnect) and `t` is the decision cutoff: only minutes that
-        START before `t` count, so a later print can never reach an earlier decision. `partial` is true
-        when `since` is not the session's first event (a restart or an outage). Unavailable until
+        session's first event, or the last reconnect) and `t` is a completed-minute decision cutoff.
+        The first partial minute is retained; prints before a reconnect are excluded on ingest.
+        Non-minute cutoffs use only minutes fully completed before them. `partial` is true
+        after a reconnect or a start after the opening minute. Unavailable until
         `min_minutes` of continuous feed exist, while an outage is open, when the feed has not caught up
         to `t`, or when the classification floors are not met."""
         t = self._syms.get(symbol.upper())
@@ -560,7 +573,9 @@ class TickTape:
         minutes = (t_ns - t.since_ns) / NS / 60.0
         if minutes < min_minutes:
             return None
-        m0 = -(-t.since_ns // (60 * NS))                        # first FULL minute after the generation start
+        # The generation aggregates already exclude pre-reconnect prints. Include
+        # its first (partial) minute, especially the opening auction's eligible flow.
+        m0 = t.since_ns // (60 * NS)
         m1 = t_ns // (60 * NS)                                  # minutes [m0, m1): starting before the cutoff
         agg = [0, 0, 0, 0, 0, 0]
         for mk, vals in t.minutes.items():
@@ -576,7 +591,9 @@ class TickTape:
         classified = (buy + sell) / float(total)
         if classified < min_classified_share or quote_share < min_quote_share:
             return None
-        partial = t.session_first_ns is None or t.since_ns > t.session_first_ns
+        since_et = datetime.fromtimestamp(t.since_ns / NS, timezone.utc).astimezone(ET)
+        partial = (t.session_first_ns is None or t.since_ns > t.session_first_ns
+                   or since_et.time() >= dtime(9, 31))
         return {"delta": buy - sell, "delta_ratio": (buy - sell) / float(buy + sell), "buy_vol": buy, "sell_vol": sell,
                 "unknown_vol": unknown, "n_trades": n, "quote_share": quote_share, "classified_share": classified,
                 "since_ns": t.since_ns, "cutoff_ns": t_ns, "minutes_continuous": minutes,
@@ -607,23 +624,22 @@ class TickTape:
             if (s_r0 - sec) * NS > self.book_stale_s * NS:
                 break
             b = t.buckets[sec]
-            if b.quote_n and b.last_quote_ns < r0 and b.last_spread_bps > 0 and not self._outage_in(b.last_quote_ns, r0) \
-                    and not (b.last_quote_ns < t.quote_invalid_ns <= r0):
-                state = (b.last_quote_ns, b.last_spread_bps)
+            if b.last_quote_ns and b.last_quote_ns < r0:
+                if b.last_spread_bps > 0 and not self._outage_in(b.last_quote_ns, r0):
+                    state = (b.last_quote_ns, b.last_spread_bps)
                 break
         for sec in range(s_r0, s1):
-            sec_start = sec * NS
-            if state is not None and state[0] < t.quote_invalid_ns <= sec_start:
-                state = None   # a crossed quote ended that state's validity
             if state is not None and (sec + 1) * NS - state[0] <= self.book_stale_s * NS:
                 ref.append(state[1])
                 if sec >= s_n0:
                     now.append(state[1])
             b = t.buckets.get(sec)
-            if b is not None and b.quote_n and b.last_quote_ns < t1_ns and b.last_spread_bps > 0:
-                state = (b.last_quote_ns, b.last_spread_bps)
+            if b is not None and b.last_quote_ns and b.last_quote_ns < t1_ns:
+                state = (b.last_quote_ns, b.last_spread_bps) if b.last_spread_bps > 0 else None
                 if sec >= s_n0:
                     now_quotes += b.quote_n
+        if state is None or (t1_ns - state[0]) / NS > now_window_s / 2:
+            return None  # no usable current inside, even if earlier seconds passed
         if len(ref) < min_ref_seconds or now_quotes < min_now_quotes or len(now) < max(1, now_window_s // 2):
             return None
         ref_med = _median(ref)
@@ -650,33 +666,29 @@ class TickTape:
             if sec >= s0:
                 continue
             b = t.buckets[sec]
-            if b.quote_n and b.last_quote_ns < t0_ns:
+            if b.last_quote_ns and b.last_quote_ns < t0_ns:
                 # a quote from before an outage or a cross says nothing about the book after it
-                if not self._outage_in(b.last_quote_ns, t0_ns) and not (b.last_quote_ns < t.quote_invalid_ns <= t0_ns):
+                if b.last_spread_bps > 0 and not self._outage_in(b.last_quote_ns, t0_ns):
                     state = (b.last_quote_ns, b.last_bid_size, b.last_ask_size, b.last_bid, b.last_ask)
                 break
         bid = ask = 0.0
         covered = 0
         quotes = 0
-        newest = None
         for sec in range(s0, s1):
-            if state is not None and state[0] < t.quote_invalid_ns <= sec * NS:
-                state = None   # a crossed quote ended that state's validity
             # the state in force at the START of this second is what this second contributes
             if state is not None and (sec + 1) * NS - state[0] <= self.book_stale_s * NS:
                 bid += state[1]
                 ask += state[2]
                 covered += 1
             b = t.buckets.get(sec)
-            if b is not None and b.quote_n and b.last_quote_ns < t1_ns:
-                state = (b.last_quote_ns, b.last_bid_size, b.last_ask_size, b.last_bid, b.last_ask)
+            if b is not None and b.last_quote_ns and b.last_quote_ns < t1_ns:
+                state = ((b.last_quote_ns, b.last_bid_size, b.last_ask_size, b.last_bid, b.last_ask)
+                         if b.last_spread_bps > 0 else None)
                 quotes += b.quote_n
-                newest = state
         n_secs = s1 - s0
         if covered == 0 or bid + ask <= 0 or covered / n_secs < min_coverage:
             return None
-        if newest is None:
-            newest = state
+        newest = state
         if newest is None or (t1_ns - newest[0]) / NS > max_last_age_s:
             return None
         if self._outage_in(t0_ns, t1_ns):
@@ -695,10 +707,16 @@ class TickTape:
             return {"seconds": 0, "trades": 0, "quotes": 0, "raw_prints": 0, "held_from_ns": None,
                     "last_ns": None, "raw_oldest_age_s": None, "evicted_by_cap": 0, "evicted_by_age": 0}
         held = max(t.session_start_ns or 0, t.evicted_boundary_ns)
+        sec = t.watermark_ns // NS
+        if sec != t.health_spread_sec:
+            t.health_spread = self.spread_stats(symbol, sec * NS)
+            t.health_spread_sec = sec
         return {"seconds": len(t.buckets), "trades": t.raw_count,
                 "quotes": sum(b.quote_n for b in t.buckets.values()), "raw_prints": t.raw_count,
                 "session_prints": sum(v[5] for v in t.minutes.values()), "session_minutes": len(t.minutes),
                 "since_ns": t.since_ns, "session": t.session,
+                "spread_ref_bps": t.health_spread["spread_ref_bps"] if t.health_spread else None,
+                "spread_now_bps": t.health_spread["spread_now_bps"] if t.health_spread else None,
                 "held_from_ns": held, "last_ns": t.watermark_ns,
                 "raw_oldest_age_s": (t.watermark_ns - held) / NS if held else None,
                 "evicted_by_cap": t.evicted_by_cap, "evicted_by_age": t.evicted_by_age}

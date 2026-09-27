@@ -18,12 +18,13 @@ for and only when it holds at least `min_sessions` sessions.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time as dtime, timezone
+from datetime import date, datetime, time as dtime, timedelta, timezone
 import math
 from typing import Any, Dict, Iterable, List, Optional
 from zoneinfo import ZoneInfo
 
 from backend.app.models.events import BarEvent
+from backend.app.core.trading_windows import is_trading_day, session_close, session_minutes
 
 ET = ZoneInfo("America/New_York")
 SESSION_OPEN, SESSION_CLOSE = dtime(9, 30), dtime(16, 0)
@@ -121,7 +122,7 @@ class VolumeProfile:
 def _session_of(bar: BarEvent) -> Optional[str]:
     ts = bar.timestamp if bar.timestamp.tzinfo else bar.timestamp.replace(tzinfo=timezone.utc)
     et = ts.astimezone(ET)
-    if not (SESSION_OPEN <= et.time() < SESSION_CLOSE):
+    if not is_trading_day(et.date()) or not (SESSION_OPEN <= et.time() < session_close(et.date())):
         return None
     return et.date().isoformat()
 
@@ -152,6 +153,17 @@ def build_profile(symbol: str, bars: Iterable[BarEvent], for_session: str, sessi
     ProfileBuildError with the specific reason when the history is not good enough."""
     if sessions <= 0 or min_sessions <= 0 or min_sessions > sessions:
         raise ProfileBuildError(f"bad session configuration sessions={sessions} min_sessions={min_sessions}")
+    target_day = date.fromisoformat(for_session)
+    if target_day.year not in (2026, 2027):
+        raise ProfileBuildError(f"exchange calendar unavailable for {for_session}")
+    expected = []
+    cursor = target_day - timedelta(days=1)
+    while len(expected) < sessions:
+        if cursor.year not in (2026, 2027):
+            raise ProfileBuildError("prior-session exchange calendar unavailable")
+        if is_trading_day(cursor):
+            expected.append(cursor.isoformat())
+        cursor -= timedelta(days=1)
     by_session: Dict[str, Dict[datetime, BarEvent]] = {}
     for b in bars:
         if not _valid(b, symbol):
@@ -159,11 +171,13 @@ def build_profile(symbol: str, bars: Iterable[BarEvent], for_session: str, sessi
         s = _session_of(b)
         if s is None or s >= for_session:
             continue
-        by_session.setdefault(s, {})[b.timestamp] = b   # de-duplicated by timestamp, last revision wins
-    used = sorted(by_session)[-sessions:]
+        if s in expected and b.timestamp.second == 0 and b.timestamp.microsecond == 0:
+            ts = b.timestamp.replace(tzinfo=timezone.utc) if b.timestamp.tzinfo is None else b.timestamp.astimezone(timezone.utc)
+            by_session.setdefault(s, {})[ts] = b   # one observation per actual minute
+    used = sorted(by_session)
     if len(used) < min_sessions:
         raise ProfileBuildError(f"only {len(used)} usable sessions before {for_session}, need {min_sessions}")
-    short = [s for s in used if len(by_session[s]) < min_bars_per_session]
+    short = [s for s in used if len(by_session[s]) < min(min_bars_per_session, session_minutes(date.fromisoformat(s)))]
     if short:
         raise ProfileBuildError(f"incomplete sessions (fewer than {min_bars_per_session} bars): {short}")
     last_bars = sorted(by_session[used[-1]].values(), key=lambda b: b.timestamp)

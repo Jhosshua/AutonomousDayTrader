@@ -12,7 +12,7 @@
   "PLTR",
   "COIN"
  ],
- "elapsed_s": 43.5,
+ "elapsed_s": 41.3,
  "events_replayed": {
   "bars": 6822,
   "trades": 2646672,
@@ -140,48 +140,48 @@
     "bars": 390,
     "session": "2026-09-24",
     "last_bar": "2026-09-24T19:59:00+00:00",
-    "last_bar_age_s": 265039.860946
+    "last_bar_age_s": 266545.231004
    },
    "XLC": {
     "bars": 390,
     "session": "2026-09-24",
     "last_bar": "2026-09-24T19:59:00+00:00",
-    "last_bar_age_s": 265039.860946
+    "last_bar_age_s": 266545.231004
    },
    "XLY": {
     "bars": 390,
     "session": "2026-09-24",
     "last_bar": "2026-09-24T19:59:00+00:00",
-    "last_bar_age_s": 265039.860946
+    "last_bar_age_s": 266545.231004
    },
    "XLF": {
     "bars": 390,
     "session": "2026-09-24",
     "last_bar": "2026-09-24T19:59:00+00:00",
-    "last_bar_age_s": 265039.860946
+    "last_bar_age_s": 266545.231004
    },
    "UUP": {
     "bars": 194,
     "session": "2026-09-24",
     "last_bar": "2026-09-24T19:59:00+00:00",
-    "last_bar_age_s": 265039.860946
+    "last_bar_age_s": 266545.231004
    },
    "SHY": {
     "bars": 388,
     "session": "2026-09-24",
     "last_bar": "2026-09-24T19:59:00+00:00",
-    "last_bar_age_s": 265039.860946
+    "last_bar_age_s": 266545.231004
    },
    "IEF": {
     "bars": 390,
     "session": "2026-09-24",
     "last_bar": "2026-09-24T19:59:00+00:00",
-    "last_bar_age_s": 265039.860946
+    "last_bar_age_s": 266545.231004
    }
   }
  },
  "profiles": {
-  "last_build": "2026-09-27T21:36:08.751380+00:00",
+  "last_build": "2026-09-27T22:01:16.930917+00:00",
   "errors": {},
   "required_sessions": 5,
   "profiles": {
@@ -321,7 +321,7 @@
     "rolling_delta": -0.09624925319317491,
     "tick_velocity_atr_per_min": 0.35629675516051285,
     "book_imbalance": -0.14893617021276595,
-    "session_delta": -576787,
+    "session_delta": -1152694,
     "spread_ratio": 0.5989661875334873,
     "spread_now_bps": 1.2162490883129942,
     "hvn_support": false,
@@ -349,7 +349,7 @@
     "rolling_delta": -0.23514934911084637,
     "tick_velocity_atr_per_min": 0.9361698239574627,
     "book_imbalance": 0.44525547445255476,
-    "session_delta": -457892,
+    "session_delta": -167767,
     "spread_ratio": 0.8323484947387807,
     "spread_now_bps": 1.4772576189565054,
     "hvn_support": true,
@@ -375,7 +375,7 @@
     "rolling_delta": -0.22734785489835618,
     "tick_velocity_atr_per_min": 0.07513382628079415,
     "book_imbalance": -0.08411214953271028,
-    "session_delta": -462364,
+    "session_delta": -172239,
     "spread_ratio": 0.6659180014579271,
     "spread_now_bps": 1.1821029611668428,
     "hvn_support": true,
@@ -403,7 +403,7 @@
     "rolling_delta": -0.22051902098401613,
     "tick_velocity_atr_per_min": 0.6699516580781191,
     "book_imbalance": -0.06306306306306306,
-    "session_delta": -464957,
+    "session_delta": -174832,
     "spread_ratio": 0.6663315295078025,
     "spread_now_bps": 1.1828370346281594,
     "hvn_support": true,
@@ -435,7 +435,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -452,7 +452,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -469,7 +469,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -486,7 +486,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -503,7 +503,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -520,7 +520,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -537,7 +537,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -554,7 +554,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -568,7 +568,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -585,7 +585,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -602,7 +602,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -617,7 +617,7 @@
     "leg_bars": 2
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -634,7 +634,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -649,7 +649,7 @@
     "leg_bars": 9
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -666,7 +666,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -683,7 +683,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -700,7 +700,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -717,7 +717,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -734,7 +734,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -751,7 +751,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -765,7 +765,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -782,7 +782,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -799,7 +799,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -816,7 +816,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -833,7 +833,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -850,7 +850,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -867,7 +867,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -884,7 +884,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -901,7 +901,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -918,7 +918,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -935,7 +935,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -952,7 +952,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -969,7 +969,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -986,7 +986,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1003,7 +1003,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1017,7 +1017,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1034,7 +1034,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1051,7 +1051,7 @@
     "ext_i": 59
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1068,7 +1068,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1085,7 +1085,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1102,7 +1102,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1119,7 +1119,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1136,7 +1136,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1150,7 +1150,7 @@
     "age": 3
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1177,8 +1177,8 @@
     "rolling_signed": -219420,
     "tick_velocity_atr_per_min": 0.35629675516051285,
     "book_imbalance": -0.14893617021276595,
-    "session_delta": -576787,
-    "session_delta_ratio": -0.09857148447934097,
+    "session_delta": -1152694,
+    "session_delta_ratio": -0.1727860353020781,
     "session_delta_partial": false,
     "session_delta_since_ns": 1790256600021069015,
     "session_delta_cutoff_ns": 1790260380000000000,
@@ -1201,7 +1201,7 @@
     }
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1216,7 +1216,7 @@
     "slope": 0.06520465036090071
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1233,7 +1233,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1250,7 +1250,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1267,7 +1267,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1284,7 +1284,7 @@
     "sell_vol": 151508
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1298,7 +1298,7 @@
     "age": 4
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1315,7 +1315,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1332,7 +1332,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1349,7 +1349,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -1363,7 +1363,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1380,7 +1380,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1394,7 +1394,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1409,7 +1409,7 @@
     "leg_bars": 3
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1426,7 +1426,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1443,7 +1443,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1460,7 +1460,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1477,7 +1477,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1494,7 +1494,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1508,7 +1508,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1522,7 +1522,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -1539,7 +1539,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1554,7 +1554,7 @@
     "leg_bars": 14
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1571,7 +1571,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1588,7 +1588,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1605,7 +1605,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1622,7 +1622,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1639,7 +1639,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1656,7 +1656,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1673,7 +1673,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1690,7 +1690,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1707,7 +1707,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -1724,7 +1724,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1741,7 +1741,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1758,7 +1758,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1775,7 +1775,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1792,7 +1792,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -1809,7 +1809,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1826,7 +1826,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -1843,7 +1843,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1860,7 +1860,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1877,7 +1877,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1894,7 +1894,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -1911,7 +1911,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1928,7 +1928,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1945,7 +1945,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -1962,7 +1962,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -1979,7 +1979,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -1996,7 +1996,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2013,7 +2013,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -2030,7 +2030,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2047,7 +2047,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -2062,7 +2062,7 @@
     "leg_bars": 4
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -2079,7 +2079,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2096,7 +2096,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -2113,7 +2113,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -2130,7 +2130,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2147,7 +2147,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2164,7 +2164,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -2181,7 +2181,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2196,7 +2196,7 @@
     "leg_bars": 6
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2213,7 +2213,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -2227,7 +2227,7 @@
     "where": "pullback_delta"
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2244,7 +2244,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2259,7 +2259,7 @@
     "leg_bars": 3
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -2276,7 +2276,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2293,7 +2293,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -2310,7 +2310,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2327,7 +2327,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2344,7 +2344,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2361,7 +2361,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2378,7 +2378,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -2392,7 +2392,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AAPL",
@@ -2407,7 +2407,7 @@
     "leg_bars": 3
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2424,7 +2424,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2441,7 +2441,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2456,7 +2456,7 @@
     "leg_bars": 2
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -2473,7 +2473,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -2490,7 +2490,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -2507,7 +2507,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -2524,7 +2524,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -2541,7 +2541,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -2558,7 +2558,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2575,7 +2575,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -2589,7 +2589,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -2606,7 +2606,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -2623,7 +2623,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "MSFT",
@@ -2637,7 +2637,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMZN",
@@ -2652,7 +2652,7 @@
     "leg_bars": 2
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -2669,7 +2669,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -2686,7 +2686,7 @@
     "pre_empted": false
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "NVDA",
@@ -2700,7 +2700,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "PLTR",
@@ -2714,7 +2714,7 @@
     "since": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "META",
@@ -2728,7 +2728,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2745,7 +2745,7 @@
     "ext_i": 110
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2757,7 +2757,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2769,7 +2769,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2781,7 +2781,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "COIN",
@@ -2795,7 +2795,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2807,7 +2807,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2819,7 +2819,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2833,7 +2833,7 @@
     "age": 1
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2860,8 +2860,8 @@
     "rolling_signed": -281866,
     "tick_velocity_atr_per_min": 0.9361698239574627,
     "book_imbalance": 0.44525547445255476,
-    "session_delta": -457892,
-    "session_delta_ratio": -0.06854028350037855,
+    "session_delta": -167767,
+    "session_delta_ratio": -0.02334602031391962,
     "session_delta_partial": false,
     "session_delta_since_ns": 1790256600030253410,
     "session_delta_cutoff_ns": 1790263620000000000,
@@ -2894,7 +2894,7 @@
     }
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2910,7 +2910,7 @@
     "quotes": 415
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "AMD",
@@ -2924,7 +2924,7 @@
     "since": 20
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -2951,8 +2951,8 @@
     "rolling_signed": -265889,
     "tick_velocity_atr_per_min": 0.07513382628079415,
     "book_imbalance": -0.08411214953271028,
-    "session_delta": -462364,
-    "session_delta_ratio": -0.06899324100093351,
+    "session_delta": -172239,
+    "session_delta_ratio": -0.02389863279989843,
     "session_delta_partial": false,
     "session_delta_since_ns": 1790256600030253410,
     "session_delta_cutoff_ns": 1790263680000000000,
@@ -2987,7 +2987,7 @@
     }
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -3003,7 +3003,7 @@
     "n_trades": 1710
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -3030,8 +3030,8 @@
     "rolling_signed": -253149,
     "tick_velocity_atr_per_min": 0.6699516580781191,
     "book_imbalance": -0.06306306306306306,
-    "session_delta": -464957,
-    "session_delta_ratio": -0.06913530793111822,
+    "session_delta": -174832,
+    "session_delta_ratio": -0.02417879072855009,
     "session_delta_partial": false,
     "session_delta_since_ns": 1790256600030253410,
     "session_delta_cutoff_ns": 1790263740000000000,
@@ -3066,7 +3066,7 @@
     }
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -3082,7 +3082,7 @@
     "quotes": 401
    },
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   },
   {
    "symbol": "GOOGL",
@@ -3094,7 +3094,7 @@
    "side": "SHORT",
    "detail": {},
    "strategy_id": "vwap_pullback",
-   "policy_id": "V2_FULL_L2_2026_09_28"
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28"
   }
  ]
 }

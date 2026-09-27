@@ -1,5 +1,7 @@
 # PLAN 2026-09-27: Ride the Trend add-ons, live from day one (session delta, spread proxy, volume profile)
 
+Current audit corrections and release evidence: [AUDIT_2026_09_27](docs/ride_the_trend_v2/AUDIT_2026_09_27.md). The historical build notes below describe the earlier revision.
+
 Status: v2, BUILT 2026-09-27 night after the Codex attack (21 findings, 6 P0; `docs/ride_the_trend_v2/codex_attack_addons.md`).
 Operator decision: all three live as ENFORCED, fail-closed gates, no recorded-only period. Builds on the live v2 + part-2 build (commits ef789a3, 87d6022, 7142f41).
 Strategy: `vwap_pullback` (Ride the Trend v2), evaluator `backend/app/strategies/vwap_pullback_v2.py`,

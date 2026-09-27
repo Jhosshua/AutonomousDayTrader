@@ -36,6 +36,7 @@ class MacroCalendar:
         self.loaded = False
         self.error: Optional[str] = None
         self.valid_through: Optional[date] = None
+        self.valid_from: date = date.min
         self.reload()
 
     def reload(self) -> None:
@@ -59,6 +60,9 @@ class MacroCalendar:
                     raise ValueError(f"negative blackout in {ev}")
                 str(ev["name"])
             self.valid_through = date.fromisoformat(str(data["valid_through"]))
+            self.valid_from = date.fromisoformat(str(data.get("valid_from", date.min.isoformat())))
+            if self.valid_from > self.valid_through:
+                raise ValueError("calendar coverage dates reversed")
             self.events, self.recurring = events, recurring
             self.loaded = True
             self.error = None
@@ -107,8 +111,8 @@ class MacroCalendar:
         if when.tzinfo is None:
             when = when.replace(tzinfo=timezone.utc)
         w = when.astimezone(ET)
-        if self.valid_through is None or w.date() > self.valid_through:
-            return False, f"MACRO_UNAVAILABLE: calendar valid through {self.valid_through}"
+        if self.valid_through is None or not self.valid_from <= w.date() <= self.valid_through:
+            return False, f"MACRO_UNAVAILABLE: calendar valid {self.valid_from} through {self.valid_through}"
         for d in (w.date() - timedelta(days=1), w.date(), w.date() + timedelta(days=1)):
             for start, end, name in self.windows_for(d):
                 if start <= w <= end:
@@ -117,7 +121,7 @@ class MacroCalendar:
 
     def today_text(self, d: date) -> str:
         ws = self.windows_for(d)
-        if not self.loaded or self.valid_through is None or d > self.valid_through:
+        if not self.loaded or self.valid_through is None or not self.valid_from <= d <= self.valid_through:
             return "Macro calendar unavailable: new trades blocked."
         if not ws:
             return "No scheduled macro releases today."

@@ -1,5 +1,7 @@
 # PLAN 2026-09-27: Ride the Trend data layers, part 2 (raw feed, real-time delta, macro/correlation)
 
+Current audit corrections and release evidence: [AUDIT_2026_09_27](docs/ride_the_trend_v2/AUDIT_2026_09_27.md). The historical build notes below describe the earlier revision.
+
 Status: v3, BUILT 2026-09-27 night (recorded-only rollout; every gate promotable by config). Plan attack:
 `docs/ride_the_trend_v2/codex_attack_data_layers_2.md`; code review: `docs/ride_the_trend_v2/codex_part2_code_review.md`;
 step-0 diagnostics: `docs/ride_the_trend_v2/step0_diagnostics_2026-09-27.md`. Scope = items 1, 3 and 4 of the

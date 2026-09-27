@@ -59,6 +59,10 @@ export interface StrategyState {
   sharpe?: number | null;
   subtitle?: string;
   description?: string;
+  mode?: string;
+  addons_enforced?: boolean;
+  profiles_ready?: { ready: number; total: number; missing: string[] };
+  last_block_by_symbol?: Record<string, { event: string; bar: string; detail?: Record<string, unknown> }>;
   tri_engine?: {
     version: string;
     symbol: string;
