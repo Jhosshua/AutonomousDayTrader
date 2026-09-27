@@ -147,6 +147,18 @@ class Settings(BaseSettings):
     MAX_POSITION_NOTIONAL: float = Field(default=25000.0, description="Max single position value ($25,000 = 50% of equity, 12.5% of 4:1 DTBP)")
     MAX_CONCURRENT_POSITIONS: int = Field(default=3, description="Max simultaneous open positions")
 
+    # Ride the Trend v2 (vwap_pullback). "v2_live" = new rules place real orders;
+    # "off" = evaluates bars, never emits (position management unaffected).
+    RIDE_THE_TREND_MODE: str = Field(default="v2_live", description="v2_live or off")
+    RIDE_THE_TREND_REQUIRE_TICKS: bool = Field(
+        default=True,
+        description="Layers 1-3 (tick aggression, book imbalance, tick velocity) are required gates; missing data rejects the trade"
+    )
+    RIDE_THE_TREND_EXCLUDE: List[str] = Field(
+        default=["TSLA", "CDE", "SPY", "QQQ"],
+        description="Symbols Ride the Trend v2 never evaluates: the Morning Plan owns TSLA/CDE; SPY/QQQ are the regime instruments"
+    )
+
     # Safe Host Port Allocations (Collision Free)
     API_PORT: int = Field(default=8005, description="FastAPI core engine & WS port")
     UI_PORT: int = Field(default=3005, description="Mobile trading UI frontend port")

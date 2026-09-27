@@ -104,6 +104,7 @@ class ResearchRecorder:
     TABLES = {
         "trades": "research_trades",
         "signals": "research_signals",
+        "setups": "research_setups",
     }
 
     def __init__(self, path: Optional[str] = None, max_queue: int = 5000,
@@ -173,6 +174,16 @@ class ResearchRecorder:
             );
             CREATE INDEX IF NOT EXISTS idx_research_signals_session
                 ON research_signals(session_date, row_id);
+            CREATE TABLE IF NOT EXISTS research_setups (
+                row_id TEXT PRIMARY KEY,
+                session_date TEXT NOT NULL,
+                strategy_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_research_setups_session
+                ON research_setups(session_date, row_id);
             """
         )
         conn.commit()

@@ -22,6 +22,8 @@ OUTCOME_TEXT = {
     "DUPLICATE": "Already has a trade or order on this stock",
     "PHASE_GATE": "Outside this strategy's trading hours",
     "MARKET_FILTER": "Blocked by the market-direction check",
+    "RS_FILTER": "Stock is not leading the market (relative strength)",
+    "MACRO_BLACKOUT": "Scheduled macro release too close (macro regime filter)",
     "CONCURRENCY": "Maximum open positions reached",
     "SIZING": "Position size worked out to 0 shares",
     "RISK": "Blocked by the risk limits",

@@ -388,3 +388,22 @@ right. Run the mutation check.
 - **What did not work**: `run_tri_engine_dry_run.py --serve` imported `WebSocket` inside a function while the module uses `from __future__ import annotations`; FastAPI could not resolve the type, treated `ws` as a query param and refused every connection (403). The dashboard sat on "Connecting to the robot".
 - **What worked instead**: Import `WebSocket` at module level.
 - **Note for next time**: The local dashboard only connects to port 8005 (`useTradingStream.ts`); serve snapshots there.
+
+## 2026-09-27: a quote opened a per-second price bucket before any print, skewing tick velocity
+- **What did not work**: `TickTape._bucket` created a bucket on the first quote of a second with `first_price` = the quote mid. A print arriving later in the same second kept that placeholder as the bucket's first price, so `velocity()` measured from a quote mid instead of a print.
+- **What worked instead**: prices come from prints only: the first print into a bucket sets first/last price, and trade queries ignore buckets with no prints.
+- **Note for next time**: when one store folds two event types, test a query whose window starts on the "other" event type.
+
+## 2026-09-27: a test swapped a module-level dependency before the module that installs it was imported
+- **What did not work**: the pipeline test set `vwap_pullback_v2.TAPE = FakeTape()` in a fixture, then did `from backend.app import main` inside the test; importing `main` for the first time re-installed the real tape and every tick gate reported `TICK_UNAVAILABLE`.
+- **What worked instead**: import `main` at the top of the test module; swap the dependency after.
+- **Note for next time**: anything `main.py` installs at import (event sink, tape) must be patched after `main` is imported, never before.
+
+## 2026-09-27: a synthetic fake session cannot pass a relative-strength gate by accident
+- **What did not work**: the bar-only test scenario oscillated around a flat level, so a pullback to VWAP always left the 30-bar return negative and the RS gate refused every fake signal; the first fake index drifted too little to read as BULLISH (0.0003 deadband on 500 = 0.15).
+- **What worked instead**: a fake uptrend (0.05 a bar with a small wobble) and an index drifting 0.01 a bar.
+- **Note for next time**: an end-to-end fake day must be built against every admission gate's numbers, not just the strategy's.
+
+## 2026-09-27: backgrounded codex review died when the Claude Code session ended
+- **What did not work**: `codex exec` launched with `run_in_background` was killed with the session; the output file held only the echoed prompt.
+- **What worked instead**: relaunch in the new session; check that the output file has content after the `codex` marker line before reading it as a review.

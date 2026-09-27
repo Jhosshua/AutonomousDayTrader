@@ -1,0 +1,2194 @@
+{
+ "date": "2026-09-25",
+ "all_arms": false,
+ "symbols": [
+  "AAPL",
+  "NVDA",
+  "AMD",
+  "MSFT",
+  "AMZN",
+  "META",
+  "GOOGL",
+  "PLTR",
+  "COIN"
+ ],
+ "elapsed_s": 13.7,
+ "events_replayed": {
+  "bars": 4290,
+  "trades": 2804461,
+  "quotes": 1948463
+ },
+ "tape": {
+  "trades_seen": 2804461,
+  "quotes_seen": 1947716
+ },
+ "funnel": {
+  "CHASED": 2,
+  "FEATURE_UNAVAILABLE": 315,
+  "HIGH_VOLUME_PULLBACK": 1,
+  "IMPULSE": 101,
+  "NEW_EXTREME": 3,
+  "NO_TOUCH": 5,
+  "PULLBACK": 4,
+  "PVR_NOT_THIN": 3,
+  "RESUMING": 4,
+  "RESUMPTION_TOO_OLD": 1,
+  "SLOPE_TOO_SLOW": 6,
+  "TOUCH_TOO_EARLY": 7,
+  "WINDOW_CLOSED": 4
+ },
+ "decisions": [],
+ "decision_summary": {
+  "signals_today": 0,
+  "orders_today": 0,
+  "blocked_today": 0,
+  "top_block_reason": null,
+  "top_block_text": null,
+  "blocked_by_reason": {}
+ },
+ "signals": [],
+ "brackets": [],
+ "account": {
+  "equity": 50000.0,
+  "realized_pnl": 0.0,
+  "positions_open": 0
+ },
+ "trades_by_strategy": {},
+ "card": {
+  "id": "vwap_pullback",
+  "version": "v2",
+  "mode": "v2_live",
+  "excluded_symbols": [
+   "TSLA",
+   "CDE",
+   "SPY",
+   "QQQ"
+  ],
+  "first_possible_signal": "10:09",
+  "today_counts": {
+   "FEATURE_UNAVAILABLE": 315,
+   "IMPULSE": 101,
+   "TOUCH_TOO_EARLY": 7,
+   "PULLBACK": 4,
+   "PVR_NOT_THIN": 3,
+   "NEW_EXTREME": 3,
+   "RESUMING": 4,
+   "SLOPE_TOO_SLOW": 6,
+   "CHASED": 2,
+   "HIGH_VOLUME_PULLBACK": 1,
+   "NO_TOUCH": 5,
+   "RESUMPTION_TOO_OLD": 1,
+   "WINDOW_CLOSED": 4
+  },
+  "signals_emitted_today": 0,
+  "data_layers": {
+   "required": true,
+   "layer1_ticks": {
+    "live": true,
+    "trades_seen": 2804461
+   },
+   "layer2_book": {
+    "live": true,
+    "quotes_seen": 1947716,
+    "depth": "top_of_book_nbbo"
+   },
+   "layer3_timestamps": {
+    "source": "exchange_nanoseconds",
+    "velocity_window_s": 60
+   },
+   "layer4_macro": {
+    "calendar_loaded": true,
+    "error": null,
+    "regime": "spy_qqq_vwap_ema+vix"
+   }
+  }
+ },
+ "failures": [],
+ "setup_events": [
+  {
+   "symbol": "NVDA",
+   "i": 35,
+   "bar_ts": "2026-09-25T14:05:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 279378.4666666667,
+    "impulse_price": 224.08
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 35,
+   "bar_ts": "2026-09-25T14:05:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 92206.86666666667,
+    "impulse_price": 247.62
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 35,
+   "bar_ts": "2026-09-25T14:05:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 61403.26666666667,
+    "impulse_price": 342
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 35,
+   "bar_ts": "2026-09-25T14:05:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 28105.366666666665,
+    "impulse_price": 193.07
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 36,
+   "bar_ts": "2026-09-25T14:06:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 269983.0333333333,
+    "impulse_price": 224.04
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 36,
+   "bar_ts": "2026-09-25T14:06:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 90450.9,
+    "impulse_price": 247.52
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 36,
+   "bar_ts": "2026-09-25T14:06:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 122654.76666666666,
+    "impulse_price": 761.33
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 36,
+   "bar_ts": "2026-09-25T14:06:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 55967.0,
+    "impulse_price": 341.77
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 36,
+   "bar_ts": "2026-09-25T14:06:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 64120.13333333333,
+    "impulse_price": 190.985
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 36,
+   "bar_ts": "2026-09-25T14:06:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 28417.3,
+    "impulse_price": 192.92
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 37,
+   "bar_ts": "2026-09-25T14:07:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 203160.63333333333,
+    "impulse_price": 509.06
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 37,
+   "bar_ts": "2026-09-25T14:07:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 90970.63333333333,
+    "impulse_price": 247.51
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 38,
+   "bar_ts": "2026-09-25T14:08:00+00:00",
+   "event": "TOUCH_TOO_EARLY",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "since": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 39,
+   "bar_ts": "2026-09-25T14:09:00+00:00",
+   "event": "PULLBACK",
+   "from_state": "IMPULSE",
+   "to_state": "PULLBACK",
+   "side": "LONG",
+   "detail": {
+    "pvr": 0.5342800918458666,
+    "leg_bars": 3,
+    "delta_ratio": -0.25074772630165415,
+    "ext_i": 39
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 40,
+   "bar_ts": "2026-09-25T14:10:00+00:00",
+   "event": "PVR_NOT_THIN",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "pvr": 0.9568166073645863,
+    "leg_bars": 4
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 40,
+   "bar_ts": "2026-09-25T14:10:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 89635.53333333334,
+    "impulse_price": 247.2984
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 40,
+   "bar_ts": "2026-09-25T14:10:00+00:00",
+   "event": "NEW_EXTREME",
+   "from_state": "PULLBACK",
+   "to_state": "PULLBACK",
+   "side": "LONG",
+   "detail": {},
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 41,
+   "bar_ts": "2026-09-25T14:11:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 53479.7,
+    "impulse_price": 334.74
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 41,
+   "bar_ts": "2026-09-25T14:11:00+00:00",
+   "event": "NEW_EXTREME",
+   "from_state": "PULLBACK",
+   "to_state": "PULLBACK",
+   "side": "LONG",
+   "detail": {},
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 42,
+   "bar_ts": "2026-09-25T14:12:00+00:00",
+   "event": "RESUMING",
+   "from_state": "PULLBACK",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 42,
+   "bar_ts": "2026-09-25T14:12:00+00:00",
+   "event": "SLOPE_TOO_SLOW",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 1,
+    "slope": 0.10215574158659756
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 43,
+   "bar_ts": "2026-09-25T14:13:00+00:00",
+   "event": "NEW_EXTREME",
+   "from_state": "RESUMING",
+   "to_state": "PULLBACK",
+   "side": "LONG",
+   "detail": {},
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 43,
+   "bar_ts": "2026-09-25T14:13:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 47574.433333333334,
+    "impulse_price": 341.68
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 44,
+   "bar_ts": "2026-09-25T14:14:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 228338.76666666666,
+    "impulse_price": 224.03
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 44,
+   "bar_ts": "2026-09-25T14:14:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "PULLBACK",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 94252.83333333333,
+    "impulse_price": 752.33
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 44,
+   "bar_ts": "2026-09-25T14:14:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 47495.333333333336,
+    "impulse_price": 341.65
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 45,
+   "bar_ts": "2026-09-25T14:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 46353.03333333333,
+    "impulse_price": 334.62
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 45,
+   "bar_ts": "2026-09-25T14:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 233573.26666666666,
+    "impulse_price": 223.64
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 45,
+   "bar_ts": "2026-09-25T14:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 69615.86666666667,
+    "impulse_price": 630.6111
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 45,
+   "bar_ts": "2026-09-25T14:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 91468.36666666667,
+    "impulse_price": 247.18
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 45,
+   "bar_ts": "2026-09-25T14:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 93403.0,
+    "impulse_price": 751.74
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 45,
+   "bar_ts": "2026-09-25T14:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 45729.6,
+    "impulse_price": 341.11
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 47,
+   "bar_ts": "2026-09-25T14:17:00+00:00",
+   "event": "PVR_NOT_THIN",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "pvr": 1.1785420731185519,
+    "leg_bars": 2
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 47,
+   "bar_ts": "2026-09-25T14:17:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 240678.0,
+    "impulse_price": 223.5801
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 47,
+   "bar_ts": "2026-09-25T14:17:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 70085.13333333333,
+    "impulse_price": 629.98
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 47,
+   "bar_ts": "2026-09-25T14:17:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 51172.8,
+    "impulse_price": 190.8401
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 47,
+   "bar_ts": "2026-09-25T14:17:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 29100.0,
+    "impulse_price": 192.78
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 48,
+   "bar_ts": "2026-09-25T14:18:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 93734.7,
+    "impulse_price": 751.6
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 49,
+   "bar_ts": "2026-09-25T14:19:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 240694.86666666667,
+    "impulse_price": 223.45
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 49,
+   "bar_ts": "2026-09-25T14:19:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 92592.73333333334,
+    "impulse_price": 750.54
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 51,
+   "bar_ts": "2026-09-25T14:21:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 71623.6,
+    "impulse_price": 629.7072
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 56,
+   "bar_ts": "2026-09-25T14:26:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 46647.566666666666,
+    "impulse_price": 336.25
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 56,
+   "bar_ts": "2026-09-25T14:26:00+00:00",
+   "event": "PULLBACK",
+   "from_state": "IMPULSE",
+   "to_state": "PULLBACK",
+   "side": "SHORT",
+   "detail": {
+    "pvr": 0.7070599465444827,
+    "leg_bars": 9,
+    "delta_ratio": -0.03244968381943957,
+    "ext_i": 56
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 57,
+   "bar_ts": "2026-09-25T14:27:00+00:00",
+   "event": "RESUMING",
+   "from_state": "PULLBACK",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 57,
+   "bar_ts": "2026-09-25T14:27:00+00:00",
+   "event": "CHASED",
+   "from_state": "RESUMING",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "age": 1,
+    "chase_std": 0.7270986098114255
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 58,
+   "bar_ts": "2026-09-25T14:28:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 46692.4,
+    "impulse_price": 336.4
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 58,
+   "bar_ts": "2026-09-25T14:28:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 232502.86666666667,
+    "impulse_price": 223.25
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 59,
+   "bar_ts": "2026-09-25T14:29:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 48148.666666666664,
+    "impulse_price": 336.505
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 59,
+   "bar_ts": "2026-09-25T14:29:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 237699.96666666667,
+    "impulse_price": 223.213
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 59,
+   "bar_ts": "2026-09-25T14:29:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 62359.833333333336,
+    "impulse_price": 629.62
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 60,
+   "bar_ts": "2026-09-25T14:30:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 48888.96666666667,
+    "impulse_price": 336.589
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 60,
+   "bar_ts": "2026-09-25T14:30:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 237568.03333333333,
+    "impulse_price": 223.1329
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 60,
+   "bar_ts": "2026-09-25T14:30:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 62500.433333333334,
+    "impulse_price": 629
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 61,
+   "bar_ts": "2026-09-25T14:31:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 76581.93333333333,
+    "impulse_price": 750.48
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 62,
+   "bar_ts": "2026-09-25T14:32:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 50656.6,
+    "impulse_price": 336.99
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 63,
+   "bar_ts": "2026-09-25T14:33:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 77366.86666666667,
+    "impulse_price": 750.38
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 65,
+   "bar_ts": "2026-09-25T14:35:00+00:00",
+   "event": "HIGH_VOLUME_PULLBACK",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "pvr": 1.3191680839751154,
+    "leg_bars": 20
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 65,
+   "bar_ts": "2026-09-25T14:35:00+00:00",
+   "event": "NO_TOUCH",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "since": 20
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 66,
+   "bar_ts": "2026-09-25T14:36:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 53461.6,
+    "impulse_price": 337
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 67,
+   "bar_ts": "2026-09-25T14:37:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 53051.833333333336,
+    "impulse_price": 337.19
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 67,
+   "bar_ts": "2026-09-25T14:37:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 105179.4,
+    "impulse_price": 514.53
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 67,
+   "bar_ts": "2026-09-25T14:37:00+00:00",
+   "event": "NO_TOUCH",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "since": 20
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 68,
+   "bar_ts": "2026-09-25T14:38:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 54558.6,
+    "impulse_price": 337.3499
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 68,
+   "bar_ts": "2026-09-25T14:38:00+00:00",
+   "event": "PULLBACK",
+   "from_state": "IMPULSE",
+   "to_state": "PULLBACK",
+   "side": "SHORT",
+   "detail": {
+    "pvr": 0.7221069933915125,
+    "leg_bars": 8,
+    "delta_ratio": -0.07163431711424266,
+    "ext_i": 68
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 68,
+   "bar_ts": "2026-09-25T14:38:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 101369.46666666666,
+    "impulse_price": 514.74
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 69,
+   "bar_ts": "2026-09-25T14:39:00+00:00",
+   "event": "RESUMING",
+   "from_state": "PULLBACK",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 69,
+   "bar_ts": "2026-09-25T14:39:00+00:00",
+   "event": "SLOPE_TOO_SLOW",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 1,
+    "slope": 0.35982528713981626
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 69,
+   "bar_ts": "2026-09-25T14:39:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 68503.96666666666,
+    "impulse_price": 750.3
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 70,
+   "bar_ts": "2026-09-25T14:40:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 56317.76666666667,
+    "impulse_price": 337.43
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 70,
+   "bar_ts": "2026-09-25T14:40:00+00:00",
+   "event": "SLOPE_TOO_SLOW",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "SHORT",
+   "detail": {
+    "age": 2,
+    "slope": 0.496882733927375
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 70,
+   "bar_ts": "2026-09-25T14:40:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 68156.73333333334,
+    "impulse_price": 750.05
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 70,
+   "bar_ts": "2026-09-25T14:40:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 52579.3,
+    "impulse_price": 190.69
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 71,
+   "bar_ts": "2026-09-25T14:41:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 57135.6,
+    "impulse_price": 337.47
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 71,
+   "bar_ts": "2026-09-25T14:41:00+00:00",
+   "event": "CHASED",
+   "from_state": "RESUMING",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "age": 3,
+    "chase_std": 2.0879257490895293
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 71,
+   "bar_ts": "2026-09-25T14:41:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 67515.6,
+    "impulse_price": 749.1905
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 71,
+   "bar_ts": "2026-09-25T14:41:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 54096.833333333336,
+    "impulse_price": 190.61
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 73,
+   "bar_ts": "2026-09-25T14:43:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 68861.4,
+    "impulse_price": 748.88
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 73,
+   "bar_ts": "2026-09-25T14:43:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 52373.433333333334,
+    "impulse_price": 190.39
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 74,
+   "bar_ts": "2026-09-25T14:44:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 68141.3,
+    "impulse_price": 748.41
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 74,
+   "bar_ts": "2026-09-25T14:44:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 53869.6,
+    "impulse_price": 190.32
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 76,
+   "bar_ts": "2026-09-25T14:46:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 66357.2,
+    "impulse_price": 748
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 77,
+   "bar_ts": "2026-09-25T14:47:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 65055.13333333333,
+    "impulse_price": 747.49
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 79,
+   "bar_ts": "2026-09-25T14:49:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 59066.066666666666,
+    "impulse_price": 337.6
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 79,
+   "bar_ts": "2026-09-25T14:49:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 91458.9,
+    "impulse_price": 515.3
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "NVDA",
+   "i": 80,
+   "bar_ts": "2026-09-25T14:50:00+00:00",
+   "event": "NO_TOUCH",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "since": 20
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 81,
+   "bar_ts": "2026-09-25T14:51:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 60996.4,
+    "impulse_price": 337.63
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 81,
+   "bar_ts": "2026-09-25T14:51:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 93319.53333333334,
+    "impulse_price": 515.49
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 83,
+   "bar_ts": "2026-09-25T14:53:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 61548.2,
+    "impulse_price": 337.7295
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 85,
+   "bar_ts": "2026-09-25T14:55:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 93849.53333333334,
+    "impulse_price": 516.165
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 85,
+   "bar_ts": "2026-09-25T14:55:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 31660.166666666668,
+    "impulse_price": 343.66
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 86,
+   "bar_ts": "2026-09-25T14:56:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 94215.8,
+    "impulse_price": 516.91
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 86,
+   "bar_ts": "2026-09-25T14:56:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 77464.06666666667,
+    "impulse_price": 248.5791
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 86,
+   "bar_ts": "2026-09-25T14:56:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 32505.1,
+    "impulse_price": 343.92
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 87,
+   "bar_ts": "2026-09-25T14:57:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 95279.53333333334,
+    "impulse_price": 517.18
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 87,
+   "bar_ts": "2026-09-25T14:57:00+00:00",
+   "event": "TOUCH_TOO_EARLY",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "since": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "GOOGL",
+   "i": 87,
+   "bar_ts": "2026-09-25T14:57:00+00:00",
+   "event": "TOUCH_TOO_EARLY",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "since": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 91,
+   "bar_ts": "2026-09-25T15:01:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 71062.2,
+    "impulse_price": 249.199
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 93,
+   "bar_ts": "2026-09-25T15:03:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 59213.76666666667,
+    "impulse_price": 337.73
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 94,
+   "bar_ts": "2026-09-25T15:04:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 37421.1,
+    "impulse_price": 634.5
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 94,
+   "bar_ts": "2026-09-25T15:04:00+00:00",
+   "event": "PVR_NOT_THIN",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "pvr": 0.8296330397849623,
+    "leg_bars": 20
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 95,
+   "bar_ts": "2026-09-25T15:05:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 36944.566666666666,
+    "impulse_price": 634.66
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 96,
+   "bar_ts": "2026-09-25T15:06:00+00:00",
+   "event": "TOUCH_TOO_EARLY",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "since": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 97,
+   "bar_ts": "2026-09-25T15:07:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 54843.53333333333,
+    "impulse_price": 337.76
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 97,
+   "bar_ts": "2026-09-25T15:07:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 97406.73333333334,
+    "impulse_price": 249.21
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "META",
+   "i": 97,
+   "bar_ts": "2026-09-25T15:07:00+00:00",
+   "event": "NO_TOUCH",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {
+    "since": 20
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 98,
+   "bar_ts": "2026-09-25T15:08:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 52993.9,
+    "impulse_price": 337.85
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 98,
+   "bar_ts": "2026-09-25T15:08:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 96545.06666666667,
+    "impulse_price": 249.27
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 99,
+   "bar_ts": "2026-09-25T15:09:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 43321.76666666667,
+    "impulse_price": 192.1845
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 99,
+   "bar_ts": "2026-09-25T15:09:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 11796.633333333333,
+    "impulse_price": 195.33
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 100,
+   "bar_ts": "2026-09-25T15:10:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 43783.23333333333,
+    "impulse_price": 192.2798
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 100,
+   "bar_ts": "2026-09-25T15:10:00+00:00",
+   "event": "TOUCH_TOO_EARLY",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "since": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 101,
+   "bar_ts": "2026-09-25T15:11:00+00:00",
+   "event": "PULLBACK",
+   "from_state": "IMPULSE",
+   "to_state": "PULLBACK",
+   "side": "LONG",
+   "detail": {
+    "pvr": 0.6087174487078918,
+    "leg_bars": 3,
+    "delta_ratio": -0.2075936156455254,
+    "ext_i": 101
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "PLTR",
+   "i": 101,
+   "bar_ts": "2026-09-25T15:11:00+00:00",
+   "event": "TOUCH_TOO_EARLY",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "since": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 102,
+   "bar_ts": "2026-09-25T15:12:00+00:00",
+   "event": "RESUMING",
+   "from_state": "PULLBACK",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 102,
+   "bar_ts": "2026-09-25T15:12:00+00:00",
+   "event": "SLOPE_TOO_SLOW",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 1,
+    "slope": 0.03069404237953584
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 103,
+   "bar_ts": "2026-09-25T15:13:00+00:00",
+   "event": "SLOPE_TOO_SLOW",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 2,
+    "slope": 0.08827783372162902
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 103,
+   "bar_ts": "2026-09-25T15:13:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 11438.5,
+    "impulse_price": 195.42
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 104,
+   "bar_ts": "2026-09-25T15:14:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 47703.833333333336,
+    "impulse_price": 337.86
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 104,
+   "bar_ts": "2026-09-25T15:14:00+00:00",
+   "event": "SLOPE_TOO_SLOW",
+   "from_state": "RESUMING",
+   "to_state": "RESUMING",
+   "side": "LONG",
+   "detail": {
+    "age": 3,
+    "slope": 0.2420336429903165
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 104,
+   "bar_ts": "2026-09-25T15:14:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 11663.833333333334,
+    "impulse_price": 195.5567
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 105,
+   "bar_ts": "2026-09-25T15:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 48586.96666666667,
+    "impulse_price": 337.965
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 105,
+   "bar_ts": "2026-09-25T15:15:00+00:00",
+   "event": "RESUMPTION_TOO_OLD",
+   "from_state": "RESUMING",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "age": 4
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 105,
+   "bar_ts": "2026-09-25T15:15:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 11973.833333333334,
+    "impulse_price": 195.56
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 106,
+   "bar_ts": "2026-09-25T15:16:00+00:00",
+   "event": "TOUCH_TOO_EARLY",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "since": 1
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 107,
+   "bar_ts": "2026-09-25T15:17:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 47286.53333333333,
+    "impulse_price": 338.22
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "MSFT",
+   "i": 107,
+   "bar_ts": "2026-09-25T15:17:00+00:00",
+   "event": "NO_TOUCH",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {
+    "since": 20
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 110,
+   "bar_ts": "2026-09-25T15:20:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 48087.9,
+    "impulse_price": 338.43
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 110,
+   "bar_ts": "2026-09-25T15:20:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 35994.2,
+    "impulse_price": 630.19
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 111,
+   "bar_ts": "2026-09-25T15:21:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 49067.333333333336,
+    "impulse_price": 338.49
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 115,
+   "bar_ts": "2026-09-25T15:25:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 36805.9,
+    "impulse_price": 629.84
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 115,
+   "bar_ts": "2026-09-25T15:25:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 10924.833333333334,
+    "impulse_price": 194.19
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 116,
+   "bar_ts": "2026-09-25T15:26:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 49029.1,
+    "impulse_price": 338.64
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 116,
+   "bar_ts": "2026-09-25T15:26:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 36435.4,
+    "impulse_price": 629.25
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 116,
+   "bar_ts": "2026-09-25T15:26:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IDLE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 92029.46666666666,
+    "impulse_price": 249.3799
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 116,
+   "bar_ts": "2026-09-25T15:26:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 10738.0,
+    "impulse_price": 193.9018
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 117,
+   "bar_ts": "2026-09-25T15:27:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "SHORT",
+   "detail": {
+    "ref": 36601.76666666667,
+    "impulse_price": 628.88
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 117,
+   "bar_ts": "2026-09-25T15:27:00+00:00",
+   "event": "IMPULSE",
+   "from_state": "IMPULSE",
+   "to_state": "IMPULSE",
+   "side": "LONG",
+   "detail": {
+    "ref": 91378.33333333333,
+    "impulse_price": 249.455
+   },
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AAPL",
+   "i": 119,
+   "bar_ts": "2026-09-25T15:29:00+00:00",
+   "event": "WINDOW_CLOSED",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {},
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMD",
+   "i": 119,
+   "bar_ts": "2026-09-25T15:29:00+00:00",
+   "event": "WINDOW_CLOSED",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {},
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "AMZN",
+   "i": 119,
+   "bar_ts": "2026-09-25T15:29:00+00:00",
+   "event": "WINDOW_CLOSED",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "LONG",
+   "detail": {},
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  },
+  {
+   "symbol": "COIN",
+   "i": 119,
+   "bar_ts": "2026-09-25T15:29:00+00:00",
+   "event": "WINDOW_CLOSED",
+   "from_state": "IMPULSE",
+   "to_state": "IDLE",
+   "side": "SHORT",
+   "detail": {},
+   "strategy_id": "vwap_pullback",
+   "policy_id": "V2_FULL_2026_09_27"
+  }
+ ]
+}

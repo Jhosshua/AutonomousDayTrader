@@ -14,7 +14,8 @@ GATE = DynamicAdaptationEngine().is_strategy_permitted
 # Documented schedule (README / plan): new entries allowed [start, end).
 EXPECTED = {
     "orb": [(time(9, 30), time(11, 30))],
-    "vwap_pullback": [(time(9, 30), time(11, 30)), (time(14, 0), time(15, 45))],
+    # v2 (2026-09-28): mornings only; the strategy itself starts signals at 09:45.
+    "vwap_pullback": [(time(9, 30), time(11, 30))],
     "mean_reversion": [(time(10, 0), time(15, 45))],
     "news_momentum": [(time(9, 30), time(15, 45))],
 }
@@ -37,10 +38,12 @@ def test_every_minute_matches_documented_hours(sid):
 
 
 def test_labels_and_next_change():
+    w = strategy_window("mean_reversion", _at(9, 45), GATE, market_trend="BULLISH")
+    assert w["state"] == "WAITING" and w["headline"] == "Opens 10:00 AM"
+    assert w["hours"] == "10:00 AM - 3:45 PM"
+    assert w["next_change_at"] == "2026-09-24T10:00:00-04:00"
     w = strategy_window("vwap_pullback", _at(12, 15), GATE, market_trend="BULLISH")
-    assert w["state"] == "WAITING" and w["headline"] == "Opens 2:00 PM"
-    assert w["hours"] == "9:30 AM - 11:30 AM, 2:00 PM - 3:45 PM"
-    assert w["next_change_at"] == "2026-09-24T14:00:00-04:00"
+    assert w["state"] == "DONE_FOR_DAY" and w["hours"] == "9:30 AM - 11:30 AM"
     w = strategy_window("orb", _at(12, 0), GATE, market_trend="BULLISH")
     assert w["state"] == "DONE_FOR_DAY"
     assert "Next: tomorrow 9:30 AM" in w["schedule_text"]

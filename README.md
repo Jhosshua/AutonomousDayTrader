@@ -82,7 +82,7 @@ The old TSLA OR15 one-share arm (`tsla_or15_retest`) takes no new entries (`OR15
 
 ### 2. 4 Dynamically Adapted Intraday Strategies
 1. **Opening Range Breakout (ORB)**: Uses the first 5 minutes in production (15 minutes is configurable), a relative volume threshold of 1.8x, midpoint invalidation stops, and tiered profit targets.
-2. **VWAP Trend Pullback & Continuation**: Anchored intraday VWAP with standard deviation bands and an EMA20/EMA50 trend filter. It needs 50 regular-session one-minute closes before its first possible entry (about 10:20 ET on a normal feed); it can trade again from 14:00 to 15:45 ET.
+2. **Ride the Trend v2** (`vwap_pullback`, since 2026-09-28): VWAP-structure trend (a new 30-bar high with the close above VWAP), a thin-volume pullback to the VWAP zone (leg volume at most 80% of the 30 bars before it), and a resumption-speed entry (close-to-close at least 0.5 ATR per bar within 3 bars of the low, no chasing past 0.5 std above VWAP). Four required data layers gate every trade: SIP trade prints classified at bid or ask (pullback aggression must not exceed -30% net selling for longs), top-of-book imbalance from NBBO quotes (at least +10% the trade's way), tick velocity on exchange nanosecond timestamps (at least 0.25 ATR per minute), and the macro regime (SPY/QQQ direction, VIX, and a macro-release blackout calendar) plus relative strength versus SPY. Stop computed once (widest of 1.5 ATR x VIX multiplier, structure past the pullback extreme, 0.4%; over 4% = no trade). Half off at 1R, runner on a 1.5 ATR trail with no second target. Mornings only, 09:45 to 11:30 ET (first possible entry about 10:09), at most 2 trades per symbol per day, TSLA/CDE/SPY/QQQ excluded. Plan and evidence: `PLAN_2026_09_27_ride_the_trend_v2.md`, `docs/ride_the_trend_v2/`.
 3. **Catalyst News Momentum Breakout**: Benzinga sentiment at least 0.60, a strictly greater than 2.0x regular-session volume surge, and contradictory-news emergency exits for intraday holdings. Premarket headlines remain eligible at the open while within the 180-second catalyst window.
 4. **Statistical Mean Reversion / Exhaustion Fades**: One-minute $|Z|\ge 1.65$ with RSI-14 extremes, volume greater than 1.30x, and wick rejection at least 0.30. It targets the 20-period mean only when the adapted-stop reward/risk is at least 1.0R.
 - **Dynamic Self-Adaptation**: Adapts position sizing, entry criteria, and stop widths dynamically across 4 VIX Volatility Regimes (Low, Normal, Elevated, Crisis) and 5 Time-of-Day Execution Phases (Pre-market scan, Open flush, Trend continuation, Midday chop defense, Power hour).
@@ -292,7 +292,8 @@ AutonomousDayTrader/
 │   │   ├── strategies/
 │   │   │   ├── base.py           # Strategy base class & signal definitions
 │   │   │   ├── orb.py            # Opening Range Breakout strategy
-│   │   │   ├── vwap_pullback.py  # VWAP Trend Pullback & Continuation
+│   │   │   ├── vwap_pullback.py  # v1 class (checkpoint decoding only)
+│   │   │   ├── vwap_pullback_v2.py  # Ride the Trend v2 (registered as vwap_pullback)
 │   │   │   ├── news_momentum.py  # Catalyst News Momentum Breakout
 │   │   │   ├── mean_reversion.py # Statistical Mean Reversion / Exhaustion
 │   │   │   ├── adaptation.py     # VIX regime scaling & time-of-day dynamics

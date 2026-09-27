@@ -197,11 +197,14 @@ class DynamicAdaptationEngine:
                 TimeOfDayPhase.TREND_CONTINUATION.value,
             )
 
-        # Gate rule 3: VWAP Pullback (trend continuation) blocked during MIDDAY_CHOP
+        # Gate rule 3: Ride the Trend v2 trades the morning only (09:45-11:30 inside the
+        # strategy; the phase gate allows OPEN_VOLATILITY_FLUSH and TREND_CONTINUATION).
+        # The 2026-09-27 replay: afternoon -0.075R vs morning -0.043R, 15:00 hour -0.099R.
         if strat == "vwap_pullback":
-            if active_phase == TimeOfDayPhase.MIDDAY_CHOP.value:
-                return False
-            return True
+            return active_phase in (
+                TimeOfDayPhase.OPEN_VOLATILITY_FLUSH.value,
+                TimeOfDayPhase.TREND_CONTINUATION.value,
+            )
 
         # Gate rule 4: Mean Reversion is disabled during morning open volatility flush
         if strat == "mean_reversion":
@@ -219,6 +222,10 @@ class DynamicAdaptationEngine:
         remain wide: capping it would move protection inside the setup's
         structural level and turn a rejected setup into a live order.
         """
+        if getattr(signal, "stop_is_final", False):
+            # Ride the Trend v2 computes its stop once (1.5 ATR x VIX multiplier,
+            # structure, floor). Scaling it here would apply the VIX multiplier twice.
+            return signal.stop_loss
         raw_dist = abs(signal.entry_price - signal.stop_loss)
         adapted_dist = raw_dist * self.current_stop_multiplier
 

@@ -25,6 +25,8 @@ from backend.app.core.account import PaperTradingAccount, PositionSide, TradingA
 from backend.app.core.broker import AlpacaBroker
 from backend.app.core.bracket import BracketChildType, BracketStatus, DynamicBracketManager
 from backend.app.core.market_filter import MarketTrendFilter
+from backend.app.core.tick_tape import TickTape
+from backend.app.core.macro_calendar import macro_calendar
 from backend.app.core.engine import BracketRole, ExecutionEngine, OrderSide, OrderType
 from backend.app.core.event_bus import event_bus
 from backend.app.core.flattening import ET_TZ, FlatteningDirective, FlatteningPhase, ZeroOvernightFlatteningEngine
@@ -42,7 +44,9 @@ from backend.app.ingestion.vix_client import VixClient
 from backend.app.models.events import BarEvent, QuoteEvent, TradeEvent, NewsEvent, VixPrint, RelayStatusEvent
 from backend.app.strategies.base import Strategy, SignalEvent
 from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
-from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
+from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy  # v1 class: checkpoint decoding only
+from backend.app.strategies import vwap_pullback_v2
+from backend.app.strategies.vwap_pullback_v2 import VWAPPullbackV2Strategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
 from backend.app.strategies.tsla_or15_retest import (
@@ -86,7 +90,14 @@ market_filter = MarketTrendFilter()
 
 # Strategies & Dynamic Self-Adaptation Engine
 orb_strategy = OpeningRangeBreakoutStrategy()
-vwap_strategy = VWAPPullbackStrategy()
+vwap_strategy = VWAPPullbackV2Strategy(
+    mode=settings.RIDE_THE_TREND_MODE,
+    excluded_symbols=list(settings.RIDE_THE_TREND_EXCLUDE),
+    require_tick_layers=settings.RIDE_THE_TREND_REQUIRE_TICKS,
+)
+# Layers 1-3 for Ride the Trend v2: every SIP print and NBBO quote folds into this tape.
+tick_tape = TickTape()
+vwap_pullback_v2.TAPE = tick_tape
 news_strategy = NewsMomentumStrategy()
 mean_reversion_strategy = MeanReversionStrategy()
 tsla_or15_strategy = TSLAOR15RetestStrategy()
@@ -820,6 +831,16 @@ def _restore_checkpoint() -> bool:
     risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.daily_starting_equity)
     decision_log.load_state(restored.get("decisions"))
     research_safe(research_tracker.load_state, restored.get("research"), recorder=research_recorder)
+    try:
+        # v1 or older v2 symbol state is replayed through the v2 evaluator; no stored index is trusted.
+        rebuilt = vwap_strategy.after_restore()
+        log.info("Ride the Trend v2 symbol state rebuilt from session bars: %s", rebuilt)
+        if rebuilt.get("failed"):
+            log.error("Ride the Trend v2: %d symbol(s) could not be rebuilt; their daily budget is closed", len(rebuilt["failed"]))
+    except Exception:
+        # Never trade on limits we cannot reconstruct: keep whatever state exists, block new entries.
+        log.exception("Ride the Trend v2 state rebuild failed; new entries blocked until the next session")
+        vwap_strategy.emission_blocked_reason = "restore_failed"
     swing_scan = restored.get("swing_scan") or {}
     if swing_scan.get("last_scan"):
         swing_strategy_engine.audit_log[:] = [swing_scan["last_scan"]]
@@ -1571,6 +1592,17 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
         if s.strategy_id == OR15_ID and not OR15_NEW_ENTRIES and not or15_controller.reserves("TSLA"):
             continue  # Retired protocol remains in checkpoint/history only.
         card = s.to_dict()
+        extra_blockers: List[str] = []
+        if s.strategy_id == "vwap_pullback":
+            # The four data layers are gates: no ticks or quotes, or a macro blackout, blocks new trades.
+            layers = card.get("data_layers") or {}
+            ticks_live = bool((layers.get("layer1_ticks") or {}).get("live"))
+            book_live = bool((layers.get("layer2_book") or {}).get("live"))
+            if not (ticks_live and book_live) and not simulation_mode:
+                extra_blockers.append("Waiting for tick and quote data.")
+            macro_ok, macro_reason = macro_calendar.check(now)
+            if not macro_ok:
+                extra_blockers.append("Macro release blackout." if macro_reason.startswith("MACRO_BLACKOUT") else "Macro calendar unavailable.")
         card["window"] = strategy_window(
             s.strategy_id,
             now,
@@ -1582,8 +1614,11 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
             persistence_halted=state_store is not None and not persistence_healthy,
             positions_full=committed_count >= adaptation_engine.max_concurrent_positions,
             vix_stale=vix_stale,
+            extra_blockers=extra_blockers,
         )
         card["decisions"] = decision_log.summary(s.strategy_id)
+        if s.strategy_id == "vwap_pullback":
+            card["window"]["notes"].append(macro_calendar.today_text(now.astimezone(ET_TZ).date()))
         if s.strategy_id in FIXED_IDS:
             blockers = []
             if risk_engine.status != BreakerStatus.ARMED:
@@ -1632,6 +1667,9 @@ def _intraday_target_overrides(
         return signal.take_profit_1, signal.take_profit_2, None
 
     if signal.strategy_id == "vwap_pullback":
+        if getattr(signal, "stop_is_final", False):
+            # v2: T1 = fill + target_1_r x (fill - stop); runner is trail-only.
+            return None, None, None
         if signal.target_1_is_r_fallback:
             return None, None, None
         if reward + 1e-9 < 0.50 * buffered_risk:
@@ -1707,6 +1745,21 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             return
 
     latest_market_prices[sym] = signal.entry_price if bar is None else bar.close
+    if signal.strategy_id == "vwap_pullback":
+        if not getattr(signal, "stop_is_final", False):
+            # Only v2 emits under this id and it always computes a final stop; anything else is refused.
+            _record_decision(signal, "RISK", "vwap_pullback signal without a final stop (not a v2 signal)", stages)
+            return
+        # Admission happens when the bar completes: judge the macro blackout at that time.
+        macro_ok, macro_detail = macro_calendar.check(signal.timestamp + timedelta(minutes=1))
+        stages.update(macro=macro_detail)
+        if not macro_ok:
+            _record_decision(signal, "MACRO_BLACKOUT", macro_detail, stages)
+            return
+        rs_ok, rs_detail = _ride_the_trend_rs(signal, stages)
+        if not rs_ok:
+            _record_decision(signal, "RS_FILTER", rs_detail, stages)
+            return
     adapted_stop = adaptation_engine.calculate_adapted_stop(signal)
     target_1_override, target_2_override, target_error = _intraday_target_overrides(signal, adapted_stop)
     stages.update(
@@ -1812,8 +1865,11 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             target_1_r=getattr(ratio_strategy, "target_1_r", None),
             target_2_r=getattr(ratio_strategy, "target_2_r", None),
             min_target_1_r=0.50 if signal.strategy_id == "vwap_pullback" else None,
+            runner_policy="TRAIL_ONLY" if getattr(signal, "stop_is_final", False) else "TARGET",
         )
         entry_order_to_bracket[submitted.id] = bracket.bracket_id
+        if signal.strategy_id == "vwap_pullback" and hasattr(vwap_strategy, "notify_admitted"):
+            vwap_strategy.notify_admitted(sym)
         if settings.RESEARCH_ENABLED:
             research_safe(research_tracker.open_bracket, bracket, signal_row, submitted, recorder=research_recorder)
         if bar:
@@ -1824,6 +1880,66 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             orb_strategy.notify_signal_rejected(sym)
         log.warning("Entry order %s rejected by execution engine: %s", submitted.id, submitted.reject_reason)
         _record_decision(signal, "ENGINE_REJECT", str(submitted.reject_reason), stages)
+
+
+def _record_setup_event(ev: Dict[str, Any]) -> None:
+    """Research only: every Ride the Trend v2 setup transition and gate decision."""
+    if not settings.RESEARCH_ENABLED:
+        return
+    ts = ev.get("bar_ts")
+    ts_iso = ts.isoformat() if isinstance(ts, datetime) else str(ts)
+    session = ts.astimezone(ET_TZ).date().isoformat() if isinstance(ts, datetime) else datetime.now(ET_TZ).date().isoformat()
+    mode = research_tracker.mode_tag()
+    row_id = f"{mode}:vwap_pullback|{ev.get('symbol')}|{ts_iso}|{ev.get('event')}|{ev.get('i')}"
+    row = {
+        "row_id": row_id, "kind": "SETUP", "session_date": session,
+        "strategy_id": ev.get("strategy_id", "vwap_pullback"), "policy_id": ev.get("policy_id"),
+        "symbol": ev.get("symbol"), "bar_ts": ts_iso, "i": ev.get("i"), "event": ev.get("event"),
+        "from_state": ev.get("from_state"), "to_state": ev.get("to_state"), "side": ev.get("side"),
+        "detail": ev.get("detail") or {}, "execution_mode": mode,
+    }
+    research_safe(research_recorder.record, "setups", row_id, row, recorder=research_recorder)
+
+
+vwap_pullback_v2.EVENT_SINK = _record_setup_event
+
+
+def _ride_the_trend_rs(signal: SignalEvent, stages: Dict[str, Any]) -> Tuple[bool, str]:
+    """Relative strength gate: the stock must lead SPY (longs) or lag it (shorts).
+
+    Joined on completed bars: SPY's latest bar must be the same minute as the stock bar
+    or the minute before (SPY can arrive a moment later). Anything else is unavailable
+    and the signal is rejected, never assumed.
+    """
+    sym = signal.symbol.upper()
+    inputs = vwap_strategy.rs_inputs(sym)
+    spy = market_filter.spy_state
+    is_buy = signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY"
+    if not inputs or inputs.get("close_30_ago") is None:
+        return False, "RS_UNAVAILABLE: stock needs 31 session bars"
+    if inputs.get("open_ts") is None or inputs["open_ts"].astimezone(ET_TZ).time() != time(9, 30):
+        return False, "RS_UNAVAILABLE: the stock's first session bar is not the 09:30 bar"
+    if spy.bars_count < 31 or spy.first_open in (None, 0) or spy.last_timestamp is None or len(spy.closes) < 31:
+        return False, "RS_UNAVAILABLE: SPY needs 31 session bars"
+    for name, val in (("stock_open", inputs["open_0930"]), ("stock_close_30", inputs["close_30_ago"]),
+                      ("spy_open", spy.first_open), ("spy_close_30", spy.closes[-31]), ("spy_last", spy.last_price)):
+        if not (isinstance(val, (int, float)) and math.isfinite(val) and val > 0):
+            return False, f"RS_UNAVAILABLE: bad {name} {val!r}"
+    bar_ts = inputs["bar_ts"]
+    spy_ts = spy.last_timestamp
+    if bar_ts.tzinfo is None:
+        bar_ts = bar_ts.replace(tzinfo=timezone.utc)
+    if spy_ts.tzinfo is None:
+        spy_ts = spy_ts.replace(tzinfo=timezone.utc)
+    lag = (bar_ts - spy_ts).total_seconds()
+    if lag < 0 or lag > 60:
+        return False, f"RS_UNAVAILABLE: SPY bar {spy_ts.isoformat()} is {lag:.0f}s from the stock bar"
+    rs_day = (inputs["close_now"] / inputs["open_0930"] - 1.0) - (spy.last_price / spy.first_open - 1.0)
+    rs_30 = (inputs["close_now"] / inputs["close_30_ago"] - 1.0) - (spy.last_price / spy.closes[-31] - 1.0)
+    stages.update(rs_day=round(rs_day, 6), rs_30=round(rs_30, 6), rs_spy_bar=spy_ts.isoformat(), rs_lag_s=lag)
+    ok = (rs_day >= 0 and rs_30 >= 0) if is_buy else (rs_day <= 0 and rs_30 <= 0)
+    verdict = "leading" if ok else "not leading"
+    return ok, f"{verdict} SPY: rs_day={rs_day * 100:.3f}% rs_30={rs_30 * 100:.3f}%"
 
 
 # Event Bus Handlers
@@ -1909,6 +2025,7 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
 
     # Evaluate intraday strategies on new bar (restricted strictly to WATCHLIST_SYMBOLS)
     collected_signals: List[SignalEvent] = []
+    vwap_strategy.vix_stop_multiplier = float(adaptation_engine.current_stop_multiplier or 1.0)
     if bar.symbol.upper() in settings.WATCHLIST_SYMBOLS:
         for strat in strategies:
             try:
@@ -2029,6 +2146,13 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
             return
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
     _mark_feed_event("quote")
+    try:
+        tick_tape.on_quote(
+            quote.symbol, quote.bid_price, quote.ask_price, quote.bid_size, quote.ask_size,
+            quote.timestamp_ns or int(quote.timestamp.timestamp() * 1_000_000_000),
+        )
+    except Exception:
+        log.exception("tick tape quote fold failed")
     or15_controller.on_quote(quote)
     tri_controller.on_quote(quote)
     for strat in strategies:
@@ -2460,9 +2584,17 @@ async def _runtime_clock_loop() -> None:
 
 
 async def handle_trade_event(trade: TradeEvent) -> None:
-    """Track the latest trade print price for pre-trade risk valuation."""
-    latest_market_prices[trade.symbol.upper()] = trade.price
+    """Track the latest trade print price; fold the print into the Ride the Trend tick tape."""
+    if isinstance(trade.price, (int, float)) and math.isfinite(trade.price) and trade.price > 0:
+        latest_market_prices[trade.symbol.upper()] = trade.price
     _mark_feed_event("trade")
+    try:
+        tick_tape.on_trade(
+            trade.symbol, trade.price, trade.size,
+            trade.timestamp_ns or int(trade.timestamp.timestamp() * 1_000_000_000),
+        )
+    except Exception:
+        log.exception("tick tape trade fold failed")
 
 
 async def _verify_or15_sip_loop() -> None:
@@ -2520,6 +2652,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     bracket_realized_pnl.clear()
     completed_brackets_recorded.clear()
     pending_trade_records.clear()
+    tick_tape.reset()
     pending_session_summaries.clear()
     pending_processed_events.clear()
     inflight_event_keys.clear()
@@ -2770,6 +2903,7 @@ async def get_health() -> Dict[str, Any]:
         },
         "relay": relay_statuses,
         "research": research_recorder.health(),
+        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
         "broker": _broker_health(),
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
@@ -2923,8 +3057,8 @@ async def get_research_rows(
 ) -> Dict[str, Any]:
     """Research export: `trades` (closed trades with R, MFE/MAE, stops, context) or
     `signals` (every emitted signal with its outcome). Page with `after` = next_after."""
-    if kind not in ("trades", "signals"):
-        raise HTTPException(status_code=404, detail="kind must be trades or signals")
+    if kind not in ("trades", "signals", "setups"):
+        raise HTTPException(status_code=404, detail="kind must be trades, signals or setups")
     if since is not None:
         try:
             date.fromisoformat(since)
@@ -2941,6 +3075,7 @@ async def get_research_rows(
         "rows": rows,
         "next_after": f"{last.get('session_date')}|{last.get('row_id')}" if last and len(rows) >= max(1, min(limit, 1000)) else None,
         "research": research_recorder.health(),
+        "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
     }
 
 

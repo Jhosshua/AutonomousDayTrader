@@ -1,0 +1,14 @@
+{
+  "_note": "Layer 4 macro blackout windows (ET). Operator-editable; the bot reads it at startup. FOMC dates are the Federal Reserve's published 2026 schedule (decision day of each two-day meeting, 14:00 statement). CPI dates for Q4 2026 must be verified against the BLS schedule before relying on them. Past valid_through every entry is refused (MACRO_UNAVAILABLE) until the calendar is extended.",
+  "valid_through": "2026-12-31",
+  "events": [
+    {"name": "FOMC decision", "date": "2026-10-28", "time_et": "14:00", "before_min": 30, "after_min": 30},
+    {"name": "FOMC decision", "date": "2026-12-09", "time_et": "14:00", "before_min": 30, "after_min": 30},
+    {"name": "CPI (verify date)", "date": "2026-10-14", "time_et": "08:30", "before_min": 15, "after_min": 45},
+    {"name": "CPI (verify date)", "date": "2026-11-12", "time_et": "08:30", "before_min": 15, "after_min": 45},
+    {"name": "CPI (verify date)", "date": "2026-12-10", "time_et": "08:30", "before_min": 15, "after_min": 45}
+  ],
+  "recurring": [
+    {"name": "Nonfarm payrolls", "rule": "first_friday", "time_et": "08:30", "before_min": 15, "after_min": 45}
+  ]
+}

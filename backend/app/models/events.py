@@ -116,6 +116,35 @@ class BarEvent:
         )
 
 
+def parse_relay_timestamp(value: Any) -> Tuple[datetime, Optional[int]]:
+    """Relay timestamps carry nanoseconds (e.g. 2026-09-25T14:00:00.017028058Z).
+
+    Returns (datetime truncated to microseconds, integer nanoseconds since the epoch).
+    Works on every Python version: the fractional part is parsed by hand.
+    """
+    text = str(value)
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    frac = ""
+    if "." in text:
+        head, rest = text.split(".", 1)
+        digits = ""
+        i = 0
+        while i < len(rest) and rest[i].isdigit():
+            digits += rest[i]
+            i += 1
+        frac = digits
+        text = head + rest[i:]
+    base = datetime.fromisoformat(text)
+    if base.tzinfo is None:
+        base = base.replace(tzinfo=timezone.utc)
+    micros = int((frac + "000000")[:6]) if frac else 0
+    nanos = int((frac + "000000000")[:9]) if frac else 0
+    dt = base.replace(microsecond=micros)
+    ns = int(base.replace(microsecond=0).timestamp()) * 1_000_000_000 + nanos
+    return dt, ns
+
+
 @dataclass(frozen=True)
 class QuoteEvent:
     """Top-of-book NBBO quote (AlpacaRelay message T: 'q')."""
@@ -129,6 +158,7 @@ class QuoteEvent:
     timestamp: datetime
     conditions: List[str] = field(default_factory=list)
     tape: str = "C"
+    timestamp_ns: Optional[int] = None  # exchange nanoseconds since the epoch
 
     @property
     def mid_price(self) -> float:
@@ -140,8 +170,7 @@ class QuoteEvent:
 
     @classmethod
     def from_relay_dict(cls, data: Dict[str, Any]) -> "QuoteEvent":
-        ts_str = str(data["t"]).replace("Z", "+00:00")
-        ts = datetime.fromisoformat(ts_str) if "+" in ts_str or "-" in ts_str[10:] else datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+        ts, ts_ns = parse_relay_timestamp(data["t"])
         return cls(
             symbol=data["S"].upper(),
             bid_price=float(data["bp"]),
@@ -153,6 +182,7 @@ class QuoteEvent:
             timestamp=ts,
             conditions=data.get("c", []),
             tape=data.get("z", "C"),
+            timestamp_ns=ts_ns,
         )
 
 
@@ -167,11 +197,11 @@ class TradeEvent:
     timestamp: datetime
     conditions: List[str] = field(default_factory=list)
     tape: str = "C"
+    timestamp_ns: Optional[int] = None  # exchange nanoseconds since the epoch
 
     @classmethod
     def from_relay_dict(cls, data: Dict[str, Any]) -> "TradeEvent":
-        ts_str = str(data["t"]).replace("Z", "+00:00")
-        ts = datetime.fromisoformat(ts_str) if "+" in ts_str or "-" in ts_str[10:] else datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+        ts, ts_ns = parse_relay_timestamp(data["t"])
         return cls(
             symbol=data["S"].upper(),
             trade_id=int(data.get("i", 0)),
@@ -181,6 +211,7 @@ class TradeEvent:
             timestamp=ts,
             conditions=data.get("c", []),
             tape=data.get("z", "C"),
+            timestamp_ns=ts_ns,
         )
 
 

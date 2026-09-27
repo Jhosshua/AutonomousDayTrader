@@ -53,6 +53,10 @@ class BracketOrder(BaseModel):
     status: BracketStatus = BracketStatus.PENDING_ENTRY
     use_trailing_target_2: bool = True
     trail_atr_multiplier: float = 1.5
+    # "TARGET": second-target limit order for the runner (default, v1 behaviour).
+    # "TRAIL_ONLY": no second target; the runner exits on the ATR trail, the stop
+    # or the 15:55 flatten (Ride the Trend v2).
+    runner_policy: str = "TARGET"
     peak_price_since_entry: float
     stop_order_id: Optional[str] = None
     target_1_order_id: Optional[str] = None
@@ -127,6 +131,7 @@ class DynamicBracketManager:
         timestamp: Optional[datetime] = None,
         arm: TradingArm = TradingArm.INTRADAY,
         fixed_single_target: bool = False,
+        runner_policy: str = "TARGET",
     ) -> BracketOrder:
         """
         Create and compute price levels for a dynamic multi-tier bracket.
@@ -187,11 +192,12 @@ class DynamicBracketManager:
             peak_price_since_entry=entry_price,
             stop_order_id=f"stop_{bracket_id}",
             target_1_order_id=f"t1_{bracket_id}",
-            target_2_order_id=f"t2_{bracket_id}" if q2 > 0 else None,
+            target_2_order_id=f"t2_{bracket_id}" if (q2 > 0 and runner_policy != "TRAIL_ONLY") else None,
             created_at=now,
             updated_at=now,
             arm=arm,
             fixed_single_target=fixed_single_target,
+            runner_policy=runner_policy,
         )
 
         self.brackets[bracket_id] = bracket
@@ -230,7 +236,9 @@ class DynamicBracketManager:
         bracket.remaining_qty = bracket.total_qty
         bracket.target_1_qty = max(1, bracket.total_qty // 2) if bracket.total_qty > 1 else 1
         bracket.target_2_qty = bracket.total_qty - bracket.target_1_qty if bracket.total_qty > 1 else 0
-        bracket.target_2_order_id = f"t2_{bracket_id}" if bracket.target_2_qty > 0 else None
+        bracket.target_2_order_id = (
+            f"t2_{bracket_id}" if (bracket.target_2_qty > 0 and bracket.runner_policy != "TRAIL_ONLY") else None
+        )
         bracket.r_distance = round(abs(fill_price - bracket.initial_stop_price), 4)
         if bracket.fixed_single_target and fill_price <= bracket.initial_stop_price:
             raise ValueError("Fixed long entry filled at or below its opening-range stop")

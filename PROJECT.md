@@ -67,7 +67,7 @@ AutonomousDayTrader is an intraday + swing paper-trading system for US equities.
 | F6 | Dynamic Bracket Orders | Multi-tier take-profit brackets with calibrated intraday geometry (Target 1 at 0.80R with 50% scale-out, Target 2 at 1.80R runner or trailing ATR stop locked to TARGET_1_HIT; slippage boundary validation and decremental partial fill tracking) | M1 | ORIGINAL_REQUEST §R1 |
 | F7 | Zero Overnight Flattening | 4-phase protocol: 15:45 entry lockout, 15:50 working order purge, 15:55 market liquidation, 15:58 flat audit before 16:00 ET | M1 | ORIGINAL_REQUEST §R1 |
 | F8 | Strategy 1: ORB | Opening Range Breakout on the first 5 minutes in production (15 minutes configurable), with RVOL $\ge 1.8\times$, midpoint stops, and target brackets | M2 | ORIGINAL_REQUEST §R2 |
-| F9 | Strategy 2: VWAP Pullback | Anchored VWAP from 09:30, standard deviation bands, EMA20 > EMA50 trend filter after 50 regular-session one-minute closes (first possible entry about 10:20 ET), bounce confirmation | M2 | ORIGINAL_REQUEST §R2 |
+| F9 | Strategy 2: Ride the Trend v2 (`vwap_pullback`) | Replaced 2026-09-28. VWAP-structure impulse, thin-volume pullback leg (PVR <= 0.80), tick-aggression trap filter, resumption slope >= 0.5 ATR/bar, tick velocity >= 0.25 ATR/min, top-of-book imbalance >= 0.10, no-chase cap, SPY relative strength, macro blackout; stop computed once; 1R half + trail-only runner; 09:45-11:30 (first entry about 10:09) | M2 | PLAN_2026_09_27_ride_the_trend_v2.md |
 | F10 | Strategy 3: News Momentum | Benzinga news catalyst sentiment trigger with strict regex word boundaries (`\b...`), volume surge $>2.0\times$ validation, news contradiction emergency exit | M2 | ORIGINAL_REQUEST §R2 |
 | F11 | Strategy 4: Mean Reversion | 1-min bar $Z$-score $\ge 1.65$, volume climax $>1.30\times$, upper/lower wick rejection $\ge 0.30$, 20-SMA mean reversion active in `NEUTRAL` regimes without fighting runaway trends | M2 | ORIGINAL_REQUEST §R2 |
 | F12 | Dynamic VIX Adaptation | Self-adaptation across 4 regimes (Low, Normal, Elevated, Crisis) with invariant dollar risk scaling and dynamic stop widths | M2 | ORIGINAL_REQUEST §R2 |
@@ -217,7 +217,8 @@ AutonomousDayTrader is an intraday + swing paper-trading system for US equities.
 │   │   ├── strategies/
 │   │   │   ├── base.py           # Strategy base class & regime interfaces
 │   │   │   ├── orb.py            # Opening Range Breakout strategy
-│   │   │   ├── vwap_pullback.py  # VWAP Trend Pullback & Continuation strategy
+│   │   │   ├── vwap_pullback.py  # v1 class kept for checkpoint decoding only
+│   │   │   ├── vwap_pullback_v2.py  # Ride the Trend v2 (registered as vwap_pullback)
 │   │   │   ├── news_momentum.py  # Catalyst News Momentum Breakout strategy
 │   │   │   ├── mean_reversion.py # Statistical Mean Reversion / Exhaustion strategy
 │   │   │   └── adaptation.py     # VIX regime scaling & time-of-day dynamics

@@ -1,0 +1,29 @@
+# Ride the Trend v2 dry run, 2026-09-25 (all arms)
+
+Replayed 4680 bars, 2,804,461 trade prints and 1,948,463 quotes for AAPL, NVDA, AMD, MSFT, AMZN, META, GOOGL, PLTR, COIN in 15.5 s, simulation mode, no broker, no network.
+
+## Funnel (every setup transition and rejection)
+- CHASED: 2
+- FEATURE_UNAVAILABLE: 315
+- HIGH_VOLUME_PULLBACK: 1
+- IMPULSE: 101
+- NEW_EXTREME: 3
+- NO_TOUCH: 5
+- PULLBACK: 4
+- PVR_NOT_THIN: 3
+- RESUMING: 4
+- RESUMPTION_TOO_OLD: 1
+- SLOPE_TOO_SLOW: 6
+- TOUCH_TOO_EARLY: 7
+- WINDOW_CLOSED: 4
+
+## Signals (0) and what the bot decided
+
+## Brackets
+
+Account: {'equity': 49772.55, 'realized_pnl': -227.45, 'positions_open': 0}. Trades by strategy: {'orb': 3}.
+Decision summary: {'signals_today': 0, 'orders_today': 0, 'blocked_today': 0, 'top_block_reason': None, 'top_block_text': None, 'blocked_by_reason': {}}.
+Data layers on the card: {"required": true, "layer1_ticks": {"live": true, "trades_seen": 2804461}, "layer2_book": {"live": true, "quotes_seen": 1947716, "depth": "top_of_book_nbbo"}, "layer3_timestamps": {"source": "exchange_nanoseconds", "velocity_window_s": 60}, "layer4_macro": {"calendar_loaded": true, "error": null, "regime": "spy_qqq_vwap_ema+vix"}}
+
+## Invariants
+PASS: all invariants held.

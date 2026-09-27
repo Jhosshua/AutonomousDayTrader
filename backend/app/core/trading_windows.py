@@ -35,7 +35,7 @@ GATE_LAG_SEC = 60
 
 STRATEGY_NOTES = {
     "orb": "Morning only. Needs the first 5 minutes to set the range.",
-    "vwap_pullback": "Needs 50 one-minute bars for its trend check; first possible entry is about 10:20 AM. Sits out midday chop.",
+    "vwap_pullback": "Version 2 (since Sept 28): mornings only, 9:45 to 11:30 AM; first possible entry about 10:09 AM. Needs a quiet pullback and a fast resumption.",
     "news_momentum": "Rare by design: needs very strong news plus a volume spike.",
     "mean_reversion": "Sits out the opening half hour.",
 }
@@ -125,6 +125,7 @@ def strategy_window(
     persistence_halted: bool = False,
     positions_full: bool = False,
     vix_stale: bool = False,
+    extra_blockers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     shown_at = (now if now.tzinfo else now.replace(tzinfo=ET)).astimezone(ET)
     # The entry gate judges each 1-minute bar by its START time, and that bar reaches the bot
@@ -183,6 +184,9 @@ def strategy_window(
         blockers.append("Saving is failing: new trades blocked until fixed.")
     if positions_full:
         blockers.append("Maximum open positions reached.")
+    for text in (extra_blockers or []):
+        if text and in_hours:
+            blockers.append(text)
     market_text = market_direction_text(strategy_id, market_trend)
     trend_u = (market_trend or "UNKNOWN").upper()
     # Limits: the entry gate still admits some trades (mirrors MarketTrendFilter exceptions).

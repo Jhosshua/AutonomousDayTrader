@@ -79,7 +79,7 @@ export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
     tint: "#EDF3EE",
     bar: "#6E9C82",
     track: "#DDE9E0",
-    what: "When a stock is moving steadily one way, it waits for a small dip, then joins the ride.",
+    what: "Version 2. When a stock pushes to a new high (or low), it waits for a quiet, low-volume dip back toward the day's average price, then joins only if the move picks up speed again. Mornings only.",
   },
   news_momentum: {
     name: "Big News",

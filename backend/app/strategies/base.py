@@ -47,6 +47,9 @@ class SignalEvent:
     catalyst_sentiment: Optional[float] = None
     target_1_is_r_fallback: bool = False
     target_2_is_r_fallback: bool = False
+    # True when the strategy computed its final stop (ATR/VIX/structure already
+    # applied). The adaptation engine must not scale it again.
+    stop_is_final: bool = False
     # Research only: the values the strategy used to decide (never read by
     # trading code). Recorded with the signal for later backtesting.
     # init=False keeps it out of the checkpoint's constructor fields, so a
