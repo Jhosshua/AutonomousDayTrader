@@ -70,3 +70,4 @@ Thumbs.db
 
 # Local QA screenshot output (scripts/verify_visual_qa_live.py)
 .local_qa_screenshots/
+research/vwap_trend_2026_09_27/data/
