@@ -113,6 +113,11 @@ def main():
                 step["decide_now"].hour, step["decide_now"].minute) < (ch, cm)
             decide = before_cutoff and bool(cards) and (
                 (step["wave"] == "primary" and cov_ok) or (step["wave"] == "secondary" and (not att or cov_ok)))
+            if decide and step["wave"] == "primary":
+                # core._commit_snapshot: the final board only, and every card valid (count == scan metadata)
+                raw = core._load_raw()
+                decide = (step["end"] == config.FREEZE_ET and health.get("source") == config.CARD_SOURCE
+                          and bool(raw) and len(raw) == health.get("cards"))
             if decide:
                 clock["now"] = step["decide_now"]
                 dec_cards = core._load_raw() if step["wave"] == "primary" else cards
