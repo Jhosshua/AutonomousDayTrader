@@ -4,8 +4,10 @@
 phase 3 (integration into `main.py`: settings, old ORB removed, checkpoint migration, exit dispatch,
 shared reservations, risk hooks, card, fake sessions) are built on branch `orb-integration`. NOT
 deployed. Next: deploy after 16:00 in `ORB_MODE=shadow` (section 10 step 4). Deviations from this plan
-are listed in MEMORY.md (2026-09-28 evening entry): the ORB-sizing half of 9.6 ("and vice versa") and
-the shadow input fingerprints (9.8) are not built; the Alpaca limiter is ORB's own budget (100/min +
+are listed in MEMORY.md (2026-09-28 evening entry). 9.6 "and vice versa" stays UNBUILT on purpose
+(operator/coordinator ruling 2026-09-28): ORB's sizing stays exactly ORBStraddle's and never shrinks
+for other arms' losses; ADT's daily loss stop still halts ORB, and ORB's open risk is reserved out of
+ADT's budget. The shadow input fingerprints (9.8) are not built; the Alpaca limiter is ORB's own budget (100/min +
 50 exit reserve), not one limiter shared with ADT (8.9).
 
 Operator request (2026-09-28): ADT's general ORB must execute exactly like ORBStraddle. Clarified after a

@@ -360,14 +360,23 @@ async def _broker_reconcile_once() -> None:
         log.warning("Alpaca sync failed (%s); new entries paused until a sync succeeds", exc)
         return
     broker_state["last_error"] = alpaca_broker.status.last_error
-    # book any ORB fill the controller already knows before comparing, so ORB's own fills do not
-    # read as a mismatch (a fill the controller has not polled yet can still cost one interval)
+    positions = dict(status.positions)
+    # ORB fill lag must never pause entries (Codex P2 #4): book what ORB already knows, and for any
+    # symbol ORB owns where ADT's book and Alpaca still differ, make the controller re-read its own
+    # orders at once (worker thread), book the result, then compare. Non-ORB differences block as before.
     try:
         if orb.sync():
             _checkpoint_runtime("ORB_SYNC")
+        local = _local_signed_positions(account)
+        orb_diff = sorted(s for s in set(local) | set(positions)
+                          if local.get(s, 0) != positions.get(s, 0) and orb.owns(s))
+        if orb_diff:
+            await asyncio.to_thread(orb.refresh_symbols, orb_diff)
+            if orb.sync():
+                _checkpoint_runtime("ORB_SYNC")
     except Exception:
         log.exception("ORB ledger sync before the broker check failed")
-    _compare_with_broker(dict(status.positions), status.equity)
+    _compare_with_broker(positions, status.equity)
 
 
 def _settle_broker_orders() -> None:
@@ -2355,6 +2364,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         if not should_process:
             return
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
+    orb.note_price(quote.symbol, (quote.bid_price + quote.ask_price) / 2.0, quote.timestamp, "quote_mid")
     _mark_feed_event("quote")
     try:
         tick_tape.on_quote(
@@ -2808,6 +2818,7 @@ async def handle_trade_event(trade: TradeEvent) -> None:
     """Track the latest trade print price; fold the print into the Ride the Trend tick tape."""
     if isinstance(trade.price, (int, float)) and math.isfinite(trade.price) and trade.price > 0:
         latest_market_prices[trade.symbol.upper()] = trade.price
+        orb.note_price(trade.symbol, trade.price, trade.timestamp, "sip_trade")
     _mark_feed_event("trade")
     try:
         tick_tape.on_trade(
@@ -3062,6 +3073,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             pass
         ui_clients.discard(ws)
     tri_controller.shutdown()
+    # ORB: stop new entries/jobs, let a running exit finish (bounded), then refuse every broker write,
+    # all BEFORE the final checkpoint and the store close (Codex P1 #3). Its last fills are booked.
+    try:
+        await asyncio.to_thread(orb.drain)
+        orb.sync()
+    except Exception:
+        log.exception("ORB shutdown drain failed")
     orb.shutdown()
     # Producers are fully stopped before the final durable checkpoint. Nothing
     # can fill or mutate the account after this point.
@@ -3220,6 +3238,7 @@ def _orb_health() -> Dict[str, Any]:
             "step": st.get("step"), "last_verdict": {k: lv.get(k) for k in ("wave", "verdict", "reason", "at")} if lv else None,
             "picks": st.get("picks") or [], "open_trades": len(st.get("holdings") or []),
             "errors": st.get("errors") or [], "init_error": st.get("init_error"),
+            "alerts": st.get("alerts") or [], "recovery": st.get("recovery") or {},
             "halted": st.get("halted"), "entries_blocked": st.get("entries_blocked")}
 
 

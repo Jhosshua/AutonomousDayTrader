@@ -167,6 +167,11 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
             {(strategy.orb.realized_pnl !== 0 || strategy.orb.unrealized_pnl !== 0) && (
               <div className="mt-2">Today: {formatSignedMoney(strategy.orb.realized_pnl)} closed{strategy.orb.open_trades.length > 0 ? `, ${formatSignedMoney(strategy.orb.unrealized_pnl)} open` : ""}</div>
             )}
+            {(strategy.orb.alerts ?? []).map((a) => (
+              <div key={a} role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/60 bg-white p-2 font-semibold text-[#8F4424]" data-testid="orb-alert">
+                {a}
+              </div>
+            ))}
             {(strategy.orb.init_error || strategy.orb.errors.length > 0) && (
               <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
                 {strategy.orb.init_error || "ORB reported a problem; check the paper account."}

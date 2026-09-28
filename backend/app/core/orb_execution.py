@@ -356,6 +356,9 @@ class OrbExecutionController:
         self.release = release or (lambda s: None)
         self.account_halt = account_halt or (lambda: None)
         self.entry_gate = entry_gate
+        # ADT shutdown fence: entries stop first (drain begins), then every write (drain deadline)
+        self._entries_closed: Optional[str] = None
+        self._writes_closed: Optional[str] = None
         self.on_event = on_event
         self.sleep = sleep or _time.sleep
         self.budget = budget or RequestBudget(self.cfg["request_budget_per_min"], self.cfg["exit_reserve_per_min"])
@@ -1106,8 +1109,21 @@ class OrbExecutionController:
         if why:
             raise DestinationRefused(f"destination refused: {why}")
 
+    def close_entries(self, why: str = "ADT is shutting down") -> None:
+        """No new entry POST from now on (an entry refused here was never sent)."""
+        self._entries_closed = why
+
+    def close_writes(self, why: str = "ADT is shutting down") -> None:
+        """No broker write of any kind from now on (after the shutdown drain's deadline)."""
+        self._entries_closed = self._entries_closed or why
+        self._writes_closed = why
+
     def _write(self, prio: str, fn: Callable, *a, _pretaken: bool = False, **kw):
         """A broker WRITE: pinned account verified first, then the budget token (unless already held)."""
+        if self._writes_closed:
+            raise DestinationRefused(f"{self._writes_closed}: no broker writes")
+        if self._entries_closed and self.broker is not None and fn == getattr(self.broker, "submit_bracket", None):
+            raise DestinationRefused(f"{self._entries_closed}: no new entries")
         self._verify_destination_for_write()
         if not _pretaken:
             self.budget.acquire(prio)
@@ -1188,6 +1204,8 @@ class OrbExecutionController:
         live = self.mode == "live"
         if self.mode == "off":
             return _res(False, "ORB is off: no new entries")
+        if self._entries_closed:
+            return _res(False, f"{self._entries_closed}: no new entries")
         if not self.ready:
             return _res(False, "startup reconciliation has not finished: no new entries until it does")
         if self.capacity_reached():
@@ -2132,7 +2150,7 @@ class OrbExecutionController:
             rd = float(pos.get("rd") or 0.0)
             r = ((px - entry) / rd) * (1 if L else -1) if (px and rd) else 0.0
             peak = max(float(pos.get("peak") or 0.0), r)
-            upd.update(peak=peak, last_r=round(r, 4), last_px=px)
+            upd.update(peak=peak, last_r=round(r, 4), last_px=px, last_px_at=now.isoformat())
             be_triggered = bool(pos.get("be_triggered")) or r >= self.cfg["breakeven_r"]
             be_locked = bool(pos.get("be_locked"))
             upd["be_triggered"] = be_triggered

@@ -103,6 +103,7 @@ export interface StrategyState {
     open_risk: number | null;
     errors: { kind?: string; alarm?: string; err?: string; reason?: string; note?: string }[];
     init_error: string | null;
+    alerts?: string[];
   };
   or15?: {
     phase: string;

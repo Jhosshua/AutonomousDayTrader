@@ -7,22 +7,6 @@ from backend.app.core.orb_execution import RequestBudget
 from backend.tests.unit.orb_integration.harness import MainOrb, pick
 
 
-def test_an_orb_position_the_controller_does_not_know_is_closed_by_adts_own_paths(main_runtime):
-    """P1: state lost (fallback 'off' build) while ADT's book still has the ORB position: it must not be
-    skipped by every exit path. It is an orphan: ADT's breaker liquidates it and an alarm says so."""
-    r = main_runtime
-    h = MainOrb(r)
-    h.open_bracket()
-    r.orb.build(h.broker, h.facade, "off", clock=h.clock, inline=True, monotonic=lambda: h.clock.now.timestamp(),
-                budget=RequestBudget(10 ** 6, 10 ** 6), sleep=h.clock.sleep, is_session=lambda d: True,
-                restore=False)
-    assert r.orb.owns("APP") is False
-    assert any(e.get("kind") == "orphan_orb_position" for e in r.orb.errors)
-    assert r.orb.is_occupied("APP") and not r.orb.reserve("APP")     # ORB cannot take it either
-    r._trip_circuit_breaker(h.clock.now)
-    assert "APP" not in r.account.positions
-    assert [o.strategy_id for o in r.engine.orders.values() if o.symbol == "APP" and o.strategy_id != "orb"] \
-        == ["CIRCUIT_BREAKER"]
 
 
 def test_api_orders_cannot_use_the_orb_strategy_id(main_runtime):

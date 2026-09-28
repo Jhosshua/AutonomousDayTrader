@@ -78,7 +78,8 @@ class OrbScheduler:
                  supervise_every_s: float = 5.0, reconcile_every_s: float = 60.0,
                  sizing_every_s: float = 60.0, secondary_every_s: float = 60.0,
                  prep_retry_s: float = 60.0,
-                 on_decision: Optional[Callable[[dict], None]] = None) -> None:
+                 on_decision: Optional[Callable[[dict], None]] = None,
+                 persist_flush: Optional[Callable[[], None]] = None) -> None:
         """on_decision(row): called on the tick thread for every verdict (kind "verdict", with the
         decider's audit/regime and the pick details) and every execution result (kind "execution"),
         so ADT can log them (decisions log, research). A failing hook never stops the scheduler."""
@@ -89,6 +90,11 @@ class OrbScheduler:
         self.is_session = is_session or (lambda d: d.weekday() < 5)
         self.persist_cb = persist_cb
         self.on_decision = on_decision
+        # persist_cb may be asynchronous (ADT writes scheduler state off the event loop); persist_flush
+        # blocks (on the execute worker) until everything queued is durable: the claim of a decision is
+        # on disk before its orders go out.
+        self.persist_flush = persist_flush
+        self._stopping = False
         self.inline = inline
         self.deadlines = dict(DEADLINES, **(deadlines or {}))
         self.mono = monotonic or _time.monotonic
@@ -174,8 +180,17 @@ class OrbScheduler:
     def _running(self, name: str) -> bool:
         return name in self._jobs
 
+    def stop_new_jobs(self) -> None:
+        """Shutdown drain: no job starts from now on; running ones may finish."""
+        with self._lock:
+            self._stopping = True
+
+    def running_futures(self) -> List[Any]:
+        with self._lock:
+            return [j.future for j in self._jobs.values() if isinstance(j.future, Future)]
+
     def _start(self, name: str, fn: Callable[[], Any], meta: Optional[dict] = None) -> bool:
-        if name in self._jobs:
+        if name in self._jobs or self._stopping:
             return False
         self._last_start[name] = self.mono()
         fut = _Done(fn) if self.inline else self._pool.submit(fn)
@@ -230,6 +245,8 @@ class OrbScheduler:
         now = self._now(now)
         with self._lock:
             self._collect(now)
+            if self._stopping:
+                return
             day = now.date().isoformat()
             if self.state.get("day") != day:
                 self.state = self._new_day_state(day, self.state.get("history"))
@@ -505,7 +522,11 @@ class OrbScheduler:
                       extra=dict(board, executing=True))
         if wave == "primary":
             self._step("primary_decision", "running", "sending the orders", now)
-        self._start("execute", lambda: self.c.execute(picks, self._now(), strict=True, wave=wave), {"wave": wave})
+        def execute_job():
+            if self.persist_flush is not None:
+                self.persist_flush()          # the decision's claim is durable before any order
+            return self.c.execute(picks, self._now(), strict=True, wave=wave)
+        self._start("execute", execute_job, {"wave": wave})
 
     def _on_execute(self, job, result, error, now):
         wave = job.meta.get("wave")
