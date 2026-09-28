@@ -40,14 +40,16 @@ The copied modules are module singletons (scanner session state, relay client, l
 process holds one facade; a new OrbsFacade re-points them (fresh scan session, relay client and lockout latch).
 
 Import-time limits: scanner.py and market.py read their ORBS_* tunables (page size, scan deadline, incremental
-mode, repair windows, relay cache/body limits) from config.SCANNER_ENV once, at import. A manifest passed to
-OrbsFacade must therefore carry the same `scanner_env` the modules were imported with; a different one is
-rejected (ValueError) rather than silently ignored. To run with other tunables, apply the manifest with
-config.apply_manifest() before this module is first imported (the replay harness does this).
+mode, repair windows, relay cache/body limits) from config.SCANNER_ENV once, at import. OrbsFacade re-evaluates
+each of those module lines (their own source text) against the manifest's `scanner_env` and compares the result
+with the constant the module actually holds; any mismatch is rejected (ValueError), never silently ignored. To
+run with other tunables, apply the manifest with config.apply_manifest() before scanner/market are first
+imported (the replay harness does this).
 """
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -59,8 +61,42 @@ from . import adaptive, config, flow, market, scanner, shim, signals
 from .ticks import ET
 
 log = logging.getLogger("adt.orbs")
-# The scanner/market tunables in force when those modules were imported (see the module docstring).
-_IMPORT_SCANNER_ENV = dict(config.SCANNER_ENV)
+# Module constants computed at import from config.getenv (see the module docstring).
+_IMPORT_TIME_TUNABLES = {
+    scanner: ("RELAY_TOKEN", "PAGE_LIMIT", "PAGE_ATTEMPTS", "SCAN_DEADLINE_S", "ORBS_INCREMENTAL",
+              "CORRECTION_HORIZON_S", "REPAIR_WINDOW_S", "RECONCILE_INTERVAL_S"),
+    market: ("MAX_CACHE_ENTRIES", "MAX_CACHE_BYTES", "MAX_RESPONSE_BYTES"),
+}
+
+
+class _ManifestEnv:
+    """config.getenv semantics over a manifest's scanner_env (pinned null = the caller's default)."""
+
+    def __init__(self, env):
+        self.env = env
+
+    def getenv(self, name, default=None):
+        if name not in self.env:
+            raise KeyError(f"{name} is not pinned in the manifest scanner_env")
+        value = self.env[name]
+        return default if value is None else value
+
+
+def import_time_mismatches(manifest: dict) -> list:
+    """[(module.NAME, module value, value the manifest implies)] for every import-time tunable that differs.
+    The expected value comes from executing the module's OWN assignment line against the manifest env, so
+    the formula is never duplicated here."""
+    env = {k: v for k, v in manifest.get("scanner_env", {}).items() if not k.startswith("_")}
+    out = []
+    for module, names in _IMPORT_TIME_TUNABLES.items():
+        lines = {ln.split(" = ", 1)[0]: ln for ln in inspect.getsource(module).splitlines() if " = " in ln}
+        for name in names:
+            ns = {"config": _ManifestEnv(env), "max": max, "min": min, "int": int, "float": float, "str": str}
+            exec(lines[name], ns)            # e.g. PAGE_LIMIT = max(100, min(10000, int(config.getenv(...))))
+            actual = getattr(module, name)
+            if actual != ns[name]:
+                out.append((f"{module.__name__.rsplit('.', 1)[1]}.{name}", actual, ns[name]))
+    return out
 
 WAVES = ("preview", "primary", "secondary")
 
@@ -100,12 +136,10 @@ class OrbsFacade:
         relay_base / relay_token: ADT settings RELAY_HTTP_URL / RELAY_TOKEN. manifest: PARITY_MANIFEST.json
         by default. http: optional urlopen-compatible transport (replay/record); default urllib."""
         manifest = manifest if manifest is not None else config.load_manifest()
-        wanted_env = {k: v for k, v in manifest.get("scanner_env", {}).items() if not k.startswith("_")}
-        if wanted_env != _IMPORT_SCANNER_ENV:
-            changed = sorted(k for k in set(wanted_env) | set(_IMPORT_SCANNER_ENV)
-                             if wanted_env.get(k) != _IMPORT_SCANNER_ENV.get(k))
-            raise ValueError(f"manifest scanner_env differs from the import-time values for {changed}; "
-                             "apply it with config.apply_manifest() before importing the facade")
+        mismatches = import_time_mismatches(manifest)
+        if mismatches:
+            raise ValueError(f"manifest scanner_env does not match the loaded module constants {mismatches}; "
+                             "apply it with config.apply_manifest() before scanner/market are imported")
         config.apply_manifest(manifest)
         config.set_relay(relay_base, relay_token)
         os.makedirs(state_dir, exist_ok=True)
@@ -214,6 +248,21 @@ class OrbsFacade:
             ok, why = _require_scan_coverage(health)
             if not ok:
                 return why
+        if wave == "primary":
+            # core._commit_snapshot (core.py:118-146): only the FINAL board (end == FREEZE_ET, the active card
+            # source), decided at/after the freeze, and every card of it valid (count == scan metadata).
+            if health.get("end") != config.FREEZE_ET or board.get("end") != config.FREEZE_ET:
+                return f"board is the {health.get('end')} board, not the {config.FREEZE_ET} final"
+            if health.get("source") != config.CARD_SOURCE:
+                return "scan source does not match the active card source"
+            fh, fm = map(int, config.FREEZE_ET.split(":"))
+            if (now_et.hour, now_et.minute) < (fh, fm):
+                return f"decision time is before the {config.FREEZE_ET} freeze"
+            valid = frozen_board(board.get("cards") or [])
+            if not valid:
+                return "no valid cards in the final scan"
+            if type(health.get("cards")) is not int or len(valid) != health["cards"]:
+                return "card count differs from scan metadata"
         last = self._last_scan.get(wave)
         if last is None or last["day"] != day.isoformat() or last["board_id"] != board.get("board_id"):
             return f"board is not the last successful {wave} scan"

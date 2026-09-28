@@ -26,7 +26,7 @@ def test_decide_refuses_boards_orbstraddle_would_not_decide(fac):  # noqa: F811
     assert "did not succeed" in refused({**board, "ok": False, "error": "coverage"})
     assert "is for" in refused({**board, "health": {**board["health"], "day": "2031-03-03"}})
     assert "covered only" in refused({**board, "health": {**board["health"], "ok": 5, "failed": 2}})
-    assert "do not match" in refused({**board, "cards": board["cards"][1:]})
+    assert "do not match" in refused({**board, "cards": board["cards"][::-1]})
     assert "not the last successful" in refused({**board, "board_id": "0" * 16})
     assert refused({**board, "cards": []}) == "the board is empty"
     again = fac.scan(D, at(9, 38), "primary", set())                  # same inputs -> same board, still valid
@@ -67,7 +67,7 @@ def test_new_facade_resets_the_session_lockout(replay, tmp_path):  # noqa: F811
 def test_manifest_cannot_silently_change_import_time_limits(tmp_path):
     manifest = copy.deepcopy(config.load_manifest())
     manifest["scanner_env"]["ORBS_SCAN_DEADLINE_S"] = "999"
-    with pytest.raises(ValueError, match="ORBS_SCAN_DEADLINE_S"):
+    with pytest.raises(ValueError, match="scanner.SCAN_DEADLINE_S"):
         OrbsFacade(str(tmp_path), "https://relay.invalid", "t", manifest=manifest)
     manifest = copy.deepcopy(config.load_manifest())
     manifest["effective"]["MIN_SCAN_COVERAGE"] = 0.95                  # runtime values do apply per facade
