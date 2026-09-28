@@ -76,6 +76,9 @@ class OrbIntegration:
         self.errors: deque = deque(maxlen=20)
         self.events: deque = deque(maxlen=50)
         self.init_error: Optional[str] = None
+        self._orphans: set = set()
+        self._persist_locks = {"controller": threading.Lock(), "scheduler": threading.Lock()}
+        self._persist_enabled = True
         self.clock: Callable[[], datetime] = lambda: datetime.now(ET)
 
     @staticmethod
@@ -103,13 +106,14 @@ class OrbIntegration:
               inline: bool = False, manifest: Optional[dict] = None, deadlines: Optional[dict] = None,
               monotonic: Optional[Callable[[], float]] = None, budget: Any = None,
               sleep: Optional[Callable[[float], None]] = None, is_session: Optional[Callable] = None,
-              restore: bool = True, expected_account: Optional[str] = None):
+              restore: bool = True, expected_account: Optional[str] = None, persist: bool = True):
         """Construct the controller + scheduler with ADT's hooks, restoring their durable state."""
         from backend.app.core.orb_execution import OrbExecutionController
         from backend.app.core.orb_scheduler import OrbScheduler
         if mode not in MODES:
             raise ValueError(f"ORB_MODE must be one of {MODES}, not {mode!r}")
         self.shutdown()
+        self._persist_enabled = persist
         manifest = manifest if manifest is not None else self.effective_manifest()
         ctl = OrbExecutionController(
             broker, facade, manifest, clock=clock, persist_cb=self._persister("controller"),
@@ -155,7 +159,16 @@ class OrbIntegration:
                 self.init_error = f"ORB decision code could not start ({type(exc).__name__}: {exc}); ORB is off"
                 log.exception("ORB facade construction failed")
                 facade, mode = None, "off"
-        self.build(broker, facade, mode)
+        try:
+            self.build(broker, facade, mode)
+        except Exception as exc:
+            # A corrupt/unsupported ORB state row must not stop ADT's other strategies: ORB runs off,
+            # with nothing restored, and the card says so. Its Alpaca orders (if any) need a human.
+            self.init_error = (f"ORB state could not be restored ({type(exc).__name__}: {str(exc)[:200]}); "
+                               "ORB is off. Check ORB's positions and orders at Alpaca by hand.")
+            log.exception("ORB state restore failed")
+            # persist=False: the unreadable rows stay exactly as they are for a human to recover
+            self.build(broker, facade, "off", restore=False, persist=False)
         try:
             self._loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -191,11 +204,19 @@ class OrbIntegration:
     # ------------------------------------------------------------------ durable ORB state
     def _persister(self, section: str) -> Callable[[dict], None]:
         def persist(state: dict) -> None:
-            store = self.r.state_store
-            if store is not None and not self.r.simulation_mode:
-                store.save_orb_state(section, state)       # durable before return; raises on failure
-            else:
-                self._mem_state[section] = copy.deepcopy(state)
+            if not self._persist_enabled:
+                return            # fallback build over an unreadable row: never overwrite that row
+            with self._persist_locks[section]:
+                # Callers snapshot before calling; two threads can race, so the snapshot actually written is
+                # taken again here, under the section lock: a stale snapshot can never land after a newer one.
+                owner = self.controller if section == "controller" else self.scheduler
+                if owner is not None:
+                    state = owner.to_state()
+                store = self.r.state_store
+                if store is not None and not self.r.simulation_mode:
+                    store.save_orb_state(section, state)       # durable before return; raises on failure
+                else:
+                    self._mem_state[section] = copy.deepcopy(state)
         return persist
 
     def _load(self, section: str) -> Optional[dict]:
@@ -220,6 +241,8 @@ class OrbIntegration:
         pos = r.account.positions.get(sym)
         if pos is not None and getattr(pos, "strategy_id", "") != ORB_ID:
             return f"ADT holds {sym} ({getattr(pos, 'strategy_id', '')})"
+        if pos is not None and not (self.controller is not None and self.controller.owns(sym)):
+            return f"ADT holds an ORB position on {sym} that the ORB controller does not know"
         for order in list(r.engine.working_orders.values()):
             if order.symbol.upper() == sym and order.execution_policy != ORB_POLICY:
                 return f"ADT has a working order on {sym}"
@@ -256,16 +279,29 @@ class OrbIntegration:
             self._orb_reserved.discard(symbol.upper())
 
     def owns(self, symbol: str) -> bool:
-        """ORB holds, reserved, or has a live order on symbol (or ADT's book says an ORB position is there)."""
+        """ORB's controller holds, reserved, or has a live order on symbol. An 'orb' position in ADT's
+        book that the controller does NOT know (state lost, old-ORB leftover) is an orphan: it is not
+        owned, so ADT's generic exit paths close it (an alarm says so) instead of skipping it forever."""
         sym = symbol.upper()
-        pos = self.r.account.positions.get(sym)
-        if pos is not None and getattr(pos, "strategy_id", "") == ORB_ID:
-            return True
         with self.lock:
             if sym in self._orb_reserved:
                 return True
         ctl = self.controller
-        return bool(ctl is not None and ctl.owns(sym))
+        if ctl is not None and ctl.owns(sym):
+            return True
+        pos = self.r.account.positions.get(sym)
+        if pos is not None and getattr(pos, "strategy_id", "") == ORB_ID:
+            self._orphan_alarm(sym)
+        return False
+
+    def _orphan_alarm(self, sym: str) -> None:
+        if sym in self._orphans:
+            return
+        self._orphans.add(sym)
+        msg = (f"{sym}: ADT's book has an ORB position the ORB controller does not know; ADT's own exit "
+               "paths will close it. Check Alpaca for leftover ORB bracket orders on it.")
+        log.error(msg)
+        self.errors.append({"kind": "orphan_orb_position", "symbol": sym, "note": msg})
 
     def claim_for_adt(self, symbol: str, order: Any, strategy_id: Optional[str]) -> Optional[str]:
         """ADT entry admission (pre-trade validator), atomically with ORB's reserve(): refuse a symbol ORB
@@ -396,7 +432,10 @@ class OrbIntegration:
         st = ctl.to_state()
         changed = False
         booked = self.ledger["booked"]
-        for key, rec in sorted(st.get("orders", {}).items(), key=lambda kv: (kv[1].get("fill_ts") or 0, kv[0])):
+        # entries before exits: a restart can find an entry's and its leg's fills in one pass, and the
+        # account must see the opening fill first (an exit booked first would open a reverse position)
+        for key, rec in sorted(st.get("orders", {}).items(),
+                               key=lambda kv: (kv[1].get("role") != "entry", kv[1].get("fill_ts") or 0, kv[0])):
             filled = int(rec.get("filled_qty") or 0)
             avg = _f(rec.get("avg_price"))
             b = booked.get(key) or {"qty": 0, "notional": 0.0, "local": None}
@@ -586,8 +625,11 @@ class OrbIntegration:
         if ctl is None:
             return 0.0
         total = 0.0
+        live_entries = {r["symbol"] for _k, r in ctl._live() if r.get("role") == "entry"}
         for h in ctl.holdings():
-            qty = abs(int(h.get("qty") or 0)) or int(h.get("planned_shares") or 0)
+            qty = abs(int(h.get("qty") or 0))
+            if not qty or h["symbol"] in live_entries:
+                qty = max(qty, int(h.get("planned_shares") or 0))   # an entry still working may fill in full
             px = _f(h.get("last_price")) or _f(h.get("avg_price")) or _f(h.get("entry_ref")) or 0.0
             stop = _f(h.get("stop"))
             if qty <= 0 or px <= 0:

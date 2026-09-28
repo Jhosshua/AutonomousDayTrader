@@ -138,3 +138,20 @@ def test_main_clock_tick_never_blocks_on_orb_network_work(main_runtime):
     finally:
         gate.set()
         r.orb.shutdown()
+
+
+def test_a_corrupt_orb_state_row_turns_orb_off_but_adt_still_starts(main_runtime, monkeypatch, tmp_path):
+    from backend.app.core.persistence import TradingStateStore
+    r = main_runtime
+    r.state_store = TradingStateStore(str(tmp_path / "s.sqlite3"))
+    try:
+        r.state_store.save_orb_state("controller", {"version": 99})          # unsupported version
+        monkeypatch.setattr(r.settings, "ORB_MODE", "shadow")
+        monkeypatch.setattr(r.settings, "ORB_STATE_DIR", str(tmp_path / "orbs"))
+        r.orb.start()
+        assert r.orb.mode == "off" and "could not be restored" in r.orb.init_error
+        card = next(c for c in r._strategy_cards() if c["id"] == "orb")
+        assert "could not be restored" in card["orb"]["init_error"]
+    finally:
+        r.orb.shutdown()
+        r.state_store.close()

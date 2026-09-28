@@ -258,3 +258,27 @@ def test_unknown_parent_and_uuid_leg_fills_are_booked_once_through_main(main_run
     assert [leg["side"] for leg in trade["fill_legs"]] == ["BUY", "SELL"]
     r.orb.sync(h.clock.now)
     assert len([t for t in r.pending_trade_records.values() if t["symbol"] == "APP"]) == 1
+
+
+def test_entry_and_target_fills_found_in_one_pass_are_booked_entry_first(main_runtime):
+    """The bracket POST reply is lost and, before ORB hears back, the parent AND its target leg fill.
+    ORB discovers both fills in the same pass (same timestamp); ADT must book the opening fill first."""
+    r = main_runtime
+    h = MainOrb(r)
+    seq = iter(range(1, 10 ** 6))
+    h.alpaca._new_id = lambda: f"00000000-0000-4000-8000-{next(seq):012d}"   # leg ids sort before our coids
+    h.clock.set(at(9, 39))
+    h.alpaca.prices["APP"] = 100.2
+    h.alpaca.fail.append({"method": "POST", "path": "/v2/orders", "kind": "lost"})
+    h.alpaca.fail.append({"method": "GET", "path": "/v2/orders:by_client_order_id", "kind": "status",
+                          "status": 503, "times": 3})
+    assert h.ctl.execute([pick("APP", "long", 100.0, 98.0)], h.clock.now)["ok"]
+    assert "APP" not in r.account.positions                       # nothing known yet
+    parent = h.alpaca.by_coid(h.pos("APP")["coid"])
+    h.alpaca.fill(h.alpaca.leg(parent["id"], "tp")["id"], price=101.85)
+    h.run_supervisor(passes=3)
+    assert h.alpaca_positions() == {} and "APP" not in r.account.positions
+    trade = next(t for t in r.pending_trade_records.values() if t["symbol"] == "APP")
+    assert trade["exit_reason"] == "target"
+    assert trade["realized_pnl"] == pytest.approx(454 * (101.85 - 100.2), abs=0.01)
+    assert r.account.realized_pnl == pytest.approx(454 * (101.85 - 100.2), abs=0.01)

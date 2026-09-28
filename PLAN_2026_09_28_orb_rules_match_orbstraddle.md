@@ -1,5 +1,13 @@
 # Plan: ADT's own ORB strategy trades by ORBStraddle's rules (2026-09-28, draft v3 after Codex rounds 1 and 2)
 
+**Status (2026-09-28 evening):** phase 1 (decision code copy, exact parity), phase 2 (execution layer) and
+phase 3 (integration into `main.py`: settings, old ORB removed, checkpoint migration, exit dispatch,
+shared reservations, risk hooks, card, fake sessions) are built on branch `orb-integration`. NOT
+deployed. Next: deploy after 16:00 in `ORB_MODE=shadow` (section 10 step 4). Deviations from this plan
+are listed in MEMORY.md (2026-09-28 evening entry): the ORB-sizing half of 9.6 ("and vice versa") and
+the shadow input fingerprints (9.8) are not built; the Alpaca limiter is ORB's own budget (100/min +
+50 exit reserve), not one limiter shared with ADT (8.9).
+
 Operator request (2026-09-28): ADT's general ORB must execute exactly like ORBStraddle. Clarified after a
 wrong first plan (sidecar robot, `PLAN_2026_09_28_orb_becomes_orbstraddle.md`, SUPERSEDED): **ORB stays
 inside ADT as its own `orb` strategy; its rules are rewritten to match ORBStraddle's** (range, triggers,

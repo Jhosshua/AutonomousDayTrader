@@ -360,6 +360,13 @@ async def _broker_reconcile_once() -> None:
         log.warning("Alpaca sync failed (%s); new entries paused until a sync succeeds", exc)
         return
     broker_state["last_error"] = alpaca_broker.status.last_error
+    # book any ORB fill the controller already knows before comparing, so ORB's own fills do not
+    # read as a mismatch (a fill the controller has not polled yet can still cost one interval)
+    try:
+        if orb.sync():
+            _checkpoint_runtime("ORB_SYNC")
+    except Exception:
+        log.exception("ORB ledger sync before the broker check failed")
     _compare_with_broker(dict(status.positions), status.equity)
 
 
@@ -466,7 +473,7 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     is_exit = False
     if existing_strat in TRI_IDS and order_strat != existing_strat:
         return False, "Fixed position is managed by its owning tranche controller"
-    if order_strat != ORB_ID and (existing_strat == ORB_ID or orb.owns(sym)):
+    if order_strat != ORB_ID and orb.owns(sym):
         # ORB's shares sit under an Alpaca bracket; only the ORB controller may touch them (it cancels
         # its legs first). Entries and exits from any other path are refused.
         return False, (f"ORB_OWNED: {sym} is held or reserved by the Opening Range Breakout (ORBStraddle "
@@ -3442,6 +3449,8 @@ async def submit_order(req: OrderCreateRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="STOP_LIMIT orders are not supported by the execution engine")
 
     symbol = req.symbol.upper()
+    if req.strategy_id.strip().lower() == ORB_ID:
+        raise HTTPException(status_code=400, detail="ORB orders are placed only by the ORB controller")
     existing_pos = account.positions.get(symbol)
     is_reducing = bool(
         existing_pos

@@ -427,3 +427,11 @@ right. Run the mutation check.
 - **What did not work**: the first session-delta design kept running sums updated as prints arrived, so a query for a bar could include prints from later bars (and a replay that preloads the tape would hand an early candidate the whole day). Codex caught it in the plan review.
 - **What worked instead**: per-minute aggregates keyed by exchange minute, queried over [since, bar end); only minutes that start before the cutoff count, and the feed watermark must have reached the cutoff.
 - **Note for next time**: every measure the strategy reads must take the decision time as an argument. A method with no cutoff parameter is a look-ahead waiting to happen.
+
+## 2026-09-28: trimming the production checkpoint into a test fixture took three tries
+
+**What did not work:** First cut kept only the last 12 engine orders: restore failed ("Tri-engine native protection identity missing"), because the tri-engine validates that every tranche's native order ids exist in the engine. Second cut kept every order: restore passed but the file was 414 KB.
+
+**What worked instead:** keep the fixed plans' state whole (only bar lists trimmed) and keep exactly the engine orders that the brackets and strategies reference (19 of 126). 137 KB, restores, saves as schema 3, restores again. The full 3.5 MB row is also run when it is present on the machine.
+
+**Note for next time:** before trimming a checkpoint, list what `validate_runtime_state` and `validate_tri_state` cross-check (orders referenced by brackets and tranches) and keep those references intact.
