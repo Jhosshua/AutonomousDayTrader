@@ -38,6 +38,13 @@ OUTCOME_TEXT = {
     "RISK": "Blocked by the risk limits",
     "ENGINE_REJECT": "Order rejected by the execution engine",
     "BAD_PRICE": "Signal had no valid price",
+    # Opening Range Breakout (ORBStraddle rules): its own scheduler and controller decide and trade
+    "ORB_SAT_OUT": "ORB sat out this decision",
+    "ORB_NO_DECISION": "ORB made no decision (the scan or board could not be used)",
+    "ORB_SHADOW": "Shadow mode: would have placed this order",
+    "ORB_REFUSED": "Picked, but not placed (a pre-order check refused it)",
+    "ORB_NOT_EXECUTED": "Picked, but not placed (ORB could not trade then)",
+    "ORB_UNKNOWN": "Order sent; the broker reply was lost and is being checked",
 }
 
 

@@ -6,14 +6,14 @@ import { TradingState, StrategyState, Position, AuditRecord } from "@/types/trad
 const DEFAULT_STRATEGIES: StrategyState[] = [
   {
     id: "orb",
-    name: "Opening Range Breakout",
+    name: "Opening Range Breakout (ORBStraddle rules)",
     status: "ACTIVE",
     daily_pnl: 0.0,
     win_rate: 0.0,
     trades_count: 0,
     sharpe: null,
-    subtitle: "5m / 15m Volatility Expansion",
-    description: "Captures institutional opening drives breaking morning high/low with high relative volume.",
+    subtitle: "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
+    description: "ORBStraddle's rules: scans about 250 stocks for a clean break of their 9:30-9:35 range and trades it with an Alpaca bracket.",
   },
   {
     id: "vwap_pullback",

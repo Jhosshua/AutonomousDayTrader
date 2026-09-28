@@ -25,7 +25,7 @@ from backend.app.core.runtime_state import capture_runtime_state
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
+from backend.app.strategies.orb import OrbStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 
 
@@ -66,7 +66,7 @@ def main() -> None:
     flattening.audit_passed = True
     adaptation = DynamicAdaptationEngine()
     strategies = [
-        OpeningRangeBreakoutStrategy(),
+        OrbStrategy(),
         VWAPPullbackStrategy(),
         NewsMomentumStrategy(),
         MeanReversionStrategy(),

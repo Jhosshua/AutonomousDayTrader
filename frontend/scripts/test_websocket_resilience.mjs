@@ -18,14 +18,14 @@ assert(hookContent.includes("export function useTradingStream"), "useTradingStre
 const DEFAULT_STRATEGIES = [
   {
     id: "orb",
-    name: "Opening Range Breakout",
+    name: "Opening Range Breakout (ORBStraddle rules)",
     status: "ACTIVE",
     daily_pnl: 280.0,
     win_rate: 0.68,
     trades_count: 3,
     sharpe: 2.41,
-    subtitle: "5m / 15m Volatility Expansion",
-    description: "Captures institutional opening drives breaking morning high/low with high relative volume.",
+    subtitle: "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
+    description: "ORBStraddle's rules: scans about 250 stocks for a clean break of their 9:30-9:35 range and trades it with an Alpaca bracket.",
   },
   {
     id: "vwap_pullback",
@@ -246,7 +246,7 @@ console.log("\n[TEST 1] Testing High-Frequency State Message Updates (100 msg/se
       strategies: [
         {
           id: "orb",
-          name: "Opening Range Breakout",
+          name: "Opening Range Breakout (ORBStraddle rules)",
           status: "ACTIVE",
           daily_pnl: 100 + i * 2,
           win_rate: 0.70,
@@ -301,7 +301,7 @@ console.log("\n[TEST 1] Testing High-Frequency State Message Updates (100 msg/se
   // Strategy enrichment preservation
   const orbStrat = client.state.strategies.find((s) => s.id === "orb");
   assert.ok(orbStrat, "ORB strategy must be present");
-  assert.strictEqual(orbStrat.subtitle, "5m / 15m Volatility Expansion", "Fallback subtitle must be preserved");
+  assert.strictEqual(orbStrat.subtitle, "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM", "Fallback subtitle must be preserved");
   assert.strictEqual(orbStrat.daily_pnl, 300, "ORB daily PnL must be updated to 300");
 
   console.log("  ✅ High-frequency 100 msg/s test PASSED with 0 state drops.");

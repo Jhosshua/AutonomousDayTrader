@@ -30,7 +30,6 @@ from backend.app.models.events import (
     OrderType,
     OrderState,
 )
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.core.flattening import (
     ZeroOvernightFlatteningEngine,
@@ -88,140 +87,8 @@ def _risk_rejection(sig) -> str:
 class TestOrbStopDistanceClamping:
     """Stress tests stop distance clamping across extreme stock prices for ORB."""
 
-    @pytest.mark.parametrize("price", [5.00, 150.00, 1000.00])
-    def test_orb_bullish_breakout_stop_distance_clamping_tight_range(self, price: float):
-        """Ultra-tight opening range: raw midpoint distance is small, must clamp >= 0.004."""
-        strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-        sym = f"ORB_TIGHT_{int(price)}"
 
-        # 5 bars establishing an ultra-tight opening range: range height is 0.001 * price
-        delta = round(price * 0.001, 4)
-        for m in range(30, 35):
-            strat.on_bar(_make_bar(
-                symbol=sym,
-                open_p=price,
-                high_p=price + delta,
-                low_p=price - delta,
-                close_p=price,
-                vol=10000,
-                ts_str=f"2026-09-21T09:{m:02d}:00-04:00",
-            ))
 
-        # Breakout bar closing slightly above range high with RVOL 3.0x (proportional upper wick)
-        entry = round(price * 1.002, 4)
-        wick = round((entry - price) * 0.1, 4)
-        bo_bar = _make_bar(
-            symbol=sym,
-            open_p=price + delta,
-            high_p=round(entry + wick, 4),
-            low_p=price,
-            close_p=entry,
-            vol=50000,
-            ts_str="2026-09-21T09:35:00-04:00",
-        )
-        sigs = strat.on_bar(bo_bar)
-        assert len(sigs) == 1, "Expected 1 ORB breakout BUY signal"
-        sig = sigs[0]
-        assert sig.side == OrderSide.BUY
-
-        stop_dist = abs(sig.entry_price - sig.stop_loss)
-        ratio = stop_dist / sig.entry_price
-
-        # Clamping contract: strictly between 0.4% and 4.0%
-        assert 0.004 - 1e-6 <= ratio <= 0.040 + 1e-6, f"ORB BUY tight clamp violated: ratio={ratio:.6f} for price={price}"
-        assert sig.stop_loss < sig.entry_price
-        assert sig.take_profit_1 > sig.entry_price
-        assert sig.take_profit_2 > sig.take_profit_1
-
-    @pytest.mark.parametrize("price", [5.00, 150.00, 1000.00])
-    def test_orb_bullish_breakout_stop_distance_clamping_wide_range(self, price: float):
-        """Extremely wide opening range: raw midpoint distance is huge (e.g. 15%), must clamp <= 0.040."""
-        strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-        sym = f"ORB_WIDE_{int(price)}"
-
-        # 5 bars establishing an ultra-wide opening range (range height 15% of price)
-        delta = round(price * 0.15, 2)
-        for m in range(30, 35):
-            strat.on_bar(_make_bar(
-                symbol=sym,
-                open_p=price,
-                high_p=price + delta,
-                low_p=price - delta,
-                close_p=price,
-                vol=10000,
-                ts_str=f"2026-09-21T09:{m:02d}:00-04:00",
-            ))
-
-        # Breakout bar closing above range high with RVOL 3.0x (close near high)
-        entry = round((price + delta) * 1.01, 2)
-        bo_bar = _make_bar(
-            symbol=sym,
-            open_p=price + delta,
-            high_p=round(entry + 0.01, 2),
-            low_p=price,
-            close_p=entry,
-            vol=50000,
-            ts_str="2026-09-21T09:35:00-04:00",
-        )
-        sigs = strat.on_bar(bo_bar)
-        assert len(sigs) == 1, "Expected 1 ORB breakout BUY signal"
-        sig = sigs[0]
-        assert sig.side == OrderSide.BUY
-
-        mid = price  # opening range is symmetric around `price`
-        stop_dist = abs(sig.entry_price - sig.stop_loss)
-        ratio = stop_dist / sig.entry_price
-
-        # Contract: a wide opening range keeps its structural stop. The stop is
-        # NOT pulled in to 3.8%; the risk engine rejects the signal instead.
-        # Clamping here would convert "too volatile, no trade" into a live
-        # trade whose stop sits inside the range that justified it.
-        assert ratio > 0.040, f"wide ORB stop was clamped: ratio={ratio:.6f} for price={price}"
-        assert math.isclose(sig.stop_loss, mid, abs_tol=0.01), "stop moved off the range midpoint"
-        assert _risk_rejection(sig) == "STOP_DISTANCE_TOO_WIDE"
-
-    @pytest.mark.parametrize("price", [5.00, 150.00, 1000.00])
-    def test_orb_bearish_breakdown_stop_distance_clamping(self, price: float):
-        """Bearish breakdown (SELL): stop distance must clamp to [0.004, 0.040]."""
-        strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-        sym = f"ORB_SHORT_{int(price)}"
-
-        # 5 bars establishing range
-        delta = round(price * 0.02, 2)
-        for m in range(30, 35):
-            strat.on_bar(_make_bar(
-                symbol=sym,
-                open_p=price,
-                high_p=price + delta,
-                low_p=price - delta,
-                close_p=price,
-                vol=10000,
-                ts_str=f"2026-09-21T09:{m:02d}:00-04:00",
-            ))
-
-        # Breakdown bar closing below range low with RVOL 3.0x
-        entry = round((price - delta) * 0.995, 4)
-        bd_bar = _make_bar(
-            symbol=sym,
-            open_p=price - delta,
-            high_p=price,
-            low_p=entry - 0.05,
-            close_p=entry,
-            vol=50000,
-            ts_str="2026-09-21T09:35:00-04:00",
-        )
-        sigs = strat.on_bar(bd_bar)
-        assert len(sigs) == 1, "Expected 1 ORB breakdown SELL signal"
-        sig = sigs[0]
-        assert sig.side == OrderSide.SELL
-
-        stop_dist = abs(sig.entry_price - sig.stop_loss)
-        ratio = stop_dist / sig.entry_price
-
-        assert 0.004 - 1e-6 <= ratio <= 0.040 + 1e-6, f"ORB SELL clamp violated: ratio={ratio:.6f} for price={price}"
-        assert sig.stop_loss > sig.entry_price
-        assert sig.take_profit_1 < sig.entry_price
-        assert sig.take_profit_2 < sig.take_profit_1
 
 
 # ============================================================================
@@ -690,36 +557,4 @@ class TestSubsystemSessionBoundaryPurge:
 class TestExtremePricesClamping:
     """Stress tests extreme boundary prices: $1.00 (penny stock) and $5,000.00 (mega-cap)."""
 
-    @pytest.mark.parametrize("price", [1.00, 5000.00])
-    def test_extreme_price_clamping_orb(self, price: float):
-        strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-        sym = f"EXT_ORB_{int(price)}"
-
-        # 5 bars establishing range: delta is 1% of price
-        delta = round(price * 0.01, 4)
-        for m in range(30, 35):
-            strat.on_bar(_make_bar(
-                symbol=sym, open_p=price, high_p=price+delta, low_p=price-delta, close_p=price,
-                vol=10000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00"
-            ))
-
-        entry = round((price + delta) * 1.005, 4)
-        wick = round((entry - price) * 0.1, 4)
-        bo_bar = _make_bar(
-            symbol=sym, open_p=price+delta, high_p=round(entry+wick, 4), low_p=price, close_p=entry,
-            vol=50000, ts_str="2026-09-21T09:35:00-04:00"
-        )
-        sigs = strat.on_bar(bo_bar)
-        assert len(sigs) == 1
-        sig = sigs[0]
-
-        stop_dist = abs(sig.entry_price - sig.stop_loss)
-        ratio = stop_dist / sig.entry_price
-        # Floor is enforced by the strategy; the ceiling is enforced by the risk
-        # engine rejecting the order, not by the strategy moving the stop.
-        # At $1.00 the ATR fallback's $0.10 floor is ~10% of price, so the
-        # signal is correctly refused rather than traded on a clamped stop.
-        assert ratio >= 0.004 - 1e-6, f"Extreme ORB floor violated: price={price}, ratio={ratio}"
-        if ratio > 0.040:
-            assert _risk_rejection(sig) == "STOP_DISTANCE_TOO_WIDE"
 

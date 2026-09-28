@@ -34,7 +34,7 @@ ALLOWED_TYPE_PREFIX = "backend.app."
 ORB_STATE_SECTIONS = ("controller", "scheduler")
 
 # Base Strategy counters that survive the ORB replacement (today's stats and an operator pause).
-# Everything else the old OpeningRangeBreakoutStrategy saved is dropped.
+# Everything else the old bar-based ORB class saved is dropped.
 LEGACY_ORB_KEEP = ("strategy_id", "status", "daily_pnl", "trades_count", "wins_count",
                    "losses_count", "win_rate", "_trade_pnls")
 

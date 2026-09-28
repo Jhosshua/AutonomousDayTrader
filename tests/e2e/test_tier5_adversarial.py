@@ -90,7 +90,6 @@ from backend.app.strategies.base import (
 )
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy, score_news_sentiment
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from tests.e2e.test_contracts import (
     AccountLedger,
@@ -531,57 +530,6 @@ def test_adv_zero_volume_bars_indicator_stability():
     assert isinstance(sigs, list)
 
 
-def test_adv_luld_halt_and_resumption():
-    """
-    Simulates a 5-minute regulatory Limit Up/Limit Down (LULD) halt (5 flat 0-vol bars),
-    followed by a high-volume reopening breakout.
-    Verifies that the engine buffers state safely during halt and routes trades on resumption.
-    """
-    account = PaperTradingAccount(initial_cash=50000.00)
-    engine = ExecutionEngine(account=account)
-    strat = OpeningRangeBreakoutStrategy()
-
-    # Pre-halt opening range bars (09:30 - 09:34 ET)
-    for m in range(30, 35):
-        bar = BarEvent(
-            symbol="NVDA",
-            open=120.0,
-            high=122.0,
-            low=119.0,
-            close=121.0,
-            volume=100000,
-            timestamp=datetime(2026, 9, 21, 13, m, 0, tzinfo=timezone.utc),
-        )
-        strat.on_bar(bar)
-
-    # 5-minute LULD halt (09:35 - 09:39 ET): 0 volume, flat price 122.0
-    for m in range(35, 40):
-        halt_bar = BarEvent(
-            symbol="NVDA",
-            open=122.0,
-            high=122.0,
-            low=122.0,
-            close=122.0,
-            volume=0,
-            timestamp=datetime(2026, 9, 21, 13, m, 0, tzinfo=timezone.utc),
-        )
-        sigs = strat.on_bar(halt_bar)
-        # Halt bars must NOT trigger false breakout signals
-        assert len(sigs) == 0
-
-    # Reopening bar at 09:40 ET: Vol 600,000, Breakout to $123.50 > $122.00
-    reopen_bar = BarEvent(
-        symbol="NVDA",
-        open=122.5,
-        high=124.0,
-        low=122.0,
-        close=123.5,
-        volume=600000,
-        timestamp=datetime(2026, 9, 21, 13, 40, 0, tzinfo=timezone.utc),
-    )
-    reopen_sigs = strat.on_bar(reopen_bar)
-    assert len(reopen_sigs) == 1
-    assert reopen_sigs[0].side == OrderSide.BUY
 
 
 def test_adv_tick_gap_temporal_recovery():

@@ -965,6 +965,8 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
     }
     if tri_controller.owns(symbol):
         pos_data.update(tri_controller.position_details(symbol))
+    if orb.owns(symbol):
+        pos_data.update(orb.position_details(symbol))
     if include_chart:
         history = market_history.get(symbol, [])
         pos_data["chart_points"] = list(history)[-120:]
@@ -2232,8 +2234,8 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     if bar.symbol.upper() in settings.WATCHLIST_SYMBOLS:
         for strat in strategies:
             try:
-                if strat.strategy_id in FIXED_IDS:
-                    continue
+                if strat.strategy_id in FIXED_IDS or strat.strategy_id == ORB_ID:
+                    continue  # fixed plans and ORB (ORBStraddle rules) run on their own controllers
                 sigs = strat.on_bar(bar)
                 if sigs:
                     collected_signals.extend(sigs)

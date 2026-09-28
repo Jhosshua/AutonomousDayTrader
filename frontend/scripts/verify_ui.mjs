@@ -140,6 +140,8 @@ for (const id of ["orb", "vwap_pullback", "news_momentum", "mean_reversion", "ts
 const card = fs.readFileSync(path.join(FRONTEND_DIR, "components/StrategyCard.tsx"), "utf8");
 assert(card.includes("strategyTheme"), "StrategyCard.tsx must use strategyTheme() from lib/plain.ts");
 assert(card.includes('data-testid="or15-details"') && card.includes("Offline replay"), "OR15 must distinguish replay from paper");
+assert(card.includes('data-testid="orb-details"') && card.includes("held at Alpaca"), "ORB card must show its mode, step and bracket trades");
+assert(plainLib.includes("Opening Range Breakout (ORBStraddle rules)"), "ORB card must use the ORBStraddle-rules name");
 const holding = fs.readFileSync(path.join(FRONTEND_DIR, "components/HoldingNow.tsx"), "utf8");
 assert(holding.includes("!position.fixed_protection") && holding.includes("Safety exit stays fixed"), "OR15 must disable stop movement");
 console.log("  ✅ Verified all five strategy themes and OR15 fixed protection controls");

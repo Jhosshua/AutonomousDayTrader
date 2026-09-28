@@ -151,6 +151,30 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
             {showPro && strategy.tri_engine.reason && <div className="mt-2 break-words">{planStatusText(strategy.tri_engine.reason)}</div>}
           </div>
         )}
+        {strategy.orb && (
+          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="orb-details">
+            <div className="font-semibold">{strategy.orb.mode_text}</div>
+            <div>{strategy.orb.hours} ET</div>
+            {strategy.orb.step && <div className="mt-1">{strategy.orb.step}</div>}
+            {strategy.orb.open_trades.map((t) => (
+              <div key={t.symbol} className="mt-2 border-t pt-2" style={{ borderColor: theme.track }}>
+                <span className="font-semibold">{t.direction === "long" ? "Bought" : "Sold short"} {t.symbol} · {Math.abs(t.qty)} shares</span>
+                <div>Safety exit {t.stop != null ? formatMoney(t.stop) : "unknown"} · target {t.target != null ? formatMoney(t.target) : "none"} (held at Alpaca)</div>
+                {t.r != null && <div>Now {t.r >= 0 ? "+" : ""}{t.r.toFixed(2)}× its risk{t.breakeven_locked ? " · stop moved to the entry" : ""}</div>}
+                {t.exit_requested && <div>Closing: {t.exit_requested}</div>}
+              </div>
+            ))}
+            {(strategy.orb.realized_pnl !== 0 || strategy.orb.unrealized_pnl !== 0) && (
+              <div className="mt-2">Today: {formatSignedMoney(strategy.orb.realized_pnl)} closed{strategy.orb.open_trades.length > 0 ? `, ${formatSignedMoney(strategy.orb.unrealized_pnl)} open` : ""}</div>
+            )}
+            {(strategy.orb.init_error || strategy.orb.errors.length > 0) && (
+              <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
+                {strategy.orb.init_error || "ORB reported a problem; check the paper account."}
+                {showPro && strategy.orb.errors.length > 0 && <div className="mt-1 text-xs">{strategy.orb.errors.map((e) => e.alarm || e.kind).join(", ")}</div>}
+              </div>
+            )}
+          </div>
+        )}
         {strategy.or15 && (
           <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="or15-details">
             <span className="font-semibold">1 share · {strategy.or15.mode === "offline_raw_open" ? "Offline replay" : "Paper account"}</span>

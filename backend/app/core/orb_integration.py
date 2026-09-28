@@ -599,6 +599,18 @@ class OrbIntegration:
         return round(total, 2)
 
     # ------------------------------------------------------------------ views
+    def position_details(self, symbol: str) -> Dict[str, Any]:
+        """Dashboard position fields for an ORB trade: its stop/target are the bracket legs at Alpaca,
+        so the UI shows them fixed (no manual stop moves)."""
+        ctl = self.controller
+        h = next((x for x in (ctl.holdings() if ctl else []) if x["symbol"] == symbol.upper()), None)
+        out: Dict[str, Any] = {"strategy_id": ORB_ID, "fixed_protection": True, "take_profit_2": None,
+                               "exit_due": None}
+        if h is not None:
+            out.update(stop_loss=h.get("stop"), take_profit_1=h.get("target"), r_multiple=h.get("r"),
+                       exit_due=datetime.combine(self.clock().astimezone(ET).date(), time(11, 0), ET).isoformat())
+        return out
+
     def status(self) -> Dict[str, Any]:
         ctl, sched = self.controller, self.scheduler
         out: Dict[str, Any] = {"mode": ctl.mode if ctl else self.mode, "configured_mode": self.configured_mode,

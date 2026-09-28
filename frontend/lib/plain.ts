@@ -87,13 +87,13 @@ export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
     what: "Buys one Tesla share after a morning breakout pulls back and holds. Checks QQQ for support, then uses fixed exits and a two-hour limit.",
   },
   orb: {
-    name: "Morning Breakout",
+    name: "Opening Range Breakout (ORBStraddle rules)",
     band: "#F4E0CF",
     ink: "#7A3E1D",
     tint: "#FAF0E6",
     bar: "#D98B5F",
     track: "#F2E3D5",
-    what: "Watches the first few minutes of the day. If a stock then shoots past that range, it jumps in.",
+    what: "Scans about 250 stocks for a clean break of their 9:30 to 9:35 range. Decides at 9:38 AM, may add a trade until 10:15 AM, and closes every trade by 11:00 AM. Each trade is a broker bracket: its stop and target wait at Alpaca.",
   },
   vwap_pullback: {
     name: "Ride the Trend",
