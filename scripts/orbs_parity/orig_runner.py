@@ -105,8 +105,14 @@ def main():
                    "scan_s": round(_time.monotonic() - s0, 2)}
             att, okc = health.get("attempted"), health.get("ok")
             cov_ok = isinstance(att, int) and att > 0 and okc / att >= config.MIN_SCAN_COVERAGE
-            decide = (step["wave"] == "primary" and cov_ok) or (
-                step["wave"] == "secondary" and cards and (not att or cov_ok))
+            # auditor gates mirrored: a frozen primary needs coverage and cards (core._commit_snapshot), a
+            # secondary run needs cards (app.py:369), and nothing is decided at/after AUTOPILOT_CUTOFF
+            # (auditor._past_cutoff, judged at decision time).
+            ch, cm = map(int, config.AUTOPILOT_CUTOFF.split(":"))
+            before_cutoff = step["decide_now"] is not None and (
+                step["decide_now"].hour, step["decide_now"].minute) < (ch, cm)
+            decide = before_cutoff and bool(cards) and (
+                (step["wave"] == "primary" and cov_ok) or (step["wave"] == "secondary" and (not att or cov_ok)))
             if decide:
                 clock["now"] = step["decide_now"]
                 dec_cards = core._load_raw() if step["wave"] == "primary" else cards
@@ -138,6 +144,7 @@ def main():
                      if 'decision' in rec else ""), flush=True)
     result["misses"] = transport.misses
     result["counts"] = transport.counts
+    result["tape_splits"] = transport.tape.splits_done
     result["elapsed_s"] = round(_time.monotonic() - t0, 1)
     with open(args.out, "w") as f:
         f.write(common.dumps(result))

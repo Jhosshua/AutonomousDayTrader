@@ -16,6 +16,18 @@ Plan: `PLAN_2026_09_28_orb_rules_match_orbstraddle.md` (sections 2.1, 5.1, 8.5, 
 - `session_calendar.py` was NOT copied: the decision modules do not import it (only ORBStraddle's scheduler
   does). Phase 2's scheduler needs a calendar check.
 
+## Review round 1 (Codex) changes
+
+- `decide()` validates the board first (scan ok, same day and wave, non-empty, coverage, board_id equal to the
+  facade's last successful scan of that wave, now before the 10:15 cutoff); otherwise verdict `refused`.
+- `scan(..., executed_today=...)` (mandatory for secondary) and `decide(..., executed_today=...)`: the caller
+  must pass the durable union of symbols executed today; they never reappear on a secondary board or in picks.
+- A new facade builds a fresh session-lockout latch.
+- A manifest whose `scanner_env` differs from the import-time values is rejected (ValueError).
+- `compare.py` also checks the copy's final facade verdict and picks; `--split-pages 09:35:00,09:35:05`
+  forces tape page boundaries at those instants (the synthetic session has rows exactly there).
+- The original runner now mirrors the auditor's cutoff and empty-board gates, so the 10:15 scan is not decided.
+
 ## How parity is proven
 
 `scripts/orbs_parity/record.py <dates>` records a past session once (read-only relay): prep data, the

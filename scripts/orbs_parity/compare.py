@@ -56,6 +56,16 @@ def run(script, day, out, extra):
         raise SystemExit(f"{script} failed for {day}")
 
 
+def expected_verdict(decision):
+    """ORBStraddle's outcome for one decision record: auditor.run_autopilot's branches after validate."""
+    if not decision["valid"]:
+        return {"verdict": "rejected", "picks": []}
+    if not decision["validated"]:
+        sat_out = (decision["reply"].get("regime") or {}).get("action") == "SIT_OUT_CASH"
+        return {"verdict": "sit_out" if sat_out else "pass", "picks": []}
+    return {"verdict": "trade", "picks": [p["symbol"] for p in decision["validated"]]}
+
+
 def parity(orig, copy):
     report = {"sections": {}, "equal": True}
     for key in ("config", "scanner_tunables", "universe", "reference_session"):
@@ -75,6 +85,12 @@ def parity(orig, copy):
         elif do is not None:
             for part in ("reply", "note", "valid", "validated", "cards", "rechecks", "now"):
                 walk(jnorm(do[part]), jnorm(dc[part]), "decision." + part, diffs)
+            # the copy's FINAL facade answer must be what ORBStraddle's path yields from the same outputs
+            # (validator result -> trade / pass / sit-out / rejected; no occupancy in parity runs)
+            want = expected_verdict(do) if "verdict" in dc else None
+            got = {"verdict": dc.get("verdict"), "picks": dc.get("picks")}
+            if want is not None and got != want:
+                diffs.append({"path": "decision.final", "original": want, "copy": got})
         picks = None
         if do is not None and do["valid"] and do["validated"]:
             picks = [p["symbol"] for p in do["validated"]]
@@ -157,7 +173,10 @@ def main():
     ap.add_argument("dates", nargs="+")
     ap.add_argument("--reuse", action="store_true", help="reuse existing replay outputs")
     ap.add_argument("--scan-deadline", default=None)
+    ap.add_argument("--split-pages", default="", help='e.g. "09:35:00,09:35:05": tape pages also end at these instants')
     args = ap.parse_args()
+    if args.split_pages:
+        os.environ["ADT_PARITY_SPLIT_AT"] = args.split_pages      # inherited by both runners
     extra = ["--scan-deadline", args.scan_deadline] if args.scan_deadline else []
     failed = []
     for day in args.dates:

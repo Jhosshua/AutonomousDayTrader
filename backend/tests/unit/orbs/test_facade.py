@@ -120,16 +120,16 @@ def test_exclusion_keeps_the_board_and_promotes_the_next_pick(fac):
 
 def test_secondary_scan_skips_occupied_symbols(fac):
     primary(fac)
-    full = fac.scan(D, at(9, 51), "secondary", set())
+    full = fac.scan(D, at(9, 51), "secondary", set(), executed_today=set())
     assert {c["symbol"] for c in full["cards"]} == {"PLTR", "BA"}
-    skipped = fac.scan(D, at(9, 52), "secondary", {"PLTR"})
+    skipped = fac.scan(D, at(9, 52), "secondary", {"PLTR"}, executed_today=set())
     assert {c["symbol"] for c in skipped["cards"]} == {"BA"}
     assert skipped["health"]["attempted"] == 6
 
 
 def test_secondary_one_sided_board_sits_out(fac):
     primary(fac)
-    board = fac.scan(D, at(9, 48), "secondary", set())
+    board = fac.scan(D, at(9, 48), "secondary", set(), executed_today=set())
     out = fac.decide(D, board, "secondary", at(9, 48, 30), set())
     assert out["verdict"] == "sit_out" and out["picks"] == []
     assert out["regime"]["classification"] == "ONE_SIDED"

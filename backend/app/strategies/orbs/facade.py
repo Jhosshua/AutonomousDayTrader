@@ -7,17 +7,27 @@ places orders or talks to Alpaca's trading API; the only network is the AlpacaRe
                      close x volume (scanner.watchlist, scanner.py:369-412), prior closes, 14-TR ATR.
   scan(...)          "preview"/"primary": scanner.run (scanner.py:1089-1100), as app.py:283-322 calls it
                      (09:36 preview, 09:38 final). "secondary": scanner.run_secondary (scanner.py:1103-1120),
-                     as app.py:359-373 calls it each minute 09:45-10:15; skip_symbols feeds the "supervised /
-                     executed today" exclusion that ORBStraddle reads from core._superv_open / core._todays.
+                     as app.py:359-373 calls it each minute 09:45-10:15. The secondary board excludes exactly
+                     what ORBStraddle's run_secondary excludes (scanner.py:1109-1118): skip_symbols = symbols
+                     currently open/supervised (core._superv_open) and executed_today = every symbol with an
+                     execution today (core._todays("execution")).
+                     THE CALLER MUST PASS THE DURABLE UNION OF EXECUTED-TODAY SYMBOLS (persisted by the
+                     controller across restarts), including trades already closed; otherwise a symbol traded
+                     and closed earlier can reappear on a secondary board and be picked again.
                      ok = app._require_scan_coverage (app.py:114-121): coverage >= MIN_SCAN_COVERAGE.
+                     Every successful scan is remembered per wave (board_id) for decide().
   decide(...)        auditor.run_autopilot's adaptive branch (auditor.py:480-496): adaptive.reply_text
                      (adaptive.py:807-833) + core.validate (core.py:334-445). The primary board is read back
                      the way core.load_cards/_load_raw (core.py:92-99, 196-208) reads the frozen board (JSON
                      round trip, valid cards only, first card per symbol); a secondary board is passed as the
                      scanner returned it (app.py:369 candidate_cards=sec_cards). `occupied` is core.execute's
                      "already held by this account" refusal (core.py:2176-2180): the pick is dropped, never
-                     replaced. The auditor's once-a-day / already-judged / slots / cutoff gates
-                     (auditor.py:390-470) belong to the controller (phase 2), not here.
+                     replaced; executed_today picks are refused the same way. Before deciding, the board is
+                     validated like ORBStraddle's snapshot path (core._commit_snapshot/_read_snapshot,
+                     auditor._past_cutoff): scan ok, same day, same wave, coverage >= MIN_SCAN_COVERAGE,
+                     board_id equal to the last successful scan of that wave, and now < AUTOPILOT_CUTOFF;
+                     otherwise verdict "refused" with the reason. The auditor's once-a-day / already-judged /
+                     slots gates (auditor.py:390-470) belong to the controller (phase 2), not here.
   recheck(card, now) core.execute's per-pick re-check (core.py:2193-2211): candle rule, flow rules 1/2, then a
                      fresh macro veto; call it again right before the POST (core.py:2390-2400).
   macro_veto(...)    flow.macro_refusals (flow.py:392-404) for one symbol at `now`.
@@ -27,7 +37,13 @@ places orders or talks to Alpaca's trading API; the only network is the AlpacaRe
                      never blocks; starts/refreshes a background read and returns the latest FRESH result.
 
 The copied modules are module singletons (scanner session state, relay client, lockout latch), so one
-process holds one facade; a new OrbsFacade re-points them.
+process holds one facade; a new OrbsFacade re-points them (fresh scan session, relay client and lockout latch).
+
+Import-time limits: scanner.py and market.py read their ORBS_* tunables (page size, scan deadline, incremental
+mode, repair windows, relay cache/body limits) from config.SCANNER_ENV once, at import. A manifest passed to
+OrbsFacade must therefore carry the same `scanner_env` the modules were imported with; a different one is
+rejected (ValueError) rather than silently ignored. To run with other tunables, apply the manifest with
+config.apply_manifest() before this module is first imported (the replay harness does this).
 """
 from __future__ import annotations
 
@@ -43,6 +59,8 @@ from . import adaptive, config, flow, market, scanner, shim, signals
 from .ticks import ET
 
 log = logging.getLogger("adt.orbs")
+# The scanner/market tunables in force when those modules were imported (see the module docstring).
+_IMPORT_SCANNER_ENV = dict(config.SCANNER_ENV)
 
 WAVES = ("preview", "primary", "secondary")
 
@@ -81,15 +99,23 @@ class OrbsFacade:
         """state_dir: where the copied scanner writes its board files and receipts (never the repo).
         relay_base / relay_token: ADT settings RELAY_HTTP_URL / RELAY_TOKEN. manifest: PARITY_MANIFEST.json
         by default. http: optional urlopen-compatible transport (replay/record); default urllib."""
-        config.apply_manifest(manifest if manifest is not None else config.load_manifest())
+        manifest = manifest if manifest is not None else config.load_manifest()
+        wanted_env = {k: v for k, v in manifest.get("scanner_env", {}).items() if not k.startswith("_")}
+        if wanted_env != _IMPORT_SCANNER_ENV:
+            changed = sorted(k for k in set(wanted_env) | set(_IMPORT_SCANNER_ENV)
+                             if wanted_env.get(k) != _IMPORT_SCANNER_ENV.get(k))
+            raise ValueError(f"manifest scanner_env differs from the import-time values for {changed}; "
+                             "apply it with config.apply_manifest() before importing the facade")
+        config.apply_manifest(manifest)
         config.set_relay(relay_base, relay_token)
         os.makedirs(state_dir, exist_ok=True)
         config.set_state_dir(state_dir)
         shim.set_transport(http)
         shim.set_occupancy()
         scanner.STATE = config.STATE
-        signals.SESSION_LOCKOUT.filepath = os.path.join(config.STATE, "session_lockout.json")
-        signals.SESSION_LOCKOUT.load()
+        # A brand-new latch: nothing from a previous state dir (locked flag, symbol, session) survives.
+        signals.SESSION_LOCKOUT = signals.SessionLockoutManager(
+            filepath=os.path.join(config.STATE, "session_lockout.json"))
         scanner._RELAY_CLIENT = market.RelayClient(base_url=config.RELAY_DATA, meta_url=config.RELAY_META,
                                                    token=config.RELAY_TOKEN, ua=config.RELAY_UA)
         scanner._SESSION = None
@@ -100,6 +126,7 @@ class OrbsFacade:
         self._scan_lock = threading.Lock()
         self._abs_latest = {}
         self._abs_lock = threading.Lock()
+        self._last_scan = {}          # wave -> {"board_id", "day", "end", "coverage"} of the last OK scan
 
     # ---------------- configuration ----------------
     def set_exclude_symbols(self, symbols: Iterable[str]) -> None:
@@ -129,7 +156,8 @@ class OrbsFacade:
                 "closes": len(scanner.adv_close), "atr": len(scanner._prep.get("atr") or {}),
                 "reference_session": scanner.REFERENCE_SESSION_DATE}
 
-    def scan(self, day: date, end: datetime, wave: str, skip_symbols: Set[str]) -> dict:
+    def scan(self, day: date, end: datetime, wave: str, skip_symbols: Set[str],
+             executed_today: Optional[Set[str]] = None) -> dict:
         if wave not in WAVES:
             raise ValueError(f"unknown wave {wave!r}")
         if end.tzinfo is None:
@@ -139,13 +167,16 @@ class OrbsFacade:
             raise ValueError("scan end must be a whole minute on the scan day (ORBStraddle cuts at HH:MM)")
         end_hhmm = end_et.strftime("%H:%M")
         skip = {str(s).upper() for s in (skip_symbols or ())}
-        if wave != "secondary" and skip:
+        if wave == "secondary" and executed_today is None:
+            raise ValueError("a secondary scan needs executed_today (the durable set of symbols executed today)")
+        executed = {str(s).upper() for s in (executed_today or ())}
+        if wave != "secondary" and (skip or executed):
             raise ValueError("preview/primary boards never skip symbols (ORBStraddle scanner.run); "
                              "apply occupancy in decide()")
         with self._scan_lock, shim.frozen_clock(end_et):
             try:
                 if wave == "secondary":
-                    shim.set_occupancy(supervised=skip)
+                    shim.set_occupancy(supervised=skip, executed=executed)
                     try:
                         cards, health = scanner.run_secondary(day, end_hhmm)
                     finally:
@@ -159,12 +190,43 @@ class OrbsFacade:
             ok, why = True, None            # app.py:370 only checks coverage when symbols were attempted
         else:
             ok, why = _require_scan_coverage(health)
+        bid = board_id(day, wave, end_hhmm, cards)
+        if ok:
+            self._last_scan[wave] = {"board_id": bid, "day": day.isoformat(), "end": end_hhmm,
+                                     "coverage": health.get("coverage")}
         return {"ok": ok, "error": why, "coverage": health.get("coverage"), "cards": cards,
-                "board_id": board_id(day, wave, end_hhmm, cards), "wave": wave, "end": end_hhmm,
-                "health": health}
+                "board_id": bid, "wave": wave, "end": end_hhmm, "health": health}
+
+    def _board_refusal(self, day: date, board, wave: str, now_et: datetime) -> Optional[str]:
+        """Why this board may not be decided (ORBStraddle's snapshot/cutoff checks), or None."""
+        if not isinstance(board, dict):
+            return "board is not a scan result"
+        if board.get("ok") is not True:
+            return f"the scan did not succeed ({board.get('error')})"
+        if board.get("wave") != wave:
+            return f"board is from the {board.get('wave')} wave, not {wave}"
+        if not board.get("cards"):
+            return "the board is empty"          # core._commit_snapshot / app.py:369 never decide an empty board
+        health = board.get("health") or {}
+        if health.get("day") != day.isoformat():
+            return f"board is for {health.get('day')}, not {day.isoformat()}"
+        if wave == "primary" or health.get("attempted"):
+            ok, why = _require_scan_coverage(health)
+            if not ok:
+                return why
+        last = self._last_scan.get(wave)
+        if last is None or last["day"] != day.isoformat() or last["board_id"] != board.get("board_id"):
+            return f"board is not the last successful {wave} scan"
+        if board.get("board_id") != board_id(day, wave, str(board.get("end")), board.get("cards") or []):
+            return "board cards do not match their board_id"
+        h, m = map(int, config.AUTOPILOT_CUTOFF.split(":"))
+        if (now_et.hour, now_et.minute) >= (h, m):
+            return f"past the {config.AUTOPILOT_CUTOFF} cutoff"
+        return None
 
     # ---------------- decision ----------------
-    def decide(self, day: date, board: dict, wave: str, now: datetime, occupied: Set[str]) -> dict:
+    def decide(self, day: date, board: dict, wave: str, now: datetime, occupied: Set[str],
+               executed_today: Optional[Set[str]] = None) -> dict:
         if wave not in ("primary", "secondary"):
             raise ValueError("only the primary and secondary boards are decided")
         if now.tzinfo is None:
@@ -172,9 +234,15 @@ class OrbsFacade:
         now_et = now.astimezone(ET)
         if now_et.date() != day:
             raise ValueError("decision time must be on the board's day")
-        raw = board.get("cards") if isinstance(board, dict) else board
-        cards = frozen_board(raw or []) if wave == "primary" else list(raw or [])
         occupied = {str(s).upper() for s in (occupied or ())}
+        executed = {str(s).upper() for s in (executed_today or ())}
+        refusal = self._board_refusal(day, board, wave, now_et)
+        if refusal:
+            return {"verdict": "refused", "reason": refusal, "picks": [], "refused": [], "audit": [],
+                    "regime": {}, "reply": None, "note": None, "cards": [], "wave": wave,
+                    "now": now_et.isoformat(), "valid": False, "validated": None}
+        raw = board.get("cards")
+        cards = frozen_board(raw or []) if wave == "primary" else list(raw or [])
         with shim.frozen_clock(now_et):
             text, note = adaptive.reply_text(cards, day.isoformat())
             good, res = shim.validate(text, cards)
@@ -198,6 +266,9 @@ class OrbsFacade:
             if sym in occupied:
                 out["refused"].append({"symbol": sym, "reason": "already held by this account"})
                 continue
+            if sym in executed:
+                out["refused"].append({"symbol": sym, "reason": "already executed today"})
+                continue
             card = by_sym[sym]
             out["picks"].append({
                 **p,
@@ -209,7 +280,7 @@ class OrbsFacade:
                 "card": card,
             })
         out["verdict"] = "trade" if out["picks"] else "blocked"
-        out["reason"] = None if out["picks"] else "every pick is already held by this account"
+        out["reason"] = None if out["picks"] else "every pick is already held or already executed today"
         return out
 
     def recheck(self, card: dict, now: datetime) -> Tuple[bool, str]:
