@@ -388,3 +388,9 @@ def test_request_budget_exit_reserve():
 def test_controller_rejects_unknown_mode():
     with pytest.raises(ValueError):
         OrbExecutionController(None, None, MANIFEST, mode="yolo")
+
+
+def test_absorption_age_is_read_from_the_manifest():
+    assert load_config({})["absorption_max_result_age_s"] == 8.0
+    assert load_config({"absorption_max_result_age_s": 5})["absorption_max_result_age_s"] == 5.0
+    assert load_config({"absorption": {"max_result_age_s": 6}})["absorption_max_result_age_s"] == 6.0

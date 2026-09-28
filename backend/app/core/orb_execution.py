@@ -111,6 +111,8 @@ ALIASES: Dict[str, List[str]] = {
     "exit_reserve_per_min": ["exit_reserve_per_min"],
     "coid_prefix": ["coid_prefix", "adt_coid_prefix"],
     "expected_account": ["expected_account", "account_number", "account_allowlist"],
+    "absorption_max_result_age_s": ["absorption_max_result_age_s", "absorption_max_age_s",
+                                    "absorption_result_age_s", "max_result_age_s"],
 }
 
 
@@ -169,6 +171,13 @@ def parse_hms(v: Any) -> time:
 # ----------------------------------------------------------------------------- budget
 class BudgetThrottled(BrokerError):
     """The local request budget refused the call: it was never sent."""
+
+
+class DestinationRefused(BrokerError):
+    """The pinned Alpaca account could not be verified: the write was never sent."""
+
+
+DEST_TTL_S = 60.0              # a verified destination is trusted this long (same credentials)
 
 
 class RequestBudget:
@@ -352,7 +361,8 @@ class OrbExecutionController:
         self._sym_locks: Dict[str, threading.Lock] = {}
         self._sym_guard = threading.Lock()
         self._held: set = set()          # symbols this process holds through reserve()
-        self._pending_reserve: set = set()   # reopened positions still to reserve (outside the lock)
+        self._pending_reserve: set = set()   # reopened positions still to reserve (guarded by _lock)
+        self._dest_ok: Optional[Tuple[str, float]] = None   # (broker fingerprint, verified at)
         self.state: Dict[str, Any] = self._empty_state()
         self.last_execute: Optional[dict] = None
         self.last_tick: Optional[dict] = None
@@ -560,8 +570,8 @@ class OrbExecutionController:
         rec = self.state["orders"][key]
         if oid and not rec.get("id"):
             rec["id"] = oid
-        if rec.get("qty") is None and _i(order.get("qty")):
-            rec["qty"] = _i(order.get("qty"))
+        if _i(order.get("qty")) and (rec.get("qty") is None or rec.get("role") == "exit"):
+            rec["qty"] = _i(order.get("qty"))      # an exit's size is what the broker holds, not our note
         status = order.get("status") if isinstance(order.get("status"), str) else None
         new_f = _i(order.get("filled_qty"))
         new_avg = _f(order.get("filled_avg_price"))
@@ -677,9 +687,12 @@ class OrbExecutionController:
                     self._event({"kind": "position_rebuilt", "symbol": sym,
                                  "note": "own orders/shares with no position record: exits at the next pass"})
                 adopted.append(sym)
-        for sym in sorted(self._pending_reserve):
+        with self._lock:
+            pending = sorted(self._pending_reserve)
+        for sym in pending:
             if self._take(sym):
-                self._pending_reserve.discard(sym)
+                with self._lock:
+                    self._pending_reserve.discard(sym)
             else:
                 self._alarm(f"reservation_conflict_{sym}", {"symbol": sym,
                             "note": "ORB supervises its own shares here but could not reserve the symbol"})
@@ -1047,10 +1060,47 @@ class OrbExecutionController:
         return None
 
     def _destination_refused(self, acct: Any) -> Optional[str]:
+        """Judge an account read; a pass refreshes the write cache, a failure clears it and alarms."""
         why = self.account_refusal(acct)
+        with self._lock:
+            self._dest_ok = None if why else (self._broker_fingerprint(), self._now().timestamp())
         if why:
             self._alarm("wrong_account", {"reason": why})
         return why
+
+    def _broker_fingerprint(self) -> str:
+        """Which credentials and endpoint a write would use: a change forces a fresh account check."""
+        c = getattr(self.broker, "_client", None)
+        key = base = ""
+        try:
+            key = str(c.headers.get("APCA-API-KEY-ID") or "") if c is not None else ""
+            base = str(getattr(c, "base_url", "")) if c is not None else ""
+        except Exception:
+            pass
+        return f"{id(self.broker)}|{base}|{key}"
+
+    def _verify_destination_for_write(self) -> None:
+        """Every broker write (entry, cancel, PATCH, exit) goes to the pinned account only. A pass is
+        cached for DEST_TTL_S with the same credentials, so exits are not slowed by account reads."""
+        with self._lock:
+            ok = self._dest_ok
+        now_ts = self._now().timestamp()
+        if ok and ok[0] == self._broker_fingerprint() and 0 <= now_ts - ok[1] < DEST_TTL_S:
+            return
+        try:
+            acct = self._call("exit", self.broker.get_account_checked)
+        except Exception as exc:
+            raise DestinationRefused(f"the account could not be verified before a broker write: {exc}")
+        why = self._destination_refused(acct)
+        if why:
+            raise DestinationRefused(f"destination refused: {why}")
+
+    def _write(self, prio: str, fn: Callable, *a, _pretaken: bool = False, **kw):
+        """A broker WRITE: pinned account verified first, then the budget token (unless already held)."""
+        self._verify_destination_for_write()
+        if not _pretaken:
+            self.budget.acquire(prio)
+        return fn(*a, **kw)
 
     def _prices_from_positions(self) -> Optional[Dict[str, float]]:
         if self.broker is None:
@@ -1476,9 +1526,9 @@ class OrbExecutionController:
             self._finish_rejected(pl, "bracket invalid after 2 dp rounding")
             return "rejected", {"error": "bracket invalid after 2 dp rounding", "rejected": True}
         try:
-            res = self._call("normal", self.broker.submit_bracket, sym, pl["shares"], side,
+            res = self._write("normal", self.broker.submit_bracket, sym, pl["shares"], side,
                              pl["target"], pl["stop"], pl["coid"])
-        except BudgetThrottled as exc:
+        except (BudgetThrottled, DestinationRefused) as exc:
             with self._lock:
                 self.state["orders"][key].update(status="not_sent", terminal=True, submit_state="answered")
             self._finish_rejected(pl, str(exc))
@@ -1566,7 +1616,7 @@ class OrbExecutionController:
                 results[name] = {"ok": False, "error": "leg not found"}
                 continue
             try:
-                rr = self._call("normal", self.broker.patch_order, lid, qty=new_qty)
+                rr = self._write("normal", self.broker.patch_order, lid, qty=new_qty)
                 results[name] = {"ok": True}
                 if isinstance(rr, dict) and rr.get("id"):
                     self._merge(rr, "leg", pos["key"], "tp" if name == "take_profit" else "sl",
@@ -1591,7 +1641,7 @@ class OrbExecutionController:
         if not sl:
             return {"ok": False, "reason": f"No open stop loss order found for {pos['symbol']}"}
         try:
-            rr = self._call("normal", self.broker.patch_order, sl, stop_price=round(entry, 2))
+            rr = self._write("normal", self.broker.patch_order, sl, stop_price=round(entry, 2))
         except Exception as exc:
             return {"ok": False, "stop_order_id": sl, "error": str(exc)[:200]}
         if isinstance(rr, dict) and rr.get("id"):
@@ -1735,7 +1785,7 @@ class OrbExecutionController:
                         continue
                 asked.add(key)
                 try:
-                    body = self._call("exit", self.broker.cancel_order_and_confirm, rec["id"], CANCEL_CONFIRM_S)
+                    body = self._write("exit", self.broker.cancel_order_and_confirm, rec["id"], CANCEL_CONFIRM_S)
                     self._merge(body)
                     if isinstance(body, dict) and body.get("status") == "canceled":
                         cancelled.append(rec["id"])
@@ -1780,26 +1830,38 @@ class OrbExecutionController:
             with self._lock:
                 self.state["orders"].pop(key, None)
             return None, f"could not save the exit record ({exc}); nothing sent", n, side
-        # the account position read IMMEDIATELY before the POST (smallest window): never send more
-        # than the account holds on our side, so the exit can never cross the account through flat
+        def not_sent(note):
+            with self._lock:
+                self.state["orders"][key].update(status="not_sent", terminal=True, submit_state="answered",
+                                                 note=note)
+        # destination and the POST's budget token come FIRST, so no wait can sit between the final
+        # position read and the POST; then the account position is read and the qty capped to it
+        # (never send more than the account holds on our side: the exit can never cross flat)
+        try:
+            self._verify_destination_for_write()
+            self.budget.acquire("exit")
+        except (BudgetThrottled, DestinationRefused) as exc:
+            not_sent(f"not sent: {exc}")
+            return None, str(exc), n, side
         try:
             net = int(self._call("exit", self.broker.position_qty, sym))
         except Exception as exc:
-            with self._lock:
-                self.state["orders"][key].update(status="not_sent", terminal=True, submit_state="answered",
-                                                 note="position unreadable right before the POST")
+            not_sent("position unreadable right before the POST")
             return None, f"could not read the account position for {sym} before the exit; retrying ({exc})", n, side
         capped = self._cap_to_account(sym, self.own_qty(sym), net, why)
         if capped == 0 or (capped > 0) != (own > 0):
-            with self._lock:
-                self.state["orders"][key].update(status="not_sent", terminal=True, submit_state="answered",
-                                                 note="nothing left to exit: fully offset by an outside trade")
+            not_sent("nothing left to exit: fully offset by an outside trade")
             return None, None, 0, side
         n = abs(capped)
         with self._lock:
             self.state["orders"][key]["qty"] = n
         try:
-            resp = self._call("exit", self.broker.submit_market_order, sym, side, n, coid)
+            self._persist()                  # the record carries the qty actually sent
+        except Exception as exc:
+            not_sent("the capped qty could not be saved before the POST")
+            return None, f"could not save the exit record ({exc}); nothing sent", n, side
+        try:
+            resp = self.broker.submit_market_order(sym, side, n, coid)     # token already held
             self._merge(dict(resp, client_order_id=resp.get("client_order_id") or coid))
             return resp.get("id"), None, n, side
         except BudgetThrottled as exc:
@@ -1853,7 +1915,7 @@ class OrbExecutionController:
                 self._event({"kind": "exit_resized_to_account", "symbol": sym, "working_qty": remaining,
                              "account_qty": net})
                 try:
-                    body = self._call("exit", self.broker.cancel_order_and_confirm, working["id"], CANCEL_CONFIRM_S)
+                    body = self._write("exit", self.broker.cancel_order_and_confirm, working["id"], CANCEL_CONFIRM_S)
                     self._merge(body)
                 except Exception as exc:
                     log.warning("cancel of oversized own exit %s failed: %s", working["id"], exc)
@@ -2118,8 +2180,12 @@ class OrbExecutionController:
     def reconcile_on_startup(self, now: Optional[datetime] = None) -> dict:
         """Rebuild ORB's book from the restored state + Alpaca by our ids/coids (parents nested,
         so their UUID legs come along) BEFORE entries are allowed. Own-prefix orders Alpaca shows
-        that the state does not know are REPORTED, never adopted, and keep entries refused."""
-        now = self._now(now)
+        that the state does not know are REPORTED, never adopted, and keep entries refused.
+        Serialized with the supervisor: a tick that arrives meanwhile is skipped, never interleaved."""
+        with self._tick_lock:
+            return self._reconcile_locked(self._now(now))
+
+    def _reconcile_locked(self, now: datetime) -> dict:
         self._roll_day(now)
         report: Dict[str, Any] = {"at": now.isoformat(), "checked": 0, "errors": [], "unknown_orders": [],
                                   "carried": [], "resolved": [], "reservation_conflicts": []}

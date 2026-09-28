@@ -393,3 +393,94 @@ def test_working_exit_larger_than_the_account_is_cancelled_and_reissued_capped()
     exits = [o for o in h.alpaca.orders.values() if o["client_order_id"].startswith("adt-orb-X-")]
     assert [o["qty"] for o in exits] == ["454", "300"]
     assert "APP" not in h.alpaca.positions and h.pos()["status"] == "CLOSED"
+
+
+# ---------------------------------------------------------------- review round 3
+def account_reads(h, since=0):
+    return [r for r in h.alpaca.requests[since:] if r[0] == "GET" and r[1] == "/v2/account"]
+
+
+def test_exit_writes_refused_when_the_account_changed_after_the_cache_expired():
+    h = opened()
+    h.alpaca.account["account_number"] = "PA-SOMEONE-ELSE"      # the keys now point elsewhere
+    n = len(h.alpaca.requests)
+    h.clock.set(at(11, 0))                                      # > 60 s after the last verification
+    h.ctl.tick()
+    assert writes_after(h, n) == []                              # no cancel, no close
+    assert any(k.endswith("wrong_account") for k in h.ctl.state["alarms"])
+    assert h.pos()["status"] == "OPEN"
+
+
+def test_credential_change_forces_a_fresh_check_inside_the_ttl():
+    h = opened()
+    h.broker._client.headers["APCA-API-KEY-ID"] = "other-key"
+    h.alpaca.account["account_number"] = "PA-SOMEONE-ELSE"
+    n = len(h.alpaca.requests)
+    h.alpaca.prices["APP"] = 99.30
+    h.clock.advance(5)                                          # well inside the 60 s TTL
+    h.ctl.tick()
+    assert writes_after(h, n) == [] and h.pos()["status"] == "OPEN"
+
+
+def test_exits_on_the_right_account_do_not_add_account_reads_inside_the_ttl():
+    h = opened()
+    n = len(h.alpaca.requests)
+    h.alpaca.prices["APP"] = 99.30
+    h.clock.advance(5)
+    h.ctl.tick()
+    assert h.pos()["closed_reason"] == "fast-fail"
+    assert account_reads(h, n) == []                            # verified by the entry's account read
+
+
+class RecordingBudget:
+    """Records how many Alpaca requests had been made at each token acquire."""
+
+    def __init__(self, h):
+        self.h, self.at = h, []
+        self.used = self.throttled = self.borrowed = 0
+
+    def acquire(self, prio="normal"):
+        self.at.append((len(self.h.alpaca.requests), prio))
+
+
+def test_exit_budget_token_is_taken_before_the_final_position_read():
+    h = opened()
+    h.ctl.budget = RecordingBudget(h)
+    h.alpaca.prices["APP"] = 99.30
+    h.clock.advance(5)
+    h.ctl.tick()
+    reqs = h.alpaca.requests
+    post = next(i for i, r in enumerate(reqs) if r[0] == "POST" and r[2].get("side") == "sell")
+    pos_read = max(i for i, r in enumerate(reqs[:post]) if r[0] == "GET" and r[1] == "/v2/positions/APP")
+    # nothing may wait for a token between the last position read and the POST
+    assert not [a for a in h.ctl.budget.at if pos_read < a[0] <= post]
+    assert pos_read == post - 1
+
+
+def test_capped_exit_qty_is_persisted_before_the_post():
+    h = opened()
+    seen = []
+
+    def hook(state):
+        ex = [r for r in state["orders"].values() if r["role"] == "exit"]
+        if ex and not seen:
+            h.alpaca.positions["APP"]["qty"] -= 100
+        if ex:
+            seen.append((ex[0]["qty"], ex[0]["id"]))
+    h.on_persist = hook
+    h.clock.set(at(11, 0))
+    h.ctl.tick()
+    assert (354, None) in seen                  # saved with the capped qty while still unsent
+
+
+def test_reconcile_takes_the_brokers_qty_for_a_working_exit():
+    h = opened()
+    h.alpaca.market_fills = False
+    h.clock.set(at(11, 0))
+    h.ctl.tick()
+    exit_row = next(o for o in h.alpaca.orders.values() if o["client_order_id"].startswith("adt-orb-X-"))
+    exit_row["qty"] = "300"                     # what the broker actually holds for it
+    ctl = h.restart()
+    assert ctl.reconcile_on_startup()["ok"]
+    rec = next(r for r in ctl.state["orders"].values() if r["role"] == "exit")
+    assert rec["qty"] == 300

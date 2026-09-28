@@ -232,3 +232,27 @@ def test_no_pinned_account_means_no_trading():
     assert not h.ctl.reconcile_on_startup()["ok"]
     h.clock.set(at(9, 20))
     assert not h.ctl.freeze_session()[0]
+
+
+def test_startup_reconcile_and_a_supervisor_tick_never_interleave():
+    import threading
+    h = opened()
+    ctl = h.restart()
+    inside, go = threading.Event(), threading.Event()
+
+    def slow_reserve(sym):
+        inside.set()
+        go.wait(5)
+        return True
+    ctl.reserve = slow_reserve
+    out = {}
+    t = threading.Thread(target=lambda: out.setdefault("rep", ctl.reconcile_on_startup()))
+    t.start()
+    try:
+        assert inside.wait(5)
+        res = ctl.tick()                     # arrives while reconcile holds the book
+        assert res == {"skipped": "another supervisor pass is running"}
+    finally:
+        go.set()
+        t.join(5)
+    assert out["rep"]["ok"] and ctl.tick() != {"skipped": "another supervisor pass is running"}
