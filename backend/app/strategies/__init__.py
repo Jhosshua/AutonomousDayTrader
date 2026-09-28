@@ -14,7 +14,7 @@ from backend.app.strategies.base import (
     calculate_rsi,
     calculate_rvol,
 )
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy, evaluate_orb_signal
+from backend.app.strategies.orb import OrbStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy, score_news_sentiment
 from backend.app.strategies.mean_reversion import MeanReversionStrategy, evaluate_mean_reversion_zscore
@@ -37,8 +37,7 @@ __all__ = [
     "calculate_zscore",
     "calculate_rsi",
     "calculate_rvol",
-    "OpeningRangeBreakoutStrategy",
-    "evaluate_orb_signal",
+    "OrbStrategy",
     "VWAPPullbackStrategy",
     "NewsMomentumStrategy",
     "score_news_sentiment",

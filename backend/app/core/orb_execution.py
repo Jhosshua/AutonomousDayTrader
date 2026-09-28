@@ -32,6 +32,10 @@ Hook contracts:
   reserve(symbol) -> bool   atomically take the symbol for ORB (False = someone got it).
   release(symbol)           give it back (pick refused, order rejected, position closed).
   account_halt() -> str|None ADT's account daily loss stop; truthy = no entries and exit all.
+  entry_gate(symbol) -> str|None
+                            ADT's last check before a real entry POST (market hours, broker
+                            position mismatch, durable ledger health); a reason = that pick is
+                            skipped, nothing is sent. Never consulted for exits.
 """
 from __future__ import annotations
 
@@ -332,7 +336,8 @@ class OrbExecutionController:
                  sleep: Optional[Callable[[float], None]] = None,
                  budget: Optional[RequestBudget] = None,
                  mode: str = "shadow",
-                 expected_account: Optional[str] = None) -> None:
+                 expected_account: Optional[str] = None,
+                 entry_gate: Optional[Callable[[str], Optional[str]]] = None) -> None:
         if mode not in MODES:
             raise ValueError(f"ORB mode must be one of {MODES}")
         self.broker = broker
@@ -350,6 +355,7 @@ class OrbExecutionController:
         self.reserve = reserve or (lambda s: True)
         self.release = release or (lambda s: None)
         self.account_halt = account_halt or (lambda: None)
+        self.entry_gate = entry_gate
         self.on_event = on_event
         self.sleep = sleep or _time.sleep
         self.budget = budget or RequestBudget(self.cfg["request_budget_per_min"], self.cfg["exit_reserve_per_min"])
@@ -1480,6 +1486,14 @@ class OrbExecutionController:
     def _late_checks(self, pl: dict, now: datetime) -> Optional[str]:
         """Right before the POST: re-read ADT's book and Alpaca's positions/open orders."""
         sym = pl["symbol"]
+        if self.entry_gate is not None:
+            try:
+                why = self.entry_gate(sym)
+            except Exception as exc:
+                why = f"the entry gate could not be read ({exc})"
+            if why:
+                self._event({"kind": "skip_entry_gate", "symbol": sym, "why": str(why)[:200]})
+                return f"ADT entry gate: {why}"
         try:
             if self.is_occupied(sym):
                 self._event({"kind": "skip_occupied", "symbol": sym, "late": True})

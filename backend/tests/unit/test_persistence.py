@@ -15,7 +15,7 @@ from backend.app.models.events import BarEvent, QuoteEvent
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
+from backend.app.strategies.orb import OrbStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 
 
@@ -27,7 +27,7 @@ def _components():
     flattening = ZeroOvernightFlatteningEngine()
     adaptation = DynamicAdaptationEngine()
     strategies = [
-        OpeningRangeBreakoutStrategy(),
+        OrbStrategy(),
         VWAPPullbackStrategy(),
         NewsMomentumStrategy(),
         MeanReversionStrategy(),
@@ -61,7 +61,8 @@ def _active_position_runtime():
     brackets.order_to_bracket.pop(bracket.stop_order_id, None)
     brackets.order_to_bracket[stop.id] = (bracket.bracket_id, BracketChildType.STOP_LOSS)
     bracket.stop_order_id = stop.id
-    strategies[0].on_bar(
+    # runtime memory example: Ride the Trend v1's per-symbol session bars (ORB keeps no per-symbol state)
+    strategies[1].on_bar(
         BarEvent("AAPL", 100, 101, 99, 100.5, 5000, timestamp)
     )
     return account, engine, brackets, risk, flattening, adaptation, strategies, entry, bracket
@@ -120,7 +121,7 @@ def test_atomic_checkpoint_restores_account_orders_bracket_and_strategy_state(tm
     assert entry.id in restored_engine.orders
     assert restored_brackets.symbol_to_bracket["AAPL"] == bracket.bracket_id
     assert restored_engine.working_orders[bracket.stop_order_id].remaining_qty == 10
-    assert restored_strategies[0].symbol_states["AAPL"].all_bars
+    assert restored_strategies[1].symbol_states["AAPL"].session_bars
     assert latest_prices == {"AAPL": 100.0}
     assert result["last_session_date"] == timestamp_date
     assert result["ledger_revision"] == 3
@@ -479,7 +480,7 @@ def test_restore_from_older_checkpoint_keeps_current_strategy_settings():
     # Simulate an older release's checkpoint: missing new attrs, stale tuning values.
     old = json.loads(json.dumps(payload))
     strat = old["strategies"]
-    orb_key = next(k for k in strat if "orb" in k)
+    mr_key = next(k for k in strat if "mean_reversion" in k)
     vwap_key = next(k for k in strat if "vwap" in k)
     news_key = next(k for k in strat if "news" in k)
 
@@ -494,12 +495,12 @@ def test_restore_from_older_checkpoint_keeps_current_strategy_settings():
                 if isinstance(v, dict) and name in v:
                     v.pop(name, None)
 
-    _drop(strat[orb_key], "min_clv")
+    _drop(strat[mr_key], "min_rr_ratio")
     _drop(strat[vwap_key], "target_1_r")
     news_state = strat[news_key]
     blob = json.dumps(news_state).replace('"volume_surge_multiplier": 2.0', '"volume_surge_multiplier": 3.5')
     strat[news_key] = json.loads(blob)
-    assert "min_clv" not in json.dumps(strat[orb_key])
+    assert "min_rr_ratio" not in json.dumps(strat[mr_key])
 
     _, _, _, _, _, _, fresh = restored = _components()
     restore_runtime_state(
@@ -509,12 +510,12 @@ def test_restore_from_older_checkpoint_keeps_current_strategy_settings():
         completed_brackets_recorded=set(), latest_market_prices={}, market_history={},
         recent_news=[],
     )
-    orb, vwap, news, _mr = fresh
-    assert orb.min_clv == 0.65
+    _orb, vwap, news, mr = fresh
+    assert mr.min_rr_ratio == 1.00
     assert vwap.target_1_r == 0.80
     assert news.volume_surge_multiplier == 2.00
     # Runtime memory is still restored.
-    assert orb.symbol_states["AAPL"].all_bars
+    assert vwap.symbol_states["AAPL"].session_bars
     ts = datetime(2026, 9, 22, 14, 1, tzinfo=timezone.utc)
     for s in fresh:
         s.on_bar(BarEvent("AAPL", 100.5, 101.5, 100.4, 101.4, 50000, ts))

@@ -335,15 +335,25 @@ class FakeFacade:
         self.calls.append(("prep", day))
         return self.prep_result() if callable(self.prep_result) else self.prep_result
 
-    def scan(self, day, end, wave, skip_symbols):
-        self.calls.append(("scan", day, end, wave, list(skip_symbols)))
+    def scan(self, day, end, wave, skip_symbols, executed_today=None):
+        # the real OrbsFacade.scan contract: a timezone-aware whole-minute end on the scan day, and a
+        # secondary scan needs the durable executed-today set; preview/primary never skip symbols
+        assert isinstance(end, datetime) and end.tzinfo is not None, end
+        assert end.astimezone(ET).date() == day and end.second == 0 and end.microsecond == 0, end
+        if wave == "secondary":
+            assert executed_today is not None, "a secondary scan needs executed_today"
+        else:
+            assert not skip_symbols and not executed_today
+        end_s = end.astimezone(ET).strftime("%H:%M")
+        self.calls.append(("scan", day, end_s, wave, list(skip_symbols), sorted(executed_today or ())))
         if not self.scan_results:
-            return {"ok": True, "error": None, "coverage": 1.0, "cards": [], "board_id": f"{wave}-{end}"}
+            return {"ok": True, "error": None, "coverage": 1.0, "cards": [], "board_id": f"{wave}-{end_s}"}
         r = self.scan_results.pop(0)
         return r() if callable(r) else r
 
-    def decide(self, day, board, wave, now, occupied):
-        self.calls.append(("decide", day, board.get("board_id"), wave, list(occupied)))
+    def decide(self, day, board, wave, now, occupied, executed_today=None):
+        assert executed_today is not None, "decide needs the durable executed-today set"
+        self.calls.append(("decide", day, board.get("board_id"), wave, list(occupied), sorted(executed_today)))
         if not self.decide_results:
             return {"verdict": "pass", "reason": "no card passed", "picks": [], "audit": [], "regime": {}}
         r = self.decide_results.pop(0)

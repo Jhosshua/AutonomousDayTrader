@@ -15,6 +15,10 @@ from backend.app.core.account import PaperTradingAccount, TradingArm
 from backend.app.models.events import OrderSide, OrderType, OrderState
 from backend.app.strategies.tri_engine import FIXED_IDS, TRI_IDS
 
+# Local ledger orders that mirror fills of ORB's Alpaca brackets (backend/app/core/orb_integration.py).
+# The ORB controller owns those broker orders: the engine never sends, settles or matches them.
+ORB_POLICY = "orb_bracket"
+
 log = logging.getLogger("engine")
 
 
@@ -223,6 +227,8 @@ class ExecutionEngine:
         broker = self.broker
         if order.execution_policy in TRI_IDS:
             raise BrokerReject("Tri-engine orders require their dedicated lifecycle", hard=True)
+        if order.execution_policy == ORB_POLICY:
+            raise BrokerReject("ORB orders are placed and managed by the ORB controller", hard=True)
         if time.monotonic() < self._broker_retry_after.get(f"sym:{order.symbol}", 0.0):
             raise BrokerNoFill(f"{order.symbol} is in broker backoff")
         is_exit = self._reduces_position(order)
@@ -307,8 +313,8 @@ class ExecutionEngine:
         if self.broker is None:
             return fills
         for order in list(self.orders.values()):
-            if order.execution_policy in TRI_IDS:
-                continue  # Dedicated controller reconciles cumulative fills and tranche ownership.
+            if order.execution_policy in TRI_IDS or order.execution_policy == ORB_POLICY:
+                continue  # Dedicated controller reconciles cumulative fills (tri tranches / ORB brackets).
             if order.fixed_intent_client_id and order.side == OrderSide.SELL:
                 if order.status.value == "FILLED":
                     continue

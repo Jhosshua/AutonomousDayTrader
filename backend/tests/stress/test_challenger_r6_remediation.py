@@ -53,7 +53,6 @@ from backend.app.main import (
     engine as app_engine,
     risk_engine as app_risk_engine,
     bracket_manager as app_bracket_manager,
-    orb_strategy as app_orb_strategy,
     market_history as app_market_history,
     recent_news as app_recent_news,
 )
@@ -69,7 +68,6 @@ from backend.app.models.events import (
     QuoteEvent,
 )
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 
 ET_TZ = ZoneInfo("America/New_York")
@@ -235,17 +233,6 @@ class TestR6ConcurrencyAndMemory:
 # ============================================================================
 
 class TestR6IndicatorsAndCausality:
-    def test_orb_rejection_resets_signal_fired_lock(self):
-        """When execution engine rejects an ORB order, notify_signal_rejected must reset the lock."""
-        bus = EventBus()
-        strategy = OpeningRangeBreakoutStrategy(bus)
-        sym = "AAPL"
-        state = strategy._get_state(sym)
-        state.breakout_fired = True
-
-        # Notify rejection
-        strategy.notify_signal_rejected(sym)
-        assert state.breakout_fired is False
 
     def test_vwap_pullback_excludes_current_candidate_bar_from_baseline(self):
         """Candidate bar's volume must NOT be included in prior 10-bar baseline calculation."""
@@ -271,33 +258,6 @@ class TestR6IndicatorsAndCausality:
         assert 1000000 not in prior_volumes
         assert sum(prior_volumes) / len(prior_volumes) == 10000.0
 
-    def test_orb_atr_excludes_candidate_bar_and_rejects_premarket(self):
-        """Candidate breakout bar must be excluded from ATR baseline, and premarket bars rejected."""
-        bus = EventBus()
-        strategy = OpeningRangeBreakoutStrategy(bus)
-        sym = "AAPL"
-
-        # Pre-market bar at 09:20 ET must not be appended to all_bars
-        pre_bar = _make_bar(sym, 150.0, 150.5, 149.8, 150.2, vol=5000, minute=20, hour=9)
-        strategy.on_bar(pre_bar)
-        state = strategy._get_state(sym)
-        assert len(state.all_bars) == 0
-
-        # Feed opening 15-minute bars (09:30 to 09:45)
-        for m in range(30, 45):
-            bar = _make_bar(sym, 150.0, 151.0, 149.5, 150.5, vol=20000, minute=m, hour=9)
-            strategy.on_bar(bar)
-
-        assert len(state.all_bars) == 15
-
-        # Feed 16th bar (candidate breakout at 09:45)
-        breakout_bar = _make_bar(sym, 150.5, 152.5, 150.4, 152.0, vol=50000, minute=45, hour=9)
-        state.all_bars.append(breakout_bar)
-
-        # ATR calculation baseline must exclude the candidate breakout bar itself
-        atr_bars = state.all_bars[:-1]
-        assert len(atr_bars) == 15
-        assert breakout_bar not in atr_bars
 
     def test_market_filter_microsecond_skew_tolerance(self):
         """Market filter must tolerate sub-second quote arrival timestamp skew without failing."""

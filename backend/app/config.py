@@ -175,6 +175,23 @@ class Settings(BaseSettings):
         description="Symbols Ride the Trend v2 never evaluates: the Morning Plan owns TSLA/CDE; SPY/QQQ are the regime instruments"
     )
 
+    # Opening Range Breakout = ORBStraddle's rules (2026-09-28). off = no scans, no new ORB trades
+    # (an open ORB trade is still managed to its exit); shadow = scans and decides exactly as live
+    # but sends no orders; live = Alpaca brackets on the paper account. Live needs BROKER_MODE=alpaca_paper.
+    ORB_MODE: str = Field(default="shadow", description="off, shadow or live")
+    ORB_EXPECTED_ACCOUNT: str = Field(
+        default="PA3CSVDZMMPY",
+        description="The one Alpaca account number ORB may trade; any other account refuses every ORB write"
+    )
+    ORB_STATE_DIR: str = Field(
+        default="",
+        description="ORB board files and receipts. Empty = an 'orbs' folder next to STATE_DB_PATH (/data/orbs in production)"
+    )
+    ORB_EXCLUDE_SYMBOLS: List[str] = Field(
+        default=["TSLA", "CDE"],
+        description="Stay on ORB's board but are never picked: ADT's Tesla/Coeur morning plans trade them"
+    )
+
     # Safe Host Port Allocations (Collision Free)
     API_PORT: int = Field(default=8005, description="FastAPI core engine & WS port")
     UI_PORT: int = Field(default=3005, description="Mobile trading UI frontend port")

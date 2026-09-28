@@ -21,7 +21,6 @@ from backend.app.strategies.base import (
     calculate_rsi,
     SignalEvent,
 )
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy, evaluate_orb_signal
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy, score_news_sentiment
 from backend.app.strategies.mean_reversion import MeanReversionStrategy, evaluate_mean_reversion_zscore
@@ -212,33 +211,6 @@ class TestCandidateBarLookbackExclusion:
         sma_vol = calculate_sma(volumes[:-1], 20)
         assert sma_vol == 20000.0
 
-    def test_orb_opening_range_lock_and_baseline_exclusion(self):
-        """ORB opening range is locked strictly at range_end_time.
-        Candidate breakout bars at 09:35+ ET cannot alter the opening range high/low.
-        """
-        strat = OpeningRangeBreakoutStrategy(range_minutes=5)
-        sym = "AAPL"
-
-        # Feed 5 opening range bars (09:30 to 09:34 ET)
-        # Highs: 101, 102, 103, 102, 101.5 -> Range High = 103.0
-        # Lows: 99, 99.5, 99.2, 99.0, 99.1 -> Range Low = 99.0
-        highs = [101.0, 102.0, 103.0, 102.5, 101.5]
-        lows = [99.0, 99.5, 99.2, 99.0, 99.1]
-        for m in range(5):
-            strat.on_bar(make_bar(sym, 100.0, highs[m], lows[m], 100.5, minute=30 + m))
-
-        state = strat._get_state(sym)
-        assert len(state.opening_bars) == 5
-
-        # Bar at 09:35 ET breaks out with High = 106.0, Close = 105.0
-        breakout_bar = make_bar(sym, 102.0, 106.0, 101.8, 105.0, vol=250000, minute=35)
-        strat.on_bar(breakout_bar)
-
-        # Range high and low must be frozen from the opening bars (103.0, 99.0)
-        assert state.range_high == 103.0
-        assert state.range_low == 99.0
-        # Candidate bar must NOT have been appended to state.opening_bars
-        assert len(state.opening_bars) == 5
 
 
 # ============================================================================
@@ -329,29 +301,6 @@ class TestFutureDataLeakagePrevention:
 class TestNumericalRobustness:
     """Stress tests verifying absence of division-by-zero, NaN, or crash on pathological bars."""
 
-    def test_zero_volume_and_flat_bars(self):
-        """Zero volume and zero range candles (open=high=low=close) must not raise exceptions."""
-        flat_bar = make_bar("SPY", 100.0, 100.0, 100.0, 100.0, vol=0, minute=31)
-
-        # ORB evaluation on flat bar
-        res = evaluate_orb_signal([flat_bar], flat_bar, rvol=0.0)
-        assert res is None
-
-        # Base math functions on flat prices
-        vwap, std = calculate_anchored_vwap([flat_bar])
-        assert vwap == 0.0
-        assert std == 0.0
-
-        atr = calculate_atr([flat_bar], period=14)
-        assert atr >= 0.01
-
-        rsi = calculate_rsi([100.0, 100.0, 100.0], period=14)
-        assert rsi == 50.0
-
-        mean, std_z, z = evaluate_mean_reversion_zscore([100.0] * 20)
-        assert mean == 100.0
-        assert std_z == 0.0
-        assert z == 0.0
 
     def test_vwap_pullback_zero_volume_rejection(self):
         """VWAPPullbackStrategy safely rejects bars with zero volume without throwing exceptions."""

@@ -251,20 +251,6 @@ def test_json_safe_handles_enums_nan_and_nesting():
     assert json_safe({"a": [math.nan, OrderSide.BUY, (1, 2)]}) == {"a": [None, "BUY", [1, 2]]}
 
 
-def test_orb_signal_carries_decision_features():
-    from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
-    orb = OpeningRangeBreakoutStrategy()
-    base = datetime(2026, 9, 24, 13, 30, tzinfo=timezone.utc)
-    sigs = []
-    for i in range(5):
-        sigs += orb.on_bar(BarEvent("NVDA", 100, 100.5, 99.5, 100, 100_000, base + timedelta(minutes=i)))
-    for i in range(5, 12):
-        sigs += orb.on_bar(BarEvent("NVDA", 100, 100.4, 99.8, 100.1, 100_000, base + timedelta(minutes=i)))
-    sigs += orb.on_bar(BarEvent("NVDA", 100.4, 101.0, 100.4, 100.95, 600_000, base + timedelta(minutes=12)))
-    assert sigs, "breakout bar should signal"
-    f = sigs[-1].features
-    assert f["range_high"] == 100.5 and f["range_low"] == 99.5 and f["rvol"] >= 1.8
-    assert f["structural_stop"] == 100.0 and "error" not in f
 
 
 def _swing_tracker():

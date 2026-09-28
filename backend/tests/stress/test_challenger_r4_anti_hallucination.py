@@ -38,7 +38,6 @@ from backend.app.core.risk import InstitutionalRiskEngine, RiskEngineConfig
 from backend.app.models.events import BarEvent, OrderSide, OrderType
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.base import SignalEvent
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.strategies.mean_reversion import MeanReversionStrategy

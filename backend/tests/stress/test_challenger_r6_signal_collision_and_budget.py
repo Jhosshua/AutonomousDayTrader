@@ -80,7 +80,7 @@ def _make_signal(
     entry_p: float = 100.0,
     stop_p: float = 98.0,
     side: OrderSide = OrderSide.BUY,
-    strategy_id: str = "orb",
+    strategy_id: str = "news_momentum",
 ) -> SignalEvent:
     now = datetime(2026, 9, 22, 10, 15, 0, tzinfo=ET_TZ)
     return SignalEvent(

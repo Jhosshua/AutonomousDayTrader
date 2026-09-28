@@ -34,7 +34,6 @@ PHASES: List[Tuple[dtime, dtime, str]] = [
 GATE_LAG_SEC = 60
 
 STRATEGY_NOTES = {
-    "orb": "Morning only. Needs the first 5 minutes to set the range.",
     "vwap_pullback": "Version 2 (since Sept 28): mornings only, 9:45 to 11:30 AM; first possible entry about 10:09 AM. Needs a quiet pullback and a fast resumption.",
     "news_momentum": "Rare by design: needs very strong news plus a volume spike.",
     "mean_reversion": "Sits out the opening half hour.",
@@ -97,7 +96,6 @@ def market_direction_text(strategy_id: str, trend: str) -> str:
     if t == "NEUTRAL":
         return {
             "mean_reversion": "Market is flat: allowed, both directions.",
-            "orb": "Market is flat: only on a stock trading at 2.2x+ normal volume.",
             "news_momentum": "Market is flat: only on a stock trading at 2.2x+ normal volume.",
             "vwap_pullback": "Market is flat: blocked until the market picks a direction.",
         }.get(strategy_id, "Market is flat.")
@@ -199,7 +197,7 @@ def strategy_window(
     if in_hours and trend_u == "NEUTRAL":
         if strategy_id == "vwap_pullback":
             blockers.append("Market is flat.")
-        elif strategy_id in ("orb", "news_momentum"):
+        elif strategy_id == "news_momentum":
             limits.append("Market is flat: only stocks trading at 2.2x+ normal volume.")
 
     can_open = in_hours and not blockers
@@ -245,4 +243,79 @@ def strategy_window(
         "market_text": market_text,
         "notes": notes,
         "evaluated_at": shown_at.isoformat(timespec="seconds"),
+    }
+
+
+ORB_DECIDE, ORB_CUTOFF, ORB_FLATTEN = dtime(9, 38), dtime(10, 15), dtime(11, 0)
+ORB_HOURS_TEXT = "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM"
+
+
+def orb_window(
+    now: datetime,
+    *,
+    mode: str,
+    step_text: str,
+    holding: bool,
+    blockers: Optional[List[str]] = None,
+    operator_status: str = "ACTIVE",
+) -> Dict[str, Any]:
+    """Card window for ORB (ORBStraddle rules). Its hours come from its own scheduler, not ADT's
+    phase gate: one decision at 9:38 AM, new trades until 10:15 AM, every ORB trade closed by
+    11:00 AM. `step_text` is the scheduler's plain sentence for what ORB is doing now."""
+    shown = (now if now.tzinfo else now.replace(tzinfo=ET)).astimezone(ET)
+    today, t = shown.date(), shown.time()
+    trading_day = is_trading_day(today)
+    in_hours = trading_day and ORB_DECIDE <= t < ORB_CUTOFF
+    blockers = [b for b in (blockers or []) if b]
+    mode = (mode or "off").lower()
+    op = (operator_status or "ACTIVE").upper()
+    if op == "PAUSED":
+        blockers.append("Paused by operator.")
+    if mode == "off":
+        blockers.append("ORB is switched off: no new trades (open ORB trades are still closed by their rules).")
+    if not trading_day:
+        state, headline = "MARKET_CLOSED", "Market closed"
+    elif holding:
+        state, headline = "MANAGING", "Managing an open trade"
+    elif t < ORB_DECIDE:
+        state, headline = "WAITING", "Decides at 9:38 AM"
+    elif in_hours and blockers:
+        state, headline = "BLOCKED", "Blocked right now"
+    elif in_hours:
+        state, headline = ("LIMITED", "Shadow mode: watching only") if mode == "shadow" else ("CAN_TRADE", "Can open trades now")
+    else:
+        state, headline = "DONE_FOR_DAY", "Done for today"
+    if op == "PAUSED" and not holding:
+        state, headline = "PAUSED", "Paused"
+    notes = [ORB_HOURS_TEXT + " ET."]
+    if mode == "shadow":
+        notes.append("Shadow mode: watching only, no orders. It scans and decides exactly as it would live.")
+    elif mode == "live":
+        notes.append("Paper account. Each trade is an Alpaca bracket: its stop and target wait at the broker.")
+    limits = ["Shadow mode: watching only, no orders."] if mode == "shadow" else []
+    if in_hours:
+        schedule_text = "In its trading hours until 10:15 AM."
+    elif not trading_day:
+        schedule_text = "Market closed today."
+    elif t < ORB_DECIDE:
+        schedule_text = "Decides at 9:38 AM."
+    elif t < ORB_FLATTEN:
+        schedule_text = "No new trades after 10:15 AM; open ORB trades close by 11:00 AM."
+    else:
+        schedule_text = "Done for today."
+    return {
+        "state": state,
+        "headline": headline,
+        "can_open_now": state == "CAN_TRADE",
+        "in_hours": in_hours,
+        "hours": ORB_HOURS_TEXT,
+        "ranges": [["09:38", "10:15"]],
+        "trading_day": trading_day,
+        "schedule_text": schedule_text,
+        "next_change_at": None,
+        "blockers": blockers if (in_hours or holding) else [b for b in blockers if "switched off" in b or "Paused" in b],
+        "limits": limits,
+        "market_text": step_text or schedule_text,
+        "notes": notes,
+        "evaluated_at": shown.isoformat(timespec="seconds"),
     }

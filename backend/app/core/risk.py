@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 import math
-from typing import Any, Dict, Optional, Set
+from typing import Any, Callable, Dict, Optional, Set
 from pydantic import BaseModel
 
 
@@ -67,6 +67,10 @@ class InstitutionalRiskEngine:
         self.current_drawdown_pct: float = 0.0
         self.breaker_triggered_at: Optional[datetime] = None
         self.breaker_trigger_equity: Optional[float] = None
+        # Risk other controllers have open or pending on the same account (ORB's brackets: shares x
+        # distance to their broker stop). It is taken out of the remaining daily-loss budget before
+        # any ADT arm sizes (plan 9.6). Not checkpointed: it is read live from the ORB controller.
+        self.reserved_risk_fn: Optional[Callable[[], float]] = None
         self.symbol_sectors: Dict[str, str] = {
             "SPY": "Index",
             "QQQ": "Index",
@@ -128,6 +132,19 @@ class InstitutionalRiskEngine:
 
         return self.status
 
+    def reserved_risk(self) -> float:
+        """Open + pending risk reserved by other controllers. Unreadable = the whole limit (fail closed)."""
+        fn = self.reserved_risk_fn
+        if fn is None:
+            return 0.0
+        try:
+            value = float(fn())
+        except Exception:
+            return float(self.config.hard_max_daily_loss_dollars)
+        if not math.isfinite(value) or value < 0:
+            return float(self.config.hard_max_daily_loss_dollars)
+        return round(value, 2)
+
     def evaluate_order_request(
         self,
         symbol: str,
@@ -184,8 +201,9 @@ class InstitutionalRiskEngine:
                 rejection_code="CIRCUIT_BREAKER_HALTED",
             )
 
-        # 1b. Remaining Daily Loss Budget Check
-        remaining_loss_budget = max(0.0, round(self.config.hard_max_daily_loss_dollars - dd_dollars, 2))
+        # 1b. Remaining Daily Loss Budget Check (net of risk reserved by other controllers, e.g. ORB)
+        reserved = self.reserved_risk()
+        remaining_loss_budget = max(0.0, round(self.config.hard_max_daily_loss_dollars - dd_dollars - reserved, 2))
         if remaining_loss_budget <= 0.0:
             return RiskCheckResult(
                 approved=False,

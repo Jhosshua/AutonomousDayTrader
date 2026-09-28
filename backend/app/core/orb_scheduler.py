@@ -34,8 +34,8 @@ log = logging.getLogger("orb_scheduler")
 STATE_VERSION = 1
 SIZING_START, SIZING_END = time(9, 15), time(9, 30)
 PREP_AT = time(9, 15)
-PREVIEW_AT, PREVIEW_END = time(9, 36, 10), "09:36"
-FINAL_AT, FINAL_END = time(9, 38, 30), "09:38"
+PREVIEW_AT, PREVIEW_END = time(9, 36, 10), time(9, 36)
+FINAL_AT, FINAL_END = time(9, 38, 30), time(9, 38)
 DEADLINES = {"calendar": 30.0, "reconcile": 180.0, "sizing": 50.0, "prep": 900.0, "preview": 240.0,
              "final": 600.0, "decide": 120.0, "secondary_scan": 240.0, "execute": None, "supervise": None}
 STEP_NAMES = ("sizing", "prep", "preview", "final", "primary_decision", "secondary", "cutoff", "flatten")
@@ -77,13 +77,18 @@ class OrbScheduler:
                  monotonic: Optional[Callable[[], float]] = None,
                  supervise_every_s: float = 5.0, reconcile_every_s: float = 60.0,
                  sizing_every_s: float = 60.0, secondary_every_s: float = 60.0,
-                 prep_retry_s: float = 60.0) -> None:
+                 prep_retry_s: float = 60.0,
+                 on_decision: Optional[Callable[[dict], None]] = None) -> None:
+        """on_decision(row): called on the tick thread for every verdict (kind "verdict", with the
+        decider's audit/regime and the pick details) and every execution result (kind "execution"),
+        so ADT can log them (decisions log, research). A failing hook never stops the scheduler."""
         self.c = controller
         self.facade = facade
         self.cfg = load_config(manifest)
         self.clock = clock or (lambda: datetime.now(ET))
         self.is_session = is_session or (lambda d: d.weekday() < 5)
         self.persist_cb = persist_cb
+        self.on_decision = on_decision
         self.inline = inline
         self.deadlines = dict(DEADLINES, **(deadlines or {}))
         self.mono = monotonic or _time.monotonic
@@ -149,6 +154,16 @@ class OrbScheduler:
     def _now(self, now: Optional[datetime] = None) -> datetime:
         n = now or self.clock()
         return n.astimezone(ET)
+
+    @staticmethod
+    def _board_end(day: date, t: time) -> datetime:
+        """The facade cuts a board at a whole ET minute of the scan day (a timezone-aware datetime)."""
+        return datetime.combine(day, time(t.hour, t.minute), tzinfo=ET)
+
+    def kick_supervisor(self) -> None:
+        """An ADT exit path asked for an ORB exit: let the next tick start a supervisor pass at once."""
+        with self._lock:
+            self._last_start.pop("supervise", None)
 
     def shutdown(self) -> None:
         if self._pool is not None:
@@ -311,7 +326,7 @@ class OrbScheduler:
             self._step("prep", "failed", f"prep failed: {why}", now)
             return
         self._prepped_day = now.date().isoformat()
-        n = result.get("symbols") or result.get("watchlist") or result.get("n")
+        n = result.get("universe_size") or result.get("symbols") or result.get("watchlist") or result.get("n")
         self._step("prep", "done", f"{len(n) if isinstance(n, (list, tuple)) else n or 'the'} symbols ready", now)
 
     def _coverage_ok(self, res: Any, require: bool = True) -> (bool, str):
@@ -341,7 +356,8 @@ class OrbScheduler:
             return
         day = now.date()
         self._step("preview", "running", "preview scan to 9:36", now)
-        self._start("preview", lambda: self.facade.scan(day, PREVIEW_END, "preview", []))
+        end = self._board_end(day, PREVIEW_END)
+        self._start("preview", lambda: self.facade.scan(day, end, "preview", []))
 
     def _on_preview(self, job, result, error, now):
         if error is not None:
@@ -360,13 +376,14 @@ class OrbScheduler:
         if self._running("prep") or self._running("preview"):
             return                  # ORBStraddle runs these in one loop: the final scan waits for them
         day = now.date()
+        end = self._board_end(day, FINAL_END)
         self._step("final", "running", "final scan to 9:38", now)
 
         def job():
             attempts = []
             for n in (1, 2):
                 try:
-                    res = self.facade.scan(day, FINAL_END, "primary", [])
+                    res = self.facade.scan(day, end, "primary", [])
                 except Exception as exc:  # noqa: BLE001
                     attempts.append(f"attempt {n}: {exc}")
                     continue
@@ -443,9 +460,11 @@ class OrbScheduler:
     def _start_decide(self, wave: str, board: dict, now: datetime) -> None:
         day = now.date()
         occupied = self._occupied(board.get("cards") or [])
+        # the durable union of symbols ORB executed today (controller state survives restarts)
+        executed = sorted(self.c.symbols_today())
 
         def job():
-            return self.facade.decide(day, board, wave, self._now(), occupied)
+            return self.facade.decide(day, board, wave, self._now(), occupied, executed_today=executed)
         self._start("decide", job, {"wave": wave, "board_id": board.get("board_id"),
                                      "symbols": sorted({str(c.get("symbol")) for c in board.get("cards") or []})})
 
@@ -460,19 +479,30 @@ class OrbScheduler:
         picks = list(result.get("picks") or [])
         verdict = str(result.get("verdict") or ("pick" if picks else "pass"))
         reason = result.get("reason")
+        board = {"board_id": job.meta.get("board_id"), "board_symbols": job.meta.get("symbols") or [],
+                 "regime": result.get("regime") or {}, "refused_picks": list(result.get("refused") or []),
+                 "executing": False}
+        if verdict == "refused":
+            # the facade would not decide this board (stale, wrong wave, past the cutoff, ...)
+            msg = f"the board was not decided: {reason or 'refused'}"
+            self._verdict(wave, "refused", msg, [], now, extra=board)
+            if wave == "primary":
+                self._step("primary_decision", "done", f"no trade: {msg}", now)
+            return
         if not picks:
-            self._verdict(wave, verdict, reason or "no pick passed", [], now, audit=result.get("audit"))
+            self._verdict(wave, verdict, reason or "no pick passed", [], now, audit=result.get("audit"), extra=board)
             if wave == "primary":
                 self._step("primary_decision", "done", f"no trade: {reason or verdict}", now)
             return
         # auditor: re-check what could have changed while the decider ran
         gate = self._entry_gate(self._now(), wave)
         if gate:
-            self._verdict(wave, verdict, f"picked, but {gate}", picks, now, audit=result.get("audit"))
+            self._verdict(wave, verdict, f"picked, but {gate}", picks, now, audit=result.get("audit"), extra=board)
             if wave == "primary":
                 self._step("primary_decision", "done", f"picked, not executed: {gate}", now)
             return
-        self._verdict(wave, verdict, reason or "picked", picks, now, audit=result.get("audit"))
+        self._verdict(wave, verdict, reason or "picked", picks, now, audit=result.get("audit"),
+                      extra=dict(board, executing=True))
         if wave == "primary":
             self._step("primary_decision", "running", "sending the orders", now)
         self._start("execute", lambda: self.c.execute(picks, self._now(), strict=True, wave=wave), {"wave": wave})
@@ -496,6 +526,13 @@ class OrbScheduler:
                       else f"no order: {out.get('reason')}")
             self._step("primary_decision", "done", detail, now)
         self._persist()
+        placed = [{k: p.get(k) for k in ("symbol", "direction", "tier", "shares", "entry_ref", "stop", "target",
+                                          "rd", "risk_usd", "coid", "outcome")}
+                  | {"error": (p.get("result") or {}).get("error") if isinstance(p.get("result"), dict) else None}
+                  for p in out.get("placed") or []]
+        self._notify({"kind": "execution", "wave": wave, "at": now.isoformat(), "ok": out.get("ok"),
+                      "reason": out.get("reason"), "mode": self.c.mode, "placed": placed,
+                      "refused": [list(x) for x in out.get("refused") or []]})
 
     def _maybe_secondary(self, now: datetime, t: time) -> None:
         start, end = parse_hms(self.cfg["secondary_start"]), parse_hms(self.cfg["secondary_end"])
@@ -515,8 +552,12 @@ class OrbScheduler:
         self.state["last_secondary_at"] = now.isoformat()
         self.state["secondary_runs"] = int(self.state.get("secondary_runs") or 0) + 1
         self._step("secondary", "running", f"watching for new breakouts (scan to {now.strftime('%H:%M')})", now)
-        day, end_hhmm, skip = now.date(), now.strftime("%H:%M"), self.c.symbols_today()
-        self._start("secondary_scan", lambda: self.facade.scan(day, end_hhmm, "secondary", skip))
+        # scanner.run_secondary: skip what ORB supervises now, and every symbol it executed today
+        # (the controller's durable position rows, so a restart cannot forget a closed trade)
+        day, end = now.date(), self._board_end(now.date(), now.time())
+        skip, executed = sorted(self.c.reserved_symbols()), sorted(self.c.symbols_today())
+        self._start("secondary_scan",
+                    lambda: self.facade.scan(day, end, "secondary", skip, executed_today=executed))
 
     def _on_secondary_scan(self, job, result, error, now):
         if error is not None:
@@ -548,8 +589,16 @@ class OrbScheduler:
         self._persist()
         self._start_decide("secondary", result, now)
 
+    def _notify(self, row: dict) -> None:
+        if self.on_decision is None:
+            return
+        try:
+            self.on_decision(row)
+        except Exception:
+            log.exception("ORB on_decision hook failed")
+
     def _verdict(self, wave: Optional[str], verdict: str, reason: Any, picks: List[dict], now: datetime,
-                 audit: Any = None) -> None:
+                 audit: Any = None, extra: Optional[dict] = None) -> None:
         row = {"wave": wave, "verdict": verdict, "reason": None if reason is None else str(reason)[:300],
                "picks": [{"symbol": p.get("symbol"), "direction": p.get("direction"), "tier": p.get("tier")}
                          for p in picks], "at": now.isoformat()}
@@ -559,6 +608,9 @@ class OrbScheduler:
             self.state["history"].append(copy.deepcopy(row))
             self.state["history"] = self.state["history"][-20:]
         self._persist()
+        details = [{k: p.get(k) for k in ("symbol", "direction", "tier", "entry", "stop", "mode", "catalyst_summary")}
+                   for p in picks]
+        self._notify(dict(row, kind="verdict", audit=list(audit or []), pick_details=details, **(extra or {})))
 
     # ------------------------------------------------------------------ status
     def _next_step(self, now: datetime) -> Optional[dict]:
@@ -610,8 +662,18 @@ class OrbScheduler:
         else:
             lv = self.state.get("last_verdict") or {}
             picked = ", ".join(f"{p['symbol']} {p['direction']}" for p in lv.get("picks") or [])
-            base = (f"Last decision: picked {picked}." if picked
-                    else f"Last decision: sat out ({lv.get('reason') or 'no card passed'}).") if lv else ""
+            plain = ", ".join(("buy " if p.get("direction") == "long" else "sell short ") + str(p["symbol"])
+                              for p in lv.get("picks") or [])
+            if not lv:
+                base = ""
+            elif picked and self.c.mode == "shadow":
+                base = f"Shadow mode (watching only, no orders): would have placed {plain}."
+            elif picked:
+                base = f"Last decision: picked {picked}."
+            elif lv.get("verdict") in ("refused", "error", "no_decision"):
+                base = f"No decision: {lv.get('reason') or lv.get('verdict')}."
+            else:
+                base = f"Last decision: sat out ({lv.get('reason') or 'no card passed'})."
         cut, fl = parse_hms(self.cfg["cutoff"]), parse_hms(self.cfg["flatten"])
         if t < cut and self.state.get("final_ok"):
             tail = " Watching for new breakouts every minute until 10:15 AM." if self.c.slots_available() > 0 \

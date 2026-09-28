@@ -48,7 +48,6 @@ from backend.app.strategies.adaptation import DynamicAdaptationEngine, TimeOfDay
 from backend.app.strategies.base import SignalEvent, StrategyStatus
 from backend.app.strategies.mean_reversion import MeanReversionStrategy, evaluate_mean_reversion_zscore
 from backend.app.strategies.news_momentum import NewsMomentumStrategy, score_news_sentiment
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy, evaluate_orb_signal
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 
 ET = ZoneInfo("America/New_York")
@@ -78,178 +77,16 @@ def _make_bar(
 # 1. ADVERSARIAL ORB FALSE BREAKOUT STRESS TESTS
 # ============================================================================
 
-def test_orb_false_breakout_piercing_high_low_rvol():
-    """
-    Adversarial Scenario:
-    Price pierces range high (High > RangeHigh) and even closes slightly above range high,
-    but volume is sub-threshold (RVOL < 1.8x).
-    Expectation: Strictly NO BUY signal.
-    """
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-
-    # Establish 5m opening range: 09:30 to 09:34. High=105.00, Low=100.00
-    for m in range(30, 35):
-        b = _make_bar(high_p=105.00, low_p=100.00, close_p=102.50, vol=20000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00")
-        sigs = strat.on_bar(b)
-        assert len(sigs) == 0
-
-    # 09:35 Bar: Pierces high (High=106.00, Close=105.50 > 105.00), but volume is only 22,000 (RVOL ~ 1.1x)
-    sub_vol_bar = _make_bar(
-        high_p=106.00,
-        low_p=104.00,
-        close_p=105.50,
-        vol=22000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(sub_vol_bar)
-    assert len(sigs) == 0, "ORB must not fire when RVOL < 1.8x even if close > range high"
-    assert strat._get_state("AAPL").breakout_fired is False, "breakout_fired flag must remain False after low-volume false breakout"
 
 
-def test_orb_false_breakout_piercing_high_closing_back_inside_range():
-    """
-    Adversarial Scenario:
-    Price violently pierces range high with enormous volume (RVOL = 4.0x),
-    BUT institutional profit-taking hammers it back down, closing inside the range.
-    Expectation: Strictly NO BUY signal; breakout_fired must remain False.
-    """
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-
-    # 5m range [100.0, 105.0] with baseline volume 20,000
-    for m in range(30, 35):
-        strat.on_bar(_make_bar(high_p=105.00, low_p=100.00, close_p=102.50, vol=20000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00"))
-
-    # 09:35 Bar: High shoots up to 108.00 (piercing 105.00 by $3.00), volume surges to 150,000,
-    # but close retreats to 104.20 (inside range!)
-    shooting_star_bar = _make_bar(
-        open_p=104.00,
-        high_p=108.00,
-        low_p=103.50,
-        close_p=104.20,
-        vol=150000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(shooting_star_bar)
-    assert len(sigs) == 0, "ORB must not fire when candle closes back inside the range"
-    assert strat._get_state("AAPL").breakout_fired is False, "Breakout flag must not be consumed by a false breakout"
 
 
-def test_orb_false_breakdown_piercing_low_closing_back_inside_range():
-    """
-    Adversarial Scenario:
-    Downside false breakdown: Price pierces range low with huge volume,
-    but forms a bear trap and closes back inside the range.
-    Expectation: Strictly NO SELL signal.
-    """
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-
-    for m in range(30, 35):
-        strat.on_bar(_make_bar(high_p=105.00, low_p=100.00, close_p=102.50, vol=20000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00"))
-
-    # 09:35 Bar: Low dips to 97.00, but close is 100.80 (inside range) on 100,000 volume
-    bear_trap_bar = _make_bar(
-        open_p=101.00,
-        high_p=101.50,
-        low_p=97.00,
-        close_p=100.80,
-        vol=100000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(bear_trap_bar)
-    assert len(sigs) == 0, "ORB breakdown must not fire when close is inside or above range low"
-    assert strat._get_state("AAPL").breakout_fired is False
 
 
-def test_orb_subsequent_genuine_breakout_after_false_breakout():
-    """
-    Adversarial Scenario:
-    Session experiences a false breakout at 09:35 (rejected).
-    At 09:37, a genuine breakout occurs with Close > RangeHigh and RVOL >= 1.8x.
-    Expectation: The genuine breakout fires successfully; the prior false breakout
-    did NOT disable or poison the strategy state.
-    """
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-
-    for m in range(30, 35):
-        strat.on_bar(_make_bar(high_p=105.00, low_p=100.00, close_p=102.50, vol=20000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00"))
-
-    # 09:35: False breakout (Close 104.50 inside range)
-    strat.on_bar(_make_bar(high_p=106.00, low_p=103.00, close_p=104.50, vol=30000, ts_str="2026-09-21T09:35:00-04:00"))
-
-    # 09:36: Consolidation bar inside range
-    strat.on_bar(_make_bar(high_p=104.80, low_p=103.80, close_p=104.20, vol=20000, ts_str="2026-09-21T09:36:00-04:00"))
-
-    # 09:37: Genuine Breakout! Close 106.20 > 105.00, volume 120,000 (RVOL ~ 3.5x)
-    bo_bar = _make_bar(
-        high_p=106.50,
-        low_p=104.50,
-        close_p=106.20,
-        vol=120000,
-        ts_str="2026-09-21T09:37:00-04:00",
-    )
-    sigs = strat.on_bar(bo_bar)
-    assert len(sigs) == 1, "ORB must successfully fire genuine breakout even after earlier false breakouts"
-    sig = sigs[0]
-    assert sig.side == OrderSide.BUY
-    assert sig.entry_price == 106.20
-    assert sig.stop_loss == 102.50  # Midpoint of 105.00 and 100.00
-    assert strat._get_state("AAPL").breakout_fired is True
 
 
-def test_orb_15_minute_range_timing_boundaries():
-    """
-    Adversarial Scenario:
-    Test 15-minute ORB (range_minutes=15).
-    Bars between 09:30 and 09:44 must only accumulate range and NEVER fire,
-    even if price breaks out of the 5-min range with massive volume.
-    Breakout can only occur at or after 09:45.
-    """
-    strat = OpeningRangeBreakoutStrategy(range_minutes=15, min_rvol=1.80)
-
-    # Ingest 14 bars (09:30 to 09:43)
-    for m in range(30, 44):
-        strat.on_bar(_make_bar(high_p=105.00, low_p=100.00, close_p=102.00, vol=20000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00"))
-
-    # Bar 09:44: High 107.0, Close 106.5, Volume 200,000 -> Still within 15-min range window (<09:45)
-    bar_44 = _make_bar(high_p=107.00, low_p=102.00, close_p=106.50, vol=200000, ts_str="2026-09-21T09:44:00-04:00")
-    sigs_44 = strat.on_bar(bar_44)
-    assert len(sigs_44) == 0, "15m ORB must not fire at 09:44 (opening range still forming)"
-    assert strat._get_state("AAPL").range_established is False
-
-    # Bar 09:45: First bar after range end. Range high is 107.00.
-    # Bar closes at 108.50 > 107.00 with high volume -> Breakout fires!
-    bar_45 = _make_bar(high_p=109.00, low_p=106.00, close_p=108.50, vol=250000, ts_str="2026-09-21T09:45:00-04:00")
-    sigs_45 = strat.on_bar(bar_45)
-    assert len(sigs_45) == 1
-    assert sigs_45[0].side == OrderSide.BUY
-    assert strat._get_state("AAPL").range_established is True
 
 
-def test_orb_rvol_self_inclusion_mathematical_attenuation():
-    """Verify RVOL calculation excludes the current breakout bar from the baseline.
-
-    A 1.80x volume surge relative to prior baseline (18,000 vs 10,000 baseline)
-    correctly yields RVOL = 1.80 and fires the breakout signal.
-    """
-    bars = [_make_bar(high_p=105.0, low_p=100.0, close_p=102.0)]
-    curr_bar = _make_bar(high_p=106.0, low_p=104.0, close_p=105.5)
-
-    # 1. Evaluate helper at exact boundary
-    assert evaluate_orb_signal(bars, curr_bar, rvol=1.79) is None
-    assert evaluate_orb_signal(bars, curr_bar, rvol=1.80) == "BUY"
-
-    # 2. Strategy on_bar test without self-inclusion attenuation
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-    for m in range(30, 35):
-        strat.on_bar(_make_bar(high_p=105.0, low_p=100.0, close_p=102.0, vol=10000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00"))
-
-    # Baseline volume of prior 5 bars is 10,000.
-    # An exact 18,000 volume (1.80x prior baseline):
-    # avg_vol excluding current bar = 50,000 / 5 = 10,000
-    # rvol = 18,000 / 10,000 = 1.80 (>= 1.80) -> Fires!
-    b_18k = _make_bar(high_p=106.0, low_p=104.0, close_p=105.5, vol=18000, ts_str="2026-09-21T09:35:00-04:00")
-    sigs = strat.on_bar(b_18k)
-    assert len(sigs) == 1, "RVOL >= 1.80 fires when breakout bar is excluded from baseline"
 
 
 # ============================================================================

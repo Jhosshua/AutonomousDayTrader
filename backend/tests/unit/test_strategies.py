@@ -11,6 +11,7 @@ import math
 import pytest
 
 from backend.app.models.events import BarEvent, NewsEvent, OrderSide, OrderType
+from backend.app.strategies.orb import OrbStrategy
 from backend.app.strategies.base import (
     SignalEvent,
     StrategyStatus,
@@ -23,7 +24,6 @@ from backend.app.strategies.base import (
     calculate_rsi,
     calculate_rvol,
 )
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy, evaluate_orb_signal
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy, score_news_sentiment
 from backend.app.strategies.mean_reversion import MeanReversionStrategy, evaluate_mean_reversion_zscore
@@ -130,123 +130,14 @@ def test_rvol():
 # 2. Strategy 1: Opening Range Breakout (ORB)
 # ============================================================================
 
-def test_orb_range_establishment_and_rvol_veto():
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-
-    # 5 opening bars: 09:30 to 09:34 ET
-    for i, m in enumerate(range(30, 35)):
-        bar = _make_bar(
-            symbol="NVDA",
-            open_p=124.0,
-            high_p=124.50 + i * 0.1,
-            low_p=123.50,
-            close_p=124.20,
-            vol=50000,
-            ts_str=f"2026-09-21T09:{m:02d}:00-04:00",
-        )
-        sigs = strat.on_bar(bar)
-        assert len(sigs) == 0
-
-    state = strat._get_state("NVDA")
-    # Range is established at breakout bar (09:35)
-    # Breakout bar with low RVOL (e.g. 1.2x) -> no signal
-    breakout_low_vol = _make_bar(
-        symbol="NVDA",
-        open_p=124.80,
-        high_p=125.50,
-        low_p=124.70,
-        close_p=125.20,
-        vol=55000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(breakout_low_vol)
-    assert len(sigs) == 0
 
 
-def test_orb_bullish_breakout_and_brackets():
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-
-    # 5 bars (09:30 to 09:34) establishing high 124.80, low 123.60, midpoint 124.20
-    bars = [
-        _make_bar(high_p=124.50, low_p=123.60, close_p=124.20, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
-        _make_bar(high_p=124.80, low_p=123.80, close_p=124.40, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
-        _make_bar(high_p=124.60, low_p=123.90, close_p=124.30, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
-        _make_bar(high_p=124.70, low_p=124.00, close_p=124.50, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
-        _make_bar(high_p=124.60, low_p=124.10, close_p=124.40, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
-    ]
-    for b in bars:
-        strat.on_bar(b)
-
-    # 09:35 Breakout bar above 124.80 with volume surge (vol = 250,000 -> RVOL ~ 5x)
-    bo_bar = _make_bar(
-        high_p=125.40,
-        low_p=124.70,
-        close_p=125.25,
-        vol=250000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(bo_bar)
-    assert len(sigs) == 1
-    sig = sigs[0]
-    assert sig.side == OrderSide.BUY
-    assert sig.strategy_id == "orb"
-    assert sig.entry_price == 125.25
-    assert sig.stop_loss == 124.20  # Midpoint of [124.80, 123.60]
-    assert sig.take_profit_1 > sig.entry_price
-    assert sig.take_profit_2 > sig.take_profit_1
-
-    # Cooldown: subsequent bars don't re-fire
-    next_bar = _make_bar(
-        high_p=125.80, low_p=125.00, close_p=125.60, vol=200000, ts_str="2026-09-21T09:36:00-04:00"
-    )
-    assert len(strat.on_bar(next_bar)) == 0
 
 
-def test_orb_uses_configured_rvol_threshold():
-    opening = [
-        _make_bar(high_p=100.5, low_p=99.5, close_p=100.0, vol=10000,
-                  ts_str=f"2026-09-21T09:{m:02d}:00-04:00")
-        for m in range(30, 35)
-    ]
-    candidate = _make_bar(high_p=100.9, low_p=100.3, close_p=100.8, vol=17000,
-                          ts_str="2026-09-21T09:35:00-04:00")
-    permissive = OpeningRangeBreakoutStrategy(min_rvol=1.6)
-    strict = OpeningRangeBreakoutStrategy(min_rvol=1.8)
-    for strategy in (permissive, strict):
-        for bar in opening:
-            strategy.on_bar(bar)
-
-    assert len(permissive.on_bar(candidate)) == 1
-    assert strict.on_bar(candidate) == []
 
 
-def test_orb_fifteen_minute_range_waits_until_0945():
-    strategy = OpeningRangeBreakoutStrategy(range_minutes=15)
-    for minute in range(30, 45):
-        opening = _make_bar(high_p=100.5, low_p=99.5, close_p=100.0, vol=10000,
-                            ts_str=f"2026-09-21T09:{minute:02d}:00-04:00")
-        assert strategy.on_bar(opening) == []
-    candidate = _make_bar(high_p=100.9, low_p=100.3, close_p=100.8, vol=25000,
-                          ts_str="2026-09-21T09:45:00-04:00")
-
-    assert len(strategy.on_bar(candidate)) == 1
-    assert strategy._get_state("AAPL").range_high == 100.5
 
 
-def test_orb_bearish_breakdown():
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-    for m in range(30, 35):
-        strat.on_bar(_make_bar(high_p=100.0, low_p=96.0, close_p=98.0, vol=50000, ts_str=f"2026-09-21T09:{m:02d}:00-04:00"))
-
-    # Breakout bar closing at 95.0 < 96.0 with RVOL 3.0x
-    breakdown_bar = _make_bar(
-        high_p=96.5, low_p=94.8, close_p=95.0, vol=200000, ts_str="2026-09-21T09:35:00-04:00"
-    )
-    sigs = strat.on_bar(breakdown_bar)
-    assert len(sigs) == 1
-    assert sigs[0].side == OrderSide.SELL
-    assert sigs[0].stop_loss == 98.00  # Midpoint of 100 and 96
-    assert sigs[0].take_profit_1 < sigs[0].entry_price
 
 
 # ============================================================================
@@ -428,7 +319,7 @@ def test_mean_reversion_overbought_climax_fade():
 
 
 def test_strategy_performance_tracking():
-    strat = OpeningRangeBreakoutStrategy()
+    strat = OrbStrategy()
     assert strat.trades_count == 0
     assert strat.win_rate == 0.0
 
@@ -452,37 +343,6 @@ def test_strategy_performance_tracking():
     assert strat.daily_pnl == 0.0
 
 
-def test_orb_stop_distance_clamping_to_risk_window():
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.5)
-
-    # 5 bars establishing an ultra-tight range on a $300 stock: [300.00, 300.20], midpoint 300.10
-    bars = [
-        _make_bar(open_p=300.05, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
-        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
-        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
-        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
-        _make_bar(open_p=300.10, high_p=300.20, low_p=300.00, close_p=300.10, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
-    ]
-    for b in bars:
-        strat.on_bar(b)
-
-    # Breakout bar with close = 300.30 (raw dist to midpoint = 0.20, which is only 0.067% < 0.40% min)
-    bo_bar = _make_bar(
-        open_p=300.15,
-        high_p=300.40,
-        low_p=300.10,
-        close_p=300.30,
-        vol=200000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(bo_bar)
-    assert len(sigs) == 1
-    sig = sigs[0]
-    stop_dist = abs(sig.entry_price - sig.stop_loss)
-    stop_pct = stop_dist / sig.entry_price
-    # Must be clamped within [0.4%, 4.0%]
-    assert 0.004 <= stop_pct <= 0.040
-    assert stop_dist >= round(sig.entry_price * 0.004, 4)
 
 
 def test_news_momentum_stop_distance_clamping():
@@ -580,81 +440,10 @@ def _risk_verdict(entry_price, stop_price, side="BUY"):
     )
 
 
-def test_orb_clv_rejection():
-    """Verify that a breakout bar with CLV < 0.65 (e.g. shooting star) is rejected."""
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-    bars = [
-        _make_bar(high_p=124.50, low_p=123.60, close_p=124.20, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
-        _make_bar(high_p=124.80, low_p=123.80, close_p=124.40, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
-        _make_bar(high_p=124.60, low_p=123.90, close_p=124.30, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
-        _make_bar(high_p=124.70, low_p=124.00, close_p=124.50, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
-        _make_bar(high_p=124.60, low_p=124.10, close_p=124.40, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
-    ]
-    for b in bars:
-        strat.on_bar(b)
-
-    # Breakout candle touches 125.50 but closes at 124.85 on low of 124.70:
-    # Range = 0.80, CLV = (124.85 - 124.70) / 0.80 = 0.15 / 0.80 = 0.1875 < 0.65
-    bo_bar = _make_bar(
-        high_p=125.50,
-        low_p=124.70,
-        close_p=124.85,
-        vol=250000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(bo_bar)
-    assert len(sigs) == 0, f"Expected CLV rejection, but got: {sigs}"
 
 
-def test_orb_bar_range_cap_rejection():
-    """Verify that an excessively wide breakout bar (> 2.2 * ATR) is rejected."""
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-    # Range high 124.80, low 124.20. Normal candle range is ~0.30 -> ATR ~ 0.35
-    bars = [
-        _make_bar(high_p=124.50, low_p=124.20, close_p=124.30, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
-        _make_bar(high_p=124.80, low_p=124.30, close_p=124.40, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
-        _make_bar(high_p=124.60, low_p=124.30, close_p=124.50, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
-        _make_bar(high_p=124.70, low_p=124.30, close_p=124.50, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
-        _make_bar(high_p=124.60, low_p=124.20, close_p=124.40, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
-    ]
-    for b in bars:
-        strat.on_bar(b)
-
-    # Bar with huge range = 126.50 - 124.50 = 2.00 (>> 2.2 * 0.35 = 0.77)
-    bo_bar = _make_bar(
-        high_p=126.50,
-        low_p=124.50,
-        close_p=126.40,
-        vol=250000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(bo_bar)
-    assert len(sigs) == 0, f"Expected Bar Range Cap rejection, but got: {sigs}"
 
 
-def test_orb_extension_cap_rejection():
-    """Verify that a breakout closing > 1.0 * ATR beyond the breakout level is rejected as overextended."""
-    strat = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-    bars = [
-        _make_bar(high_p=124.50, low_p=123.80, close_p=124.20, vol=50000, ts_str="2026-09-21T09:30:00-04:00"),
-        _make_bar(high_p=124.80, low_p=124.00, close_p=124.40, vol=50000, ts_str="2026-09-21T09:31:00-04:00"),
-        _make_bar(high_p=124.60, low_p=124.00, close_p=124.30, vol=50000, ts_str="2026-09-21T09:32:00-04:00"),
-        _make_bar(high_p=124.70, low_p=124.10, close_p=124.50, vol=50000, ts_str="2026-09-21T09:33:00-04:00"),
-        _make_bar(high_p=124.60, low_p=124.10, close_p=124.40, vol=50000, ts_str="2026-09-21T09:34:00-04:00"),
-    ]
-    for b in bars:
-        strat.on_bar(b)
-
-    # Range high is 124.80. Bar closes at 125.80 (> range_high + 1.0 * ATR)
-    bo_bar = _make_bar(
-        high_p=125.85,
-        low_p=124.60,
-        close_p=125.80,
-        vol=250000,
-        ts_str="2026-09-21T09:35:00-04:00",
-    )
-    sigs = strat.on_bar(bo_bar)
-    assert len(sigs) == 0, f"Expected Extension Cap rejection, but got: {sigs}"
 
 
 def test_news_word_boundary_substring_protection():

@@ -10,13 +10,18 @@ from backend.app.core.account import AccountStatus, PaperTradingAccount
 from backend.app.core.bracket import BracketStatus, DynamicBracketManager
 from backend.app.core.engine import ExecutionEngine
 from backend.app.core.flattening import ZeroOvernightFlatteningEngine
-from backend.app.core.persistence import decode_runtime_value, encode_runtime_value, PersistenceError
+from backend.app.core.persistence import (
+    decode_runtime_value, encode_runtime_value, migrate_legacy_orb_payload, PersistenceError,
+)
 from backend.app.core.risk import InstitutionalRiskEngine
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.base import Strategy
 
 
-RUNTIME_STATE_VERSION = 1
+# 2 (2026-09-28): the "orb" strategy is ORBStraddle's rules run by the ORB controller; the old
+# ORB's per-symbol state is not part of a v2 checkpoint. v1 checkpoints are migrated (the old
+# ORB fields dropped) before any persisted type is decoded.
+RUNTIME_STATE_VERSION = 2
 
 
 def capture_runtime_state(
@@ -44,6 +49,7 @@ def capture_runtime_state(
     decisions: Optional[Dict[str, Any]] = None,
     swing_scan: Optional[Dict[str, Any]] = None,
     research: Optional[Dict[str, Any]] = None,
+    orb: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 
     """Return a complete JSON-safe recovery checkpoint."""
@@ -147,6 +153,11 @@ def capture_runtime_state(
     if research is not None:
         # Optional key: open-trade research state (JSON-safe, size-capped).
         state["research"] = research
+    if orb is not None:
+        # ORB's ADT-side ledger linkage (which ORB broker fills are already booked, which
+        # trades are recorded). The controller and scheduler state are their own durable
+        # rows (orb_state table), written by ORB's worker threads.
+        state["orb"] = orb
     encoded = encode_runtime_value(state)
     if not isinstance(encoded, dict):
         raise PersistenceError("Encoded runtime checkpoint is not an object")
@@ -175,6 +186,8 @@ def restore_runtime_state(
 ) -> Dict[str, Any]:
 
     """Restore a checkpoint into already-wired singleton components."""
+    if isinstance(payload, dict) and payload.get("runtime_state_version") == 1:
+        payload = migrate_legacy_orb_payload(payload)
     decoded = decode_runtime_value(payload)
     if decoded.get("runtime_state_version") != RUNTIME_STATE_VERSION:
         raise PersistenceError(
@@ -291,6 +304,7 @@ def restore_runtime_state(
         "decisions": decoded.get("decisions"),
         "swing_scan": decoded.get("swing_scan"),
         "research": decoded.get("research"),
+        "orb": decoded.get("orb"),
     }
 
 
