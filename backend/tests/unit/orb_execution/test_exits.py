@@ -457,20 +457,93 @@ def test_exit_budget_token_is_taken_before_the_final_position_read():
     assert pos_read == post - 1
 
 
-def test_capped_exit_qty_is_persisted_before_the_post():
+def test_exit_intent_is_persisted_uncapped_before_the_read_and_capped_after_the_post():
     h = opened()
     seen = []
 
     def hook(state):
         ex = [r for r in state["orders"].values() if r["role"] == "exit"]
         if ex and not seen:
-            h.alpaca.positions["APP"]["qty"] -= 100
+            h.alpaca.positions["APP"]["qty"] -= 100     # an outside sale lands after the intent
         if ex:
             seen.append((ex[0]["qty"], ex[0]["id"]))
     h.on_persist = hook
     h.clock.set(at(11, 0))
     h.ctl.tick()
-    assert (354, None) in seen                  # saved with the capped qty while still unsent
+    assert seen[0] == (454, None)               # intent: coid + the uncapped upper bound, unsent
+    assert seen[1][0] == 354 and seen[1][1]     # capped qty + order id, right after the POST
+    assert [r[2]["qty"] for r in h.alpaca.requests if r[0] == "POST" and r[2].get("side") == "sell"] == ["354"]
+
+
+def test_capped_qty_and_order_id_are_persisted_as_soon_as_the_post_returns():
+    h = opened()
+    h.alpaca.market_fills = False           # the exit stays working: the confirm loop polls it
+    rows = []
+    h.on_persist = lambda st: rows.append((len(h.alpaca.requests),
+                                           [(r["qty"], r["id"]) for r in st["orders"].values() if r["role"] == "exit"]))
+    h.clock.set(at(11, 0))
+    h.ctl.tick()
+    post = next(i for i, r in enumerate(h.alpaca.requests) if r[0] == "POST" and r[2].get("side") == "sell")
+    right_after = [ex for n, ex in rows if n == post + 1]
+    assert right_after and right_after[0][0][0] == 454 and right_after[0][0][1]   # before any other request
+
+
+def test_a_slow_persist_never_sits_between_the_position_read_and_the_exit_post():
+    import time as _t
+    h = opened()
+    persists_at = []
+
+    def slow(state):
+        persists_at.append(len(h.alpaca.requests))
+        _t.sleep(0.02)
+    h.on_persist = slow
+    h.alpaca.prices["APP"] = 99.30
+    h.clock.advance(5)
+    h.ctl.tick()
+    reqs = h.alpaca.requests
+    post = next(i for i, r in enumerate(reqs) if r[0] == "POST" and r[2].get("side") == "sell")
+    pos_read = max(i for i, r in enumerate(reqs[:post]) if r[0] == "GET" and r[1] == "/v2/positions/APP")
+    assert pos_read == post - 1                 # the read is immediately followed by the POST
+    assert post not in persists_at              # no persist ran after the read and before the POST
+    assert any(n <= pos_read for n in persists_at) and any(n > post for n in persists_at)
+
+
+def test_restart_between_the_exit_intent_and_the_post_recovers_with_one_sell():
+    import copy
+    h = opened()
+    snap = []
+
+    def crash_after_intent(state):
+        if not snap and any(r["role"] == "exit" for r in state["orders"].values()):
+            snap.append(copy.deepcopy(state))
+            raise OSError("process died right after saving the exit intent")
+    h.on_persist = crash_after_intent
+    h.clock.set(at(11, 0))
+    h.ctl.tick()
+    assert not [r for r in h.alpaca.requests if r[0] == "POST" and r[2].get("side") == "sell"]
+    h.on_persist = None
+    h.persisted.append(snap[0])                 # the durable checkpoint the dead process left
+    ctl = h.restart()
+    assert ctl.reconcile_on_startup()["ok"]
+    for _ in range(3):
+        h.clock.advance(30)                     # the unsent intent is proven never-sent after the grace
+        ctl.tick()
+    sells = [r for r in h.alpaca.requests if r[0] == "POST" and r[2].get("side") == "sell"]
+    assert len(sells) == 1 and sells[0][2]["qty"] == "454"
+    assert h.pos()["status"] == "CLOSED" and h.own_fill_sum() == 0 and h.alpaca.refused_403 == []
+
+
+def test_secret_change_inside_the_ttl_forces_a_fresh_account_check():
+    h = opened()
+    h.broker._client.headers["APCA-API-SECRET-KEY"] = "a-different-secret"
+    h.alpaca.account["account_number"] = "PA-SOMEONE-ELSE"
+    n = len(h.alpaca.requests)
+    h.alpaca.prices["APP"] = 99.30
+    h.clock.advance(5)
+    h.ctl.tick()
+    assert writes_after(h, n) == [] and h.pos()["status"] == "OPEN"
+    blob = repr(h.ctl.to_state()) + repr(h.ctl._dest_ok)
+    assert "test-secret" not in blob and "a-different-secret" not in blob and "test-key" not in blob
 
 
 def test_reconcile_takes_the_brokers_qty_for_a_working_exit():

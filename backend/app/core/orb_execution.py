@@ -36,6 +36,7 @@ Hook contracts:
 from __future__ import annotations
 
 import copy
+import hashlib
 import logging
 import math
 import secrets
@@ -1071,13 +1072,17 @@ class OrbExecutionController:
     def _broker_fingerprint(self) -> str:
         """Which credentials and endpoint a write would use: a change forces a fresh account check."""
         c = getattr(self.broker, "_client", None)
-        key = base = ""
+        key = secret = base = ""
         try:
-            key = str(c.headers.get("APCA-API-KEY-ID") or "") if c is not None else ""
-            base = str(getattr(c, "base_url", "")) if c is not None else ""
+            if c is not None:
+                key = str(c.headers.get("APCA-API-KEY-ID") or "")
+                secret = str(c.headers.get("APCA-API-SECRET-KEY") or "")
+                base = str(getattr(c, "base_url", ""))
         except Exception:
             pass
-        return f"{id(self.broker)}|{base}|{key}"
+        # one-way digest: the raw key id / secret are never stored or logged
+        digest = hashlib.sha256("\x00".join((base, key, secret)).encode()).hexdigest()
+        return f"{id(self.broker)}|{digest}"
 
     def _verify_destination_for_write(self) -> None:
         """Every broker write (entry, cancel, PATCH, exit) goes to the pinned account only. A pass is
@@ -1798,8 +1803,10 @@ class OrbExecutionController:
                       if r.get("status") not in QUIESCENT and not self._is_working_exit(r)]
         return cancelled, unresolved
 
-    def _cap_to_account(self, sym: str, own: int, net: int, why: str) -> int:
-        """Never push the ACCOUNT past zero: write off the part of own qty an outside trade took."""
+    def _cap_to_account(self, sym: str, own: int, net: int, why: str, defer: Optional[list] = None) -> int:
+        """Never push the ACCOUNT past zero: write off the part of own qty an outside trade took.
+        defer: collect the event/alarm instead of emitting it (hooks may be slow; the exit POST
+        must follow the position read with nothing slow in between)."""
         room = max(net, 0) if own > 0 else max(-net, 0)
         if abs(own) <= room:
             return own
@@ -1809,11 +1816,18 @@ class OrbExecutionController:
             side = "sell" if own > 0 else "buy"
             new_q, avg, _pnl, _unk = _fill_math(int(o["qty"]), o.get("avg"), side, gone, o.get("avg"))
             o["qty"], o["avg"] = new_q, avg
-        self._event({"kind": "exit_capped_outside_trade", "symbol": sym, "why": why, "own_qty": own,
-                     "account_qty": net, "written_off": gone,
-                     "note": "an outside trade already reduced this position; ORB exits only what is left"})
-        self._alarm(f"exit_capped_{sym}", {"symbol": sym, "written_off": gone})
+        ev = {"kind": "exit_capped_outside_trade", "symbol": sym, "why": why, "own_qty": own,
+              "account_qty": net, "written_off": gone,
+              "note": "an outside trade already reduced this position; ORB exits only what is left"}
+        if defer is not None:
+            defer.append(ev)
+        else:
+            self._emit_cap(ev)
         return self.own_qty(sym)
+
+    def _emit_cap(self, ev: dict) -> None:
+        self._event(ev)
+        self._alarm(f"exit_capped_{ev['symbol']}", {"symbol": ev["symbol"], "written_off": ev["written_off"]})
 
     def _next_exit_coid(self, sym: str, day: str) -> str:
         n = self._next("exit_seq", f"{sym}|{day}")
@@ -1830,13 +1844,20 @@ class OrbExecutionController:
             with self._lock:
                 self.state["orders"].pop(key, None)
             return None, f"could not save the exit record ({exc}); nothing sent", n, side
+        # The intent (coid + the UNCAPPED planned qty, an upper bound) was persisted above. From here
+        # to the POST nothing slow may run: destination check and budget token first, then the
+        # position read, the cap, and the POST immediately. The capped qty and the order id are
+        # persisted right after the POST; a restart in between is resolved by the coid lookup and
+        # the "broker order qty is truth" rule.
+        deferred: list = []
+
         def not_sent(note):
             with self._lock:
                 self.state["orders"][key].update(status="not_sent", terminal=True, submit_state="answered",
                                                  note=note)
-        # destination and the POST's budget token come FIRST, so no wait can sit between the final
-        # position read and the POST; then the account position is read and the qty capped to it
-        # (never send more than the account holds on our side: the exit can never cross flat)
+            for ev in deferred:
+                self._emit_cap(ev)
+            self._persist_quiet()
         try:
             self._verify_destination_for_write()
             self.budget.acquire("exit")
@@ -1848,7 +1869,7 @@ class OrbExecutionController:
         except Exception as exc:
             not_sent("position unreadable right before the POST")
             return None, f"could not read the account position for {sym} before the exit; retrying ({exc})", n, side
-        capped = self._cap_to_account(sym, self.own_qty(sym), net, why)
+        capped = self._cap_to_account(sym, self.own_qty(sym), net, why, defer=deferred)
         if capped == 0 or (capped > 0) != (own > 0):
             not_sent("nothing left to exit: fully offset by an outside trade")
             return None, None, 0, side
@@ -1856,13 +1877,11 @@ class OrbExecutionController:
         with self._lock:
             self.state["orders"][key]["qty"] = n
         try:
-            self._persist()                  # the record carries the qty actually sent
-        except Exception as exc:
-            not_sent("the capped qty could not be saved before the POST")
-            return None, f"could not save the exit record ({exc}); nothing sent", n, side
-        try:
             resp = self.broker.submit_market_order(sym, side, n, coid)     # token already held
             self._merge(dict(resp, client_order_id=resp.get("client_order_id") or coid))
+            for ev in deferred:
+                self._emit_cap(ev)
+            self._persist_quiet()            # capped qty + order id, right after the POST
             return resp.get("id"), None, n, side
         except BudgetThrottled as exc:
             with self._lock:
@@ -1875,6 +1894,9 @@ class OrbExecutionController:
                 rec = self.state["orders"].get(key)
                 if rec and rec.get("submit_state") == "in_flight":
                     rec["submit_state"] = "answered" if definitive else "unanswered"
+            for ev in deferred:
+                self._emit_cap(ev)
+            self._persist_quiet()
         got, not_found = self._lookup_coid(coid, tries=3, gap=0.5, sleep_first=False)
         if got is not None:
             self._merge(dict(got, client_order_id=got.get("client_order_id") or coid))
