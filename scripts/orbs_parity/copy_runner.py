@@ -30,9 +30,6 @@ def run_copy(day, scan_deadline=None, exclude=None, log=print, max_steps=None):
     work = tempfile.mkdtemp(prefix="orbs_copy_")
     from backend.app.strategies.orbs import config as ocfg
     ocfg.apply_manifest(manifest)          # before scanner is imported: it reads its tunables at import time
-    from backend.app.strategies.orbs import scanner
-    if scanner.SCAN_DEADLINE_S != float(manifest["scanner_env"]["ORBS_SCAN_DEADLINE_S"]):
-        scanner.SCAN_DEADLINE_S = float(manifest["scanner_env"]["ORBS_SCAN_DEADLINE_S"])   # already imported
     from backend.app.strategies.orbs.facade import OrbsFacade
     fac = OrbsFacade(state_dir=os.path.join(work, "state"), relay_base=common.RELAY_ROOT,
                      relay_token="parity-transport", manifest=manifest, http=transport)
@@ -48,17 +45,21 @@ def run_copy(day, scan_deadline=None, exclude=None, log=print, max_steps=None):
         for step in common.schedule(day)[:max_steps]:
             end_dt = step["scan_now"].replace(second=0)
             s0 = _time.monotonic()
-            board = fac.scan(d, end_dt, step["wave"], set())
+            board = fac.scan(d, end_dt, step["wave"], set(),
+                             executed_today=set() if step["wave"] == "secondary" else None)
             if board["health"] is None:
                 raise RuntimeError(f"scan failed: {board['error']}")
             cards, health = board["cards"], board["health"]
             rec = {"wave": step["wave"], "end": step["end"], "cards": cards,
                    "health": common.health_subset(health), "scan_s": round(_time.monotonic() - s0, 2)}
-            att = health.get("attempted")
-            decide = (step["wave"] == "primary" and board["ok"]) or (
-                step["wave"] == "secondary" and cards and (not att or board["ok"]))
-            if decide:
-                out = fac.decide(d, board, step["wave"], step["decide_now"], set())
+            out = None
+            if step["wave"] != "preview":
+                # the facade applies the board gates itself (scan ok, coverage, non-empty, cutoff, board_id)
+                out = fac.decide(d, board, step["wave"], step["decide_now"], set(), executed_today=set())
+                if out["verdict"] == "refused":
+                    rec["refused"] = out["reason"]
+                    out = None
+            if out is not None:
                 rechecks = {}
                 by_sym = {c["symbol"]: c for c in out["cards"]}
                 for p in (out["validated"] if out["valid"] else []):
@@ -76,6 +77,7 @@ def run_copy(day, scan_deadline=None, exclude=None, log=print, max_steps=None):
         shutil.rmtree(work, ignore_errors=True)
     result["misses"] = transport.misses
     result["counts"] = transport.counts
+    result["tape_splits"] = transport.tape.splits_done
     result["elapsed_s"] = round(_time.monotonic() - t0, 1)
     return result
 

@@ -100,6 +100,11 @@ def build(sym):
         trade(_at(9, 30, 0, 50) + timedelta(seconds=5 * k), off, size, extra_ns=5)
         if k % 7 == 3:
             trade(_at(9, 30, 1, 0) + timedelta(seconds=5 * k), 0.5, 7, cond=["@", "I"], extra_ns=9)
+    # a print and a quote stamped EXACTLY 09:35:00.000000000 (first post-range instant) and 09:35:05.000000000
+    # (the delay gate), so page splits at those boundaries (ADT_PARITY_SPLIT_AT) land on real rows
+    for boundary in (_at(9, 35, 0), _at(9, 35, 5)):
+        quote(boundary, 0.0, 510, 510)
+        trade(boundary, 0.05, 100)
     # inside the range until the break
     t = _at(9, 35, 2)
     stop_inside = brk if brk is not None else end

@@ -110,6 +110,10 @@ class TapeStore:
         self.end_ns = ts_ns(datetime.combine(d, TAPE_END, tzinfo=ET).isoformat())
         self._cache = {}
         self._lock = threading.Lock()
+        splits = [x for x in os.environ.get("ADT_PARITY_SPLIT_AT", "").split(",") if x.strip()]
+        self.split_ns = sorted(ts_ns(datetime.combine(d, dtime.fromisoformat(x.strip()), tzinfo=ET).isoformat())
+                               for x in splits)
+        self.splits_done = 0
 
     def paths(self, sym, kind):
         base = os.path.join(self.dir, f"{sym}.{kind}")
@@ -173,6 +177,13 @@ class TapeStore:
                 raise ReplayMiss(f"foreign page token {token!r}")
             i = int(m.group(1))
         j = min(i + limit, hi)
+        # Page-boundary stress (ADT_PARITY_SPLIT_AT="09:35:00,09:35:05"): a page also ends right before the
+        # first row stamped at/after each boundary, so that row opens the next page.
+        for split in self.split_ns:
+            k = bisect.bisect_left(stamps, split)
+            if i < k < j:
+                j = k
+                self.splits_done += 1
         nxt = (b'"replay:%d"' % j) if j < hi else b"null"
         return (b'{"' + kind.encode() + b'":[' + b",".join(lines[i:j]) + b'],"symbol":"' + sym.encode()
                 + b'","next_page_token":' + nxt + b"}")
