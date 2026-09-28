@@ -1,3 +1,5 @@
+# SUPERSEDED 2026-09-28: operator wanted ORB rewritten INSIDE ADT, not a sidecar. See PLAN_2026_09_28_orb_rules_match_orbstraddle.md
+
 # Plan: ADT's general ORB is replaced by ORBStraddle's execution (2026-09-28, draft v3 after Codex attack rounds 1 and 2)
 
 Operator request (2026-09-28 13:40 ET): "I want number one, orb the general one, to execute exactly like
