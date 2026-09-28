@@ -60,6 +60,7 @@ TERMINAL = frozenset({"filled", "canceled", "expired", "rejected", "replaced"})
 QUIESCENT = TERMINAL | frozenset({"done_for_day"})
 ACTIVE = frozenset({"PENDING_SUBMIT", "SUBMITTED", "UNKNOWN", "OPEN"})
 OWN_REFRESH_MIN_S = 10.0       # a live non-entry own order is refetched at most this often
+RECHECK_NOT_FOUND_S = 60.0     # an inferred never-reached entry is asked again this often
 PENDING_GRACE_S = 60.0         # a lost submit is not called "never reached the broker" sooner
 EXIT_CONFIRM_S = 10.0          # _verified_flatten confirm_s
 ESCALATED_CONFIRM_S = 20.0
@@ -81,7 +82,7 @@ DEFAULTS: Dict[str, Any] = {
     "own_price_sanity_pct": 50.0, "flatten_escalate_after_s": 120.0,
     "flatten_escalate_hm": "15:45", "excluded_symbols": ["TSLA", "CDE"],
     "request_budget_per_min": 90, "exit_reserve_per_min": 40, "coid_prefix": "adt-orb",
-    "shadow_equity": 100000.0,
+    "shadow_equity": 100000.0, "expected_account": None, "absorption_max_result_age_s": 8.0,
 }
 ALIASES: Dict[str, List[str]] = {
     "risk_pct": ["risk_pct", "orbs_risk_pct"],
@@ -109,6 +110,7 @@ ALIASES: Dict[str, List[str]] = {
     "request_budget_per_min": ["request_budget_per_min"],
     "exit_reserve_per_min": ["exit_reserve_per_min"],
     "coid_prefix": ["coid_prefix", "adt_coid_prefix"],
+    "expected_account": ["expected_account", "account_number", "account_allowlist"],
 }
 
 
@@ -147,7 +149,8 @@ def load_config(manifest: Optional[dict]) -> Dict[str, Any]:
     for k in ("risk_pct", "daily_loss_halt_pct", "max_slip_stop_frac", "target_r", "fast_fail_r",
               "breakeven_r", "clawback_peak_r", "clawback_giveback_r", "absorption_arm_r",
               "max_buying_power_pct", "max_name_notional_pct", "min_stop_pct",
-              "own_price_sanity_pct", "flatten_escalate_after_s", "shadow_equity"):
+              "own_price_sanity_pct", "flatten_escalate_after_s", "shadow_equity",
+              "absorption_max_result_age_s"):
         cfg[k] = float(cfg[k])
     for k in ("max_open_slots", "max_structure_picks", "request_budget_per_min", "exit_reserve_per_min"):
         cfg[k] = int(cfg[k])
@@ -318,12 +321,18 @@ class OrbExecutionController:
                  on_event: Optional[Callable[[dict], None]] = None,
                  sleep: Optional[Callable[[float], None]] = None,
                  budget: Optional[RequestBudget] = None,
-                 mode: str = "shadow") -> None:
+                 mode: str = "shadow",
+                 expected_account: Optional[str] = None) -> None:
         if mode not in MODES:
             raise ValueError(f"ORB mode must be one of {MODES}")
         self.broker = broker
         self.facade = facade
         self.cfg = load_config(manifest)
+        # core.verify_destination: the ONE Alpaca account ORB may trade (ADT: PA3CSVDZMMPY)
+        acct_pin = expected_account or self.cfg.get("expected_account")
+        if isinstance(acct_pin, (list, tuple)):
+            acct_pin = acct_pin[0] if len(acct_pin) == 1 else None      # one account, never "any of"
+        self.expected_account = str(acct_pin or "").strip() or None
         self.clock = clock or (lambda: datetime.now(ET))
         self.persist_cb = persist_cb
         self.on_fill = on_fill
@@ -343,6 +352,7 @@ class OrbExecutionController:
         self._sym_locks: Dict[str, threading.Lock] = {}
         self._sym_guard = threading.Lock()
         self._held: set = set()          # symbols this process holds through reserve()
+        self._pending_reserve: set = set()   # reopened positions still to reserve (outside the lock)
         self.state: Dict[str, Any] = self._empty_state()
         self.last_execute: Optional[dict] = None
         self.last_tick: Optional[dict] = None
@@ -577,6 +587,9 @@ class OrbExecutionController:
             rec["terminal"] = False
             rec.pop("inferred_terminal", None)
             rec["note"] = "revived: the broker answered with this order after a 404"
+            if rec.get("role") == "entry":
+                self._reopen_position_locked(rec.get("position") or key,
+                                             "the broker showed this entry after it was called never-reached")
         if oid and rec.get("submit_state") in ("in_flight", "unanswered"):
             rec["submit_state"] = "answered"
         if status and not rec["terminal"]:
@@ -602,6 +615,75 @@ class OrbExecutionController:
                 self._merge_locked(leg, "leg", pos_key, kind, rec["symbol"],
                                    "sell" if rec["side"] == "buy" else "buy")
         return key
+
+    def _absorption_fresh(self, ab: dict) -> bool:
+        """flow.fresh_read: the read's window ended at most ABSORPTION_MAX_RESULT_AGE_S (8 s) before NOW,
+        judged at the moment of action (an earlier exit in the same pass can take seconds)."""
+        asof = _parse_ts(ab.get("asof"))
+        if asof is None:
+            return False
+        age = (self._now() - asof).total_seconds()
+        return 0 <= age <= self.cfg["absorption_max_result_age_s"]
+
+    def _reopen_position_locked(self, pos_key: str, why: str) -> None:
+        """A closed position whose own orders turn out to be live (or to hold shares) is ours again:
+        reopen it with its recorded stop/rd so every exit and the 11:00 flatten cover it."""
+        pos = self.state["positions"].get(pos_key)
+        if pos is None or pos.get("status") in ACTIVE:
+            return
+        pos.update(status="UNKNOWN", reopened=True, reopened_why=why, closed_reason=None, closed_at=None,
+                   exit_reason=None, exit_since=None, escalated=None)
+        if pos.get("day") != self.state.get("day"):
+            pos["carried"] = True
+        for rr in self.state["risk"].get(pos.get("day") or "", []):
+            if rr["coid"] == pos["coid"] and rr.get("result") in ("not_found", "rejected", "not_sent"):
+                rr["result"] = "unknown"
+        self._pending_reserve.add(pos["symbol"])
+        self._event({"kind": "position_reopened", "symbol": pos["symbol"], "why": why})
+
+    def _adopt_orphans(self) -> List[str]:
+        """Own qty or live own orders on a symbol with no open position (a late fill, a revived
+        entry, a lost row): reopen the position they belong to, or rebuild one with no known stop,
+        which exits at the next pass (core.adopt_book_positions + ent 'time_exit')."""
+        adopted = []
+        with self._lock:
+            active = {p["symbol"] for p in self._active_positions()}
+            for sym in self._own_open_symbols():
+                if sym in active:
+                    continue
+                recs = [r for r in self.state["orders"].values() if r["symbol"] == sym]
+                keys = [r.get("position") for r in recs if r.get("position") in self.state["positions"]]
+                if keys:
+                    key = max(keys, key=lambda k: self.state["positions"][k].get("created_at") or "")
+                    self._reopen_position_locked(key, "own shares or live own orders with no open position")
+                else:
+                    entry = next((r for r in recs if r.get("role") == "entry"), None) or (recs[0] if recs else None)
+                    q = int((self.state["own"].get(sym) or {}).get("qty") or 0)
+                    side = entry["side"] if entry else ("buy" if q > 0 else "sell")
+                    key = f"rebuilt:{sym}:{self.state.get('day')}"
+                    self.state["positions"][key] = {
+                        "key": key, "coid": (entry or {}).get("coid") or key, "symbol": sym,
+                        "direction": "long" if side == "buy" else "short", "tier": "quant",
+                        "day": self.state.get("day"), "planned_shares": abs(q), "shares": abs(q),
+                        "initial_shares": abs(q), "bracket_qty": abs(q),
+                        "entry_ref": (self.state["own"].get(sym) or {}).get("avg") or 0.0,
+                        "stop": None, "rd": 0.0, "target": None, "risk_usd": 0.0,
+                        "created_at": self._now().isoformat(), "status": "UNKNOWN", "peak": 0.0,
+                        "no_known_stop": True, "errs": 0, "carried": False}
+                    for r in recs:
+                        if not r.get("position"):
+                            r["position"] = key
+                    self._pending_reserve.add(sym)
+                    self._event({"kind": "position_rebuilt", "symbol": sym,
+                                 "note": "own orders/shares with no position record: exits at the next pass"})
+                adopted.append(sym)
+        for sym in sorted(self._pending_reserve):
+            if self._take(sym):
+                self._pending_reserve.discard(sym)
+            else:
+                self._alarm(f"reservation_conflict_{sym}", {"symbol": sym,
+                            "note": "ORB supervises its own shares here but could not reserve the symbol"})
+        return adopted
 
     def _apply_fill(self, rec: dict, delta: int, px: float) -> None:
         sym, side = rec["symbol"], rec["side"]
@@ -688,7 +770,16 @@ class OrbExecutionController:
 
     def needs_supervision(self) -> bool:
         with self._lock:
-            return bool(self._active_positions()) or any(not r["terminal"] for r in self.state["orders"].values())
+            return (bool(self._active_positions()) or any(not r["terminal"] for r in self.state["orders"].values())
+                    or bool(self._own_open_symbols()) or bool(self._recheck_candidates()))
+
+    def _recheck_candidates(self) -> List[str]:
+        """Entries we only INFERRED never reached the broker (today or yesterday): asked again by coid
+        at most every RECHECK_NOT_FOUND_S, so a late appearance is still discovered."""
+        day = self.state.get("day") or ""
+        floor = (date.fromisoformat(day) - timedelta(days=1)).isoformat() if day else ""
+        return [k for k, r in self.state["orders"].items()
+                if r.get("inferred_terminal") and r.get("role") == "entry" and str(r.get("day") or "") >= floor]
 
     def slots_available(self) -> int:
         return max(0, self.cfg["max_open_slots"] - len(self._active_positions()))
@@ -811,8 +902,9 @@ class OrbExecutionController:
             if not isinstance(acct, dict) or acct.get("equity_estimated"):
                 return False, "account equity is unavailable or estimated"
             num = str(acct.get("account_number") or "")
-            if not num:
-                return False, "account number is missing"
+            why = self._destination_refused(acct)
+            if why:
+                return False, f"destination refused: {why}"
             if acct.get("trading_blocked") or acct.get("account_blocked"):
                 return False, "the account is blocked"
             equity = _f(acct.get("equity"))
@@ -860,6 +952,9 @@ class OrbExecutionController:
         try:
             if acct is None:
                 acct = self._call("normal", self.broker.get_account_checked)
+            why = self._destination_refused(acct)
+            if why:
+                return False, f"destination refused: {why}"
             baseline, source = self.account_day_equity_baseline(acct, now)
             bp = _f(acct.get("buying_power")) or 0.0
             if baseline is None:
@@ -938,6 +1033,24 @@ class OrbExecutionController:
         if not r:
             return None
         return r if isinstance(r, str) else "ADT account daily loss stop"
+
+    def account_refusal(self, acct: Any) -> Optional[str]:
+        """core.verify_destination: None when acct is the pinned account and not blocked, else why not.
+        No pinned account is itself a refusal (fail closed)."""
+        if not self.expected_account:
+            return "no expected Alpaca account is configured: name the account before ORB may trade it"
+        num = str((acct or {}).get("account_number") or "") if isinstance(acct, dict) else ""
+        if num != self.expected_account:
+            return f"Alpaca account {num or '?'!r} is not ORB's account {self.expected_account!r}"
+        if acct.get("trading_blocked") or acct.get("account_blocked"):
+            return "the broker has this account blocked"
+        return None
+
+    def _destination_refused(self, acct: Any) -> Optional[str]:
+        why = self.account_refusal(acct)
+        if why:
+            self._alarm("wrong_account", {"reason": why})
+        return why
 
     def _prices_from_positions(self) -> Optional[Dict[str, float]]:
         if self.broker is None:
@@ -1048,6 +1161,9 @@ class OrbExecutionController:
                     raise ValueError("equity must be finite and positive")
             except Exception as exc:
                 return _res(False, f"account read failed: {exc}")
+            why = self._destination_refused(acct)
+            if why:
+                return _res(False, f"destination refused: {why}")
             snap = self.session_sizing(day)
             base_now, _src = self.account_day_equity_baseline(acct, now)
             if snap and base_now is not None and abs(float(snap["equity"]) - float(base_now)) > 0.01:
@@ -1516,6 +1632,8 @@ class OrbExecutionController:
         with self._lock:
             due = [(k, dict(r)) for k, r in self.state["orders"].items() if not r["terminal"] and (
                 r.get("role") == "entry" or now_ts - float(r.get("last_refresh") or 0) >= OWN_REFRESH_MIN_S)]
+            due += [(k, dict(self.state["orders"][k])) for k in self._recheck_candidates()
+                    if now_ts - float(self.state["orders"][k].get("last_refresh") or 0) >= RECHECK_NOT_FOUND_S]
         due.sort(key=lambda kr: 0 if kr[1].get("role") == "entry" else 1)
         ok = failed = skipped = 0
         for key, rec in due:
@@ -1525,7 +1643,7 @@ class OrbExecutionController:
                 continue
             try:
                 cur = self.state["orders"].get(key)
-                if not cur or cur["terminal"]:
+                if not cur or (cur["terminal"] and not cur.get("inferred_terminal")):
                     continue
                 if self._refresh_one(key, dict(cur), prio):
                     ok += 1
@@ -1662,6 +1780,24 @@ class OrbExecutionController:
             with self._lock:
                 self.state["orders"].pop(key, None)
             return None, f"could not save the exit record ({exc}); nothing sent", n, side
+        # the account position read IMMEDIATELY before the POST (smallest window): never send more
+        # than the account holds on our side, so the exit can never cross the account through flat
+        try:
+            net = int(self._call("exit", self.broker.position_qty, sym))
+        except Exception as exc:
+            with self._lock:
+                self.state["orders"][key].update(status="not_sent", terminal=True, submit_state="answered",
+                                                 note="position unreadable right before the POST")
+            return None, f"could not read the account position for {sym} before the exit; retrying ({exc})", n, side
+        capped = self._cap_to_account(sym, self.own_qty(sym), net, why)
+        if capped == 0 or (capped > 0) != (own > 0):
+            with self._lock:
+                self.state["orders"][key].update(status="not_sent", terminal=True, submit_state="answered",
+                                                 note="nothing left to exit: fully offset by an outside trade")
+            return None, None, 0, side
+        n = abs(capped)
+        with self._lock:
+            self.state["orders"][key]["qty"] = n
         try:
             resp = self._call("exit", self.broker.submit_market_order, sym, side, n, coid)
             self._merge(dict(resp, client_order_id=resp.get("client_order_id") or coid))
@@ -1703,18 +1839,35 @@ class OrbExecutionController:
                         and r.get("status") not in QUIESCENT), None)
         err = None
         if working:
-            order_id, n = working["id"], abs(own)
-        else:
+            # a working own exit larger than what the account still holds would cross flat when it
+            # fills: cancel and confirm it, then re-issue at the capped quantity
             try:
                 net = int(self._call("exit", self.broker.position_qty, sym))
             except Exception as exc:
                 reason = f"could not read the account position for {sym}; retrying ({exc})"
                 self._event({"kind": "exit_waiting_on_position", "symbol": sym, "why": why, "reason": reason})
                 return self._exit_result(sym, why, t0, False, False, reason=reason, cancelled=cancelled)
-            own = self._cap_to_account(sym, own, net, why)
-            if own == 0:
-                return self._exit_result(sym, why, t0, True, True, cancelled=cancelled,
-                                         note="fully offset by an outside trade")
+            remaining = int(working.get("qty") or 0) - int(working.get("filled_qty") or 0)
+            room = max(net, 0) if own > 0 else max(-net, 0)
+            if remaining > room:
+                self._event({"kind": "exit_resized_to_account", "symbol": sym, "working_qty": remaining,
+                             "account_qty": net})
+                try:
+                    body = self._call("exit", self.broker.cancel_order_and_confirm, working["id"], CANCEL_CONFIRM_S)
+                    self._merge(body)
+                except Exception as exc:
+                    log.warning("cancel of oversized own exit %s failed: %s", working["id"], exc)
+                cur = self.state["orders"].get(self._find(oid=working["id"]) or "") or {}
+                if cur.get("status") not in QUIESCENT:
+                    reason = f"oversized own exit {working['id']} not confirmed cancelled ({cur.get('status')})"
+                    return self._exit_result(sym, why, t0, False, False, reason=reason, cancelled=cancelled)
+                working = None
+                own = self.own_qty(sym)
+                if own == 0:
+                    return self._exit_result(sym, why, t0, True, True, cancelled=cancelled)
+        if working:
+            order_id, n = working["id"], abs(own)
+        else:
             order_id, err, n, _side = self._submit_exit(sym, own, why, pos_key)
         flat = False
         if order_id:
@@ -1797,8 +1950,8 @@ class OrbExecutionController:
                 self.refresh_own_orders()
             except Exception as exc:
                 log.warning("own order refresh failed (continuing): %s", exc)
+        self._adopt_orphans()
         active = self._active_positions()
-        # an own order with no live position row (should not happen) still gets exited at 11:00
         if not active:
             self._persist_quiet()
             return {"active": 0}
@@ -1861,7 +2014,7 @@ class OrbExecutionController:
                 px = None
         L = pos["direction"] == "long"
         flat_now = now.time() >= parse_hms(self.cfg["flatten"])
-        carry = bool(pos.get("carried"))
+        carry = bool(pos.get("carried") or pos.get("no_known_stop"))
         requested = self.state["exit_requests"].get(sym)
         r = 0.0
         claw = ff = be_exit = absorb = False
@@ -1903,6 +2056,8 @@ class OrbExecutionController:
                     log.warning("absorption check skipped for %s: %s", sym, exc)
                 if ab and ab.get("direction") not in (None, "long" if L else "short"):
                     ab = None
+                if ab and not self._absorption_fresh(ab):
+                    ab = None               # flow.fresh_read: a stale or undated read never acts
                 if ab and r >= self.cfg["absorption_arm_r"]:
                     if ab.get("error") and not pos.get("absorption_error_logged"):
                         upd["absorption_error_logged"] = True
@@ -1918,7 +2073,7 @@ class OrbExecutionController:
         if not (force or requested or flat_now or carry or be_exit or claw or absorb or ff):
             return None
         why = (force if force else requested if requested else "flatten" if flat_now
-               else "carried_over" if carry else "breakeven" if be_exit else "clawback" if claw
+               else ("carried_over" if pos.get("carried") else "no_known_stop") if carry else "breakeven" if be_exit else "clawback" if claw
                else "absorption" if absorb else "fast-fail")
         with self._lock:
             live = self.state["positions"].get(key)
@@ -1973,8 +2128,15 @@ class OrbExecutionController:
             self.ready = report["ok"]
             self.startup_report = report
             return report
+        try:
+            why = self._destination_refused(self._call("exit", self.broker.get_account_checked))
+        except Exception as exc:
+            why = f"account read failed: {exc}"
+        if why:
+            report["errors"].append(f"destination refused: {why}")
         with self._lock:
             pending = [(k, dict(r)) for k, r in self.state["orders"].items() if not r["terminal"]]
+            pending += [(k, dict(self.state["orders"][k])) for k in self._recheck_candidates()]
         pending.sort(key=lambda kr: 0 if kr[1].get("role") == "entry" else 1)
         for key, rec in pending:
             report["checked"] += 1
@@ -1997,6 +2159,7 @@ class OrbExecutionController:
         except Exception as exc:
             report["errors"].append(f"open orders could not be listed: {exc}")
         day = self._day(now)
+        self._adopt_orphans()
         for pos in self._active_positions():
             if self._flat_proven(pos):
                 self._close_position(pos["key"], self._close_reason(pos))

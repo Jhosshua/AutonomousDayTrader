@@ -390,7 +390,7 @@ class Harness:
     """A controller wired to FakeAlpaca through the real AlpacaBroker, plus recorded hooks."""
 
     def __init__(self, mode="live", start=None, equity=50000.0, last_equity=None, buying_power=200000.0,
-                 freeze=True, reconcile=True, adt_book=None):
+                 freeze=True, reconcile=True, adt_book=None, expected_account="PA3CSVDZMMPY"):
         self.clock = FakeClock(start or at(9, 20))
         self.alpaca = FakeAlpaca(self.clock, equity, last_equity, buying_power)
         self.broker = AlpacaBroker("test-key", "test-secret",
@@ -405,6 +405,8 @@ class Harness:
         self.halt = [None]
         self.persist_raises = [False]
         self.writes_at_persist: List[int] = []
+        self.expected_account = expected_account
+        self.on_persist = None           # test hook: runs after each durable persist
         self.ctl = self.build(mode)
         if freeze:
             ok, detail = self.ctl.freeze_session(self.clock.now)
@@ -418,6 +420,8 @@ class Harness:
             raise OSError("disk full")
         self.writes_at_persist.append(len(self.alpaca.writes))
         self.persisted.append(state)
+        if self.on_persist:
+            self.on_persist(state)
 
     def _reserve(self, sym):
         if sym in self.reserved or sym in self.adt_book:
@@ -434,7 +438,8 @@ class Harness:
             self.broker, self.facade, MANIFEST, clock=self.clock, persist_cb=self._persist,
             on_fill=lambda *a: self.fills.append(a), is_occupied=lambda s: s in self.adt_book,
             reserve=self._reserve, release=self._release, account_halt=lambda: self.halt[0],
-            sleep=self.clock.sleep, budget=RequestBudget(10 ** 6, 10 ** 6), mode=mode)
+            sleep=self.clock.sleep, budget=RequestBudget(10 ** 6, 10 ** 6), mode=mode,
+            expected_account=self.expected_account)
         if state is not None:
             ctl.from_state(state)
         return ctl

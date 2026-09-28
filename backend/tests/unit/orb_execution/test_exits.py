@@ -143,25 +143,46 @@ def test_clawback_after_peak_giveback():
     assert h.pos()["closed_reason"] == "clawback"
 
 
+def read(h, fire, age_s=0.0, ratio=-0.42):
+    """A finished absorption read whose 30 s window ended age_s seconds ago."""
+    from datetime import timedelta
+    return {"fire": fire, "direction": "long", "ratio": ratio, "trades": 31,
+            "asof": h.clock.now - timedelta(seconds=age_s)}
+
+
 def test_absorption_exit_needs_arm_and_a_fresh_firing_read():
     h = opened()
-    h.facade.absorption["APP"] = {"fire": True, "direction": "long", "ratio": -0.42, "trades": 31}
+    h.facade.absorption["APP"] = read(h, True)
     h.alpaca.prices["APP"] = 101.00         # r = 0.36: not armed, no read asked for
     h.clock.advance(5)
     h.ctl.tick()
     assert h.pos()["status"] == "OPEN"
     assert not [c for c in h.facade.calls if c[0] == "absorption_poll"]
-    h.facade.absorption["APP"] = {"fire": False, "direction": "long", "ratio": -0.1, "trades": 31}
     h.alpaca.prices["APP"] = 101.40         # r = 0.545: armed, read does not fire
     h.clock.advance(5)
+    h.facade.absorption["APP"] = read(h, False, ratio=-0.1)
     h.ctl.tick()
     assert h.pos()["status"] == "OPEN"
-    h.facade.absorption["APP"] = {"fire": True, "direction": "long", "ratio": -0.42, "trades": 31}
     n = len(h.alpaca.requests)
     h.clock.advance(5)
+    h.facade.absorption["APP"] = read(h, True, age_s=3)
     h.ctl.tick()
     assert_cancel_then_close(h, n, "APP", 454)
     assert h.pos()["closed_reason"] == "absorption"
+
+
+@pytest.mark.parametrize("asof", ["stale", "undated", "future"])
+def test_a_stale_or_undated_absorption_read_never_exits(asof):
+    h = opened()
+    h.alpaca.prices["APP"] = 101.40         # armed (r = 0.545)
+    h.clock.advance(5)
+    ab = read(h, True, age_s={"stale": 8.5, "future": -2}.get(asof, 0))
+    if asof == "undated":
+        ab.pop("asof")
+    h.facade.absorption["APP"] = ab
+    n = len(h.alpaca.requests)
+    h.ctl.tick()
+    assert writes_after(h, n) == [] and h.pos()["status"] == "OPEN"
 
 
 def test_eleven_oclock_flatten():
@@ -335,3 +356,40 @@ def test_fake_enforces_the_one_sell_order_rule():
         h.broker.submit_market_order("APP", "sell", 454, "manual-1")
     assert getattr(e.value, "status_code", None) == 403
     assert h.alpaca.refused_403 and h.alpaca.refused_403[0]["code"] == 40310000
+
+
+def test_exit_qty_is_recapped_to_a_position_read_right_before_the_post():
+    """Codex P1: an outside sale landing after the exit record is saved must shrink the exit,
+    never push the account through flat."""
+    h = opened()
+    done = []
+
+    def outside_sale(state):
+        if not done and any(r["role"] == "exit" for r in state["orders"].values()):
+            done.append(1)
+            h.alpaca.positions["APP"]["qty"] -= 100          # someone sold 100 by hand just now
+    h.on_persist = outside_sale
+    h.clock.set(at(11, 0))
+    h.ctl.tick()
+    sells = [r[2] for r in h.alpaca.requests if r[0] == "POST" and r[2].get("side") == "sell"]
+    assert [s["qty"] for s in sells] == ["354"]
+    assert h.alpaca.refused_403 == [] and "APP" not in h.alpaca.positions
+    assert h.pos()["status"] == "CLOSED" and h.ctl.own_qty("APP") == 0
+    assert any(e["kind"] == "exit_capped_outside_trade" for e in h.ctl.state["events"])
+
+
+def test_working_exit_larger_than_the_account_is_cancelled_and_reissued_capped():
+    h = opened()
+    h.alpaca.market_fills = False
+    h.clock.set(at(11, 0))
+    h.ctl.tick()
+    first = [o for o in h.alpaca.orders.values() if o["client_order_id"].startswith("adt-orb-X-")]
+    assert len(first) == 1 and first[0]["qty"] == "454"
+    h.alpaca.positions["APP"]["qty"] = 300                  # an outside sale of 154 meanwhile
+    h.alpaca.market_fills = True
+    h.clock.advance(5)
+    h.ctl.tick()
+    assert h.alpaca.orders[first[0]["id"]]["status"] == "canceled"
+    exits = [o for o in h.alpaca.orders.values() if o["client_order_id"].startswith("adt-orb-X-")]
+    assert [o["qty"] for o in exits] == ["454", "300"]
+    assert "APP" not in h.alpaca.positions and h.pos()["status"] == "CLOSED"

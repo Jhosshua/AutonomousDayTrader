@@ -149,3 +149,86 @@ def test_state_round_trip_is_json_and_versioned():
         assert False, "a future state version must be refused"
     except ValueError:
         pass
+
+
+def lost_entry_marked_never_reached():
+    """An entry whose POST reply was lost and whose by-coid lookups kept answering 404 until the
+    grace ran out: ORB concluded it never reached the broker. It actually did (and filled)."""
+    h = Harness()
+    h.alpaca.prices["APP"] = 100.2
+    h.alpaca.fail.append({"method": "POST", "path": "/v2/orders", "kind": "lost"})
+    h.alpaca.fail.append({"method": "GET", "path": "/v2/orders:by_client_order_id", "kind": "status",
+                          "status": 404, "times": 4})
+    h.ctl.execute([pick("APP", "long", 100.0, 98.0)])
+    h.clock.advance(70)
+    h.ctl.tick()
+    h.ctl.tick()
+    assert h.pos()["status"] == "CLOSED" and "never reached" in h.pos()["closed_reason"]
+    assert h.ctl.own_qty("APP") == 0 and "APP" in h.alpaca.positions      # the broker holds 454
+    assert h.alpaca.fail[-1]["times"] == 0                                # the next lookup finds it
+    return h
+
+
+def test_revived_entry_after_restart_is_reopened_with_its_stop_and_supervised():
+    h = lost_entry_marked_never_reached()
+    ctl = h.restart()
+    rep = ctl.reconcile_on_startup()
+    assert rep["ok"]
+    p = h.pos()
+    assert p["status"] == "OPEN" and p.get("reopened") and p["rd"] == 2.2   # its own stop/R, not a guess
+    assert ctl.own_qty("APP") == 454 and h.own_fill_sum() == 454
+    assert "APP" in h.reserved and ctl.owns("APP")
+    n = len(h.alpaca.requests)
+    h.alpaca.prices["APP"] = 99.30          # r = -0.41: the normal software exits apply again
+    h.clock.advance(5)
+    ctl.tick()
+    assert h.pos()["closed_reason"] == "fast-fail" and h.own_fill_sum() == 0
+    assert h.alpaca.refused_403 == [] and n < len(h.alpaca.requests)
+
+
+def test_revived_entry_found_late_without_a_restart_is_flattened_at_eleven():
+    h = lost_entry_marked_never_reached()
+    h.clock.advance(61)
+    h.ctl.tick()                            # the periodic by-coid recheck finds it
+    assert h.pos()["status"] == "OPEN" and h.ctl.own_qty("APP") == 454
+    h.clock.set(at(11, 0))
+    h.ctl.tick()
+    assert h.pos()["closed_reason"] == "flatten" and h.own_fill_sum() == 0
+
+
+def test_own_shares_with_no_position_record_are_rebuilt_and_exited():
+    h = opened()
+    st = h.persisted[-1]
+    st = dict(st, positions={})             # the position row was lost, the own orders were not
+    h.persisted.append(st)
+    ctl = h.restart()
+    assert ctl.reconcile_on_startup()["ok"]
+    h.clock.advance(5)
+    ctl.tick()
+    closed = [p for p in ctl.state["positions"].values() if p["symbol"] == "APP"]
+    assert closed and closed[0]["closed_reason"] == "no_known_stop" and h.own_fill_sum() == 0
+    assert h.alpaca.refused_403 == [] and "APP" not in h.alpaca.positions
+
+
+def test_wrong_account_fails_closed_at_startup_freeze_and_execute():
+    h = Harness(freeze=False, reconcile=False, expected_account="PA-SOMEONE-ELSE")
+    rep = h.ctl.reconcile_on_startup()
+    assert not rep["ok"] and not h.ctl.ready and "destination refused" in rep["errors"][0]
+    assert any(k.endswith("wrong_account") for k in h.ctl.state["alarms"])
+    h.clock.set(at(9, 20))
+    ok, why = h.ctl.freeze_session()
+    assert not ok and "destination refused" in why and h.ctl.session_sizing() is None
+    # right account at startup, then the keys point somewhere else before the order
+    h2 = Harness()
+    h2.alpaca.prices["APP"] = 100.2
+    h2.alpaca.account["account_number"] = "PA-SOMEONE-ELSE"
+    out = h2.ctl.execute([pick("APP", "long", 100.0, 98.0)])
+    assert not out["ok"] and "destination refused" in out["reason"]
+    assert h2.alpaca.writes == []
+
+
+def test_no_pinned_account_means_no_trading():
+    h = Harness(freeze=False, reconcile=False, expected_account=None)
+    assert not h.ctl.reconcile_on_startup()["ok"]
+    h.clock.set(at(9, 20))
+    assert not h.ctl.freeze_session()[0]
