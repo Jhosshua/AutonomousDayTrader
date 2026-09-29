@@ -367,6 +367,9 @@ def trades_response(items: List[Dict[str, Any]], recovered: Optional[List[Dict[s
         "summary": trades_summary(items),
         "items": items,
         "recovered_sessions": recovered or [],
+        # The real /api/trades also sends every session summary as "sessions" (backend/app/main.py), and the
+        # history drawer reads "sessions" first; mirror it so the drawer is tested on the production shape.
+        "sessions": recovered or [],
         "next_cursor": next_cursor,
     }
 
@@ -699,8 +702,18 @@ def run_recovered_session_check(browser) -> None:
     page.get_by_text("Day Trader", exact=False).first.wait_for(state="visible", timeout=10000)
     page.get_by_role("button", name="Trade history").click()  # was "See all trades", renamed in e033306
     page.wait_for_timeout(400)
-    check(page.get_by_text("older, recovered day", exact=False).count() > 0, "[recovered] recovered aggregate session note is shown")
-    check(page.get_by_text("Some older details unavailable", exact=False).count() > 0, "[recovered] 'Some older details unavailable' note is shown")
+    # Wording since e033306 ("Fix tri-engine recovery and restore clear daily trade history"): the day row says
+    # "daily total only" and, opened, explains that individual trades are unavailable.
+    day = page.locator("[data-testid=history-days] details").filter(has_text="daily total only")
+    check(day.count() == 1, "[recovered] the recovered day is listed as 'daily total only'")
+    summary_text = " ".join(day.first.locator("summary").inner_text().split()) if day.count() else ""
+    check("5 finished trades" in summary_text and "-$21.34" in summary_text,
+          f"[recovered] its row shows the recovered trade count and total ({summary_text!r})")
+    if day.count():
+        day.first.locator("summary").click()
+        page.wait_for_timeout(200)
+    note = page.get_by_text("The daily total was recovered. Individual trade details are unavailable.", exact=False)
+    check(note.count() == 1 and note.first.is_visible(), "[recovered] opened, it explains individual trade details are unavailable")
     context.close()
 
 
