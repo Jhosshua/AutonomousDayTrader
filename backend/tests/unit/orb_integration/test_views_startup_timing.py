@@ -21,8 +21,9 @@ def test_startup_in_local_mode_runs_shadow_with_no_broker(main_runtime, monkeypa
         assert r.orb.controller.expected_account == "PA3CSVDZMMPY"
         # ADT's TSLA/CDE exclusion is applied on top of the parity manifest (which keeps [] for parity)
         assert r.orb.controller.cfg["excluded_symbols"] == ["CDE", "TSLA"]
-        from backend.app.strategies.orbs import config as orbs_config
-        assert orbs_config.EXCLUDE_SYMBOLS == frozenset({"TSLA", "CDE"})
+        # the decision code runs in its own process; its exclusion is set there
+        assert r.orb.facade_proc is not None and r.orb.facade_proc.healthy()
+        assert r.orb.facade.effective_config()["EXCLUDE_SYMBOLS"] == ["CDE", "TSLA"]
         cfg = r.orb.controller.cfg
         assert (cfg["request_budget_per_min"], cfg["exit_reserve_per_min"]) == (100, 50)
         assert (cfg["cutoff"], cfg["flatten"], cfg["risk_pct"], cfg["max_day_risk_frac"]) == ("10:15", "11:00", 2.0, 0.025)

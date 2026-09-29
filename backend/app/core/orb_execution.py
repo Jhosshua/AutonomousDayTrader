@@ -2464,7 +2464,10 @@ class OrbExecutionController:
             try:
                 px = self.fresh_price(sym, now)
             except Exception:
-                px = None
+                # the decision process (latest trade) may be down: Alpaca's own position price, as
+                # ORBStraddle's supervisor does; exits never depend on the decision process
+                again = self._prices_from_positions()
+                px = (again or {}).get(sym)
         L = pos["direction"] == "long"
         flat_now = now.time() >= parse_hms(self.cfg["flatten"])
         carry = bool(pos.get("carried") or pos.get("no_known_stop"))

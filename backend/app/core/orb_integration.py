@@ -103,6 +103,9 @@ class OrbIntegration:
         self._sched_error: Optional[str] = None
         self._sched_thread: Optional[threading.Thread] = None
         self._writes_closed = False
+        self.facade_proc = None                  # FacadeProxy (child process) when started by start()
+        self._facade_restart: Optional[threading.Thread] = None
+        self._facade_next_restart = 0.0
 
     @staticmethod
     def _empty_ledger() -> Dict[str, Any]:
@@ -138,7 +141,7 @@ class OrbIntegration:
         from backend.app.core.orb_scheduler import OrbScheduler
         if mode not in MODES:
             raise ValueError(f"ORB_MODE must be one of {MODES}, not {mode!r}")
-        self.shutdown()
+        self.shutdown(close_facade=facade is not self.facade_proc)
         self._writes_closed = False
         self._persist_enabled = persist
         manifest = manifest if manifest is not None else self.effective_manifest()
@@ -178,14 +181,19 @@ class OrbIntegration:
         facade = None
         if mode != "off" or broker is not None:
             try:
-                from backend.app.strategies.orbs.facade import OrbsFacade
-                facade = OrbsFacade(self.state_dir(), s.RELAY_HTTP_URL, s.RELAY_TOKEN,
-                                    manifest=self.effective_manifest())
-                facade.set_exclude_symbols(s.ORB_EXCLUDE_SYMBOLS)
+                # the decision code runs in its own process: its scan threads never hold ADT's GIL
+                from backend.app.core.orb_facade_proc import FacadeProxy
+                facade = FacadeProxy(self.state_dir(), s.RELAY_HTTP_URL, s.RELAY_TOKEN,
+                                     self.effective_manifest(), exclude=list(s.ORB_EXCLUDE_SYMBOLS))
+                facade.start()
+                self.facade_proc = facade
             except Exception as exc:
                 self.init_error = f"ORB decision code could not start ({type(exc).__name__}: {exc}); ORB is off"
-                log.exception("ORB facade construction failed")
+                log.exception("ORB facade process failed to start")
+                if facade is not None:
+                    facade.close(timeout=1.0)
                 facade, mode = None, "off"
+                self.facade_proc = None
         if self.ledger_error is not None:
             self.init_error = self.ledger_error
             self._alert("_ledger", f"ORB is off: {self.ledger_error}. ADT's other strategies run normally.")
@@ -229,6 +237,11 @@ class OrbIntegration:
                              "is unknown and is resolved by client id at the next startup: %s",
                              len(unresolved), extra_wait, unresolved)
         self.unresolved_at_shutdown = unresolved
+        if self.facade_proc is not None:
+            try:
+                self.facade_proc.close(timeout=5.0)          # nothing may ask it anything any more
+            except Exception:
+                log.exception("ORB decision process close failed")
         try:
             self.flush_scheduler_state(timeout=5.0)
         except Exception as exc:
@@ -240,8 +253,14 @@ class OrbIntegration:
         out = (unfinished or [f"{len(pending)} job(s)"]) if pending else []
         return out + [f"unresolved write {u.get('coid') or u.get('order_id')}" for u in unresolved]
 
-    def shutdown(self) -> None:
+    def shutdown(self, close_facade: bool = True) -> None:
         self._writes_closed = True
+        if close_facade and self.facade_proc is not None:
+            try:
+                self.facade_proc.close(timeout=2.0)
+            except Exception:
+                log.exception("ORB decision process close failed")
+            self.facade_proc = None
         if self.controller is not None:
             self.controller.close_writes("ORB was stopped")
         if self.scheduler is not None:
@@ -550,6 +569,9 @@ class OrbIntegration:
         r = self.r
         if r.simulation_mode:
             return "replay mode never sends real orders"
+        down = self.facade_down()
+        if down:
+            return down
         now_et = self.clock().astimezone(ET)
         today = now_et.date()
         if not r.is_trading_day(today) or not (time(9, 30) <= now_et.time() < r.session_close(today)):
@@ -595,6 +617,7 @@ class OrbIntegration:
         collects worker jobs; the ledger sync is in-memory."""
         if self.scheduler is None or self.r.simulation_mode:
             return
+        self._check_facade()
         try:
             self.check_orphans()
         except Exception as exc:
@@ -771,6 +794,38 @@ class OrbIntegration:
                 lk.release()
         self._dirty.set()
         return n
+
+    # ------------------------------------------------------------------ decision process health
+    FACADE_RESTART_BACKOFF_S = 30.0
+
+    def _check_facade(self) -> None:
+        """Restart a dead decision process on a worker thread (never on the loop), with a back-off."""
+        proc = self.facade_proc
+        if proc is None or self._writes_closed or proc.healthy():
+            return
+        if self._facade_restart is not None and self._facade_restart.is_alive():
+            return
+        mono = _time.monotonic()
+        if mono < self._facade_next_restart:
+            return
+        self._facade_next_restart = mono + self.FACADE_RESTART_BACKOFF_S
+        self._err({"kind": "decision_process_down", "err": proc.last_error or "not running",
+                   "note": "ORB opens nothing until its decision process is back; exits keep working"})
+
+        def restart():
+            try:
+                proc.restart()
+                log.warning("ORB decision process restarted (restart #%d)", proc.restarts)
+            except Exception as exc:
+                log.error("ORB decision process restart failed: %s", exc)
+        self._facade_restart = threading.Thread(target=restart, name="OrbFacadeRestart", daemon=True)
+        self._facade_restart.start()
+
+    def facade_down(self) -> Optional[str]:
+        proc = self.facade_proc
+        if proc is not None and not proc.healthy():
+            return "ORB's decision process is restarting"
+        return None
 
     # ------------------------------------------------------------------ price marks (Codex P1 #2)
     def note_price(self, symbol: str, price: float, ts: datetime, source: str = "feed") -> None:
@@ -1101,6 +1156,19 @@ class OrbIntegration:
                        exit_due=datetime.combine(self.clock().astimezone(ET).date(), time(11, 0), ET).isoformat())
         return out
 
+    @staticmethod
+    def _trade_sentence(h: dict) -> str:
+        long = h.get("direction") == "long"
+        qty = abs(int(h.get("qty") or 0)) or int(h.get("planned_shares") or 0)
+        what = f"{'Bought' if long else 'Shorted'} {h['symbol']} ({'long' if long else 'short'}), {qty} shares"
+        r = h.get("r")
+        now = f", now {'+' if (r or 0) >= 0 else ''}{r:.2f}x its risk" if isinstance(r, (int, float)) else ""
+        stop, tgt = h.get("stop"), h.get("target")
+        prot = (f"; stop {stop:.2f}" if isinstance(stop, (int, float)) else "") + \
+               (f", target {tgt:.2f}" if isinstance(tgt, (int, float)) else "") + (" (held at Alpaca)" if stop else "")
+        tail = "; closing now." if h.get("exit_requested") else "; closes by 11:00 AM."
+        return what + now + prot + tail
+
     def status(self) -> Dict[str, Any]:
         ctl, sched = self.controller, self.scheduler
         out: Dict[str, Any] = {"mode": ctl.mode if ctl else self.mode, "configured_mode": self.configured_mode,
@@ -1109,6 +1177,9 @@ class OrbIntegration:
                                "expected_account": self.r.settings.ORB_EXPECTED_ACCOUNT,
                                "init_error": self.init_error, "errors": self.current_errors(),
                                "alerts": list(self.alerts.values()),
+                               "decision_process": None if self.facade_proc is None else {
+                                   "running": self.facade_proc.healthy(), "pid": self.facade_proc.pid(),
+                                   "restarts": self.facade_proc.restarts, "last_error": self.facade_proc.last_error},
                                "marks": {k: {"price": v[0], "at": v[1].isoformat(), "source": v[2]}
                                          for k, v in self.marks.items()}}
         if ctl is None or sched is None:
@@ -1116,6 +1187,10 @@ class OrbIntegration:
             return out
         s = sched.status()
         c = ctl.status()
+        holdings = c.get("holdings") or []
+        if holdings:
+            # while a trade is open the card talks about the trade, not the latest (sat-out) verdict
+            s = dict(s, step=" ".join(self._trade_sentence(h) for h in holdings))
         out.update(ready=c.get("ready"), step=s.get("step"), next_step=s.get("next_step"), steps=s.get("steps"),
                    last_verdict=s.get("last_verdict"), picks=s.get("picks"), secondary=s.get("secondary"),
                    running=s.get("running"), session=s.get("session"), day=s.get("day"),

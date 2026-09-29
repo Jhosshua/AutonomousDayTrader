@@ -20,19 +20,36 @@ if common.REPO not in sys.path:
     sys.path.insert(0, common.REPO)
 
 
-def run_copy(day, scan_deadline=None, exclude=None, log=print, max_steps=None):
+def _make_transport(cache_root, day):
+    """Built inside the ORB decision process (FacadeProxy): the replay transport for one day."""
+    common.CACHE_ROOT = cache_root
+    return common.Transport(day, "replay")
+
+
+def run_copy(day, scan_deadline=None, exclude=None, log=print, max_steps=None, use_proxy=False):
+    """use_proxy: run the facade in ADT's decision child process (orb_facade_proc.FacadeProxy), as
+    production does, instead of in this process. Its outputs must be byte-identical."""
     manifest = common.load_manifest()
     if scan_deadline:
         manifest["scanner_env"]["ORBS_SCAN_DEADLINE_S"] = str(scan_deadline)
     if exclude:
         manifest["adt"]["exclude_symbols"] = list(exclude)
-    transport = common.Transport(day, "replay")
     work = tempfile.mkdtemp(prefix="orbs_copy_")
-    from backend.app.strategies.orbs import config as ocfg
-    ocfg.apply_manifest(manifest)          # before scanner is imported: it reads its tunables at import time
-    from backend.app.strategies.orbs.facade import OrbsFacade
-    fac = OrbsFacade(state_dir=os.path.join(work, "state"), relay_base=common.RELAY_ROOT,
-                     relay_token="parity-transport", manifest=manifest, http=transport)
+    if use_proxy:
+        import functools
+        from backend.app.core.orb_facade_proc import FacadeProxy
+        transport = None
+        fac = FacadeProxy(os.path.join(work, "state"), common.RELAY_ROOT, "parity-transport", manifest,
+                          exclude=list(exclude) if exclude else None,
+                          http_factory=functools.partial(_make_transport, common.CACHE_ROOT, day))
+        fac.start()
+    else:
+        transport = common.Transport(day, "replay")
+        from backend.app.strategies.orbs import config as ocfg
+        ocfg.apply_manifest(manifest)          # before scanner is imported: it reads its tunables at import time
+        from backend.app.strategies.orbs.facade import OrbsFacade
+        fac = OrbsFacade(state_dir=os.path.join(work, "state"), relay_base=common.RELAY_ROOT,
+                         relay_token="parity-transport", manifest=manifest, http=transport)
     d = date.fromisoformat(day)
     t0 = _time.monotonic()
     try:
@@ -73,11 +90,18 @@ def run_copy(day, scan_deadline=None, exclude=None, log=print, max_steps=None):
             log(f"[copy {day}] {step['wave']} {step['end']}: {len(cards)} cards, cov {health.get('coverage')}, "
                 f"{rec['scan_s']}s" + (f", decision {rec['decision']['verdict']} {rec['decision']['picks']}"
                                        if 'decision' in rec else ""))
+        if use_proxy:
+            result["misses"] = fac.http_attr("misses")
+            result["counts"] = fac.http_attr("counts")
+            result["tape_splits"] = fac.http_attr("tape.splits_done")
     finally:
+        if use_proxy:
+            fac.close()
         shutil.rmtree(work, ignore_errors=True)
-    result["misses"] = transport.misses
-    result["counts"] = transport.counts
-    result["tape_splits"] = transport.tape.splits_done
+    if not use_proxy:
+        result["misses"] = transport.misses
+        result["counts"] = transport.counts
+        result["tape_splits"] = transport.tape.splits_done
     result["elapsed_s"] = round(_time.monotonic() - t0, 1)
     return result
 

@@ -91,3 +91,22 @@ def test_copy_matches_original_on_recorded_session_primary(day):
     report = compare.parity(orig, result)
     assert report["equal"], json.dumps({"sections": report["sections"], "steps": report["steps"]},
                                        default=str)[:3000]
+
+
+def test_the_decision_process_proxy_gives_byte_identical_outputs(synthetic_root):
+    """Production runs the facade in a child process (orb_facade_proc). On the synthetic session the proxy
+    path must produce exactly the in-process outputs: every board, decision, audit row and re-check."""
+    common, copy_runner, compare = parity_modules()
+    old = _with_root(common, synthetic_root)
+    try:
+        inproc = copy_runner.run_copy(SYNTH_DAY, log=lambda m: None)
+        viaproxy = copy_runner.run_copy(SYNTH_DAY, log=lambda m: None, use_proxy=True)
+        golden = load_golden(os.path.join(synthetic_root, SYNTH_DAY))
+    finally:
+        common.CACHE_ROOT = old
+    strip = lambda r: {k: v for k, v in r.items() if k != "elapsed_s"}          # noqa: E731
+    for st in inproc["steps"] + viaproxy["steps"]:
+        st.pop("scan_s", None)
+    assert common.dumps(strip(inproc)) == common.dumps(strip(viaproxy))
+    assert compare.parity(golden, viaproxy)["equal"]
+    assert not viaproxy["misses"] and len(viaproxy["steps"]) == 33

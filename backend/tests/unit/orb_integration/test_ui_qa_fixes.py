@@ -72,3 +72,16 @@ def test_step_text_is_plain_and_card_pnl_includes_open_trades(main_runtime):
     assert "Bought APP (long)" in c["orb"]["step"] and "picked" not in c["orb"]["step"]
     assert c["orb"]["unrealized_pnl"] == pytest.approx(454 * 0.9, abs=0.01)
     assert c["orb"]["total_pnl"] == pytest.approx(454 * 0.9, abs=0.01)
+
+
+def test_while_a_trade_is_open_the_step_text_shows_the_trade_not_the_last_verdict(main_runtime):
+    r = main_runtime
+    h = session(r)
+    h.facade.scan_results = [board("APP"), board("APP", board_id="final"), board("PLTR", board_id="sec")]
+    h.facade.decide_results = [{"verdict": "trade", "reason": None, "picks": [pick("APP", "long", 100.0, 98.0)],
+                                "audit": []},
+                               {"verdict": "sit_out", "reason": "board is one-sided", "picks": [], "audit": []}]
+    run(h, at(9, 10), at(9, 45, 10))
+    assert h.sched.state["last_verdict"]["verdict"] == "sit_out"          # the latest verdict is a sit-out
+    step = card(r, h.clock.now)["orb"]["step"]
+    assert step.startswith("Bought APP (long), 454 shares") and "stop 98.00" in step and "sat out" not in step
