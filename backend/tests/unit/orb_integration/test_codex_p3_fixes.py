@@ -20,76 +20,125 @@ def rebuild_off(r, h):
     h.ctl, h.sched = r.orb.controller, r.orb.scheduler
 
 
-def settle(r, h, rounds=40):
+def settle(r, h, rounds=10):
     for _ in range(rounds):
         r.orb.tick(h.clock.now)
-        if not r.orb._rec_jobs:
-            r.orb.tick(h.clock.now)
-            if not r.orb._rec_jobs:
-                return
-        _time.sleep(0.02)
+        h.clock.advance(6)
 
 
-# ------------------------------------------------------------------ P1 #1 orphan positions
-def test_orphan_orb_position_is_closed_orb_safely_legs_first(main_runtime):
+# ------------------------------------------------------------------ P1 #1 orphans: never auto-sold
+def test_unprovable_orb_shares_are_never_sold_and_raise_a_plain_alert(main_runtime):
+    """ORB's state was lost (controller rebuilt empty) while ADT's book and Alpaca still hold the
+    bracket: nothing may auto-sell it (its legs are live at Alpaca), no generic path may touch it,
+    and the card says what to do."""
     r = main_runtime
     h = MainOrb(r)
     h.open_bracket()
-    parent = h.parent()
     rebuild_off(r, h)
-    assert r.orb.owns("APP") and r.orb.is_orphan("APP")
+    h.ctl.reconcile_on_startup()                              # nothing is adopted without proof
     n = len(h.alpaca.requests)
-    r._trip_circuit_breaker(h.clock.now)                    # a generic path wants it closed
-    assert not [o for o in r.engine.orders.values() if o.symbol == "APP" and o.strategy_id != "orb"]
+    r._trip_circuit_breaker(h.clock.now)
+    out = asyncio.run(r._execute_manual_flatten(["APP"], h.clock.now, None))
+    asyncio.run(r.handle_flattening_directive(r.FlatteningDirective(
+        phase=r.FlatteningPhase.MANDATORY_LIQUIDATION, timestamp=h.clock.now, action_required="t",
+        liquidate_all_positions=True)))
     settle(r, h)
-    w = h.writes_after(n)
-    posts = [i for i, (m, p, b) in enumerate(w) if m == "POST"]
-    deletes = [i for i, (m, p, b) in enumerate(w) if m == "DELETE"]
-    assert len(posts) == 1 and deletes and max(deletes) < posts[0], w
-    body = w[posts[0]][2]
-    assert body["side"] == "sell" and int(body["qty"]) == 454 and body["client_order_id"].startswith("adt-orb-R-APP-")
-    for leg_id in parent["legs_ids"]:
-        assert h.alpaca.orders[leg_id]["status"] == "canceled"          # no naked leg left behind
-    assert h.alpaca_positions() == {} and "APP" not in r.account.positions
-    assert h.alpaca.refused_403 == [] and not r.orb.alerts
-    trade = next(t for t in r.pending_trade_records.values() if t["trade_id"].startswith("orb_recovery_APP"))
-    assert trade["strategy_id"] == "orb"
-
-
-def test_unprovable_orphan_is_never_liquidated_and_raises_a_plain_alert(main_runtime):
-    r = main_runtime
-    h = MainOrb(r)
-    h.open_bracket()
-    r.account.apply_fill("x", "APP", "BUY", 46, 100.0, 0.0, h.clock.now, strategy_id="orb")   # 500 != 454
-    rebuild_off(r, h)
-    n = len(h.alpaca.requests)
-    asyncio.run(r._execute_manual_flatten(["APP"], h.clock.now, None))
-    settle(r, h)
-    assert h.writes_after(n) == []                                    # nothing sent at all
+    assert h.writes_after(n) == [] and h.alpaca_positions() == {"APP": 454}
+    assert r.account.positions["APP"].shares == 454
     assert not [o for o in r.engine.orders.values() if o.symbol == "APP" and o.strategy_id != "orb"]
     alert = r.orb.alerts["APP"]
-    assert "cannot prove" in alert and "Nothing was sent" in alert
+    assert "no ORB order at Alpaca explains" in alert and "Nothing will sell them automatically" in alert
+    assert out["rejected"] == [{"symbol": "APP", "reason": alert}]
     card = next(c for c in r._strategy_cards(h.clock.now) if c["id"] == "orb")
-    assert alert in card["orb"]["alerts"]
-    assert asyncio.run(r.get_health())["orb"]["alerts"] == [alert]
-    o = r.engine.create_order("APP", r.OrderSide.SELL, r.OrderType.MARKET, 500, strategy_id="AUTO_FLATTEN")
+    assert alert in card["orb"]["alerts"] and asyncio.run(r.get_health())["orb"]["alerts"] == [alert]
+    o = r.engine.create_order("APP", r.OrderSide.SELL, r.OrderType.MARKET, 454, strategy_id="AUTO_FLATTEN")
     ok, why = r.pre_trade_risk_validator(o, r.account)
     assert not ok and why.startswith("ORB_OWNED")
 
 
-def test_live_adt_orb_orders_nobody_tracks_are_cancelled(main_runtime):
+def test_a_mixed_position_is_never_auto_sold_beyond_orbs_own_shares(main_runtime):
+    """Alpaca holds ORB's 454 plus 100 bought by hand, and ADT's book says ORB has 500 (46 unexplained).
+    The controller closes exactly its own 454 at 11:00; the 100 manual shares stay at Alpaca, and the 46
+    ADT cannot explain are alerted, never sold."""
     r = main_runtime
     h = MainOrb(r)
-    h.alpaca.entry_mode = "new"                                       # the entry never fills
     h.open_bracket()
-    parent = h.parent()
-    rebuild_off(r, h)
-    rep = h.ctl.reconcile_on_startup()
-    assert rep["unknown_orders"] and not rep["ok"]
-    settle(r, h)
-    assert h.alpaca.orders[parent["id"]]["status"] == "canceled"
-    assert not [q for q in h.alpaca.requests if q[0] == "POST" and q[2].get("client_order_id", "").startswith("adt-orb-R")]
-    assert h.ctl.reconcile_on_startup()["ok"]                          # ORB can trade again
+    h.alpaca._apply_position("APP", "buy", 100, 100.0)
+    r.account.apply_fill("x", "APP", "BUY", 46, 100.0, 0.0, h.clock.now, strategy_id="orb")
+    h.clock.set(at(11, 0, 5))
+    for _ in range(4):
+        h.tick(6)
+    sells = [q[2] for q in h.alpaca.requests if q[0] == "POST" and q[2].get("side") == "sell"]
+    assert [int(b["qty"]) for b in sells] == [454]
+    assert h.alpaca_positions() == {"APP": 100}
+    assert r.account.positions["APP"].shares == 46 and "APP" in r.orb.alerts
+    assert h.alpaca.refused_403 == []
+
+
+def test_a_rebuilt_controller_re_emitting_fills_books_nothing_twice(main_runtime):
+    """The controller comes back from an OLDER saved state (the entry intent, before the fill was read):
+    reconciliation reads the filled bracket again and re-emits the entry fill; ADT's per-order map books
+    only what is beyond what it already booked for that Alpaca order id."""
+    r = main_runtime
+    h = MainOrb(r)
+    older = []
+    def keep_unfilled_entry(st):
+        orders = st.get("orders") or {}
+        if not older and any(o.get("role") == "entry" and not o.get("filled_qty") for o in orders.values()):
+            older.append(st)
+    h.ctl.persist_cb = (lambda real: (lambda st: (keep_unfilled_entry(h.ctl.to_state()), real(st))))(
+        h.ctl.persist_cb)
+    h.open_bracket()
+    assert r.account.positions["APP"].shares == 454
+    parent_id = h.parent()["id"]
+    assert r.orb.ledger["booked"][parent_id]["qty"] == 454             # keyed by Alpaca's order id
+    r.orb._mem_state["controller"] = older[0]                           # an older durable row
+    r.orb.build(h.broker, h.facade, "live", clock=h.clock, inline=True, monotonic=lambda: h.clock.now.timestamp(),
+                budget=RequestBudget(10 ** 6, 10 ** 6), sleep=h.clock.sleep, is_session=lambda d: True)
+    h.ctl, h.sched = r.orb.controller, r.orb.scheduler
+    assert h.ctl.own_qty("APP") == 0
+    assert h.ctl.reconcile_on_startup()["ok"] and h.ctl.own_qty("APP") == 454     # fill re-emitted
+    r.orb.sync(h.clock.now)
+    assert r.account.positions["APP"].shares == 454                     # not 908
+    n = len(h.alpaca.requests)
+    h.clock.set(at(11, 0, 5))
+    h.run_supervisor(passes=3)
+    h.assert_orb_closed_through_its_controller(n)
+
+
+def test_the_shutdown_fence_covers_the_exit_post_and_closes_the_check_to_post_race(main_runtime):
+    """A write already past the fence finishes before close_writes returns; nothing POSTs afterwards,
+    including the exit's market order (which does not go through _write)."""
+    r = main_runtime
+    h = MainOrb(r)
+    h.open_bracket()
+    real = h.broker.submit_market_order
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_submit(*a, **kw):
+        entered.set()
+        release.wait(3)
+        return real(*a, **kw)
+    h.broker.submit_market_order = slow_submit
+    h.ctl.request_exit("APP", "MANUAL_FLATTEN")
+    t = threading.Thread(target=h.ctl.tick)
+    t.start()
+    assert entered.wait(3)                     # the exit POST is in flight
+    closed = {}
+    c = threading.Thread(target=lambda: closed.setdefault("ok", h.ctl.close_writes("test", wait_s=5)))
+    c.start()
+    _time.sleep(0.1)
+    assert "ok" not in closed                  # close_writes waits for the in-flight write
+    release.set()
+    t.join(5)
+    c.join(5)
+    assert closed["ok"] is True
+    n = len(h.alpaca.requests)
+    h.broker.submit_market_order = real
+    h.ctl.request_exit("APP", "AGAIN")
+    h.alpaca.prices["APP"] = 50.0
+    h.ctl.tick()
+    assert [q for q in h.alpaca.requests[n:] if q[0] in ("POST", "DELETE", "PATCH")] == []
 
 
 # ------------------------------------------------------------------ P1 #2 marks + breaker
@@ -115,6 +164,23 @@ def test_orb_positions_are_marked_from_the_newest_timestamped_price_and_trip_the
     assert r.risk_engine.status == r.BreakerStatus.HALTED_DAILY_LOSS
     assert h.ctl.entries_blocked() == "CIRCUIT_BREAKER"
     assert any(e.get("reason") == "CIRCUIT_BREAKER" for e in h.ctl.state["events"])
+
+
+def test_a_throttled_breaker_check_still_runs_when_the_throttle_expires(main_runtime, monkeypatch):
+    r = main_runtime
+    h = MainOrb(r)
+    h.open_bracket()
+    clock = [1000.0]
+    monkeypatch.setattr("backend.app.core.orb_integration._time.monotonic", lambda: clock[0])
+    t0 = h.clock.now
+    r.orb.note_price("APP", 100.0, t0 + timedelta(seconds=1))
+    assert r.orb.mark_positions(t0) is True
+    clock[0] += 1.0
+    r.orb.note_price("APP", 97.2, t0 + timedelta(seconds=2))           # -$1,362: throttled this second
+    assert r.orb.mark_positions(t0) is False and r.risk_engine.status == r.BreakerStatus.ARMED
+    clock[0] += 5.0                                                    # no new price at all
+    assert r.orb.mark_positions(t0) is True
+    assert r.risk_engine.status == r.BreakerStatus.HALTED_DAILY_LOSS
 
 
 def test_feed_events_feed_the_marks(main_runtime):

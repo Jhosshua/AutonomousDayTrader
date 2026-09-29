@@ -359,6 +359,10 @@ class OrbExecutionController:
         # ADT shutdown fence: entries stop first (drain begins), then every write (drain deadline)
         self._entries_closed: Optional[str] = None
         self._writes_closed: Optional[str] = None
+        # every broker write holds a slot; close_writes() takes the gate exclusively (no new slot, waits
+        # for the ones in flight), so no write can pass the check and POST after the fence closes
+        self._write_gate = threading.Condition()
+        self._writes_in_flight = 0
         self.on_event = on_event
         self.sleep = sleep or _time.sleep
         self.budget = budget or RequestBudget(self.cfg["request_budget_per_min"], self.cfg["exit_reserve_per_min"])
@@ -1113,21 +1117,47 @@ class OrbExecutionController:
         """No new entry POST from now on (an entry refused here was never sent)."""
         self._entries_closed = why
 
-    def close_writes(self, why: str = "ADT is shutting down") -> None:
-        """No broker write of any kind from now on (after the shutdown drain's deadline)."""
-        self._entries_closed = self._entries_closed or why
-        self._writes_closed = why
+    def close_writes(self, why: str = "ADT is shutting down", wait_s: float = 30.0) -> bool:
+        """No broker write of any kind from now on. Returns once every write that already passed the
+        fence has returned (bounded by wait_s; False if one is still in flight)."""
+        with self._write_gate:
+            self._entries_closed = self._entries_closed or why
+            self._writes_closed = why
+            deadline = _time.monotonic() + wait_s
+            while self._writes_in_flight > 0:
+                left = deadline - _time.monotonic()
+                if left <= 0:
+                    return False
+                self._write_gate.wait(timeout=left)
+        return True
+
+    def _acquire_write_slot(self, entry: bool = False) -> None:
+        with self._write_gate:
+            if self._writes_closed:
+                raise DestinationRefused(f"{self._writes_closed}: no broker writes")
+            if entry and self._entries_closed:
+                raise DestinationRefused(f"{self._entries_closed}: no new entries")
+            self._writes_in_flight += 1
+
+    def _release_write_slot(self) -> None:
+        with self._write_gate:
+            self._writes_in_flight -= 1
+            self._write_gate.notify_all()
 
     def _write(self, prio: str, fn: Callable, *a, _pretaken: bool = False, **kw):
-        """A broker WRITE: pinned account verified first, then the budget token (unless already held)."""
-        if self._writes_closed:
-            raise DestinationRefused(f"{self._writes_closed}: no broker writes")
-        if self._entries_closed and self.broker is not None and fn == getattr(self.broker, "submit_bracket", None):
-            raise DestinationRefused(f"{self._entries_closed}: no new entries")
+        """A broker WRITE: pinned account verified first, then the budget token (unless already held).
+        The call itself runs inside a write slot (see close_writes)."""
+        entry = self.broker is not None and fn == getattr(self.broker, "submit_bracket", None)
+        if self._writes_closed or (entry and self._entries_closed):
+            raise DestinationRefused(f"{self._writes_closed or self._entries_closed}: no broker writes")
         self._verify_destination_for_write()
         if not _pretaken:
             self.budget.acquire(prio)
-        return fn(*a, **kw)
+        self._acquire_write_slot(entry)
+        try:
+            return fn(*a, **kw)
+        finally:
+            self._release_write_slot()
 
     def _prices_from_positions(self) -> Optional[Dict[str, float]]:
         if self.broker is None:
@@ -1909,7 +1939,15 @@ class OrbExecutionController:
         with self._lock:
             self.state["orders"][key]["qty"] = n
         try:
-            resp = self.broker.submit_market_order(sym, side, n, coid)     # token already held
+            self._acquire_write_slot()              # the shutdown fence covers the exit POST too
+        except DestinationRefused as exc:
+            not_sent(f"not sent: {exc}")
+            return None, str(exc), n, side
+        try:
+            try:
+                resp = self.broker.submit_market_order(sym, side, n, coid)     # token already held
+            finally:
+                self._release_write_slot()
             self._merge(dict(resp, client_order_id=resp.get("client_order_id") or coid))
             for ev in deferred:
                 self._emit_cap(ev)

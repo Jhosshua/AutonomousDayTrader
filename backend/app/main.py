@@ -3238,7 +3238,7 @@ def _orb_health() -> Dict[str, Any]:
             "step": st.get("step"), "last_verdict": {k: lv.get(k) for k in ("wave", "verdict", "reason", "at")} if lv else None,
             "picks": st.get("picks") or [], "open_trades": len(st.get("holdings") or []),
             "errors": st.get("errors") or [], "init_error": st.get("init_error"),
-            "alerts": st.get("alerts") or [], "recovery": st.get("recovery") or {},
+            "alerts": st.get("alerts") or [],
             "halted": st.get("halted"), "entries_blocked": st.get("entries_blocked")}
 
 
@@ -3646,7 +3646,9 @@ async def _execute_manual_flatten(
     )
     if orb_requested:
         for sym in orb_requested:
-            if orb.owns(sym):
+            if sym in orb.alerts:
+                rejected.append({"symbol": sym, "reason": orb.alerts[sym]})
+            elif orb.owns(sym):
                 rejected.append({"symbol": sym, "reason": "Close requested; waiting for broker confirmation"})
             else:
                 flattened.append(sym)

@@ -37,10 +37,9 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
-from concurrent.futures import Future, ThreadPoolExecutor, wait as _wait_futures
+from concurrent.futures import wait as _wait_futures
 
 from backend.app.core.engine import ORB_POLICY, OrderSide, OrderType
-from backend.app.core.orb_orphans import recover as _recover_orphan
 
 log = logging.getLogger("orb_integration")
 ET = ZoneInfo("America/New_York")
@@ -51,27 +50,7 @@ ACTIVE = frozenset({"PENDING_SUBMIT", "SUBMITTED", "UNKNOWN", "OPEN"})
 CLAIM_STATES = frozenset({"CREATED", "SUBMITTED", "ACCEPTED", "PARTIALLY_FILLED"})
 SYNC_EVERY_S = 5.0
 MARK_BREAKER_EVERY_S = 5.0       # ORB price marks re-evaluate ADT's daily loss stop at most this often
-RECOVERY_RETRY_S = 10.0          # an orphan close that is not finished is tried again after this
-RECOVERY_UNPROVEN_RETRY_S = 300.0
 DRAIN_TIMEOUT_S = 20.0
-
-
-class _FencedBroker:
-    """The orphan recovery's broker: every write refused once ADT's shutdown closed writes."""
-
-    def __init__(self, broker: Any, closed: Callable[[], bool]) -> None:
-        self._b, self._closed = broker, closed
-
-    def __getattr__(self, name: str) -> Any:
-        attr = getattr(self._b, name)
-        if name in ("submit_market_order", "cancel_order_and_confirm", "submit_bracket", "patch_order",
-                    "request_cancel", "submit"):
-            def guarded(*a, **kw):
-                if self._closed():
-                    raise RuntimeError("ADT is shutting down: no broker writes")
-                return attr(*a, **kw)
-            return guarded
-        return attr
 
 
 def _f(v: Any) -> Optional[float]:
@@ -105,11 +84,9 @@ class OrbIntegration:
         self._persist_locks = {"controller": threading.Lock(), "scheduler": threading.Lock()}
         self._persist_enabled = True
         self.clock: Callable[[], datetime] = lambda: datetime.now(ET)
-        # orphan ORB positions / orders (Codex phase-3 P1 #1)
-        self.recovery: Dict[str, Dict[str, Any]] = {}
-        self._rec_jobs: Dict[str, Future] = {}
-        self._rec_pool: Optional[ThreadPoolExecutor] = None
+        # plain-language alerts (e.g. ORB shares in ADT's book that no ORB order explains)
         self.alerts: Dict[str, str] = {}
+        self._mark_eval_pending = False
         # timestamped price marks for ORB positions (P1 #2)
         self.marks: Dict[str, tuple] = {}
         self._last_mark_eval: Optional[float] = None
@@ -123,7 +100,10 @@ class OrbIntegration:
 
     @staticmethod
     def _empty_ledger() -> Dict[str, Any]:
-        # booked: ORB order record key -> {qty, notional, local}; recorded: position keys with a trade row;
+        # booked: BROKER ORDER ID -> {qty (cumulative shares booked), notional, local}: the per-order map that
+        # makes booking idempotent (a controller rebuilt from an older or lost state that re-emits fills,
+        # or re-registers an order under another record key, books nothing twice). It rides in ADT's
+        # checkpoint, atomically with the account it booked into. recorded: position keys with a trade row;
         # logged: decision rows already written (dedupe across restarts)
         return {"version": LEDGER_VERSION, "booked": {}, "recorded": [], "logged": []}
 
@@ -228,7 +208,6 @@ class OrbIntegration:
         if sched is not None:
             sched.stop_new_jobs()
             futures += sched.running_futures()
-        futures += [f for f in self._rec_jobs.values() if not f.done()]
         _done, pending = _wait_futures(futures, timeout=timeout) if futures else (set(), set())
         self._writes_closed = True
         if ctl is not None:
@@ -252,10 +231,6 @@ class OrbIntegration:
                 self.scheduler.shutdown()
             except Exception:
                 log.exception("ORB scheduler shutdown failed")
-        if self._rec_pool is not None:
-            self._rec_pool.shutdown(wait=False, cancel_futures=True)
-            self._rec_pool = None
-        self._rec_jobs.clear()
         self.scheduler = None
         self.controller = None
 
@@ -272,8 +247,8 @@ class OrbIntegration:
         self.errors.clear()
         self.events.clear()
         self.init_error = None
-        self.recovery.clear()
         self.alerts.clear()
+        self._mark_eval_pending = False
         self.marks.clear()
         self._orphans.clear()
         self._last_mark_eval: Optional[float] = None
@@ -413,9 +388,10 @@ class OrbIntegration:
 
     def owns(self, symbol: str) -> bool:
         """ORB holds, reserved, or has a live order on symbol. An 'orb' position in ADT's book that the
-        controller does NOT know (state lost, old-ORB leftover) is an orphan: it is still ORB's (ADT's
-        generic paths never touch it, its bracket legs may be live at Alpaca), and ORB closes it
-        ORB-safely: legs found by client id, cancelled and confirmed, then exactly its quantity."""
+        controller does NOT know (state lost, old-ORB leftover) is an orphan: it is still ORB's, so ADT's
+        generic paths never touch it (its bracket legs may be live at Alpaca), nothing ever auto-sells it,
+        and a plain-language alert asks a human to check it. What the controller can prove from its own
+        orders (lost position row, restart mid-trade) it rebuilds and exits itself, legs first."""
         sym = symbol.upper()
         with self.lock:
             if sym in self._orb_reserved:
@@ -437,7 +413,7 @@ class OrbIntegration:
         return not (ctl is not None and ctl.owns(sym))
 
     def orphan_targets(self) -> List[str]:
-        """ORB positions the controller cannot see, and symbols with live adt-orb orders it does not know."""
+        """ORB shares in ADT's book the controller cannot explain, and live adt-orb orders it does not know."""
         out = {s for s in list(self.r.account.positions) if self.is_orphan(s)}
         ctl = self.controller
         rep = (ctl.startup_report or {}) if ctl is not None else {}
@@ -446,6 +422,25 @@ class OrbIntegration:
             if sym and not ctl.owns(sym):
                 out.add(sym)
         return sorted(out)
+
+    def check_orphans(self) -> None:
+        """Alert (never trade) on what ORB cannot prove is its own. Only after the controller's startup
+        reconciliation has run, so a restart does not alarm on something it is about to rebuild."""
+        ctl = self.controller
+        if ctl is None or ctl.startup_report is None:
+            return
+        targets = self.orphan_targets()
+        for sym in targets:
+            pos = self.r.account.positions.get(sym)
+            if pos is not None and getattr(pos, "strategy_id", "") == ORB_ID:
+                self._alert(sym, f"{sym}: ADT's book holds {pos.shares} ORB shares that no ORB order at Alpaca "
+                                 "explains. Nothing will sell them automatically and no other strategy may touch "
+                                 "them. Check Alpaca by hand: cancel any ORB bracket orders on it, then close it.")
+            else:
+                self._alert(sym, f"{sym}: Alpaca has a live ORB order that ORB's saved state does not know. It was "
+                                 "not touched, and ORB opens no new trades until it is resolved. Check it by hand.")
+        for sym in [s for s in self.alerts if s not in targets]:
+            self.alerts.pop(sym, None)
 
     def _orphan_alarm(self, sym: str) -> None:
         if sym in self._orphans:
@@ -538,12 +533,10 @@ class OrbIntegration:
         if self.scheduler is None or self.r.simulation_mode:
             return
         try:
-            self._collect_recovery(now)
-            for sym in self.orphan_targets():
-                self._schedule_recovery(sym, "orphan ORB position", force=False)
+            self.check_orphans()
         except Exception as exc:
-            log.exception("ORB orphan recovery failed")
-            self.errors.append({"kind": "orphan_recovery", "err": str(exc)[:200]})
+            log.exception("ORB orphan check failed")
+            self.errors.append({"kind": "orphan_check", "err": str(exc)[:200]})
         try:
             self.scheduler.tick(now)
         except Exception as exc:
@@ -566,7 +559,7 @@ class OrbIntegration:
 
     def _local_order(self, key: str, rec: dict) -> Any:
         r = self.r
-        booked = self.ledger["booked"].get(key) or {}
+        booked = self.ledger["booked"].get(self._bkey(key, rec)) or {}
         local = r.engine.orders.get(booked.get("local") or "")
         if local is not None:
             return local
@@ -584,6 +577,11 @@ class OrbIntegration:
         r.engine._record_audit(local, local.status, "ORB_BROKER_ORDER",
                                f"ORB {name} order {rec.get('id') or rec.get('coid')} at Alpaca")
         return local
+
+    @staticmethod
+    def _bkey(key: str, rec: dict) -> str:
+        """The booking key: Alpaca's order id (a fill only exists once the broker answered with one)."""
+        return str(rec.get("id") or key)
 
     def sync(self, now: Optional[datetime] = None) -> bool:
         """Book ORB's new broker fills into ADT's account/ledger (idempotent, cumulative per ORB order),
@@ -603,7 +601,8 @@ class OrbIntegration:
                                key=lambda kv: (kv[1].get("role") != "entry", kv[1].get("fill_ts") or 0, kv[0])):
             filled = int(rec.get("filled_qty") or 0)
             avg = _f(rec.get("avg_price"))
-            b = booked.get(key) or {"qty": 0, "notional": 0.0, "local": None}
+            bkey = self._bkey(key, rec)
+            b = booked.get(bkey) or {"qty": 0, "notional": 0.0, "local": None}
             delta = filled - int(b["qty"])
             if delta <= 0 or avg is None or avg <= 0:
                 continue
@@ -618,7 +617,7 @@ class OrbIntegration:
             ts = rec.get("fill_ts")
             at = datetime.fromtimestamp(float(ts), timezone.utc) if ts else now
             r.engine._apply_fill_to_ledger(local, delta, round(px, 6), 0.0, 0.0, at)
-            booked[key] = {"qty": filled, "notional": notional, "local": local.id, "symbol": rec["symbol"],
+            booked[bkey] = {"qty": filled, "notional": notional, "local": local.id, "symbol": rec["symbol"],
                            "position": rec.get("position"), "role": rec.get("role"), "leg_kind": rec.get("leg_kind")}
             changed = True
             log.info("ORB fill booked: %s %s %d @ %.4f (%s)", rec.get("side"), rec["symbol"], delta, px, rec.get("role"))
@@ -642,10 +641,11 @@ class OrbIntegration:
             if int((own.get(sym) or {}).get("qty") or 0) != 0:
                 continue                         # shares still open under another position row
             recs = {k: v for k, v in st.get("orders", {}).items() if (v.get("position") or k) == key}
-            if any(int(v.get("filled_qty") or 0) != int((self.ledger["booked"].get(k) or {}).get("qty") or 0)
+            if any(int(v.get("filled_qty") or 0) > int((self.ledger["booked"].get(self._bkey(k, v)) or {}).get("qty") or 0)
                    for k, v in recs.items()):
                 continue                         # a fill is not booked yet
-            locals_ = [r.engine.orders.get((self.ledger["booked"].get(k) or {}).get("local") or "") for k in recs]
+            locals_ = [r.engine.orders.get((self.ledger["booked"].get(self._bkey(k, v)) or {}).get("local") or "")
+                       for k, v in recs.items()]
             entries = [o for k, o in zip(recs, locals_) if o is not None and recs[k].get("role") == "entry"]
             exits = [o for k, o in zip(recs, locals_) if o is not None and recs[k].get("role") != "entry"]
             entry_fills = [f for o in entries for f in o.fills]
@@ -755,10 +755,13 @@ class OrbIntegration:
         for sym in [s for s in self.marks if s not in r.account.positions]:
             self.marks.pop(sym, None)
         mono = _time.monotonic()
-        if not (changed or force_eval) or (
+        if changed or force_eval:
+            self._mark_eval_pending = True       # a throttled check is owed, even if no new price comes
+        if not self._mark_eval_pending or (
                 self._last_mark_eval is not None and mono - self._last_mark_eval < MARK_BREAKER_EVERY_S):
             return False
         self._last_mark_eval = mono
+        self._mark_eval_pending = False
         status = r.risk_engine.evaluate_account_state(
             equity=r.account.equity, cash=r.account.cash, realized_pnl=r.account.realized_pnl,
             unrealized_pnl=r.account.unrealized_pnl, timestamp=now)
@@ -766,104 +769,6 @@ class OrbIntegration:
             r._trip_circuit_breaker(now)
             r._checkpoint_runtime("ORB_MARK_BREAKER")
         return True
-
-    # ------------------------------------------------------------------ orphan recovery (Codex P1 #1)
-    def _schedule_recovery(self, sym: str, reason: str, force: bool) -> None:
-        ctl = self.controller
-        rec = self.recovery.setdefault(sym, {"attempts": 0, "status": None, "reason": None, "next_at": 0.0,
-                                             "requested": reason})
-        if sym in self._rec_jobs or self._writes_closed:
-            return
-        if ctl is None or ctl.broker is None:
-            self._alert(sym, f"{sym}: an ORB position needs closing but ORB has no broker connection. "
-                             "Close it by hand at Alpaca after cancelling its bracket orders.")
-            return
-        mono = _time.monotonic()
-        if not force and mono < rec["next_at"]:
-            return
-        rec["attempts"] += 1
-        pos = self.r.account.positions.get(sym)
-        adt_qty = 0
-        if pos is not None and getattr(pos, "strategy_id", "") == ORB_ID:
-            adt_qty = pos.shares if pos.side.value == "LONG" else -pos.shares
-        prefix = str(ctl.cfg.get("coid_prefix") or "adt-orb") + "-"
-        broker = _FencedBroker(ctl.broker, lambda: self._writes_closed)
-        now, attempt = self.clock(), rec["attempts"]
-        if self._rec_pool is None:
-            self._rec_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="OrbOrphan")
-        self._rec_jobs[sym] = self._rec_pool.submit(
-            _recover_orphan, broker, sym, adt_qty, prefix, now=now, attempt=attempt,
-            account_refusal=ctl.account_refusal, sleep=ctl.sleep)
-
-    def _collect_recovery(self, now: datetime) -> None:
-        for sym, fut in list(self._rec_jobs.items()):
-            if not fut.done():
-                continue
-            del self._rec_jobs[sym]
-            rec = self.recovery[sym]
-            try:
-                res = fut.result()
-            except Exception as exc:
-                res = {"status": "retry", "fills": [], "reason": f"{type(exc).__name__}: {str(exc)[:160]}"}
-            for fill in res.get("fills") or []:
-                self._book_recovery_fill(sym, fill, now)
-            rec.update(status=res.get("status"), reason=res.get("reason"), at=now.isoformat())
-            if res.get("status") in ("closed", "nothing"):
-                self.alerts.pop(sym, None)
-                self._orphans.discard(sym)
-                self._record_recovery_trade(sym, now)
-                self.errors.append({"kind": "orphan_resolved", "symbol": sym, "note": res.get("reason")})
-                rec["next_at"] = _time.monotonic() + RECOVERY_RETRY_S
-            elif res.get("status") == "unproven":
-                self._alert(sym, f"{sym}: ORB cannot prove which shares and orders are its own "
-                                 f"({res.get('reason')}). Nothing was sent. Check Alpaca by hand: cancel ORB's "
-                                 "bracket orders on it, then close it.")
-                rec["next_at"] = _time.monotonic() + RECOVERY_UNPROVEN_RETRY_S
-            else:
-                rec["next_at"] = _time.monotonic() + RECOVERY_RETRY_S
-            self.r._checkpoint_runtime("ORB_ORPHAN_RECOVERY")
-
-    def _book_recovery_fill(self, sym: str, fill: dict, now: datetime) -> None:
-        r = self.r
-        key = f"recovery:{fill['order_id']}"
-        b = self.ledger["booked"].get(key) or {"qty": 0, "notional": 0.0, "local": None}
-        rec = {"symbol": sym, "side": fill["side"], "qty": fill["qty"], "filled_qty": b["qty"] + fill["qty"],
-               "coid": fill.get("client_order_id"), "id": fill["order_id"], "role": "recovery",
-               "position": f"recovery:{sym}"}
-        local = self._local_order(key, rec)
-        if local.remaining_qty < fill["qty"]:
-            local.qty += fill["qty"] - local.remaining_qty
-            local.remaining_qty = fill["qty"]
-        r.engine._apply_fill_to_ledger(local, int(fill["qty"]), round(float(fill["price"]), 6), 0.0, 0.0, now)
-        self.ledger["booked"][key] = {"qty": b["qty"] + fill["qty"], "notional": b["notional"] + fill["qty"] * fill["price"],
-                                      "local": local.id, "symbol": sym, "position": f"recovery:{sym}",
-                                      "role": "recovery"}
-        log.warning("ORB orphan recovery fill booked: %s %s %s @ %.4f", fill["side"], sym, fill["qty"], fill["price"])
-
-    def _record_recovery_trade(self, sym: str, now: datetime) -> None:
-        r = self.r
-        if sym in r.account.positions:
-            return
-        locals_ = [r.engine.orders.get(v.get("local") or "") for k, v in self.ledger["booked"].items()
-                   if v.get("position") == f"recovery:{sym}"]
-        fills = [f for o in locals_ if o is not None for f in o.fills]
-        if not fills:
-            return
-        tid = f"orb_recovery_{sym}_{now.astimezone(ET).date().isoformat()}"
-        if tid in r.pending_trade_records:
-            return
-        pnl = round(sum(f.realized_pnl for f in fills), 2)
-        trade = {"trade_id": tid, "session_date": now.astimezone(ET).date().isoformat(), "symbol": sym,
-                 "side": "RECOVERY", "status": "CLOSED", "strategy_id": ORB_ID,
-                 "opened_at": min(f.timestamp for f in fills).isoformat(), "closed_at": now.isoformat(),
-                 "quantity": sum(f.qty for f in fills), "avg_entry_price": None,
-                 "avg_exit_price": round(sum(f.qty * f.price for f in fills) / sum(f.qty for f in fills), 4),
-                 "realized_pnl": pnl, "fees": 0.0, "exit_reason": "orphan ORB position closed by ORB recovery",
-                 "aggregate_only": False,
-                 "fill_legs": [{"fill_id": f.fill_id, "order_id": f.order_id, "side": f.side.value, "qty": f.qty,
-                                "price": f.price, "fee": f.fee, "realized_pnl": f.realized_pnl,
-                                "timestamp": f.timestamp.isoformat()} for f in fills]}
-        r.pending_trade_records[tid] = r._sanitize_for_json(trade)
 
     def _alert(self, sym: str, text: str) -> None:
         if self.alerts.get(sym) != text:
@@ -942,13 +847,11 @@ class OrbIntegration:
                 self.scheduler.kick_supervisor()
             return ok
         if sym in self.orphan_targets():
-            self._schedule_recovery(sym, reason, force=True)
-            return True
+            self.check_orphans()          # alert only: an unprovable position is never auto-sold
         return False
 
     def request_all_exits(self, reason: str, block_entries: bool = True) -> List[str]:
-        for sym in self.orphan_targets():
-            self._schedule_recovery(sym, reason, force=True)
+        self.check_orphans()
         ctl = self.controller
         if ctl is None:
             return []
@@ -1007,8 +910,6 @@ class OrbIntegration:
                                "expected_account": self.r.settings.ORB_EXPECTED_ACCOUNT,
                                "init_error": self.init_error, "errors": list(self.errors)[-10:],
                                "alerts": list(self.alerts.values()),
-                               "recovery": {k: {kk: v.get(kk) for kk in ("status", "reason", "attempts", "at")}
-                                            for k, v in self.recovery.items()},
                                "marks": {k: {"price": v[0], "at": v[1].isoformat(), "source": v[2]}
                                          for k, v in self.marks.items()}}
         if ctl is None or sched is None:
