@@ -89,7 +89,7 @@ def test_real_production_checkpoint_restores_saves_and_restores_again(main_runti
         payload3 = json.loads(saved[1])
         assert payload3["runtime_state_version"] == 2
         assert "SymbolORBState" not in saved[1]
-        assert payload3["orb"]["version"] == 1                              # ORB's ledger section
+        assert payload3["orb"]["version"] == 2 and r.orb.ledger_error is None   # ORB's ledger section
         r.reset_runtime_state()
         assert r._restore_checkpoint() is True
         assert (r.account.equity, r.account.cash) == (pytest.approx(eq1), pytest.approx(cash1))
@@ -159,4 +159,62 @@ def test_orb_controller_and_scheduler_state_survive_a_restart_through_the_store(
         assert ctl2.ready is False                                     # entries wait for reconciliation
         assert ctl2.reconcile_on_startup()["ok"]
     finally:
+        r.state_store.close()
+
+
+def test_production_checkpoint_has_no_orb_section_so_orb_starts_normally(main_runtime, tmp_path, monkeypatch):
+    r = main_runtime
+    row = json.load(open(TRIMMED))
+    assert "orb" not in json.loads(row["payload"])
+    db = str(tmp_path / "trading_state.sqlite3")
+    _v2_store(db, row)
+    r.state_store = TradingStateStore(db)
+    try:
+        assert r._restore_checkpoint() is True
+        assert r.orb.ledger_error is None
+        monkeypatch.setattr(r.settings, "ORB_MODE", "shadow")
+        monkeypatch.setattr(r.settings, "ORB_STATE_DIR", str(tmp_path / "orbs"))
+        r.orb.start()
+        assert r.orb.mode == "shadow" and not r.orb.alerts
+    finally:
+        r.orb.shutdown()
+        r.state_store.close()
+
+
+def test_an_old_or_unknown_orb_ledger_section_fails_closed_for_orb_only(main_runtime, tmp_path, monkeypatch):
+    """A version-1 ORB ledger (keyed by controller record key; branch-only) is never read as empty:
+    ORB goes off, books nothing, alerts; ADT restores and runs; the section is saved back unchanged."""
+    r = main_runtime
+    row = json.load(open(TRIMMED))
+    payload = json.loads(row["payload"])
+    payload = migrate_legacy_orb_payload(payload)
+    v1 = {"version": 1, "booked": {"adt-orb-APP-2026-09-28-w1-a1": {"qty": 454, "notional": 45490.8}},
+          "recorded": [], "logged": []}
+    payload["orb"] = v1
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    import hashlib
+    row = dict(row, schema_version=3, payload=raw, checksum=hashlib.sha256(raw.encode()).hexdigest())
+    db = str(tmp_path / "trading_state.sqlite3")
+    _v2_store(db, row)
+    r.state_store = TradingStateStore(db)
+    try:
+        assert r._restore_checkpoint() is True                         # ADT itself is up
+        assert r.orb.ledger_error and "version 1" in r.orb.ledger_error
+        monkeypatch.setattr(r.settings, "ORB_MODE", "live")
+        monkeypatch.setattr(r.settings, "ORB_STATE_DIR", str(tmp_path / "orbs"))
+        r.orb.start()
+        assert r.orb.mode == "off" and "_ledger" in r.orb.alerts
+        card = next(c for c in r._strategy_cards() if c["id"] == "orb")
+        assert any("fill ledger" in a for a in card["orb"]["alerts"])
+        # even with a filled ORB order in the controller's book, nothing is booked into ADT
+        r.orb.controller._merge({"id": "o-1", "client_order_id": "adt-orb-APP-2026-09-28-w1-a1", "symbol": "APP",
+                                 "side": "buy", "qty": "10", "filled_qty": "10", "filled_avg_price": "100",
+                                 "status": "filled"}, role_hint="entry")
+        assert r.orb.controller.own_qty("APP") == 10
+        assert r.orb.sync() is False and "APP" not in r.account.positions   # never books
+        assert r._checkpoint_runtime("TEST") is True
+        saved = json.loads(r.state_store._connection.execute("SELECT payload FROM runtime_checkpoint").fetchone()[0])
+        assert saved["orb"] == v1                                      # kept for a human, not overwritten
+    finally:
+        r.orb.shutdown()
         r.state_store.close()

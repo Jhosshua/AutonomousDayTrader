@@ -363,6 +363,8 @@ class OrbExecutionController:
         # for the ones in flight), so no write can pass the check and POST after the fence closes
         self._write_gate = threading.Condition()
         self._writes_in_flight = 0
+        self._inflight_writes: Dict[int, dict] = {}     # slot id -> what is being written (coid / order id)
+        self._slot_seq = 0
         self.on_event = on_event
         self.sleep = sleep or _time.sleep
         self.budget = budget or RequestBudget(self.cfg["request_budget_per_min"], self.cfg["exit_reserve_per_min"])
@@ -387,7 +389,9 @@ class OrbExecutionController:
         return {"version": STATE_VERSION, "day": None, "sizing": {}, "baseline": {}, "halt": {},
                 "entries_blocked": {}, "risk": {}, "exec_seq": {}, "attempts": {}, "exit_seq": {},
                 "positions": {}, "orders": {}, "own": {}, "realized": {}, "exit_requests": {},
-                "executions": [], "events": [], "alarms": {}}
+                "executions": [], "events": [], "alarms": {},
+                # writes whose outcome was still unknown when ADT shut down: resolved at startup
+                "unresolved_writes": []}
 
     def to_state(self) -> Dict[str, Any]:
         with self._lock:
@@ -1123,6 +1127,11 @@ class OrbExecutionController:
         with self._write_gate:
             self._entries_closed = self._entries_closed or why
             self._writes_closed = why
+        return self.wait_writes(wait_s)
+
+    def wait_writes(self, wait_s: float) -> bool:
+        """Wait (bounded) until no broker write is in flight. True when none is."""
+        with self._write_gate:
             deadline = _time.monotonic() + wait_s
             while self._writes_in_flight > 0:
                 left = deadline - _time.monotonic()
@@ -1131,18 +1140,47 @@ class OrbExecutionController:
                 self._write_gate.wait(timeout=left)
         return True
 
-    def _acquire_write_slot(self, entry: bool = False) -> None:
+    def inflight_writes(self) -> List[dict]:
+        with self._write_gate:
+            return [dict(v) for v in self._inflight_writes.values()]
+
+    def mark_unresolved_writes(self) -> List[dict]:
+        """Shutdown with a write still in flight: record what it was (client id / order id) durably, so
+        the next startup reconciliation resolves its outcome at Alpaca before any entry."""
+        rows = self.inflight_writes()
+        if rows:
+            with self._lock:
+                self.state.setdefault("unresolved_writes", []).extend(rows)
+            self._event({"kind": "unresolved_writes_at_shutdown", "writes": rows})
+            self._persist_quiet()
+        return rows
+
+    def _acquire_write_slot(self, entry: bool = False, what: Optional[dict] = None) -> int:
         with self._write_gate:
             if self._writes_closed:
                 raise DestinationRefused(f"{self._writes_closed}: no broker writes")
             if entry and self._entries_closed:
                 raise DestinationRefused(f"{self._entries_closed}: no new entries")
             self._writes_in_flight += 1
+            self._slot_seq += 1
+            self._inflight_writes[self._slot_seq] = dict(what or {}, at=self._now().isoformat())
+            return self._slot_seq
 
-    def _release_write_slot(self) -> None:
+    def _release_write_slot(self, slot: Optional[int] = None) -> None:
         with self._write_gate:
             self._writes_in_flight -= 1
+            if slot is not None:
+                self._inflight_writes.pop(slot, None)
             self._write_gate.notify_all()
+
+    @staticmethod
+    def _describe_write(fn: Callable, a: tuple, kw: dict) -> dict:
+        name = getattr(fn, "__name__", str(fn))
+        if name == "submit_bracket":
+            return {"kind": name, "symbol": a[0] if a else None, "coid": a[5] if len(a) > 5 else kw.get("client_order_id")}
+        if name == "submit_market_order":
+            return {"kind": name, "symbol": a[0] if a else None, "coid": a[3] if len(a) > 3 else kw.get("client_order_id")}
+        return {"kind": name, "order_id": a[0] if a else kw.get("order_id")}
 
     def _write(self, prio: str, fn: Callable, *a, _pretaken: bool = False, **kw):
         """A broker WRITE: pinned account verified first, then the budget token (unless already held).
@@ -1153,11 +1191,11 @@ class OrbExecutionController:
         self._verify_destination_for_write()
         if not _pretaken:
             self.budget.acquire(prio)
-        self._acquire_write_slot(entry)
+        slot = self._acquire_write_slot(entry, self._describe_write(fn, a, kw))
         try:
             return fn(*a, **kw)
         finally:
-            self._release_write_slot()
+            self._release_write_slot(slot)
 
     def _prices_from_positions(self) -> Optional[Dict[str, float]]:
         if self.broker is None:
@@ -1938,8 +1976,8 @@ class OrbExecutionController:
         n = abs(capped)
         with self._lock:
             self.state["orders"][key]["qty"] = n
-        try:
-            self._acquire_write_slot()              # the shutdown fence covers the exit POST too
+        try:                                    # the shutdown fence covers the exit POST too
+            slot = self._acquire_write_slot(what={"kind": "submit_market_order", "symbol": sym, "coid": coid})
         except DestinationRefused as exc:
             not_sent(f"not sent: {exc}")
             return None, str(exc), n, side
@@ -1947,7 +1985,7 @@ class OrbExecutionController:
             try:
                 resp = self.broker.submit_market_order(sym, side, n, coid)     # token already held
             finally:
-                self._release_write_slot()
+                self._release_write_slot(slot)
             self._merge(dict(resp, client_order_id=resp.get("client_order_id") or coid))
             for ev in deferred:
                 self._emit_cap(ev)
@@ -2292,6 +2330,31 @@ class OrbExecutionController:
             why = f"account read failed: {exc}"
         if why:
             report["errors"].append(f"destination refused: {why}")
+        # writes whose outcome was unknown at the last shutdown: find each at Alpaca (by client id, or
+        # by order id) and fold its answer into the book before anything else is judged
+        with self._lock:
+            markers = list(self.state.get("unresolved_writes") or [])
+        report["unresolved_writes"] = markers
+        left = []
+        for m in markers:
+            try:
+                if m.get("coid"):
+                    got = self._call("exit", self.broker.get_order_by_client_id, m["coid"])
+                    if isinstance(got, dict) and got.get("id"):
+                        self._merge(dict(got, client_order_id=got.get("client_order_id") or m["coid"]))
+                elif m.get("order_id"):
+                    got = self._call("exit", self.broker.get_order, m["order_id"], True)
+                    if isinstance(got, dict) and got.get("id"):
+                        self._merge(got)
+            except BrokerHTTPError as exc:
+                if exc.status_code != 404:
+                    left.append(m)
+            except Exception:
+                left.append(m)
+        with self._lock:
+            self.state["unresolved_writes"] = left
+        if left:
+            report["errors"].append(f"{len(left)} write(s) from before the restart could not be resolved yet")
         with self._lock:
             pending = [(k, dict(r)) for k, r in self.state["orders"].items() if not r["terminal"]]
             pending += [(k, dict(self.state["orders"][k])) for k in self._recheck_candidates()]

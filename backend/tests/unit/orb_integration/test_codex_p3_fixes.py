@@ -335,3 +335,118 @@ def test_slow_scheduler_persist_never_blocks_the_tick_and_is_flushed_before_orde
     finally:
         r.orb.shutdown()
         r.state_store.close()
+
+
+# ------------------------------------------------------------------ final round: operator orphan resolution
+def _orphan(r):
+    h = MainOrb(r)
+    h.open_bracket()
+    rebuild_off(r, h)
+    h.ctl.reconcile_on_startup()
+    settle(r, h, rounds=2)
+    assert "APP" in r.orb.alerts
+    return h
+
+
+def test_resolve_orphan_is_refused_while_alpaca_still_holds_the_shares_or_live_orb_orders(main_runtime):
+    from fastapi import HTTPException
+    r = main_runtime
+    h = _orphan(r)
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(r.resolve_orb_orphan(r.OrbResolveRequest(symbol="APP")))
+    assert err.value.status_code == 409 and "Alpaca still holds 454 APP shares" in err.value.detail
+    # the human sells at Alpaca but forgets the bracket legs
+    h.alpaca._apply_position("APP", "sell", 454, 100.5)
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(r.resolve_orb_orphan(r.OrbResolveRequest(symbol="APP")))
+    assert "still live at Alpaca" in err.value.detail
+    assert r.account.positions["APP"].shares == 454 and "APP" in r.orb.alerts
+    assert not [q for q in h.alpaca.requests if q[0] in ("POST", "DELETE", "PATCH") and "adt-orb-X" in str(q[2])]
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(r.resolve_orb_orphan(r.OrbResolveRequest(symbol="NVDA")))
+    assert "nothing to resolve" in err.value.detail
+
+
+def test_resolve_orphan_clears_the_book_alert_and_mismatch_with_an_audit_note(main_runtime):
+    r = main_runtime
+    h = _orphan(r)
+    for oid, o in h.alpaca.orders.items():                          # the human cancels the legs ...
+        if o["status"] in ("new", "held", "accepted"):
+            o["status"] = "canceled"
+    h.alpaca._apply_position("APP", "sell", 454, 100.5)              # ... and sells at Alpaca
+    r.alpaca_broker, r.engine.broker = h.broker, h.broker
+    try:
+        asyncio.run(r._broker_reconcile_once())
+        assert r.broker_state["mismatch"] is True                    # ADT still books 454
+        n = len(h.alpaca.requests)
+        out = asyncio.run(r.resolve_orb_orphan(r.OrbResolveRequest(symbol="APP")))
+        assert out["resolved"] and out["qty"] == 454 and out["reason"] == "operator resolved orphan"
+        assert [q[0] for q in h.alpaca.requests[n:]] and all(q[0] == "GET" for q in h.alpaca.requests[n:])
+        assert "APP" not in r.account.positions and "APP" not in r.orb.alerts
+        assert r.orb.ledger["resolved"][-1]["symbol"] == "APP"
+        assert any(d["outcome"] == "ORB_ORPHAN_RESOLVED" for d in r.decision_log.recent(10, "orb"))
+        asyncio.run(r._broker_reconcile_once())
+        assert r.broker_state["mismatch"] is False
+    finally:
+        r.alpaca_broker, r.engine.broker = None, None
+
+
+# ------------------------------------------------------------------ final round: unresolved write at shutdown
+def test_a_write_unanswered_after_the_extra_wait_is_marked_and_resolved_at_startup(main_runtime, caplog):
+    r = main_runtime
+    h = _live_threaded(r)
+    h.open_bracket()
+    real = h.broker.submit_market_order
+    release = threading.Event()
+
+    def stuck_submit(*a, **kw):
+        release.wait(5)
+        return real(*a, **kw)
+    h.broker.submit_market_order = stuck_submit
+    h.ctl.request_exit("APP", "MANUAL_FLATTEN")
+    h.sched._start("supervise", lambda: h.ctl.tick())
+    _time.sleep(0.2)
+    import logging
+    with caplog.at_level(logging.CRITICAL, logger="orb_integration"):
+        left = r.orb.drain(timeout=0.1, extra_wait=0.3)
+    marker = r.orb.unresolved_at_shutdown
+    assert marker and marker[0]["coid"].startswith("adt-orb-X-APP-") and any("unresolved write" in x for x in left)
+    assert any(rec.levelname == "CRITICAL" for rec in caplog.records)
+    saved = r.orb._load("controller")
+    assert saved["unresolved_writes"][0]["coid"] == marker[0]["coid"]   # durable before the store closes
+    release.set()                                                        # the POST lands after all
+    deadline = _time.monotonic() + 5
+    while _time.monotonic() < deadline and any(not f.done() for f in h.sched.running_futures()):
+        _time.sleep(0.05)
+    # next process: startup reconciliation finds the order by client id and books its fill
+    r.orb.build(h.broker, h.facade, "live", clock=h.clock, inline=True, monotonic=lambda: h.clock.now.timestamp(),
+                budget=RequestBudget(10 ** 6, 10 ** 6), sleep=h.clock.sleep, is_session=lambda d: True)
+    ctl = r.orb.controller
+    rep = ctl.reconcile_on_startup()
+    assert rep["unresolved_writes"] and ctl.state["unresolved_writes"] == []
+    assert ctl.own_qty("APP") == 0 and h.alpaca_positions() == {}
+
+
+def test_a_write_that_resolves_inside_the_extra_wait_leaves_no_marker(main_runtime):
+    r = main_runtime
+    h = _live_threaded(r)
+    h.open_bracket()
+    real = h.broker.submit_market_order
+
+    def slowish(*a, **kw):
+        _time.sleep(0.3)
+        return real(*a, **kw)
+    h.broker.submit_market_order = slowish
+    h.ctl.request_exit("APP", "MANUAL_FLATTEN")
+    h.sched._start("supervise", lambda: h.ctl.tick())
+    _time.sleep(0.1)
+    left = r.orb.drain(timeout=0.05, extra_wait=5.0)
+    assert r.orb.unresolved_at_shutdown == [] and not any("unresolved" in x for x in left)
+    assert not (r.orb._load("controller") or {}).get("unresolved_writes")
+
+
+def test_the_card_offers_the_resolve_action_for_each_orphan(main_runtime):
+    r = main_runtime
+    h = _orphan(r)
+    card = next(c for c in r._strategy_cards(h.clock.now) if c["id"] == "orb")
+    assert card["orb"]["orphans"] == [{"symbol": "APP", "text": r.orb.alerts["APP"]}]

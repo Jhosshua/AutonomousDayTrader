@@ -142,6 +142,7 @@ assert(card.includes("strategyTheme"), "StrategyCard.tsx must use strategyTheme(
 assert(card.includes('data-testid="or15-details"') && card.includes("Offline replay"), "OR15 must distinguish replay from paper");
 assert(card.includes('data-testid="orb-details"') && card.includes("held at Alpaca"), "ORB card must show its mode, step and bracket trades");
 assert(card.includes('data-testid="orb-alert"'), "ORB card must show ORB's plain-language alerts (orphan positions)");
+assert(card.includes('data-testid="orb-resolve-orphan"') && card.includes("/api/orb/resolve-orphan"), "ORB orphan alert must offer the audited resolve action");
 assert(plainLib.includes("Opening Range Breakout (ORBStraddle rules)"), "ORB card must use the ORBStraddle-rules name");
 const holding = fs.readFileSync(path.join(FRONTEND_DIR, "components/HoldingNow.tsx"), "utf8");
 assert(holding.includes("!position.fixed_protection") && holding.includes("Safety exit stays fixed"), "OR15 must disable stop movement");

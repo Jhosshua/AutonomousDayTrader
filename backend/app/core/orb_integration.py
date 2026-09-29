@@ -32,7 +32,7 @@ import os
 import threading
 import time as _time
 from collections import deque
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from zoneinfo import ZoneInfo
@@ -45,7 +45,10 @@ log = logging.getLogger("orb_integration")
 ET = ZoneInfo("America/New_York")
 ORB_ID = "orb"
 MODES = ("off", "shadow", "live")
-LEDGER_VERSION = 1
+# 2: `booked` keyed by Alpaca order id (idempotent). Version 1 (keyed by controller record key) only ever
+# existed on the unreleased orb-integration branch; any other version fails closed for ORB only.
+LEDGER_VERSION = 2
+DRAIN_EXTRA_WAIT_S = 60.0
 ACTIVE = frozenset({"PENDING_SUBMIT", "SUBMITTED", "UNKNOWN", "OPEN"})
 CLAIM_STATES = frozenset({"CREATED", "SUBMITTED", "ACCEPTED", "PARTIALLY_FILLED"})
 SYNC_EVERY_S = 5.0
@@ -87,6 +90,9 @@ class OrbIntegration:
         # plain-language alerts (e.g. ORB shares in ADT's book that no ORB order explains)
         self.alerts: Dict[str, str] = {}
         self._mark_eval_pending = False
+        self.ledger_error: Optional[str] = None
+        self._bad_ledger: Optional[Any] = None
+        self.unresolved_at_shutdown: List[dict] = []
         # timestamped price marks for ORB positions (P1 #2)
         self.marks: Dict[str, tuple] = {}
         self._last_mark_eval: Optional[float] = None
@@ -105,7 +111,7 @@ class OrbIntegration:
         # or re-registers an order under another record key, books nothing twice). It rides in ADT's
         # checkpoint, atomically with the account it booked into. recorded: position keys with a trade row;
         # logged: decision rows already written (dedupe across restarts)
-        return {"version": LEDGER_VERSION, "booked": {}, "recorded": [], "logged": []}
+        return {"version": LEDGER_VERSION, "booked": {}, "recorded": [], "logged": [], "resolved": []}
 
     # ------------------------------------------------------------------ construction
     def effective_manifest(self) -> dict:
@@ -180,6 +186,10 @@ class OrbIntegration:
                 self.init_error = f"ORB decision code could not start ({type(exc).__name__}: {exc}); ORB is off"
                 log.exception("ORB facade construction failed")
                 facade, mode = None, "off"
+        if self.ledger_error is not None:
+            self.init_error = self.ledger_error
+            self._alert("_ledger", f"ORB is off: {self.ledger_error}. ADT's other strategies run normally.")
+            mode = "off"
         try:
             self.build(broker, facade, mode)
         except Exception as exc:
@@ -196,7 +206,7 @@ class OrbIntegration:
             self._loop = None
         log.info("ORB (ORBStraddle rules) started: mode=%s broker=%s", mode, "alpaca_paper" if broker else "none")
 
-    def drain(self, timeout: float = DRAIN_TIMEOUT_S) -> List[str]:
+    def drain(self, timeout: float = DRAIN_TIMEOUT_S, extra_wait: float = DRAIN_EXTRA_WAIT_S) -> List[str]:
         """Graceful shutdown, BEFORE ADT's final checkpoint (Codex P1 #3). Worker thread only.
         1. no new entry POST and no new job; 2. running jobs (an exit mid-way, an orphan close) get up
         to `timeout` s to finish; 3. then every broker write is refused, so a job that could not finish
@@ -210,8 +220,15 @@ class OrbIntegration:
             futures += sched.running_futures()
         _done, pending = _wait_futures(futures, timeout=timeout) if futures else (set(), set())
         self._writes_closed = True
-        if ctl is not None:
-            ctl.close_writes("ADT is shutting down")
+        unresolved: List[dict] = []
+        if ctl is not None and not ctl.close_writes("ADT is shutting down", wait_s=0.0):
+            # a write already at Alpaca's door: keep the store and writer alive for it (bounded)
+            if not ctl.wait_writes(extra_wait):
+                unresolved = ctl.mark_unresolved_writes()
+                log.critical("ORB shutdown: %d broker write(s) still unanswered after %.0f s more; their outcome "
+                             "is unknown and is resolved by client id at the next startup: %s",
+                             len(unresolved), extra_wait, unresolved)
+        self.unresolved_at_shutdown = unresolved
         try:
             self.flush_scheduler_state(timeout=5.0)
         except Exception as exc:
@@ -220,7 +237,8 @@ class OrbIntegration:
         if pending:
             log.error("ORB shutdown drain: %d job(s) did not finish in %.0f s; their broker writes are refused",
                       len(pending), timeout)
-        return (unfinished or [f"{len(pending)} job(s)"]) if pending else []
+        out = (unfinished or [f"{len(pending)} job(s)"]) if pending else []
+        return out + [f"unresolved write {u.get('coid') or u.get('order_id')}" for u in unresolved]
 
     def shutdown(self) -> None:
         self._writes_closed = True
@@ -249,6 +267,8 @@ class OrbIntegration:
         self.init_error = None
         self.alerts.clear()
         self._mark_eval_pending = False
+        self.ledger_error, self._bad_ledger = None, None
+        self.unresolved_at_shutdown = []
         self.marks.clear()
         self._orphans.clear()
         self._last_mark_eval: Optional[float] = None
@@ -333,14 +353,28 @@ class OrbIntegration:
             return store.load_orb_state(section)
         return copy.deepcopy(self._mem_state.get(section))
 
-    def ledger_state(self) -> Dict[str, Any]:
+    def ledger_state(self) -> Any:
+        if self.ledger_error is not None:
+            return copy.deepcopy(self._bad_ledger)       # keep the unreadable section as it was
         return copy.deepcopy(self.ledger)
 
-    def load_ledger_state(self, state: Optional[dict]) -> None:
-        base = self._empty_ledger()
+    def load_ledger_state(self, state: Optional[Any]) -> None:
+        """No section (a checkpoint from before ORB) = a fresh ledger. A section of another version is
+        never read as empty (that would book ORB's fills twice): ORB fails closed (off, no booking, an
+        alert) while ADT's other strategies start normally."""
+        self.ledger = self._empty_ledger()
+        self.ledger_error, self._bad_ledger = None, None
+        if state is None:
+            return
         if isinstance(state, dict) and state.get("version") == LEDGER_VERSION:
-            base.update({k: copy.deepcopy(state.get(k, base[k])) for k in ("booked", "recorded", "logged")})
-        self.ledger = base
+            self.ledger.update({k: copy.deepcopy(state.get(k, self.ledger[k]))
+                                for k in ("booked", "recorded", "logged", "resolved")})
+            return
+        version = state.get("version") if isinstance(state, dict) else type(state).__name__
+        self.ledger_error = (f"ORB's saved fill ledger has version {version!r}, not {LEDGER_VERSION}: ORB is off "
+                             "and books nothing until a person checks ORB's positions at Alpaca")
+        self._bad_ledger = copy.deepcopy(state)
+        log.error(self.ledger_error)
 
     # ------------------------------------------------------------------ reservations (one lock)
     def adt_occupied(self, symbol: str) -> Optional[str]:
@@ -439,7 +473,7 @@ class OrbIntegration:
             else:
                 self._alert(sym, f"{sym}: Alpaca has a live ORB order that ORB's saved state does not know. It was "
                                  "not touched, and ORB opens no new trades until it is resolved. Check it by hand.")
-        for sym in [s for s in self.alerts if s not in targets]:
+        for sym in [s for s in self.alerts if s not in targets and not s.startswith("_")]:
             self.alerts.pop(sym, None)
 
     def _orphan_alarm(self, sym: str) -> None:
@@ -588,8 +622,8 @@ class OrbIntegration:
         refresh the ORB positions' prices, record finished ORB trades. Event loop only."""
         ctl = self.controller
         self._dirty.clear()
-        if ctl is None:
-            return False
+        if ctl is None or self.ledger_error is not None:
+            return False                        # an unreadable ledger never books (no double booking)
         r = self.r
         now = now or datetime.now(timezone.utc)
         st = ctl.to_state()
@@ -769,6 +803,70 @@ class OrbIntegration:
             r._trip_circuit_breaker(now)
             r._checkpoint_runtime("ORB_MARK_BREAKER")
         return True
+
+    # ------------------------------------------------------------------ operator: resolve an orphan
+    def resolve_refusal(self, symbol: str) -> Optional[str]:
+        """Local precheck (event loop) for POST /api/orb/resolve-orphan."""
+        sym = symbol.upper()
+        if self.r.simulation_mode:
+            return "Not available in replay mode."
+        if not self.is_orphan(sym):
+            return f"{sym} is not an ORB position that ORB cannot explain; nothing to resolve."
+        if self.controller is None or self.controller.broker is None:
+            return "ORB has no broker connection, so Alpaca cannot be checked."
+        return None
+
+    def alpaca_clear_for(self, symbol: str) -> tuple:
+        """Worker thread: READ Alpaca. (True, detail) only if Alpaca holds no shares of the symbol beyond
+        what ADT's other books hold (none: ADT keeps one position per symbol and this one is ORB's) and
+        no ORB order (adt-orb client id, or a leg of one) is still live there."""
+        sym = symbol.upper()
+        ctl = self.controller
+        broker = ctl.broker
+        prefix = str(ctl.cfg.get("coid_prefix") or "adt-orb") + "-"
+        qty = int(broker.position_qty(sym))
+        if qty != 0:
+            return False, (f"Alpaca still holds {qty} {sym} shares. Close them at Alpaca first (after cancelling "
+                           "ORB's bracket orders), then try again.")
+        after = (self.clock() - timedelta(days=7)).isoformat()
+        final = {"filled", "canceled", "expired", "rejected", "replaced", "done_for_day"}
+        for row in broker.list_orders("all", sym, after, 500, True) or []:
+            if not isinstance(row, dict) or not str(row.get("client_order_id") or "").startswith(prefix):
+                continue
+            for o in [row] + [leg for leg in (row.get("legs") or []) if isinstance(leg, dict)]:
+                if o.get("status") not in final:
+                    return False, (f"ORB order {o.get('client_order_id') or o.get('id')} on {sym} is still live at "
+                                   "Alpaca. Cancel it there first, then try again.")
+        return True, f"Alpaca holds no {sym} shares and no live ORB orders"
+
+    def apply_resolution(self, symbol: str, now: datetime) -> Dict[str, Any]:
+        """Event loop, after alpaca_clear_for said yes: close ADT's stale ORB position at its last known
+        price (so equity does not jump; Alpaca's real close price shows up as equity drift), write the
+        audit note into ORB's ledger and the decisions log, checkpoint, clear the alert."""
+        r, sym = self.r, symbol.upper()
+        pos = r.account.positions.get(sym)
+        if pos is None or getattr(pos, "strategy_id", "") != ORB_ID:
+            return {"resolved": False, "reason": f"{sym} has no ORB position in ADT's book any more"}
+        qty, side = pos.shares, pos.side.value
+        px = float(pos.market_price or pos.avg_entry_price)
+        rec = {"symbol": sym, "side": "sell" if side == "LONG" else "buy", "qty": qty, "filled_qty": qty,
+               "coid": f"operator-resolve-{sym}-{now.isoformat()}", "id": None, "role": "operator_resolve",
+               "position": f"operator:{sym}"}
+        local = self._local_order(f"operator:{sym}:{now.isoformat()}", rec)
+        r.engine._apply_fill_to_ledger(local, int(qty), round(px, 6), 0.0, 0.0, now)
+        note = {"symbol": sym, "qty": qty, "side": side, "price_booked": px, "at": now.isoformat(),
+                "reason": "operator resolved orphan",
+                "detail": "Alpaca showed no shares and no live ORB orders; ADT's stale ORB position was closed "
+                          "at its last known price (Alpaca's real close price shows as equity drift)",
+                "local_order_id": local.id}
+        self.ledger.setdefault("resolved", []).append(note)
+        r.decision_log.record(ORB_ID, sym, "BUY" if side == "SHORT" else "SELL", px, "ORB_ORPHAN_RESOLVED",
+                              f"operator resolved orphan: {qty} shares removed from ADT's book", now)
+        log.warning("ORB orphan %s resolved by the operator: %s", sym, note)
+        self.alerts.pop(sym, None)
+        self._orphans.discard(sym)
+        r._checkpoint_runtime("ORB_ORPHAN_RESOLVED")
+        return {"resolved": True, **note}
 
     def _alert(self, sym: str, text: str) -> None:
         if self.alerts.get(sym) != text:
@@ -962,5 +1060,7 @@ class OrbIntegration:
             "hours": "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
             "errors": st.get("errors") or [], "init_error": st.get("init_error"),
             "alerts": st.get("alerts") or [],
+            "orphans": [{"symbol": k, "text": v} for k, v in self.alerts.items()
+                        if not k.startswith("_") and self.is_orphan(k)],
         }
         return card

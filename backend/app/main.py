@@ -3076,7 +3076,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ORB: stop new entries/jobs, let a running exit finish (bounded), then refuse every broker write,
     # all BEFORE the final checkpoint and the store close (Codex P1 #3). Its last fills are booked.
     try:
-        await asyncio.to_thread(orb.drain)
+        unfinished = await asyncio.to_thread(orb.drain)
+        if unfinished:
+            log.error("ORB shutdown drain left: %s", unfinished)
         orb.sync()
     except Exception:
         log.exception("ORB shutdown drain failed")
@@ -3246,6 +3248,29 @@ def _orb_health() -> Dict[str, Any]:
 async def get_orb() -> Dict[str, Any]:
     """ORB (ORBStraddle rules): mode, current step, last verdict, picks, open trades, errors."""
     return _sanitize_for_json(orb.status())
+
+
+class OrbResolveRequest(BaseModel):
+    symbol: str
+
+
+@app.post("/api/orb/resolve-orphan")
+async def resolve_orb_orphan(req: OrbResolveRequest) -> Dict[str, Any]:
+    """Operator action: after closing an unexplained ORB position at Alpaca by hand, clear it from ADT's
+    book. Allowed only when Alpaca (read now) shows no shares of the symbol and no live ORB orders."""
+    sym = req.symbol.strip().upper()
+    why = orb.resolve_refusal(sym)
+    if why:
+        raise HTTPException(status_code=409, detail=why)
+    try:
+        ok, detail = await asyncio.to_thread(orb.alpaca_clear_for, sym)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Alpaca could not be read: {exc}") from exc
+    if not ok:
+        raise HTTPException(status_code=409, detail=detail)
+    result = orb.apply_resolution(sym, datetime.now(timezone.utc))
+    await broadcast_ui_state(force=True)
+    return _sanitize_for_json(result)
 
 
 @app.get("/api/account")

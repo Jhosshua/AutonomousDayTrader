@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Sunrise, Waves, Zap, Undo2, CornerDownRight } from "lucide-react";
+import { apiBase } from "@/lib/apiBase";
 import { StrategyState } from "@/types/trading";
 import {
   StrategyLedgerAgg,
@@ -42,6 +44,43 @@ const CHIP_STYLES: Record<string, { bg: string; fg: string }> = {
   grey: { bg: "#FFFFFF", fg: "#5D5A73" },
   terracotta: { bg: "#FFFFFF", fg: "#8F4424" },
 };
+
+function OrbOrphanResolve({ symbol }: { symbol: string }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [armed, setArmed] = useState(false);
+  const resolve = async () => {
+    if (!armed) {
+      setArmed(true);
+      setMsg(`Only after you closed ${symbol} and cancelled ORB's orders on it at Alpaca. Tap again to confirm.`);
+      return;
+    }
+    setArmed(false);
+    setBusy(true);
+    try {
+      const res = await fetch(`${apiBase()}/api/orb/resolve-orphan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const body = await res.json().catch(() => ({}));
+      setMsg(res.ok ? `${symbol} cleared from the bot's book.` : String(body.detail || "Refused."));
+    } catch {
+      setMsg("Could not reach the bot. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={resolve} disabled={busy} data-testid="orb-resolve-orphan"
+        className="rounded-lg border border-[#8F4424]/60 bg-white px-3 py-1.5 text-xs font-semibold text-[#8F4424]">
+        {busy ? "Checking Alpaca…" : armed ? `Confirm: clear ${symbol}` : `I closed ${symbol} at Alpaca: clear it`}
+      </button>
+      {msg && <div className="mt-1 text-xs font-normal">{msg}</div>}
+    </div>
+  );
+}
 
 export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0 }: StrategyCardProps) {
   const theme = strategyTheme(strategy.id, strategy.name);
@@ -167,11 +206,15 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
             {(strategy.orb.realized_pnl !== 0 || strategy.orb.unrealized_pnl !== 0) && (
               <div className="mt-2">Today: {formatSignedMoney(strategy.orb.realized_pnl)} closed{strategy.orb.open_trades.length > 0 ? `, ${formatSignedMoney(strategy.orb.unrealized_pnl)} open` : ""}</div>
             )}
-            {(strategy.orb.alerts ?? []).map((a) => (
-              <div key={a} role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/60 bg-white p-2 font-semibold text-[#8F4424]" data-testid="orb-alert">
-                {a}
-              </div>
-            ))}
+            {(strategy.orb.alerts ?? []).map((a) => {
+              const orphan = (strategy.orb?.orphans ?? []).find((o) => o.text === a);
+              return (
+                <div key={a} role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/60 bg-white p-2 font-semibold text-[#8F4424]" data-testid="orb-alert">
+                  {a}
+                  {orphan && <OrbOrphanResolve symbol={orphan.symbol} />}
+                </div>
+              );
+            })}
             {(strategy.orb.init_error || strategy.orb.errors.length > 0) && (
               <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
                 {strategy.orb.init_error || "ORB reported a problem; check the paper account."}

@@ -104,6 +104,7 @@ export interface StrategyState {
     errors: { kind?: string; alarm?: string; err?: string; reason?: string; note?: string }[];
     init_error: string | null;
     alerts?: string[];
+    orphans?: { symbol: string; text: string }[];
   };
   or15?: {
     phase: string;
