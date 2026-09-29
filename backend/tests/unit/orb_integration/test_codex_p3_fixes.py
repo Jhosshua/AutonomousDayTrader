@@ -543,40 +543,6 @@ def test_resolve_orphan_changes_nothing_when_the_checkpoint_fails(main_runtime, 
     assert not any(d["outcome"] == "ORB_ORPHAN_RESOLVED" for d in r.decision_log.recent(10, "orb"))
 
 
-def test_operator_resolve_of_an_unknown_write_is_atomic_with_reconciliation(main_runtime):
-    """The marker's removal and its durable save are one step for reconciliation: a reconciliation that
-    starts while the save is in flight waits for it; if the save fails the marker is back, ORB is not
-    ready, and the next reconciliation still refuses entries."""
-    r = main_runtime
-    h = _marker_after_restart(r)
-    h.ctl.reconcile_on_startup()
-    h.ctl.ready = True                                   # even if something had set it, a failure resets it
-    real_persist = h.ctl.persist_cb
-    saving, release = threading.Event(), threading.Event()
-
-    def failing_persist(state):
-        saving.set()
-        release.wait(5)
-        raise OSError("disk full")
-    h.ctl.persist_cb = failing_persist
-    errors = []
-    t = threading.Thread(target=lambda: errors.append(
-        pytest.raises(OSError, h.ctl.resolve_unknown_write, "adt-orb-X-APP-2026-09-28-1-9", "t")))
-    t.start()
-    assert saving.wait(5)
-    rec = {}
-    rt = threading.Thread(target=lambda: rec.setdefault("rep", h.ctl.reconcile_on_startup()))
-    rt.start()
-    _time.sleep(0.2)
-    assert rt.is_alive() and "rep" not in rec          # reconciliation waits for the resolution to finish
-    h.ctl.persist_cb = real_persist
-    release.set()
-    t.join(5)
-    rt.join(5)
-    assert errors and len(h.ctl.state["unresolved_writes"]) == 1
-    assert not rec["rep"]["ok"] and h.ctl.ready is False
-    h.alpaca.prices["PLTR"] = 50.1
-    assert "reconciliation" in h.ctl.execute([pick("PLTR", "long", 50.0, 49.0)], h.clock.now)["reason"]
 
 
 def test_a_failed_operator_resolve_leaves_orb_unready_at_once(main_runtime):
@@ -591,3 +557,93 @@ def test_a_failed_operator_resolve_leaves_orb_unready_at_once(main_runtime):
     with pytest.raises(OSError):
         h.ctl.resolve_unknown_write("adt-orb-X-APP-2026-09-28-1-9", "t")
     assert h.ctl.ready is False and len(h.ctl.state["unresolved_writes"]) == 1
+
+
+def _block_resolver_save(h, fail):
+    """The resolution's own save stalls (and then fails or succeeds); every other save goes through."""
+    real = h.ctl.persist_cb
+    saving, release, me = threading.Event(), threading.Event(), {}
+
+    def persist(state):
+        if threading.current_thread() is me.get("t") and not me.get("done"):
+            me["done"] = True
+            saving.set()
+            release.wait(5)
+            if fail:
+                raise OSError("disk full")
+        return real(state)
+    h.ctl.persist_cb = persist
+    return saving, release, me
+
+
+def _start_resolver(h, me, out):
+    def run():
+        try:
+            out["hit"] = h.ctl.resolve_unknown_write("adt-orb-X-APP-2026-09-28-1-9", "t")
+        except Exception as exc:
+            out["err"] = exc
+    t = threading.Thread(target=run)
+    me["t"] = t
+    t.start()
+    return t
+
+
+def test_reconciliation_during_a_resolution_neither_sets_ready_nor_clears_the_marker(main_runtime):
+    r = main_runtime
+    h = _marker_after_restart(r)
+    h.ctl.reconcile_on_startup()
+    saving, release, me = _block_resolver_save(h, fail=True)
+    out = {}
+    t = _start_resolver(h, me, out)
+    assert saving.wait(5)
+    h.broker.submit_market_order("ZZZ", "buy", 1, "adt-orb-X-APP-2026-09-28-1-9")   # even if Alpaca shows it now
+    rep = h.ctl.reconcile_on_startup()                  # runs now: no lock is held during the save
+    assert not rep["ok"] and h.ctl.ready is False
+    assert len(h.ctl.state["unresolved_writes"]) == 1   # not cleared from reconciliation
+    release.set()
+    t.join(5)
+    assert isinstance(out.get("err"), OSError)
+    assert len(h.ctl.state["unresolved_writes"]) == 1 and h.ctl.ready is False
+    assert r.orb._load("controller")["unresolved_writes"]    # the durable state has the marker back
+    # retries continue: the next reconciliation (no resolution running) finds the order and clears it
+    assert h.ctl.reconcile_on_startup()["ok"] and h.ctl.state["unresolved_writes"] == []
+
+
+def test_a_successful_resolution_lets_the_next_reconciliation_decide(main_runtime):
+    r = main_runtime
+    h = _marker_after_restart(r)
+    h.ctl.reconcile_on_startup()
+    saving, release, me = _block_resolver_save(h, fail=False)
+    out = {}
+    t = _start_resolver(h, me, out)
+    assert saving.wait(5)
+    assert not h.ctl.reconcile_on_startup()["ok"]
+    release.set()
+    t.join(5)
+    assert out.get("hit") and h.ctl.state["unresolved_writes"] == [] and h.ctl.ready is False
+    assert not r.orb._load("controller")["unresolved_writes"]
+    assert h.ctl.reconcile_on_startup()["ok"] and h.ctl.ready
+
+
+def test_a_stalled_resolution_save_never_stops_supervision_or_exits(main_runtime):
+    r = main_runtime
+    h = _marker_after_restart(r)
+    h.ctl.reconcile_on_startup()
+    saving, release, me = _block_resolver_save(h, fail=False)
+    out = {}
+    t = _start_resolver(h, me, out)
+    try:
+        assert saving.wait(5)
+        n = len(h.alpaca.requests)
+        h.ctl.request_exit("APP", "CIRCUIT_BREAKER")
+        done = {}
+        tt = threading.Thread(target=lambda: done.setdefault("r", h.ctl.tick()))
+        tt.start()
+        tt.join(3)
+        assert "r" in done, "the supervisor pass was blocked by the resolution's save"
+        r.orb.sync(h.clock.now)
+        h.assert_orb_closed_through_its_controller(n)
+        assert not t.is_alive() or not out                 # the resolution is still waiting on its save
+    finally:
+        release.set()
+        t.join(5)

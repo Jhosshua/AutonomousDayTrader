@@ -364,6 +364,7 @@ class OrbExecutionController:
         self._write_gate = threading.Condition()
         self._writes_in_flight = 0
         self._inflight_writes: Dict[int, dict] = {}     # slot id -> what is being written (coid / order id)
+        self._resolving: Optional[str] = None            # unknown-write marker an operator is removing
         self._slot_seq = 0
         self.on_event = on_event
         self.sleep = sleep or _time.sleep
@@ -395,7 +396,13 @@ class OrbExecutionController:
 
     def to_state(self) -> Dict[str, Any]:
         with self._lock:
-            return copy.deepcopy(self.state)
+            out = copy.deepcopy(self.state)
+            if self._resolving is not None:
+                # an operator is removing this unknown-write marker: every save written meanwhile is
+                # the state WITHOUT it (the marker stays in memory until that save is durable)
+                out["unresolved_writes"] = [m for m in out.get("unresolved_writes") or []
+                                            if self._resolving not in (m.get("coid"), m.get("order_id"))]
+            return out
 
     def from_state(self, state: Optional[dict]) -> None:
         """Restore a checkpointed state. Entries stay refused until reconcile_on_startup()."""
@@ -1146,23 +1153,34 @@ class OrbExecutionController:
 
     def resolve_unknown_write(self, ref: str, note: str) -> Optional[dict]:
         """Operator: drop one unresolved-write marker (by client id or order id) after checking Alpaca by
-        hand. Returns the removed marker (audited in the events) or None if there is no such marker."""
-        # Serialized with startup reconciliation (and the supervisor) through _tick_lock for the whole
-        # remove + persist: a reconciliation can never see the marker gone before it is durably gone.
-        with self._tick_lock:
+        hand. No lock is held during the save, so a stalled save never stops supervision or exits:
+          1. under _lock: ready=False and `resolving` set (reconciliation neither sets ready nor clears
+             this marker meanwhile);
+          2. save the state without the marker (to_state omits it while resolving);
+          3. under _lock: success = marker removed, the next reconciliation decides ready;
+             failure = marker kept, ready stays False, retries continue (and the error is raised).
+        Returns the removed marker, or None if there is no such marker."""
+        with self._lock:
+            if self._resolving is not None:
+                raise RuntimeError("another unknown-write resolution is in progress")
+            hit = next((m for m in self.state.get("unresolved_writes") or []
+                        if ref in (m.get("coid"), m.get("order_id"))), None)
+            if hit is None:
+                return None
+            self._resolving = ref
+            self.ready = False
+        try:
+            self._persist()
+        except Exception:
             with self._lock:
-                rows = list(self.state.get("unresolved_writes") or [])
-                hit = next((m for m in rows if ref in (m.get("coid"), m.get("order_id"))), None)
-                if hit is None:
-                    return None
-                self.state["unresolved_writes"] = [m for m in rows if m is not hit]
-            try:
-                self._persist()
-            except Exception:
-                with self._lock:              # not durable: the marker stays, entries stay off
-                    self.state["unresolved_writes"] = rows
-                self.ready = False            # the scheduler keeps re-running reconciliation
-                raise
+                self._resolving = None
+                self.ready = False
+            self._persist_quiet()            # the durable state gets the marker back (best effort)
+            raise
+        with self._lock:
+            self.state["unresolved_writes"] = [m for m in self.state.get("unresolved_writes") or []
+                                               if ref not in (m.get("coid"), m.get("order_id"))]
+            self._resolving = None
         self._event({"kind": "unresolved_write_resolved_by_operator", "write": hit, "note": note})
         return hit
 
@@ -2356,6 +2374,7 @@ class OrbExecutionController:
         # by order id) and fold its answer into the book before anything else is judged
         with self._lock:
             markers = list(self.state.get("unresolved_writes") or [])
+            resolving = self._resolving
         report["unresolved_writes"] = markers
         # A marker is cleared ONLY when Alpaca shows the order: "not found" proves nothing (a POST can
         # still land late), so ORB stays unready for entries and the scheduler retries this every
@@ -2363,6 +2382,9 @@ class OrbExecutionController:
         # supervision of known positions keep running meanwhile.
         left = []
         for m in markers:
+            if resolving is not None and resolving in (m.get("coid"), m.get("order_id")):
+                left.append(m)                # an operator is resolving it: never cleared from here
+                continue
             found = False
             try:
                 if m.get("coid"):
@@ -2380,7 +2402,15 @@ class OrbExecutionController:
             if not found:
                 left.append(dict(m, checks=int(m.get("checks") or 0) + 1, last_check=now.isoformat()))
         with self._lock:
-            self.state["unresolved_writes"] = left
+            # drop only the markers this pass found at Alpaca; a resolution finished meanwhile stays done
+            left_refs = {(m.get("coid"), m.get("order_id")) for m in left}
+            by_ref = {(m.get("coid"), m.get("order_id")): m for m in left}
+            self.state["unresolved_writes"] = [by_ref.get((m.get("coid"), m.get("order_id")), m)
+                                               for m in (self.state.get("unresolved_writes") or [])
+                                               if (m.get("coid"), m.get("order_id")) in left_refs
+                                               or m not in markers]
+        if resolving is not None:
+            report["errors"].append("an operator is resolving an unknown write; no new ORB entries until it is saved")
         if left:
             report["errors"].append(f"{len(left)} write(s) sent just before the last shutdown have no answer "
                                     "from Alpaca yet; no new ORB entries until they are found or resolved")
@@ -2426,7 +2456,10 @@ class OrbExecutionController:
                                                "note": "ADT-ORB orders at Alpaca that the saved state does not "
                                                        "know: not adopted; a human must check them"})
         report["ok"] = not report["errors"] and not report["unknown_orders"] and not report["reservation_conflicts"]
-        self.ready = report["ok"]
+        with self._lock:
+            if self._resolving is not None:
+                report["ok"] = False          # never ready while a resolution's save is in flight
+            self.ready = report["ok"]
         self.startup_report = report
         self._event({"kind": "startup_reconcile", "ok": report["ok"], "errors": report["errors"][:5],
                      "unknown_orders": len(report["unknown_orders"]), "carried": report["carried"]})
