@@ -1147,18 +1147,22 @@ class OrbExecutionController:
     def resolve_unknown_write(self, ref: str, note: str) -> Optional[dict]:
         """Operator: drop one unresolved-write marker (by client id or order id) after checking Alpaca by
         hand. Returns the removed marker (audited in the events) or None if there is no such marker."""
-        with self._lock:
-            rows = list(self.state.get("unresolved_writes") or [])
-            hit = next((m for m in rows if ref in (m.get("coid"), m.get("order_id"))), None)
-            if hit is None:
-                return None
-            self.state["unresolved_writes"] = [m for m in rows if m is not hit]
-        try:
-            self._persist()
-        except Exception:
-            with self._lock:                  # not durable: the marker stays
-                self.state["unresolved_writes"] = rows
-            raise
+        # Serialized with startup reconciliation (and the supervisor) through _tick_lock for the whole
+        # remove + persist: a reconciliation can never see the marker gone before it is durably gone.
+        with self._tick_lock:
+            with self._lock:
+                rows = list(self.state.get("unresolved_writes") or [])
+                hit = next((m for m in rows if ref in (m.get("coid"), m.get("order_id"))), None)
+                if hit is None:
+                    return None
+                self.state["unresolved_writes"] = [m for m in rows if m is not hit]
+            try:
+                self._persist()
+            except Exception:
+                with self._lock:              # not durable: the marker stays, entries stay off
+                    self.state["unresolved_writes"] = rows
+                self.ready = False            # the scheduler keeps re-running reconciliation
+                raise
         self._event({"kind": "unresolved_write_resolved_by_operator", "write": hit, "note": note})
         return hit
 

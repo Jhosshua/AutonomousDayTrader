@@ -541,3 +541,53 @@ def test_resolve_orphan_changes_nothing_when_the_checkpoint_fails(main_runtime, 
     assert r.account.positions["APP"].shares == 454 and (r.account.equity, r.account.cash) == (eq, cash)
     assert len(r.engine.orders) == n_orders and "APP" in r.orb.alerts and not r.orb.ledger["resolved"]
     assert not any(d["outcome"] == "ORB_ORPHAN_RESOLVED" for d in r.decision_log.recent(10, "orb"))
+
+
+def test_operator_resolve_of_an_unknown_write_is_atomic_with_reconciliation(main_runtime):
+    """The marker's removal and its durable save are one step for reconciliation: a reconciliation that
+    starts while the save is in flight waits for it; if the save fails the marker is back, ORB is not
+    ready, and the next reconciliation still refuses entries."""
+    r = main_runtime
+    h = _marker_after_restart(r)
+    h.ctl.reconcile_on_startup()
+    h.ctl.ready = True                                   # even if something had set it, a failure resets it
+    real_persist = h.ctl.persist_cb
+    saving, release = threading.Event(), threading.Event()
+
+    def failing_persist(state):
+        saving.set()
+        release.wait(5)
+        raise OSError("disk full")
+    h.ctl.persist_cb = failing_persist
+    errors = []
+    t = threading.Thread(target=lambda: errors.append(
+        pytest.raises(OSError, h.ctl.resolve_unknown_write, "adt-orb-X-APP-2026-09-28-1-9", "t")))
+    t.start()
+    assert saving.wait(5)
+    rec = {}
+    rt = threading.Thread(target=lambda: rec.setdefault("rep", h.ctl.reconcile_on_startup()))
+    rt.start()
+    _time.sleep(0.2)
+    assert rt.is_alive() and "rep" not in rec          # reconciliation waits for the resolution to finish
+    h.ctl.persist_cb = real_persist
+    release.set()
+    t.join(5)
+    rt.join(5)
+    assert errors and len(h.ctl.state["unresolved_writes"]) == 1
+    assert not rec["rep"]["ok"] and h.ctl.ready is False
+    h.alpaca.prices["PLTR"] = 50.1
+    assert "reconciliation" in h.ctl.execute([pick("PLTR", "long", 50.0, 49.0)], h.clock.now)["reason"]
+
+
+def test_a_failed_operator_resolve_leaves_orb_unready_at_once(main_runtime):
+    r = main_runtime
+    h = _marker_after_restart(r)
+    h.ctl.reconcile_on_startup()
+    h.ctl.ready = True
+
+    def failing(state):
+        raise OSError("disk full")
+    h.ctl.persist_cb = failing
+    with pytest.raises(OSError):
+        h.ctl.resolve_unknown_write("adt-orb-X-APP-2026-09-28-1-9", "t")
+    assert h.ctl.ready is False and len(h.ctl.state["unresolved_writes"]) == 1
