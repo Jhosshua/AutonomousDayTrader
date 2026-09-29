@@ -1,6 +1,6 @@
 # Plan 2026-09-29: "Holding now" says which strategy, and the dashboard shows how the robot adapts
 
-Status: v2, revised after two independent critiques (backend truth: 2 P0 + 16 P1; operator UX/QA: 11 P1). All P0/P1 accepted unless marked. Design mockup (v1, superseded where this text differs): canvas https://claude.ai/artifact/2TWAJNTRtELgH8JwdKEjR3
+Status: BUILT 2026-09-29 (merge 1761911). v2, revised after two independent critiques (backend truth: 2 P0 + 16 P1; operator UX/QA: 11 P1). All P0/P1 accepted unless marked. Design mockup (v1, superseded where this text differs): canvas https://claude.ai/artifact/2TWAJNTRtELgH8JwdKEjR3
 
 ## Operator request
 

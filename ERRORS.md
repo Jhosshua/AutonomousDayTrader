@@ -435,3 +435,11 @@ right. Run the mutation check.
 **What worked instead:** keep the fixed plans' state whole (only bar lists trimmed) and keep exactly the engine orders that the brackets and strategies reference (19 of 126). 137 KB, restores, saves as schema 3, restores again. The full 3.5 MB row is also run when it is present on the machine.
 
 **Note for next time:** before trimming a checkpoint, list what `validate_runtime_state` and `validate_tri_state` cross-check (orders referenced by brackets and tranches) and keep those references intact.
+
+## 2026-09-29: A plan claimed "the fear gauge shrinks the trade"; the code's notional cap made that false most of the time
+
+**What did not work:** plan v1 for the holding card said adaptive trades are "70% of normal size" in a nervous market and "half size" at midday, read straight from the multipliers in adaptation.py.
+
+**What worked instead:** a critique agent actually ran `calculate_position_size` on $50k at $100: stops of 0.5%, 1% and 2% give 125 shares in every VIX level, because the 25%-of-equity notional cap binds before the risk budget. The card now records `qty_if_neutral` and claims a size change only when the shares really differ.
+
+**Note for next time:** before any UI copy says a rule changed an outcome, compute the outcome with and without the rule on realistic inputs. A multiplier in the code is not a change in the result when a later min() caps it.
