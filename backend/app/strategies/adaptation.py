@@ -12,7 +12,10 @@ import math
 from typing import Any, Dict, List, Optional, Set, Tuple
 import zoneinfo
 
-from backend.app.models.events import OrderSide, VixPrint, VixRegime, classify_vix_regime
+from backend.app.models.events import (
+    OrderSide, VIX_REGIME_BOUNDARIES, VIX_REGIME_SIZING_MULTIPLIERS, VIX_REGIME_STOP_MULTIPLIERS,
+    VixPrint, VixRegime, classify_vix_regime,
+)
 from backend.app.strategies.base import SignalEvent, resolve_stop
 
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
@@ -323,19 +326,72 @@ class DynamicAdaptationEngine:
 
         return True, "APPROVED_BY_ADAPTATION_ENGINE", shares
 
-    def get_market_context(self) -> Dict[str, Any]:
-        """Get market context dictionary for UI WebSocket streaming."""
-        ctx = {
-            "vix": self.current_vix,
+    @property
+    def time_multiplier(self) -> float:
+        """The time-of-day size factor calculate_adapted_size applies (display reads this)."""
+        return 0.50 if self.current_time_phase == TimeOfDayPhase.MIDDAY_CHOP.value else 1.0
+
+    @staticmethod
+    def vix_tiers() -> List[Dict[str, Any]]:
+        """The fear-gauge levels straight from the events.py tuples (None = open end)."""
+        names = (VixRegime.LOW, VixRegime.NORMAL, VixRegime.ELEVATED, VixRegime.CRISIS)
+        bounds = (None,) + tuple(VIX_REGIME_BOUNDARIES) + (None,)
+        return [{"name": names[i].value, "lower": bounds[i], "upper": bounds[i + 1],
+                 "sizing": VIX_REGIME_SIZING_MULTIPLIERS[i], "stop": VIX_REGIME_STOP_MULTIPLIERS[i]}
+                for i in range(4)]
+
+    @staticmethod
+    def _midday_window() -> Optional[Dict[str, str]]:
+        from backend.app.core.trading_windows import PHASES
+        for start, end, phase in PHASES:
+            if phase == TimeOfDayPhase.MIDDAY_CHOP.value:
+                return {"start": start.strftime("%H:%M"), "end": end.strftime("%H:%M")}
+        return None
+
+    def get_market_context(
+        self,
+        vix_stale: Optional[bool] = None,
+        vix_age_seconds: Optional[float] = None,
+        adaptive_strategies: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Get market context dictionary for UI WebSocket streaming.
+
+        Display only. Every key is ALWAYS present (None when unknown) because the UI merges
+        streamed frames, so an omitted key would keep a stale value on screen. The stale flag,
+        VIX age and adaptive strategy ids live outside the engine and are passed in by main.py.
+        """
+        vix = self.current_vix
+        ctx: Dict[str, Any] = {
+            "vix": vix if isinstance(vix, (int, float)) and math.isfinite(vix) else None,
             "vix_regime": self.current_vix_regime,
             "time_phase": self.current_time_phase,
             "market_status": self.market_status,
             "sizing_multiplier": self.current_sizing_multiplier,
             "stop_multiplier": self.current_stop_multiplier,
+            "vix_stale": vix_stale,
+            "vix_age_seconds": vix_age_seconds,
+            "time_multiplier": self.time_multiplier,
+            "market_trend": None,
+            "market_trend_reason": None,
+            "max_concurrent_positions": self.max_concurrent_positions,
+            "notional_cap_pct": round(self.max_alloc_pct * 100.0, 4),
+            "base_risk_pct": round(self.base_risk_pct * 100.0, 4),
+            "midday": None,
+            "vix_tiers": None,
+            "adaptive_strategies": list(adaptive_strategies) if adaptive_strategies is not None else [],
         }
         if self.market_filter is not None:
-            trend, _ = self.market_filter.get_current_trend()
-            ctx["market_trend"] = trend.value
+            try:
+                trend, reason = self.market_filter.get_current_trend()
+                ctx["market_trend"] = trend.value
+                ctx["market_trend_reason"] = str(reason).split(":")[0].strip()[:60] or None
+            except Exception:
+                pass
+        try:
+            ctx["midday"] = self._midday_window()
+            ctx["vix_tiers"] = self.vix_tiers()
+        except Exception:
+            pass
         return ctx
 
     def get_snapshot(self) -> AdaptationState:

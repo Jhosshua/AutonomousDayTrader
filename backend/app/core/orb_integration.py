@@ -456,6 +456,9 @@ class OrbIntegration:
         if isinstance(state, dict) and state.get("version") == LEDGER_VERSION:
             self.ledger.update({k: copy.deepcopy(state.get(k, self.ledger[k]))
                                 for k in ("booked", "recorded", "logged", "resolved")})
+            # display-only section (absent in older checkpoints; older code ignores it)
+            if isinstance(state.get("regime"), dict):
+                self.ledger["regime"] = copy.deepcopy(state["regime"])
             return
         version = state.get("version") if isinstance(state, dict) else type(state).__name__
         self.ledger_error = (f"ORB's saved fill ledger has version {version!r}, not {LEDGER_VERSION}: ORB is off "
@@ -1105,6 +1108,23 @@ class OrbIntegration:
         self.alerts[sym] = text
 
     # ------------------------------------------------------------------ decisions log / research
+    def _remember_regime(self, picks: List[dict], regime: Any, wave: Any, at: Any, day: str) -> None:
+        """Display only: the 9:38 market check each picked symbol was traded under, day-scoped, kept in
+        this ledger section (never the scheduler state, whose version check would refuse a change)."""
+        try:
+            reg = regime if isinstance(regime, dict) else {}
+            saved = self.ledger.get("regime")
+            if not isinstance(saved, dict) or saved.get("day") != day:
+                saved = {"day": day, "symbols": {}}
+            for p in picks:
+                sym = str(p.get("symbol") or "").upper()
+                if sym:
+                    saved["symbols"][sym] = {"classification": reg.get("classification"),
+                                             "short_frac": _f(reg.get("short_frac")), "wave": wave, "at": at}
+            self.ledger["regime"] = saved
+        except Exception:
+            log.warning("ORB regime note failed", exc_info=True)
+
     def _on_decision(self, row: dict) -> None:
         """Scheduler hook (tick thread = event loop in production): decisions log + research rows."""
         r = self.r
@@ -1118,6 +1138,8 @@ class OrbIntegration:
         mode = self.controller.mode if self.controller is not None else self.mode
         if row.get("kind") == "verdict":
             picks = row.get("pick_details") or []
+            if picks:
+                self._remember_regime(picks, row.get("regime"), row.get("wave"), row.get("at"), day)
             if not picks:
                 outcome = "ORB_SAT_OUT" if row.get("verdict") in ("sit_out", "pass", "blocked", "skipped") else "ORB_NO_DECISION"
                 r.decision_log.record(ORB_ID, "BOARD", "-", 0.0, outcome,
@@ -1241,11 +1263,43 @@ class OrbIntegration:
         ctl = self.controller
         h = next((x for x in (ctl.holdings() if ctl else []) if x["symbol"] == symbol.upper()), None)
         out: Dict[str, Any] = {"strategy_id": ORB_ID, "fixed_protection": True, "take_profit_2": None,
-                               "exit_due": None}
+                               "exit_due": None, "orb_context": self._orb_context(symbol, h)}
         if h is not None:
+            flatten = ctl.cfg["flatten"] if ctl is not None else "11:00"
+            from backend.app.core.orb_execution import parse_hms
             out.update(stop_loss=h.get("stop"), take_profit_1=h.get("target"), r_multiple=h.get("r"),
-                       exit_due=datetime.combine(self.clock().astimezone(ET).date(), time(11, 0), ET).isoformat())
+                       exit_due=datetime.combine(self.clock().astimezone(ET).date(), parse_hms(flatten), ET).isoformat())
         return out
+
+    def _orb_context(self, symbol: str, h: Optional[dict]) -> Dict[str, Any]:
+        """Display only, every key always present (None when unknown): the 9:38 check this trade passed."""
+        ctx: Dict[str, Any] = {"classification": None, "short_frac": None, "wave": None, "decided_at": None,
+                               "short_bounds": None, "flow_rules_on": None, "breakeven_r": None,
+                               "risk_usd": None, "flatten_at": None}
+        try:
+            from backend.app.strategies.orbs import config as orbs_config
+            from backend.app.strategies.orbs.adaptive import ADAPTIVE_CONFIG
+            saved = self.ledger.get("regime") or {}
+            today = self.clock().astimezone(ET).date().isoformat()
+            if saved.get("day") == today:
+                note = (saved.get("symbols") or {}).get(symbol.upper()) or {}
+                ctx.update(classification=note.get("classification"), short_frac=note.get("short_frac"),
+                           wave=note.get("wave"), decided_at=note.get("at"))
+            ctx["short_bounds"] = {"min": ADAPTIVE_CONFIG["MIN_BOARD_SHORT_FRAC"],
+                                   "max": ADAPTIVE_CONFIG["MAX_BOARD_SHORT_FRAC"]}
+            eff = orbs_config.effective()
+            ctx["flow_rules_on"] = [name for key, name in (
+                ("CANDLE_RULE", "candle"), ("DELTA_RULE", "delta"), ("VELOCITY_RULE", "velocity"),
+                ("MACRO_RULE", "macro"), ("ABSORPTION_EXIT", "absorption")) if eff.get(key)]
+            ctl = self.controller
+            if ctl is not None:
+                ctx["breakeven_r"] = ctl.cfg.get("breakeven_r")
+                ctx["flatten_at"] = str(ctl.cfg.get("flatten"))
+            if h is not None:
+                ctx["risk_usd"] = _f(h.get("risk_usd"))
+        except Exception:
+            log.warning("ORB context failed for %s", symbol, exc_info=True)
+        return ctx
 
     @staticmethod
     def _trade_sentence(h: dict) -> str:

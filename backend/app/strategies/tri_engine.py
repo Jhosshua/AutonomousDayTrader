@@ -24,6 +24,7 @@ CDE_ID = "cde_asymmetric_dual"
 TRI_IDS = frozenset((TSLA_ID, CDE_ID))
 FIXED_IDS = TRI_IDS | {"tsla_or15_retest"}
 VERSION = "ASYMMETRIC_DUAL_PAPER_V1"
+TRI_RISK_PCT = .0075     # per-plan risk budget, fraction of session-start equity (same value tri_execution sizes with)
 SOURCE_PATH = Path(__file__).resolve().parents[3] / "docs/tri_engine/SOURCE_EXECUTION_PLAN.md"
 SOURCE_SHA256 = "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb"
 MINUTE = timedelta(minutes=1)
@@ -282,7 +283,7 @@ class AsymmetricDualStrategy(Strategy):
             "phase": self.phase, "reason": self.reason, "quantity": self.quantity,
             "last_error": self.last_error,
             "side": self.side, "mode": self.execution_mode, "risk_reserved": self.risk_reserved,
-            "risk_budget": self.session_equity * .0075 if self.session_equity else None,
+            "risk_budget": self.session_equity * TRI_RISK_PCT if self.session_equity else None,
             "or_high": self.or_high, "or_low": self.or_low, "or_mid": self.or_mid,
             "qqq_close": self.qqq_close, "qqq_vwap": self.qqq_vwap,
             "entry_due": self.entry_due.isoformat() if self.entry_due else None,
