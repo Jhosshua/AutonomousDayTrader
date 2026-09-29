@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sunrise, Waves, Zap, Undo2, CornerDownRight } from "lucide-react";
+import { ChevronDown, Sunrise, Waves, Zap, Undo2, CornerDownRight } from "lucide-react";
 import { apiBase } from "@/lib/apiBase";
 import { StrategyState } from "@/types/trading";
 import {
@@ -35,8 +35,15 @@ interface StrategyCardProps {
   strategy: StrategyState;
   ledgerAgg?: StrategyLedgerAgg;
   showPro: boolean;
-  delayMs?: number;
 }
+
+/** Row grid shared with StrategyTable's column header so the hours bars line up. Phone: name / result /
+ * chevron on line 1, status + hours bar on line 2, today's note on line 3. Desktop: name / status / hours bar /
+ * result on line 1, today's note under status and bar on line 2 (full width, so long notes stay short). */
+export const ROW_GRID =
+  "grid grid-cols-[148px_minmax(0,1fr)_auto_16px] gap-x-3 lg:grid-cols-[minmax(0,1fr)_150px_minmax(0,1.2fr)_84px_16px] lg:gap-x-4";
+/** Content that sits under the status and hours-bar columns on desktop, full width on phones. */
+const UNDER_ROW = "col-span-4 col-start-1 lg:col-span-3 lg:col-start-2";
 
 const CHIP_STYLES: Record<string, { bg: string; fg: string }> = {
   sage: { bg: "#FFFFFF", fg: "#2F5A45" },
@@ -75,7 +82,7 @@ function OrbOrphanResolve({ symbol }: { symbol: string }) {
   return (
     <div className="mt-2">
       <button type="button" onClick={resolve} disabled={busy} data-testid="orb-resolve-orphan"
-        className="rounded-lg border border-[#8F4424]/60 bg-white px-3 py-1.5 text-xs font-semibold text-[#8F4424]">
+        className="min-h-[44px] rounded-lg border border-[#8F4424]/60 bg-white px-3 py-1.5 text-xs font-semibold text-[#8F4424]">
         {busy ? "Checking Alpaca…" : armed ? `Confirm: clear ${symbol}` : `I closed ${symbol} at Alpaca: clear it`}
       </button>
       {msg && <div className="mt-1 text-xs font-normal">{msg}</div>}
@@ -83,7 +90,8 @@ function OrbOrphanResolve({ symbol }: { symbol: string }) {
   );
 }
 
-export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0 }: StrategyCardProps) {
+export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyCardProps) {
+  const [open, setOpen] = useState(false);
   const theme = strategyTheme(strategy.id, strategy.name);
   const Icon = ICONS[strategy.id] || Waves;
   const win = strategy.window;
@@ -121,165 +129,208 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
     win?.notes?.[0]
   );
 
+  // Alarms render OUTSIDE the collapsible details: never hidden behind a click.
+  const orbAlerts = strategy.orb?.alerts ?? [];
+  const orbProblem = strategy.orb
+    ? (strategy.orb.init_error || (strategy.orb.errors.some((e) => e.alarm !== "orb_alert" && !(strategy.orb?.orphans ?? []).some((o) => o.symbol === e.symbol)) ? "ORB reported a problem; check the paper account." : null))
+    : null;
+  const triError = strategy.tri_engine?.last_error ?? null;
+  const hasAlarm = orbAlerts.length > 0 || !!orbProblem || !!triError;
+  // Live status that must not hide behind a click either (plan section 8, P1).
+  const orb = strategy.orb;
+  const trendOff = strategy.id === "vwap_pullback" && strategy.mode === "off";
+  const trendAddonsOff = strategy.id === "vwap_pullback" && !strategy.addons_enforced;
+  const or15Unconfirmed = strategy.or15?.phase === "HOLDING" && strategy.or15.mode !== "offline_raw_open" && !strategy.or15.protection_confirmed;
+  const hasStatus = !!orb?.step || (orb?.open_trades.length ?? 0) > 0 || trendOff || trendAddonsOff || or15Unconfirmed;
+  const detailsId = `strategy-details-${strategy.id}`;
+
   return (
-    <article
-      className="rise hover-card flex min-h-[380px] sm:min-h-[420px] flex-col overflow-hidden rounded-[26px] border border-line bg-white"
-      style={{ animationDelay: `${delayMs}ms` }}
-    >
-      <div
-        className="flex flex-col gap-4 px-5 py-5"
-        style={{ background: theme.band, filter: resting ? "saturate(0.55) brightness(1.03)" : undefined }}
+    <article className="border-t border-line" data-testid={`strategy-row-${strategy.id}`}>
+      <h3>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={detailsId}
+        data-testid="strategy-row-toggle"
+        className={`${ROW_GRID} min-h-[52px] w-full items-center gap-y-1 px-4 py-2 text-left transition-colors hover:bg-[#FBF8F2] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#4A5190]`}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="bob flex h-11 w-11 flex-shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-2xl" style={{ background: theme.bar }}>
-            <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" strokeWidth={1.9} aria-hidden="true" />
-          </div>
+        <span className="col-span-2 col-start-1 row-start-1 flex min-w-0 items-center gap-2.5 lg:col-span-1">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
-            style={{ background: chipStyle.bg, color: chipStyle.fg }}
-            data-testid="window-badge"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+            style={{ background: theme.bar, opacity: resting ? 0.6 : 1 }}
+            aria-hidden="true"
           >
-            <span
-              className={chip.breathing ? "breathe inline-block h-2 w-2 rounded-full" : "inline-block h-2 w-2 rounded-full"}
-              style={{ background: resting || chip.tone === "grey" ? "#A7A2B8" : theme.bar }}
-            />
-            {chip.label}
+            <Icon className="h-4 w-4 text-white" strokeWidth={2} />
           </span>
-        </div>
-        <h3 className="font-display text-xl sm:text-2xl font-semibold" style={{ color: theme.ink }}>
-          {theme.name}
-        </h3>
-      </div>
+          <span className="font-display text-[15px] font-semibold leading-tight" style={{ color: theme.ink }} data-testid="strategy-name">
+            {theme.name}
+          </span>
+        </span>
 
-      <div className="flex flex-grow flex-col gap-4 px-5 py-5">
-        {showPro && (
-          <div className="flex flex-col gap-1 self-start rounded-lg px-2.5 py-1.5 text-xs font-semibold" style={{ background: theme.tint, color: theme.ink }}>
-            <span>Pro name: {strategy.name}</span>
-            <span className="font-normal">
-              Win rate: {ledgerAgg ? `${Math.round((ledgerAgg.wins / Math.max(1, ledgerAgg.trades_count)) * 100)}%` : `${Math.round((strategy.win_rate ?? 0) * 100)}%`}
-            </span>
-            {win?.blockers && win.blockers.length > 0 && <span className="font-normal">Blocked by: {win.blockers.join(", ")}</span>}
-          </div>
-        )}
-        <p className="text-sm leading-relaxed text-[#3E3A57]">{theme.what}</p>
-        {strategy.id === "vwap_pullback" && (
-          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="trend-details">
-            <div className="font-semibold">{strategy.mode === "off" ? "New entries switched off" : "Paper account · Morning entries"}</div>
-            <div>{strategy.addons_enforced ? "Flow, spread and prior-volume checks enforced." : "Extra flow, spread and prior-volume checks switched off."}</div>
-            {win?.notes?.slice(1).map((line) => <div key={line} className="mt-1">{line}</div>)}
-            <details className="mt-2">
-              <summary className="cursor-pointer font-semibold">Latest refused setup by stock</summary>
-              {Object.keys(strategy.last_block_by_symbol || {}).length === 0 ? (
-                <div className="mt-1">No refused setups recorded this session.</div>
-              ) : (
-                <ul className="mt-2 space-y-2">
-                  {Object.entries(strategy.last_block_by_symbol || {}).sort(([a], [b]) => a.localeCompare(b)).map(([symbol, block]) => (
-                    <li key={symbol}><span className="font-semibold">{symbol}</span> · {etTimeLabel(block.bar)} ET<br />{trendBlockText(block.event)}</li>
-                  ))}
-                </ul>
-              )}
-            </details>
-          </div>
-        )}
-        {strategy.tri_engine && (
-          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="tri-engine-details">
-            <div className="font-semibold">{strategy.tri_engine.mode === "offline_raw_open" ? "Offline replay" : "Paper account"} · {strategy.tri_engine.quantity ? `${strategy.tri_engine.quantity} shares` : "Size follows the risk budget"}</div>
-            <div>{strategy.tri_engine.symbol === "TSLA" ? "Buys until 11:30 AM · Bets on a drop until 11 AM" : "Buys until noon · Bets on a drop until 11:30 AM"} ET</div>
-            <div>{strategy.tri_engine.symbol === "TSLA"
-              ? (showPro ? "Half at 1.5R / 3 hours · Half at 2R / 4 hours" : "Half aims for 1.5× its risk within 3 hours, half for 2× within 4 hours")
-              : (showPro ? "Full position at 2R / 3 hours" : "Aims for 2× its risk within 3 hours")}</div>
-            {strategy.tri_engine.risk_budget != null && <div>Risk budget: {formatMoney(strategy.tri_engine.risk_budget)}</div>}
-            {strategy.tri_engine.last_error && (
-              <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
-                Broker issue: check the paper account. Order management will keep retrying.
-                {showPro && <div className="mt-1 text-xs">{strategy.tri_engine.last_error}</div>}
-              </div>
-            )}
-            {strategy.tri_engine.tranches.map((t, i, all) => (
-              <div key={t.id} className="mt-2 border-t pt-2" style={{ borderColor: theme.track }}>
-                <span className="font-semibold">{showPro ? `${t.target_r}R part` : trancheName(i, all.length)} · {t.qty - t.closed_qty} of {t.qty} shares open</span>
-                <div>{strategy.tri_engine?.side === "SHORT" ? "Buys back" : "Sells"} at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
-              </div>
-            ))}
-            {showPro && strategy.tri_engine.reason && <div className="mt-2 break-words">{planStatusText(strategy.tri_engine.reason)}</div>}
-          </div>
-        )}
-        {strategy.orb && (
-          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="orb-details">
-            <div className="font-semibold">{strategy.orb.mode_text}</div>
-            <div>{strategy.orb.hours} ET</div>
-            {strategy.orb.step && <div className="mt-1">{strategy.orb.step}</div>}
-            {strategy.orb.open_trades.map((t) => (
-              <div key={t.symbol} className="mt-2 border-t pt-2" style={{ borderColor: theme.track }}>
-                <span className="font-semibold">{t.direction === "long" ? "Bought" : "Sold short"} {t.symbol} · {Math.abs(t.qty)} shares</span>
-                <div>Safety exit {t.stop != null ? formatMoney(t.stop) : "unknown"} · target {t.target != null ? formatMoney(t.target) : "none"} (held at Alpaca)</div>
-                {t.r != null && <div>Now {t.r >= 0 ? "+" : ""}{t.r.toFixed(2)}× its risk{t.breakeven_locked ? " · stop moved to the entry" : ""}</div>}
-                {t.exit_requested && <div>Closing: {t.exit_requested}</div>}
-              </div>
-            ))}
-            {(strategy.orb.realized_pnl !== 0 || strategy.orb.unrealized_pnl !== 0) && (
-              <div className="mt-2">Today: {formatSignedMoney(strategy.orb.realized_pnl)} closed{strategy.orb.open_trades.length > 0 ? `, ${formatSignedMoney(strategy.orb.unrealized_pnl)} open` : ""}</div>
-            )}
-            {(strategy.orb.alerts ?? []).map((a) => {
-              const orphan = (strategy.orb?.orphans ?? []).find((o) => o.text === a);
-              return (
-                <div key={a} role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/60 bg-white p-2 font-semibold text-[#8F4424]" data-testid="orb-alert">
-                  {a}
-                  {orphan && <OrbOrphanResolve symbol={orphan.symbol} />}
-                </div>
-              );
-            })}
-            {(strategy.orb.init_error || strategy.orb.errors.some((e) => e.alarm !== "orb_alert" && !(strategy.orb?.orphans ?? []).some((o) => o.symbol === e.symbol))) && (
-              <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
-                {strategy.orb.init_error || "ORB reported a problem; check the paper account."}
-                {showPro && strategy.orb.errors.length > 0 && <div className="mt-1 text-xs">{strategy.orb.errors.map((e) => e.alarm || e.kind).join(", ")}</div>}
-              </div>
-            )}
-          </div>
-        )}
-        {strategy.or15 && (
-          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="or15-details">
-            <span className="font-semibold">1 share · {strategy.or15.mode === "offline_raw_open" ? "Offline replay" : "Paper account"}</span>
-            <div>Watches 9:45–11:30 AM ET</div>
-            {strategy.or15.phase === "HOLDING" && <div>{strategy.or15.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : strategy.or15.protection_confirmed ? "Safety exit and target held at the broker." : "Confirming protection with the broker."}</div>}
-            {showPro && strategy.or15.reason && <div className="break-words">{planStatusText(strategy.or15.reason)}</div>}
-          </div>
-        )}
-
-        <div className="mt-auto flex flex-col gap-1.5" data-testid="strategy-window">
-          <div className="relative h-3 rounded-full" style={{ background: theme.track }}>
-            {segments.map((seg, i) => (
-              <div
-                key={i}
-                className="grow absolute inset-y-0 rounded-md"
-                style={{ left: `${seg.left}%`, width: `${seg.width}%`, background: theme.bar, opacity: resting ? 0.5 : 1 }}
-              />
-            ))}
-            {showNow && (
-              <div
-                className="breathe absolute -top-1 h-5 w-[3px] rounded-sm"
-                style={{ left: `${nowLeft}%`, background: "#1D1A33" }}
-              />
-            )}
-          </div>
-          <div className="flex justify-between text-xs text-muted">
-            <span>9:30</span>
-            <span>noon</span>
-            <span>4 PM</span>
-          </div>
-        </div>
-
-        <div
-          className="flex items-start justify-between gap-3 rounded-2xl px-3.5 py-3 text-sm leading-snug text-[#3E3A57]"
-          style={{ background: theme.tint }}
-          data-testid="strategy-decisions"
+        <span
+          className="col-start-1 row-start-2 inline-flex items-center gap-1.5 justify-self-start rounded-full px-2.5 py-1 text-xs font-semibold lg:col-start-2 lg:row-start-1"
+          style={{ background: theme.tint, color: chipStyle.fg }}
+          data-testid="window-badge"
         >
-          <span>{note}</span>
-          <span className="flex-shrink-0 tabular-nums text-base font-bold" style={{ color: pnlColor }}>
-            {tradesCount > 0 ? formatSignedMoney(pnl) : "$0"}
-          </span>
+          <span
+            className={chip.breathing ? "breathe inline-block h-2 w-2 rounded-full" : "inline-block h-2 w-2 rounded-full"}
+            style={{ background: resting || chip.tone === "grey" ? "#A7A2B8" : theme.bar }}
+          />
+          {chip.label}
+        </span>
+
+        <span className="relative col-span-3 col-start-2 row-start-2 block h-2 rounded-full lg:col-span-1 lg:col-start-3 lg:row-start-1" style={{ background: theme.track }} data-testid="strategy-window">
+          {segments.map((seg, i) => (
+            <span
+              key={i}
+              className="grow absolute inset-y-0 block rounded-md"
+              style={{ left: `${seg.left}%`, width: `${seg.width}%`, background: theme.bar, opacity: resting ? 0.5 : 1 }}
+            />
+          ))}
+          {showNow && (
+            <span
+              className="breathe absolute -top-1 block h-4 w-[3px] rounded-sm"
+              style={{ left: `${nowLeft}%`, background: "#1D1A33" }}
+            />
+          )}
+        </span>
+
+        <span className={`${UNDER_ROW} row-start-3 text-[13px] leading-snug text-[#3E3A57] lg:row-start-2`} data-testid="strategy-decisions">
+          {note}
+        </span>
+
+        <span className="col-start-3 row-start-1 text-right text-sm font-bold tabular-nums lg:col-start-4" style={{ color: pnlColor }} data-testid="strategy-pnl">
+          {tradesCount > 0 ? formatSignedMoney(pnl) : "$0"}
+        </span>
+
+        <ChevronDown
+          className="col-start-4 row-start-1 h-4 w-4 text-muted transition-transform lg:col-start-5"
+          style={{ transform: open ? "rotate(180deg)" : undefined }}
+          aria-hidden="true"
+        />
+      </button>
+      </h3>
+
+      {hasStatus && (
+        <div className={`${ROW_GRID} px-4 pb-2.5`}>
+        <div className={`${UNDER_ROW} flex flex-col gap-1.5 text-[13px] leading-snug text-[#3E3A57]`} data-testid="strategy-status">
+          {trendOff && <div className="font-semibold">New entries switched off</div>}
+          {trendAddonsOff && <div>Extra flow, spread and prior-volume checks switched off.</div>}
+          {or15Unconfirmed && <div>Confirming protection with the broker.</div>}
+          {orb?.step && <div>{orb.step}</div>}
+          {orb?.open_trades.map((t) => (
+            <div key={t.symbol} className="rounded-lg px-3 py-1.5" style={{ background: theme.tint, color: theme.ink }}>
+              <span className="font-semibold">{t.direction === "long" ? "Bought" : "Sold short"} {t.symbol} · {Math.abs(t.qty)} shares</span>
+              <div>Safety exit {t.stop != null ? formatMoney(t.stop) : "unknown"} · target {t.target != null ? formatMoney(t.target) : "none"} (held at Alpaca)</div>
+              {t.r != null && <div>Now {t.r >= 0 ? "+" : ""}{t.r.toFixed(2)}× its risk{t.breakeven_locked ? " · stop moved to the entry" : ""}</div>}
+              {t.exit_requested && <div className="font-semibold">Closing: {t.exit_requested}</div>}
+            </div>
+          ))}
         </div>
-      </div>
+        </div>
+      )}
+
+      {hasAlarm && (
+        <div className={`${ROW_GRID} px-4 pb-3`}>
+        <div className={`${UNDER_ROW} flex flex-col gap-2`}>
+          {orbAlerts.map((a) => {
+            const orphan = (strategy.orb?.orphans ?? []).find((o) => o.text === a);
+            return (
+              <div key={a} role="alert" className="break-words rounded-lg border border-[#8F4424]/60 bg-white p-2 text-sm font-semibold text-[#8F4424]" data-testid="orb-alert">
+                {a}
+                {orphan && <OrbOrphanResolve symbol={orphan.symbol} />}
+              </div>
+            );
+          })}
+          {orbProblem && (
+            <div role="alert" className="break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-sm text-[#8F4424]" data-testid="orb-init-error">
+              {orbProblem}
+              {showPro && (strategy.orb?.errors.length ?? 0) > 0 && <div className="mt-1 text-xs">{strategy.orb?.errors.map((e) => e.alarm || e.kind).join(", ")}</div>}
+            </div>
+          )}
+          {triError && (
+            <div role="alert" className="break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-sm text-[#8F4424]" data-testid="tri-engine-broker-issue">
+              Broker issue: check the paper account. Order management will keep retrying.
+              {showPro && <div className="mt-1 text-xs">{triError}</div>}
+            </div>
+          )}
+        </div>
+        </div>
+      )}
+
+      {open && (
+        <div id={detailsId} className="grid gap-3 px-4 pb-4 pt-1 lg:grid-cols-2 lg:pl-[54px]" data-testid="strategy-details">
+          <div className="flex flex-col gap-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: theme.ink }}>How it works</div>
+            <p className="text-sm leading-relaxed text-[#3E3A57]">{theme.what}</p>
+            {showPro && (
+              <div className="flex flex-col gap-1 self-start rounded-lg px-2.5 py-1.5 text-xs font-semibold" style={{ background: theme.tint, color: theme.ink }}>
+                <span>Pro name: {strategy.name}</span>
+                <span className="font-normal">
+                  Win rate: {ledgerAgg ? `${Math.round((ledgerAgg.wins / Math.max(1, ledgerAgg.trades_count)) * 100)}%` : `${Math.round((strategy.win_rate ?? 0) * 100)}%`}
+                </span>
+                {win?.blockers && win.blockers.length > 0 && <span className="font-normal">Blocked by: {win.blockers.join(", ")}</span>}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            {strategy.id === "vwap_pullback" && (
+              <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="trend-details">
+                {strategy.mode !== "off" && <div className="font-semibold">Paper account · Morning entries</div>}
+                {strategy.addons_enforced && <div>Flow, spread and prior-volume checks enforced.</div>}
+                {win?.notes?.slice(1).map((line) => <div key={line} className="mt-1">{line}</div>)}
+                <details className="mt-2">
+                  <summary className="flex min-h-[44px] cursor-pointer items-center font-semibold">Latest refused setup by stock</summary>
+                  {Object.keys(strategy.last_block_by_symbol || {}).length === 0 ? (
+                    <div className="mt-1">No refused setups recorded this session.</div>
+                  ) : (
+                    <ul className="mt-2 space-y-2">
+                      {Object.entries(strategy.last_block_by_symbol || {}).sort(([a], [b]) => a.localeCompare(b)).map(([symbol, block]) => (
+                        <li key={symbol}><span className="font-semibold">{symbol}</span> · {etTimeLabel(block.bar)} ET<br />{trendBlockText(block.event)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </details>
+              </div>
+            )}
+            {strategy.tri_engine && (
+              <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="tri-engine-details">
+                <div className="font-semibold">{strategy.tri_engine.mode === "offline_raw_open" ? "Offline replay" : "Paper account"} · {strategy.tri_engine.quantity ? `${strategy.tri_engine.quantity} shares` : "Size follows the risk budget"}</div>
+                <div>{strategy.tri_engine.symbol === "TSLA" ? "Buys until 11:30 AM · Bets on a drop until 11 AM" : "Buys until noon · Bets on a drop until 11:30 AM"} ET</div>
+                <div>{strategy.tri_engine.symbol === "TSLA"
+                  ? (showPro ? "Half at 1.5R / 3 hours · Half at 2R / 4 hours" : "Half aims for 1.5× its risk within 3 hours, half for 2× within 4 hours")
+                  : (showPro ? "Full position at 2R / 3 hours" : "Aims for 2× its risk within 3 hours")}</div>
+                {strategy.tri_engine.risk_budget != null && <div>Risk budget: {formatMoney(strategy.tri_engine.risk_budget)}</div>}
+                {strategy.tri_engine.tranches.map((t, i, all) => (
+                  <div key={t.id} className="mt-2 border-t pt-2" style={{ borderColor: theme.track }}>
+                    <span className="font-semibold">{showPro ? `${t.target_r}R part` : trancheName(i, all.length)} · {t.qty - t.closed_qty} of {t.qty} shares open</span>
+                    <div>{strategy.tri_engine?.side === "SHORT" ? "Buys back" : "Sells"} at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
+                  </div>
+                ))}
+                {showPro && strategy.tri_engine.reason && <div className="mt-2 break-words">{planStatusText(strategy.tri_engine.reason)}</div>}
+              </div>
+            )}
+            {strategy.orb && (
+              <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="orb-details">
+                <div className="font-semibold">{strategy.orb.mode_text}</div>
+                <div>{strategy.orb.hours} ET</div>
+                {(strategy.orb.realized_pnl !== 0 || strategy.orb.unrealized_pnl !== 0) && (
+                  <div className="mt-2">Today: {formatSignedMoney(strategy.orb.realized_pnl)} closed{strategy.orb.open_trades.length > 0 ? `, ${formatSignedMoney(strategy.orb.unrealized_pnl)} open` : ""}</div>
+                )}
+              </div>
+            )}
+            {strategy.or15 && (
+              <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="or15-details">
+                <span className="font-semibold">1 share · {strategy.or15.mode === "offline_raw_open" ? "Offline replay" : "Paper account"}</span>
+                <div>Watches 9:45–11:30 AM ET</div>
+                {strategy.or15.phase === "HOLDING" && !or15Unconfirmed && <div>{strategy.or15.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : "Safety exit and target held at the broker."}</div>}
+                {showPro && strategy.or15.reason && <div className="break-words">{planStatusText(strategy.or15.reason)}</div>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </article>
   );
 }

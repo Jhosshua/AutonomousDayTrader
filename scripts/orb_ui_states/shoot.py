@@ -139,6 +139,9 @@ def main() -> int:
                 first = post(base, "/__dev/orb_state/waiting")
                 page.clock.set_fixed_time(datetime.fromisoformat(first["fake_now"]))
                 page.goto(f"http://adt.test:{port}/", wait_until="networkidle")
+                # 2026-09-29 compact dashboard: playbooks are rows; open the ORB row once (it stays open across frames)
+                page.wait_for_selector("[data-testid=strategy-row-orb] [data-testid=strategy-row-toggle]", timeout=20000)
+                page.click("[data-testid=strategy-row-orb] [data-testid=strategy-row-toggle]")
                 page.wait_for_selector("[data-testid=orb-details]", timeout=20000)
                 loads = navs[0]
                 for name, expect, alarm_ok in STATES:

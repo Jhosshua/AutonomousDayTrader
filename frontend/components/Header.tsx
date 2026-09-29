@@ -10,6 +10,8 @@ interface HeaderProps {
   broker?: BrokerInfo;
   showPro: boolean;
   onTogglePro: (next: boolean) => void;
+  /** Rendered in the header row on large screens, as its own full-width row below on phones. */
+  children?: React.ReactNode;
 }
 
 const PRO_STORAGE_KEY = "daytrader.showPro";
@@ -60,7 +62,7 @@ function accountLabel(broker?: BrokerInfo): string {
   return "Practice account. The trades are simulated, no real orders.";
 }
 
-export default function Header({ isConnected, broker, showPro, onTogglePro }: HeaderProps) {
+export default function Header({ isConnected, broker, showPro, onTogglePro, children }: HeaderProps) {
   const [clock, setClock] = useState<string>("");
   useEffect(() => {
     setClock(nowLabel());
@@ -69,19 +71,21 @@ export default function Header({ isConnected, broker, showPro, onTogglePro }: He
   }, []);
 
   return (
-    <header className="rise relative flex flex-wrap items-center justify-between gap-4">
+    <header className="rise relative flex flex-wrap items-center justify-between gap-3 lg:flex-nowrap">
       <div className="flex items-center gap-3">
         <div
-          className="bob flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl shadow-lg"
+          className="bob flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg"
           style={{ background: "linear-gradient(135deg, #D98B5F, #C47A88 55%, #8189C4)" }}
         >
-          <LineChart className="h-6 w-6 text-white" strokeWidth={1.8} aria-hidden="true" />
+          <LineChart className="h-5 w-5 text-white" strokeWidth={1.8} aria-hidden="true" />
         </div>
         <div className="flex flex-col gap-0.5">
-          <div className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-ink">Day Trader</div>
-          <div className="text-xs sm:text-sm text-muted" data-testid="account-label">{accountLabel(broker)}</div>
+          <div className="font-display text-xl font-semibold tracking-tight text-ink">Day Trader</div>
+          <div className="text-xs text-muted" data-testid="account-label">{accountLabel(broker)}</div>
         </div>
       </div>
+
+      {children && <div className="order-last w-full lg:order-none lg:ml-auto lg:w-auto">{children}</div>}
 
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2 rounded-full border border-line bg-white/80 px-3 sm:px-4 py-2 text-xs sm:text-sm">

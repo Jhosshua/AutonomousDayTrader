@@ -27,7 +27,7 @@ const requiredFiles = [
   "components/RightNowCard.tsx",
   "components/SegmentedModeToggle.tsx",
   "components/StrategyCard.tsx",
-  "components/StrategyCarousel.tsx",
+  "components/StrategyTable.tsx",
   "components/HoldingNow.tsx",
   "components/MarketMoodCard.tsx",
   "components/RecentTrades.tsx",
@@ -53,6 +53,7 @@ const deletedFiles = [
   "components/ActivePositionTray.tsx",
   "components/LiveChart.tsx",
   "components/ManualControls.tsx",
+  "components/StrategyCarousel.tsx", // replaced by StrategyTable (2026-09-29 compact dashboard)
 ];
 for (const file of deletedFiles) {
   assert(!fs.existsSync(path.join(FRONTEND_DIR, file)), `Old dark-theme component should be deleted: ${file}`);
@@ -127,6 +128,13 @@ const testidLocations = {
   "swing-schedule": "components/SwingTelemetryBar.tsx",
   "active-swing-positions": "components/ActiveSwingPositionsTable.tsx",
   "market-mood": "components/MarketMoodCard.tsx",
+  // 2026-09-29 compact dashboard: playbooks are rows in one table
+  "strategy-table": "components/StrategyTable.tsx",
+  "strategy-row-toggle": "components/StrategyCard.tsx",
+  "strategy-details": "components/StrategyCard.tsx",
+  "strategy-status": "components/StrategyCard.tsx",
+  "orb-init-error": "components/StrategyCard.tsx",
+  "tri-engine-broker-issue": "components/StrategyCard.tsx",
 };
 for (const [testid, file] of Object.entries(testidLocations)) {
   const content = fs.readFileSync(path.join(FRONTEND_DIR, file), "utf8");

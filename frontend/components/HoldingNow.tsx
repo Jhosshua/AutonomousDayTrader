@@ -43,9 +43,9 @@ const BADGE_TEXT: Record<Kind, string> = {
 
 function Tile({ label, children, testid }: { label: string; children: React.ReactNode; testid?: string }) {
   return (
-    <div className="rounded-xl bg-[#F3F1EA] px-3 py-2 text-sm text-ink" data-testid={testid}>
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
-      <div className="mt-0.5">{children}</div>
+    <div className="rounded-lg bg-[#F3F1EA] px-2 py-1 text-xs leading-snug text-ink sm:px-2.5 sm:text-[13px]" data-testid={testid}>
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+      <div>{children}</div>
     </div>
   );
 }
@@ -102,88 +102,125 @@ function HoldingRow({
 
   return (
     <div className="rise flex flex-col overflow-hidden rounded-2xl border border-line bg-white" data-testid={`holding-row-${position.symbol}`}>
-      <div
-        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 sm:px-5"
-        style={{
-          background: theme.band,
-          color: theme.ink,
-          borderBottom: kind === "orb" ? `2px dashed ${theme.ink}` : undefined,
-        }}
-        data-testid="holding-banner"
-        data-kind={kind}
-      >
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-          <div className="font-display text-lg font-semibold leading-tight sm:text-xl" data-testid="holding-strategy">{theme.name}</div>
-        </div>
-        <span
-          className="rounded-full border bg-white/70 px-3 py-1 text-xs font-semibold"
-          style={{ borderColor: theme.ink, color: theme.ink }}
-          data-testid="holding-badge"
-        >
-          {BADGE_TEXT[kind]}
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-3 p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-base sm:text-lg font-semibold text-ink">
+      {/* Phone: strategy line, plan, note, buttons. Desktop: the two buttons get their own column on the right. */}
+      <div className="grid gap-2 px-3 py-2.5 sm:px-4 lg:grid-cols-[minmax(0,1fr)_190px] lg:gap-x-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 lg:col-start-1">
+          <div
+            className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg px-2.5 py-1.5"
+            style={{
+              background: theme.band,
+              color: theme.ink,
+              borderBottom: kind === "orb" ? `2px dashed ${theme.ink}` : undefined,
+            }}
+            data-testid="holding-banner"
+            data-kind={kind}
+          >
+            <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            <span className="font-display text-[15px] font-semibold leading-tight" data-testid="holding-strategy">{theme.name}</span>
+            <span
+              className="rounded-full border bg-white/70 px-2 py-0.5 text-[11px] font-semibold"
+              style={{ borderColor: theme.ink, color: theme.ink }}
+              data-testid="holding-badge"
+            >
+              {BADGE_TEXT[kind]}
+            </span>
+          </div>
+          <div className="min-w-0 flex-1 basis-[200px]">
+            <div className="text-[15px] font-semibold text-ink">
               {companyName(position.symbol)}
               {companyName(position.symbol) !== position.symbol.toUpperCase() && <> <span className="text-xs font-medium text-muted">{position.symbol}</span></>}
             </div>
-            <div className="text-sm text-muted">
+            <div className="text-xs text-muted">
               {isLong ? "bet it goes up" : "bet it goes down"} &middot; {position.shares} shares &middot; {isLong ? "bought" : "sold short"} at {formatMoney(entry)}
               {decided && <> &middot; decided at {decided}</>}
             </div>
           </div>
           <div
-            className="rounded-full px-3 py-1.5 text-sm font-bold tabular-nums"
+            className="rounded-full px-3 py-1 text-sm font-bold tabular-nums"
             style={won ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
           >
             {formatSignedMoney(position.unrealized_pnl)}
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-3" data-testid="holding-plan">
-          <Tile label="Safety exit" testid="holding-tile-stop">
-            <div className="font-semibold">{stop != null ? formatMoney(stop) : "No safety exit set"}</div>
-            {movedFrom != null && <div className="text-xs text-muted">started at {formatMoney(movedFrom)}</div>}
-            {bracketed && !t1Done && <div className="text-xs text-muted">Moves to break-even after the first target, then follows the price.</div>}
-            {bracketed && t1Done && <div className="text-xs text-muted">First target sold. It now follows the price.</div>}
-          </Tile>
-          {kind !== "orb" && !position.tranches && (
-            <Tile label="Target" testid="holding-tile-target">
-              {position.take_profit_1 == null ? (
-                <div className="font-semibold">Setting up</div>
-              ) : trailing && !t1Done ? (
-                <div className="font-semibold">First part sells at {formatMoney(position.take_profit_1)}, the rest follows the price</div>
-              ) : trailing ? (
-                <div className="font-semibold">First part sold. The rest follows the price.</div>
-              ) : t1Done && position.take_profit_2 != null ? (
-                <div className="font-semibold">First part sold. The rest sells at {formatMoney(position.take_profit_2)}</div>
-              ) : (
-                <div className="font-semibold">{formatMoney(position.take_profit_1)}</div>
-              )}
+          <div className="order-last flex flex-wrap gap-2 lg:order-none lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:flex-col lg:justify-center">
+            <button
+              type="button"
+              onClick={sellButton.trigger}
+              disabled={sellButton.phase === "sending"}
+              data-testid={`btn-sell-now-${position.symbol}`}
+              className="min-h-[44px] flex-1 min-w-[120px] rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-60 lg:w-full lg:flex-none"
+              style={{ background: "#A9553A" }}
+            >
+              {sellLabel}
+            </button>
+            <button
+              type="button"
+              onClick={breakEvenButton.trigger}
+              disabled={!breakEvenEnabled || breakEvenButton.phase === "sending"}
+              title={position.strategy_id === "orb" ? "ORB moves its own stop at Alpaca" : position.fixed_protection ? "This plan keeps its safety exit fixed" : "Before fees"}
+              data-testid={`btn-break-even-${position.symbol}`}
+              className="min-h-[44px] flex-1 min-w-[150px] rounded-xl border px-3 text-[13px] font-semibold leading-tight disabled:opacity-40 lg:w-full lg:flex-none"
+              style={{ borderColor: "#D5E2D6", color: "#2F5A45", background: "#EDF3EE" }}
+            >
+              {position.strategy_id === "orb" ? "ORB moves its own stop" : position.fixed_protection ? "Safety exit stays fixed" : beLabel}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:col-start-1" data-testid="holding-plan">
+            <Tile label="Safety exit" testid="holding-tile-stop">
+              <div className="font-semibold">{stop != null ? formatMoney(stop) : "No safety exit set"}</div>
+              {movedFrom != null && <div className="text-xs text-muted">started at {formatMoney(movedFrom)}</div>}
+              {bracketed && !t1Done && <div className="text-xs text-muted">Moves to break-even after the first target, then follows the price.</div>}
+              {bracketed && t1Done && <div className="text-xs text-muted">First target sold. It now follows the price.</div>}
             </Tile>
-          )}
-          {position.exit_due && !position.tranches && (
-            <Tile label="Time limit" testid="holding-tile-exit-due">
-              <div className="font-semibold">Sells by {etTimeLabel(position.exit_due)} at the latest</div>
-            </Tile>
-          )}
-        </div>
+            {kind !== "orb" && !position.tranches && (
+              <Tile label="Target" testid="holding-tile-target">
+                {position.take_profit_1 == null ? (
+                  <div className="font-semibold">Setting up</div>
+                ) : trailing && !t1Done ? (
+                  <div className="font-semibold">First part sells at {formatMoney(position.take_profit_1)}, the rest follows the price</div>
+                ) : trailing ? (
+                  <div className="font-semibold">First part sold. The rest follows the price.</div>
+                ) : t1Done && position.take_profit_2 != null ? (
+                  <div className="font-semibold">First part sold. The rest sells at {formatMoney(position.take_profit_2)}</div>
+                ) : (
+                  <div className="font-semibold">{formatMoney(position.take_profit_1)}</div>
+                )}
+              </Tile>
+            )}
+            {position.exit_due && !position.tranches && (
+              <Tile label="Time limit" testid="holding-tile-exit-due">
+                <div className="font-semibold">Sells by {etTimeLabel(position.exit_due)} at the latest</div>
+              </Tile>
+            )}
+            {position.tranches && (
+              <div className="col-span-2 grid gap-1.5 sm:grid-cols-2 sm:gap-2" data-testid="fixed-tranches">
+                {position.tranches.map((t, i, all) => (
+                  <div key={t.id} className="rounded-lg bg-[#EDF4F7] px-2 py-1 text-xs leading-snug text-[#2F5368] sm:px-2.5 sm:text-[13px]">
+                    <div className="font-semibold">{trancheName(i, all.length)} · {t.qty - t.closed_qty} shares open</div>
+                    <div>Sells at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
+                    <div>{t.closed_qty === t.qty ? "Finished" : t.protection_confirmed && !t.protection_terminal ? "Protection held at the broker" : "Checking protection and exit orders"}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
         {kind === "adaptive" && (
-          <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: theme.tint, color: theme.ink }} data-testid="holding-why">
+          <div className="relative rounded-lg px-3 py-1.5 text-[13px] leading-snug lg:col-start-1" style={{ background: theme.tint, color: theme.ink }} data-testid="holding-why">
             {why ? (
-              <div className="flex flex-col gap-1.5">
-                <p className="font-semibold">{why.sizeLine}</p>
-                {why.stopLine && <p>{why.stopLine}</p>}
-                {why.trendLine && <p>{why.trendLine}</p>}
+              <>
+                <p className={why.rows.length > 0 ? "lg:pr-[112px]" : undefined}>
+                  <span className="font-semibold">{why.sizeLine}</span>
+                  {why.stopLine && <> {why.stopLine}</>}
+                  {why.trendLine && <> {why.trendLine}</>}
+                  {" "}<span className="text-xs" data-testid="holding-still">{stillHeldLine(marketContext?.vix_regime)}</span>
+                </p>
                 {why.rows.length > 0 && (
                   <details data-testid="holding-why-details">
-                    <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold">Why this size?</summary>
+                    {/* Desktop: top-right corner of the box, so a closed disclosure takes no line of its own. */}
+                    <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold lg:absolute lg:right-3 lg:top-0">Why this size?</summary>
                     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pb-1 text-sm">
                       {why.rows.map((r) => (
                         <div key={r.label} className="contents">
@@ -194,8 +231,7 @@ function HoldingRow({
                     </dl>
                   </details>
                 )}
-                <p className="text-xs" data-testid="holding-still">{stillHeldLine(marketContext?.vix_regime)}</p>
-              </div>
+              </>
             ) : (
               <p data-testid="holding-no-record">This trade started before the robot kept this record.</p>
             )}
@@ -203,14 +239,14 @@ function HoldingRow({
         )}
 
         {kind === "fixed" && (
-          <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: theme.tint, color: theme.ink }} data-testid="holding-fixed-note">
+          <div className="rounded-lg px-3 py-1.5 text-[13px] leading-snug lg:col-start-1" style={{ background: theme.tint, color: theme.ink }} data-testid="holding-fixed-note">
             Does the market change this trade? No, on purpose.{" "}
             {position.plan_risk_pct != null ? `It always risks ${position.plan_risk_pct}% of the account, its` : "Its"} exits were set when it bought and never move, and it runs on its own clock.
           </div>
         )}
 
         {kind === "orb" && (
-          <div className="rounded-xl px-3 py-2.5 text-sm" style={{ background: theme.tint, color: theme.ink }} data-testid="holding-orb-note">
+          <div className="rounded-lg px-3 py-1.5 text-[13px] leading-snug lg:col-start-1" style={{ background: theme.tint, color: theme.ink }} data-testid="holding-orb-note">
             {orbBoxText({
               classification: position.orb_context?.classification ?? null,
               short_frac: position.orb_context?.short_frac ?? null,
@@ -220,42 +256,6 @@ function HoldingRow({
             })}
           </div>
         )}
-
-        {position.tranches && (
-          <div className="grid gap-2 sm:grid-cols-2" data-testid="fixed-tranches">
-            {position.tranches.map((t, i, all) => (
-              <div key={t.id} className="rounded-xl bg-[#EDF4F7] px-3 py-2 text-sm text-[#2F5368]">
-                <div className="font-semibold">{trancheName(i, all.length)} · {t.qty - t.closed_qty} shares open</div>
-                <div>Sells at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
-                <div>{t.closed_qty === t.qty ? "Finished" : t.protection_confirmed && !t.protection_terminal ? "Protection held at the broker" : "Checking protection and exit orders"}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={sellButton.trigger}
-            disabled={sellButton.phase === "sending"}
-            data-testid={`btn-sell-now-${position.symbol}`}
-            className="min-h-[44px] flex-1 min-w-[140px] rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-60"
-            style={{ background: "#A9553A" }}
-          >
-            {sellLabel}
-          </button>
-          <button
-            type="button"
-            onClick={breakEvenButton.trigger}
-            disabled={!breakEvenEnabled || breakEvenButton.phase === "sending"}
-            title={position.strategy_id === "orb" ? "ORB moves its own stop at Alpaca" : position.fixed_protection ? "This plan keeps its safety exit fixed" : "Before fees"}
-            data-testid={`btn-break-even-${position.symbol}`}
-            className="min-h-[44px] flex-1 min-w-[180px] rounded-xl border px-4 text-sm font-semibold disabled:opacity-40"
-            style={{ borderColor: "#D5E2D6", color: "#2F5A45", background: "#EDF3EE" }}
-          >
-            {position.strategy_id === "orb" ? "ORB moves its own stop" : position.fixed_protection ? "Safety exit stays fixed" : beLabel}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -266,9 +266,9 @@ function HoldingRow({
 export default function HoldingNow({ positions, marketContext, onFlattenPosition, onTightenStop }: HoldingNowProps) {
   if (positions.length === 0) return null;
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Holding now</h2>
-      <div className="flex flex-col gap-3">
+    <section className="flex flex-col gap-2">
+      <h2 className="font-display text-lg font-semibold text-ink">Holding now</h2>
+      <div className="flex flex-col gap-2">
         {positions.map((p) => (
           <HoldingRow key={p.symbol} position={p} marketContext={marketContext} onFlattenPosition={onFlattenPosition} onTightenStop={onTightenStop} />
         ))}

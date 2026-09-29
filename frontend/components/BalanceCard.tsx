@@ -58,17 +58,17 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading }: 
   }, [todayTrades]);
 
   return (
-    <div className="rise hover-card flex flex-col gap-4 rounded-[28px] border border-line bg-white p-6 sm:p-7">
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
-        <div className="flex flex-col gap-1.5">
-          <div className="text-sm text-muted">Your balance</div>
-          <div className="font-display text-4xl sm:text-5xl font-medium tracking-tight tabular-nums text-ink">
+    <div className="rise hover-card flex flex-col gap-3 rounded-[22px] border border-line bg-white p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5">
+      <div className="flex flex-row items-start justify-between gap-3 sm:w-[46%] sm:flex-col sm:justify-center sm:gap-2">
+        <div className="flex flex-col gap-0.5">
+          <div className="text-xs text-muted">Your balance</div>
+          <div className="font-display text-3xl font-medium tracking-tight tabular-nums text-ink">
             {formatMoney(equity)}
           </div>
         </div>
         {!loading && (
           <div
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold"
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
             style={
               isDown
                 ? { background: "#F6E3DA", color: "#8F4424" }
@@ -77,7 +77,7 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading }: 
                 : { background: "#F3F1EA", color: "#5D5A73" }
             }
           >
-            {isDown ? <ArrowDown className="h-4 w-4" /> : isUp ? <ArrowUp className="h-4 w-4" /> : null}
+            {isDown ? <ArrowDown className="h-3.5 w-3.5" /> : isUp ? <ArrowUp className="h-3.5 w-3.5" /> : null}
             <span>
               {isDown ? "Down " : isUp ? "Up " : "Flat "}
               {formatMoney(Math.abs(dailyPnl))} today
@@ -86,46 +86,49 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading }: 
         )}
       </div>
 
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-muted">Finished trades today</span>
-        {hasTrades && (
-          <span className="font-semibold tabular-nums" style={{ color: finalValue < 0 ? "#8F4424" : finalValue > 0 ? "#2F6B4C" : "#5D5A73" }}>
-            {finalValue < 0 ? "-" : finalValue > 0 ? "+" : ""}{formatMoney(Math.abs(finalValue))}
-          </span>
-        )}
-      </div>
-      <div className="relative h-[96px] sm:h-[130px]">
-        {hasTrades ? (
-          <svg width="100%" height="100%" viewBox="0 0 560 150" preserveAspectRatio="none" role="img"
-            aria-label={`Chart of today's finished trades: cumulative result ${finalValue >= 0 ? "up" : "down"} ${formatMoney(Math.abs(finalValue))}`}>
-            <defs>
-              <linearGradient id="balanceLine" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stopColor="#6E9C82" />
-                <stop offset="0.5" stopColor="#8189C4" />
-                <stop offset="1" stopColor="#C47A88" />
-              </linearGradient>
-              <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#8189C4" stopOpacity="0.25" />
-                <stop offset="1" stopColor="#C47A88" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <line x1="0" y1={zeroY} x2="560" y2={zeroY} stroke="#CFC6B3" strokeWidth="1" strokeDasharray="4 5" />
-            <path className="fadein" d={fillPath} fill="url(#balanceFill)" />
-            <path className="draw" d={path} fill="none" stroke="url(#balanceLine)" strokeWidth="3" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-            <div className="h-px w-full" style={{ background: "#EFE4D2" }} />
-            <span className="mt-2 text-sm text-muted">No trades yet today</span>
-          </div>
-        )}
-      </div>
-      <div className="relative -mt-2 flex justify-between text-xs text-muted">
-        <span>9:30 AM</span>
-        {hasTrades && nowPct > 12 && nowPct < 88 && (
-          <span className="absolute -translate-x-1/2" style={{ left: `${nowPct}%`, color: "#7A3343", fontWeight: 600 }}>Now</span>
-        )}
-        <span>4:00 PM</span>
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+        <div className="flex items-baseline justify-between gap-3 text-xs">
+          <span className="text-muted">Finished trades today</span>
+          {hasTrades && (
+            <span className="text-sm font-semibold tabular-nums" style={{ color: finalValue < 0 ? "#8F4424" : finalValue > 0 ? "#2F6B4C" : "#5D5A73" }}>
+              {finalValue < 0 ? "-" : finalValue > 0 ? "+" : ""}{formatMoney(Math.abs(finalValue))}
+            </span>
+          )}
+        </div>
+        <div className="relative h-[44px]">
+          {hasTrades ? (
+            <svg width="100%" height="100%" viewBox="0 0 560 150" preserveAspectRatio="none" role="img"
+              aria-label={`Chart of today's finished trades: cumulative result ${finalValue >= 0 ? "up" : "down"} ${formatMoney(Math.abs(finalValue))}`}>
+              <defs>
+                <linearGradient id="balanceLine" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stopColor="#6E9C82" />
+                  <stop offset="0.5" stopColor="#8189C4" />
+                  <stop offset="1" stopColor="#C47A88" />
+                </linearGradient>
+                <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#8189C4" stopOpacity="0.25" />
+                  <stop offset="1" stopColor="#C47A88" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <line x1="0" y1={zeroY} x2="560" y2={zeroY} stroke="#CFC6B3" strokeWidth="1" strokeDasharray="4 5" vectorEffect="non-scaling-stroke" />
+              <path className="fadein" d={fillPath} fill="url(#balanceFill)" />
+              <path className="draw" d={path} fill="none" stroke="url(#balanceLine)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            </svg>
+          ) : (
+            <div className="flex h-full items-center justify-center gap-3 text-center">
+              <div className="h-px flex-1" style={{ background: "#EFE4D2" }} />
+              <span className="text-xs text-muted">No trades yet today</span>
+              <div className="h-px flex-1" style={{ background: "#EFE4D2" }} />
+            </div>
+          )}
+        </div>
+        <div className="relative flex justify-between text-[11px] text-muted">
+          <span>9:30 AM</span>
+          {hasTrades && nowPct > 12 && nowPct < 88 && (
+            <span className="absolute -translate-x-1/2" style={{ left: `${nowPct}%`, color: "#7A3343", fontWeight: 600 }}>Now</span>
+          )}
+          <span>4:00 PM</span>
+        </div>
       </div>
     </div>
   );

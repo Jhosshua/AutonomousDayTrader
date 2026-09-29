@@ -8,7 +8,7 @@ import Header, { useProWordsToggle } from "@/components/Header";
 import SegmentedModeToggle, { TradingMode } from "@/components/SegmentedModeToggle";
 import BalanceCard from "@/components/BalanceCard";
 import RightNowCard from "@/components/RightNowCard";
-import StrategyCarousel from "@/components/StrategyCarousel";
+import StrategyTable from "@/components/StrategyTable";
 import HoldingNow from "@/components/HoldingNow";
 import MarketMoodCard from "@/components/MarketMoodCard";
 import RecentTrades from "@/components/RecentTrades";
@@ -94,8 +94,8 @@ export default function Home() {
   // the financial content area waits for a real snapshot instead of showing synthetic zeros.
   if (!hasReceivedData) {
     return (
-      <main className="min-h-screen bg-ground px-4 py-6 sm:px-10 sm:py-10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:gap-7">
+      <main className="min-h-screen bg-ground px-3 py-4 sm:px-6 sm:py-5">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
           <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro} />
           <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-line border-t-darkcard" aria-hidden="true" />
@@ -107,12 +107,14 @@ export default function Home() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-ground px-4 py-6 sm:px-10 sm:py-10">
+    <main className="relative min-h-screen overflow-x-hidden bg-ground px-3 py-4 sm:px-6 sm:py-5">
       <div className="drift pointer-events-none absolute -left-40 -top-52 h-[420px] w-[420px] rounded-full opacity-70 blur-3xl" style={{ background: "#F3E1CF" }} />
       <div className="drift2 pointer-events-none absolute -right-40 -top-40 h-[420px] w-[420px] rounded-full opacity-80 blur-3xl" style={{ background: "#E2E1F1" }} />
 
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-6 sm:gap-7">
-        <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro} />
+      <div className="relative mx-auto flex max-w-[1400px] flex-col gap-3">
+        <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro}>
+          <SegmentedModeToggle mode={mode} onModeChange={setMode} />
+        </Header>
 
         {showPro && (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-white/70 px-4 py-2 text-xs text-muted">
@@ -170,7 +172,7 @@ export default function Home() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
           <BalanceCard
             equity={state.account.equity}
             dailyPnl={state.account.daily_pnl}
@@ -187,22 +189,22 @@ export default function Home() {
           />
         </section>
 
-        <SegmentedModeToggle mode={mode} onModeChange={setMode} />
-
         {mode === "intraday" ? (
-          <div className="fadein flex flex-col gap-6 sm:gap-7">
-            <HoldingNow
-              positions={intradayPositions}
-              marketContext={state.market_context}
-              onFlattenPosition={flattenPosition}
-              onTightenStop={tightenStop}
-            />
+          <div className="fadein grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="flex min-w-0 flex-col gap-3">
+              <HoldingNow
+                positions={intradayPositions}
+                marketContext={state.market_context}
+                onFlattenPosition={flattenPosition}
+                onTightenStop={tightenStop}
+              />
 
-            <MarketMoodCard context={state.market_context} tradingDay={firstTradingDayFlag} />
+              <MarketMoodCard context={state.market_context} tradingDay={firstTradingDayFlag} />
 
-            <StrategyCarousel strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} />
+              <StrategyTable strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} />
+            </div>
 
-            <section className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
+            <div className="flex min-w-0 flex-col gap-3">
               <RecentTrades
                 items={todayLedger.items}
                 loading={todayLedger.loading}
@@ -216,10 +218,10 @@ export default function Home() {
                 intradayPositionsCount={intradayPositions.length}
                 onFlattenAll={flattenAll}
               />
-            </section>
+            </div>
           </div>
         ) : (
-          <div className="fadein flex flex-col gap-6 sm:gap-7">
+          <div className="fadein flex flex-col gap-4">
             <SwingTelemetryBar swingState={state.swing} showPro={showPro} />
             <ActiveSwingPositionsTable
               positions={state.swing?.positions ?? []}

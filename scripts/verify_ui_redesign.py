@@ -669,7 +669,7 @@ def run_pagination_check(browser) -> None:
     install_mocks(page, payload, [], dispatched, trades_pages=[page1, page2])
     page.goto(BASE_URL, wait_until="networkidle", timeout=15000)
     page.get_by_text("Day Trader", exact=False).first.wait_for(state="visible", timeout=10000)
-    page.get_by_text("See all trades", exact=False).click()
+    page.get_by_role("button", name="Trade history").click()  # was "See all trades", renamed in e033306
     page.wait_for_timeout(400)
     initial_count = page.locator('button:has(time)').count()
     check(initial_count > 0, f"[pagination] first page of trades rendered ({initial_count} rows)")
@@ -697,7 +697,7 @@ def run_recovered_session_check(browser) -> None:
     install_mocks(page, payload, [], dispatched, recovered=recovered)
     page.goto(BASE_URL, wait_until="networkidle", timeout=15000)
     page.get_by_text("Day Trader", exact=False).first.wait_for(state="visible", timeout=10000)
-    page.get_by_text("See all trades", exact=False).click()
+    page.get_by_role("button", name="Trade history").click()  # was "See all trades", renamed in e033306
     page.wait_for_timeout(400)
     check(page.get_by_text("older, recovered day", exact=False).count() > 0, "[recovered] recovered aggregate session note is shown")
     check(page.get_by_text("Some older details unavailable", exact=False).count() > 0, "[recovered] 'Some older details unavailable' note is shown")

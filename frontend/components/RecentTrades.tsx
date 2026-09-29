@@ -29,9 +29,9 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
   const top6 = sorted.slice(0, 6);
 
   return (
-    <div className="rise hover-card flex flex-col gap-1 rounded-[28px] border border-line bg-white p-6 sm:p-7" style={{ animationDelay: "300ms" }}>
-      <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">What it did today</h2>
+    <div className="rise hover-card flex flex-col rounded-[22px] border border-line bg-white px-4 pb-2 pt-3 sm:px-5" style={{ animationDelay: "300ms" }}>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-lg font-semibold text-ink">What it did today</h2>
         <button
           type="button"
           onClick={onSeeAll}
@@ -43,14 +43,14 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
       </div>
 
       {loading && items.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted">Loading today's trades…</div>
+        <div className="py-4 text-center text-sm text-muted">Loading today's trades…</div>
       ) : error ? (
-        <div className="py-6 text-center text-sm" style={{ color: "#8F4424" }}>
+        <div className="py-4 text-center text-sm" style={{ color: "#8F4424" }}>
           Couldn't load today's trades
         </div>
       ) : top6.length === 0 ? (
-        <div className="py-3 text-sm text-muted">
-          <p className="mb-3">No finished trades today. Your previous days are saved in Trade history.</p>
+        <div className="py-2 text-sm text-muted">
+          <p className="mb-2">No finished trades today. Your previous days are saved in Trade history.</p>
           {recentDays.map((day) => (
             <button key={day.session_date} type="button" onClick={onSeeAll}
               className="mt-2 flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border border-line p-3 text-left hover:bg-[#FAF8F2]">
@@ -68,29 +68,29 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
           return (
             <div
               key={t.trade_id}
-              className="grid grid-cols-[40px_minmax(0,1fr)_auto] sm:grid-cols-[76px_44px_minmax(0,1fr)_auto] items-center gap-3 border-t py-3 first:border-t-0"
+              className="grid grid-cols-[32px_minmax(0,1fr)_auto] sm:grid-cols-[64px_32px_minmax(0,1fr)_auto] items-center gap-2.5 border-t py-2"
               style={{ borderColor: "#F5EEE2" }}
             >
               <div className="hidden tabular-nums text-sm text-muted sm:block">{etTimeLabel(t.closed_at)}</div>
               <div
-                className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl text-lg font-bold"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-base font-bold"
                 style={{ background: theme.track, color: theme.ink }}
               >
                 {isLong ? "↑" : "↓"}
               </div>
               <div className="flex min-w-0 flex-col gap-0.5">
-                <div className="text-sm sm:text-base font-semibold text-ink">
+                <div className="text-sm font-semibold text-ink">
                   {companyName(t.symbol)} <span className="text-xs font-medium text-muted">{t.symbol}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-muted">
-                  <span className="whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold" style={{ background: theme.tint, color: theme.ink }}>
+                  <span className="rounded-md px-2 py-0.5 text-xs font-semibold" style={{ background: theme.tint, color: theme.ink }}>
                     {theme.name}
                   </span>
                   <span className="whitespace-nowrap">{isLong ? "bet it goes up" : "bet it goes down"}<span className="tabular-nums sm:hidden"> · {etTimeLabel(t.closed_at)}</span></span>
                 </div>
               </div>
               <div
-                className="whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-bold tabular-nums sm:px-3 sm:py-1.5"
+                className="whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-bold tabular-nums"
                 style={won ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
               >
                 {won ? "+" : "-"}

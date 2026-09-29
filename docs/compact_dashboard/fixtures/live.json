@@ -1,0 +1,1092 @@
+{
+ "type": "STATE_UPDATE",
+ "timestamp": "2026-09-29T17:27:27.045199+00:00",
+ "account": {
+  "equity": 49512.87,
+  "cash": 49512.87,
+  "buying_power": 198051.48,
+  "daily_pnl": -53.01,
+  "daily_pnl_pct": -0.11,
+  "daily_drawdown": 53.01,
+  "daily_drawdown_pct": 0.0011,
+  "is_circuit_broken": false,
+  "risk_level": "NORMAL",
+  "status": "ACTIVE",
+  "daily_starting_equity": 49565.88
+ },
+ "market_context": {
+  "vix": 16.34,
+  "vix_regime": "NORMAL",
+  "time_phase": "MIDDAY_CHOP",
+  "market_status": "OPEN",
+  "sizing_multiplier": 1.0,
+  "stop_multiplier": 1.0,
+  "vix_stale": false,
+  "vix_age_seconds": 10.7,
+  "time_multiplier": 0.5,
+  "market_trend": "NEUTRAL",
+  "market_trend_reason": "NEUTRAL",
+  "max_concurrent_positions": 3,
+  "notional_cap_pct": 25.0,
+  "base_risk_pct": 1.0,
+  "midday": {
+   "start": "11:30",
+   "end": "14:00"
+  },
+  "vix_tiers": [
+   {
+    "name": "LOW",
+    "lower": null,
+    "upper": 15.0,
+    "sizing": 1.2,
+    "stop": 0.85
+   },
+   {
+    "name": "NORMAL",
+    "lower": 15.0,
+    "upper": 25.0,
+    "sizing": 1.0,
+    "stop": 1.0
+   },
+   {
+    "name": "ELEVATED",
+    "lower": 25.0,
+    "upper": 35.0,
+    "sizing": 0.7,
+    "stop": 1.4
+   },
+   {
+    "name": "CRISIS",
+    "lower": 35.0,
+    "upper": null,
+    "sizing": 0.35,
+    "stop": 2.0
+   }
+  ],
+  "adaptive_strategies": [
+   "vwap_pullback",
+   "news_momentum",
+   "mean_reversion"
+  ]
+ },
+ "strategies": [
+  {
+   "id": "orb",
+   "name": "Opening Range Breakout (ORBStraddle rules)",
+   "status": "ACTIVE",
+   "daily_pnl": 0.0,
+   "win_rate": 0.0,
+   "trades_count": 0,
+   "sharpe": 0.0,
+   "window": {
+    "state": "DONE_FOR_DAY",
+    "headline": "Done for today",
+    "can_open_now": false,
+    "in_hours": false,
+    "hours": "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
+    "ranges": [
+     [
+      "09:38",
+      "10:15"
+     ]
+    ],
+    "trading_day": true,
+    "schedule_text": "Done for today.",
+    "next_change_at": null,
+    "blockers": [],
+    "limits": [],
+    "market_text": "Picked RKLB, but no order went out: no pick passed the sizing guards. Done for today.",
+    "notes": [
+     "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM ET.",
+     "Paper account. Each trade is an Alpaca bracket: its stop and target wait at the broker."
+    ],
+    "evaluated_at": "2026-09-29T13:27:27-04:00"
+   },
+   "orb": {
+    "mode": "live",
+    "mode_text": "Live: paper account orders",
+    "step": "Picked RKLB, but no order went out: no pick passed the sizing guards. Done for today.",
+    "next_step": null,
+    "ready": true,
+    "last_verdict": {
+     "at": "2026-09-29T10:13:49.662168-04:00",
+     "execution": {
+      "accepted": 0,
+      "ok": false,
+      "reason": "no pick passed the sizing guards",
+      "refused": [
+       [
+        "RKLB",
+        "day risk budget spent"
+       ]
+      ]
+     },
+     "picks": [
+      {
+       "direction": "short",
+       "symbol": "RKLB",
+       "tier": "structure"
+      }
+     ],
+     "reason": "picked",
+     "verdict": "trade",
+     "wave": "secondary"
+    },
+    "picks": [
+     {
+      "direction": "short",
+      "symbol": "RKLB",
+      "tier": "structure"
+     }
+    ],
+    "open_trades": [],
+    "realized_pnl": 0.0,
+    "unrealized_pnl": 0.0,
+    "open_risk": 0.0,
+    "total_pnl": 0.0,
+    "no_trade_reason": null,
+    "hours": "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
+    "errors": [],
+    "init_error": null,
+    "alerts": [],
+    "orphans": []
+   },
+   "decisions": {
+    "signals_today": 20,
+    "orders_today": 0,
+    "blocked_today": 20,
+    "top_block_reason": "ORB_SAT_OUT",
+    "top_block_text": "ORB sat out this decision",
+    "blocked_by_reason": {
+     "ORB_REFUSED": 3,
+     "ORB_SAT_OUT": 15,
+     "ORB_SHADOW": 2
+    }
+   }
+  },
+  {
+   "id": "vwap_pullback",
+   "name": "Ride the Trend v2 (VWAP structure, thin pullback, resumption speed)",
+   "status": "ACTIVE",
+   "daily_pnl": 0.0,
+   "win_rate": 0.0,
+   "trades_count": 0,
+   "sharpe": 0.0,
+   "version": "v2",
+   "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28",
+   "mode": "v2_live",
+   "excluded_symbols": [
+    "TSLA",
+    "CDE",
+    "SPY",
+    "QQQ"
+   ],
+   "first_possible_signal": "10:09",
+   "last_evaluated_bar": "2026-09-29T17:26:00+00:00",
+   "today_counts": {
+    "CHASED": 1,
+    "FEATURE_UNAVAILABLE": 315,
+    "HIGH_VOLUME_PULLBACK": 3,
+    "IMPULSE": 119,
+    "NEW_EXTREME": 8,
+    "NO_TOUCH": 4,
+    "PULLBACK": 6,
+    "PVR_NOT_THIN": 3,
+    "RESUMING": 4,
+    "RESUMPTION_MEASURED": 5,
+    "RESUMPTION_TOO_OLD": 3,
+    "SLOPE_TOO_SLOW": 4,
+    "TOUCH_TOO_EARLY": 20,
+    "WINDOW_CLOSED": 5
+   },
+   "setups_today": 119,
+   "signals_emitted_today": 0,
+   "data_layers": {
+    "required": true,
+    "layer1_ticks": {
+     "live": true,
+     "trades_seen": 1787645
+    },
+    "layer2_book": {
+     "live": true,
+     "quotes_seen": 2693761,
+     "depth": "top_of_book_nbbo"
+    },
+    "layer3_timestamps": {
+     "source": "exchange_nanoseconds",
+     "velocity_window_s": 60,
+     "raw_prints": 787187
+    },
+    "layer4_macro": {
+     "calendar_loaded": true,
+     "error": null,
+     "regime": "spy_qqq_vwap_ema+vix"
+    }
+   },
+   "enforced_gates": [],
+   "addons_enforced": true,
+   "last_block_by_symbol": {
+    "AAPL": {
+     "bar": "2026-09-29T15:29:00+00:00",
+     "detail": {},
+     "event": "WINDOW_CLOSED"
+    },
+    "AMD": {
+     "bar": "2026-09-29T15:29:00+00:00",
+     "detail": {},
+     "event": "WINDOW_CLOSED"
+    },
+    "AMZN": {
+     "bar": "2026-09-29T15:25:00+00:00",
+     "detail": {
+      "leg_bars": 2,
+      "pvr": 1.2202567346701383
+     },
+     "event": "HIGH_VOLUME_PULLBACK"
+    },
+    "COIN": {
+     "bar": "2026-09-29T15:29:00+00:00",
+     "detail": {},
+     "event": "WINDOW_CLOSED"
+    },
+    "GOOGL": {
+     "bar": "2026-09-29T15:22:00+00:00",
+     "detail": {
+      "since": 20
+     },
+     "event": "NO_TOUCH"
+    },
+    "META": {
+     "bar": "2026-09-29T15:29:00+00:00",
+     "detail": {},
+     "event": "WINDOW_CLOSED"
+    },
+    "MSFT": {
+     "bar": "2026-09-29T15:24:00+00:00",
+     "detail": {
+      "since": 1
+     },
+     "event": "TOUCH_TOO_EARLY"
+    },
+    "NVDA": {
+     "bar": "2026-09-29T15:29:00+00:00",
+     "detail": {},
+     "event": "WINDOW_CLOSED"
+    },
+    "PLTR": {
+     "bar": "2026-09-29T15:13:00+00:00",
+     "detail": {
+      "leg_bars": 12,
+      "pvr": 1.1721199535391222
+     },
+     "event": "PVR_NOT_THIN"
+    }
+   },
+   "profiles_ready": {
+    "ready": 9,
+    "total": 9,
+    "missing": []
+   },
+   "window": {
+    "state": "DONE_FOR_DAY",
+    "headline": "Done for today",
+    "can_open_now": false,
+    "in_hours": false,
+    "hours": "9:30 AM - 11:30 AM",
+    "ranges": [
+     [
+      "09:30",
+      "11:30"
+     ]
+    ],
+    "trading_day": true,
+    "schedule_text": "Done for today. Next: tomorrow 9:30 AM.",
+    "next_change_at": "2026-09-30T09:30:00-04:00",
+    "blockers": [],
+    "limits": [],
+    "market_text": "Market is flat: blocked until the market picks a direction.",
+    "notes": [
+     "Version 2 (since Sept 28): mornings only, 9:45 to 11:30 AM; first possible entry about 10:09 AM. Needs a quiet pullback and a fast resumption.",
+     "No scheduled macro releases today.",
+     "Dollar calm, rates calm.",
+     "Prior-days volume profiles ready for 9 of 9 stocks."
+    ],
+    "evaluated_at": "2026-09-29T13:27:27-04:00"
+   },
+   "decisions": {
+    "signals_today": 0,
+    "orders_today": 0,
+    "blocked_today": 0,
+    "top_block_reason": null,
+    "top_block_text": null,
+    "blocked_by_reason": {}
+   }
+  },
+  {
+   "id": "news_momentum",
+   "name": "Catalyst News Momentum Breakout",
+   "status": "ACTIVE",
+   "daily_pnl": 0.0,
+   "win_rate": 0.0,
+   "trades_count": 0,
+   "sharpe": 0.0,
+   "window": {
+    "state": "LIMITED",
+    "headline": "Can trade, with limits",
+    "can_open_now": true,
+    "in_hours": true,
+    "hours": "9:30 AM - 3:45 PM",
+    "ranges": [
+     [
+      "09:30",
+      "15:45"
+     ]
+    ],
+    "trading_day": true,
+    "schedule_text": "In its trading hours until 3:45 PM.",
+    "next_change_at": "2026-09-29T15:45:00-04:00",
+    "blockers": [],
+    "limits": [
+     "Market is flat: only stocks trading at 2.2x+ normal volume."
+    ],
+    "market_text": "Market is flat: only on a stock trading at 2.2x+ normal volume.",
+    "notes": [
+     "Rare by design: needs very strong news plus a volume spike."
+    ],
+    "evaluated_at": "2026-09-29T13:27:27-04:00"
+   },
+   "decisions": {
+    "signals_today": 0,
+    "orders_today": 0,
+    "blocked_today": 0,
+    "top_block_reason": null,
+    "top_block_text": null,
+    "blocked_by_reason": {}
+   }
+  },
+  {
+   "id": "mean_reversion",
+   "name": "Statistical Mean Reversion / Exhaustion Fades",
+   "status": "ACTIVE",
+   "daily_pnl": 47.59,
+   "win_rate": 0.5,
+   "trades_count": 2,
+   "sharpe": 0.32,
+   "window": {
+    "state": "CAN_TRADE",
+    "headline": "Can open trades now",
+    "can_open_now": true,
+    "in_hours": true,
+    "hours": "10:00 AM - 3:45 PM",
+    "ranges": [
+     [
+      "10:00",
+      "15:45"
+     ]
+    ],
+    "trading_day": true,
+    "schedule_text": "In its trading hours until 3:45 PM.",
+    "next_change_at": "2026-09-29T15:45:00-04:00",
+    "blockers": [],
+    "limits": [],
+    "market_text": "Market is flat: allowed, both directions.",
+    "notes": [
+     "Sits out the opening half hour."
+    ],
+    "evaluated_at": "2026-09-29T13:27:27-04:00"
+   },
+   "decisions": {
+    "signals_today": 4,
+    "orders_today": 2,
+    "blocked_today": 2,
+    "top_block_reason": "MARKET_FILTER",
+    "top_block_text": "Blocked by the market-direction check",
+    "blocked_by_reason": {
+     "MARKET_FILTER": 2
+    }
+   }
+  },
+  {
+   "id": "tsla_asymmetric_dual",
+   "name": "TSLA Asymmetric Opening Range",
+   "status": "ACTIVE",
+   "daily_pnl": 0.0,
+   "win_rate": 0.0,
+   "trades_count": 0,
+   "sharpe": 0.0,
+   "tri_engine": {
+    "version": "ASYMMETRIC_DUAL_PAPER_V1",
+    "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+    "symbol": "TSLA",
+    "phase": "NO_SIGNAL",
+    "reason": null,
+    "quantity": 0,
+    "last_error": null,
+    "side": null,
+    "mode": "alpaca_paper",
+    "risk_reserved": 0.0,
+    "risk_budget": 371.74409999999995,
+    "or_high": 358.74,
+    "or_low": 352.01,
+    "or_mid": 355.375,
+    "qqq_close": 736.6,
+    "qqq_vwap": 738.2630834163474,
+    "entry_due": null,
+    "incomplete": false,
+    "tranches": []
+   },
+   "window": {
+    "state": "DONE_FOR_DAY",
+    "headline": "No qualifying setup today.",
+    "can_open_now": false,
+    "in_hours": false,
+    "hours": "9:45 AM\u201311:30 ET",
+    "ranges": [
+     [
+      "09:45",
+      "11:30"
+     ]
+    ],
+    "trading_day": true,
+    "schedule_text": "No qualifying setup today.",
+    "next_change_at": null,
+    "blockers": [],
+    "limits": [],
+    "market_text": "No qualifying setup today.",
+    "notes": [
+     "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+    ],
+    "evaluated_at": "2026-09-29T13:27:27.045280-04:00"
+   },
+   "decisions": {
+    "signals_today": 0,
+    "orders_today": 0,
+    "blocked_today": 0,
+    "top_block_reason": null,
+    "top_block_text": null,
+    "blocked_by_reason": {}
+   }
+  },
+  {
+   "id": "cde_asymmetric_dual",
+   "name": "CDE Asymmetric Opening Range",
+   "status": "ACTIVE",
+   "daily_pnl": -100.6,
+   "win_rate": 0.0,
+   "trades_count": 1,
+   "sharpe": 0.0,
+   "tri_engine": {
+    "version": "ASYMMETRIC_DUAL_PAPER_V1",
+    "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+    "symbol": "CDE",
+    "phase": "CLOSED",
+    "reason": null,
+    "quantity": 1652,
+    "last_error": null,
+    "side": "SHORT",
+    "mode": "alpaca_paper",
+    "risk_reserved": 0.0,
+    "risk_budget": 371.74409999999995,
+    "or_high": 17.93,
+    "or_low": 17.46,
+    "or_mid": 17.695,
+    "qqq_close": 737.07,
+    "qqq_vwap": 737.8404708366766,
+    "entry_due": "2026-09-29T13:49:00+00:00",
+    "incomplete": false,
+    "tranches": [
+     {
+      "broker_stop": 17.69,
+      "broker_target": 17.02,
+      "close_order_ids": [
+       "ord_ae474b984003"
+      ],
+      "closed_qty": 1006,
+      "entry_at": "2026-09-29T13:49:01.895152+00:00",
+      "entry_price": 17.47,
+      "exit_due": "2026-09-29T16:49:01.895152+00:00",
+      "exit_notional": 17675.420000000002,
+      "exit_reason": "TIME_LIMIT",
+      "id": 1,
+      "protection_cid": "adt-tri-CDE-2026-09-29-t1",
+      "protection_confirmed": true,
+      "protection_terminal": true,
+      "qty": 1006,
+      "realized_pnl": -100.6,
+      "risk_per_share": 0.22500000000000142,
+      "stop": 17.695,
+      "stop_order_id": "ord_7f5dde98732e",
+      "target": 17.019999999999996,
+      "target_order_id": "ord_44420c7bb1ba",
+      "target_r": 2.0,
+      "exit_at": "2026-09-29T16:49:04.586629+00:00"
+     }
+    ]
+   },
+   "window": {
+    "state": "DONE_FOR_DAY",
+    "headline": "Finished today's trade.",
+    "can_open_now": false,
+    "in_hours": false,
+    "hours": "9:45 AM\u201312:00 ET",
+    "ranges": [
+     [
+      "09:45",
+      "12:00"
+     ]
+    ],
+    "trading_day": true,
+    "schedule_text": "Finished today's trade.",
+    "next_change_at": null,
+    "blockers": [],
+    "limits": [],
+    "market_text": "Finished today's trade.",
+    "notes": [
+     "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+    ],
+    "evaluated_at": "2026-09-29T13:27:27.045280-04:00"
+   },
+   "decisions": {
+    "signals_today": 2,
+    "orders_today": 1,
+    "blocked_today": 1,
+    "top_block_reason": "SIGNAL",
+    "top_block_text": null,
+    "blocked_by_reason": {
+     "SIGNAL": 1
+    }
+   }
+  }
+ ],
+ "primary_position": null,
+ "all_positions": [],
+ "positions_count": 0,
+ "working_orders_count": 0,
+ "ledger_revision": 33,
+ "persistence": {
+  "status": "durable",
+  "last_checkpoint_at": "2026-09-29T17:27:21.607272+00:00",
+  "restored_at": "2026-09-29T15:42:17.383863+00:00"
+ },
+ "ingestion": {
+  "stock": "connected",
+  "news": "connected",
+  "vix": "connected"
+ },
+ "broker": {
+  "mode": "alpaca_paper",
+  "account_number": "PA3CSVDZMMPY",
+  "mismatch": false
+ },
+ "recent_news": [
+  {
+   "headline": "Quantum eMotion shares are trading lower after the company announced a definitive arrangement agreement to acquire Plurilock for aggregate equity consideration of ~C$33.8 million.",
+   "symbols": [
+    "QNC"
+   ],
+   "score": 0.0,
+   "confidence": 0.0,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T17:15:39.843000+00:00"
+  },
+  {
+   "headline": "Nokia Deepfield Cloud Intelligence Expands Across Zain KSA Network",
+   "symbols": [
+    "NOK",
+    "SPRX"
+   ],
+   "score": 0.0,
+   "confidence": 0.0,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T17:19:52.304000+00:00"
+  },
+  {
+   "headline": "&#39;Beyond Spring and Fall&#39;: Apple Prepares Organization Restructure for Accelerating Product Launches",
+   "symbols": [
+    "AAPL",
+    "SCHG",
+    "TECL",
+    "TMFC"
+   ],
+   "score": 0.0,
+   "confidence": 0.0,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T17:19:55.176000+00:00"
+  },
+  {
+   "headline": "Bitcoin Plummeted After the Last 4 Midterm Elections: Will History Repeat?",
+   "symbols": [
+    "BTCUSD"
+   ],
+   "score": -0.1974,
+   "confidence": 0.5,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T17:22:34.630000+00:00"
+  },
+  {
+   "headline": "Corning Lands $3 Billion AT&amp;T Fiber Deal",
+   "symbols": [
+    "GLW",
+    "T",
+    "VZ"
+   ],
+   "score": 0.0,
+   "confidence": 0.0,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T17:25:45.618000+00:00"
+  },
+  {
+   "headline": "What&#39;s Going On With MongoDB Stock Tuesday?",
+   "symbols": [
+    "CAML",
+    "LRNZ",
+    "MDB",
+    "META",
+    "SKYY"
+   ],
+   "score": 0.0,
+   "confidence": 0.0,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T12:33:16+00:00"
+  },
+  {
+   "headline": "Why Is Yimutian Stock Gaining Tuesday?",
+   "symbols": [
+    "YMT"
+   ],
+   "score": 0.2913,
+   "confidence": 0.5,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T11:38:26+00:00"
+  },
+  {
+   "headline": "What&#39;s Going On With MongoDB Stock Tuesday?",
+   "symbols": [
+    "CAML",
+    "LRNZ",
+    "MDB",
+    "META",
+    "SKYY"
+   ],
+   "score": 0.0,
+   "confidence": 0.0,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T12:33:16+00:00"
+  },
+  {
+   "headline": "Fed&#39;s Barr Says I See U.S. Not Getting To 2% Inflation Target In A Timely Way Unless We Adjust Our Policy",
+   "symbols": [
+    "SPY"
+   ],
+   "score": 0.0,
+   "confidence": 0.0,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T17:26:53.512000+00:00"
+  },
+  {
+   "headline": "Why Is Yimutian Stock Gaining Tuesday?",
+   "symbols": [
+    "YMT"
+   ],
+   "score": 0.2913,
+   "confidence": 0.5,
+   "category": "NEUTRAL",
+   "created_at": "2026-09-29T11:38:26+00:00"
+  }
+ ],
+ "recent_activity": [
+  {
+   "id": "ord_a11821896f48",
+   "timestamp": "14:40:00",
+   "type": "ACCEPTED",
+   "event_type": "ACCEPTED",
+   "symbol": "MSFT",
+   "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_a11821896f48",
+   "timestamp": "14:40:01",
+   "type": "FULL_FILL",
+   "event_type": "FULL_FILL",
+   "symbol": "MSFT",
+   "message": "ACCEPTED -> FILLED (Filled 24 @ $513.14, fee $0.00)",
+   "price": 513.14,
+   "qty": 24,
+   "quantity": 24
+  },
+  {
+   "id": "ord_4b18f379cddc",
+   "timestamp": "14:40:01",
+   "type": "ORDER_CREATED",
+   "event_type": "ORDER_CREATED",
+   "symbol": "MSFT",
+   "message": "NONE -> CREATED (Order initialized)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_4b18f379cddc",
+   "timestamp": "14:40:01",
+   "type": "SUBMITTED",
+   "event_type": "SUBMITTED",
+   "symbol": "MSFT",
+   "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_4b18f379cddc",
+   "timestamp": "14:40:01",
+   "type": "ACCEPTED",
+   "event_type": "ACCEPTED",
+   "symbol": "MSFT",
+   "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ff0654bbebbb",
+   "timestamp": "14:40:01",
+   "type": "ORDER_CREATED",
+   "event_type": "ORDER_CREATED",
+   "symbol": "MSFT",
+   "message": "NONE -> CREATED (Order initialized)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ff0654bbebbb",
+   "timestamp": "14:40:01",
+   "type": "SUBMITTED",
+   "event_type": "SUBMITTED",
+   "symbol": "MSFT",
+   "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ff0654bbebbb",
+   "timestamp": "14:40:01",
+   "type": "ACCEPTED",
+   "event_type": "ACCEPTED",
+   "symbol": "MSFT",
+   "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_be16f7d2c811",
+   "timestamp": "14:40:01",
+   "type": "ORDER_CREATED",
+   "event_type": "ORDER_CREATED",
+   "symbol": "MSFT",
+   "message": "NONE -> CREATED (Order initialized)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_be16f7d2c811",
+   "timestamp": "14:40:01",
+   "type": "SUBMITTED",
+   "event_type": "SUBMITTED",
+   "symbol": "MSFT",
+   "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_be16f7d2c811",
+   "timestamp": "14:40:01",
+   "type": "ACCEPTED",
+   "event_type": "ACCEPTED",
+   "symbol": "MSFT",
+   "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ff0654bbebbb",
+   "timestamp": "15:01:14",
+   "type": "FULL_FILL",
+   "event_type": "FULL_FILL",
+   "symbol": "MSFT",
+   "message": "ACCEPTED -> FILLED (Filled 12 @ $509.48, fee $0.00)",
+   "price": 509.48,
+   "qty": 12,
+   "quantity": 12
+  },
+  {
+   "id": "ord_be16f7d2c811",
+   "timestamp": "15:07:15",
+   "type": "FULL_FILL",
+   "event_type": "FULL_FILL",
+   "symbol": "MSFT",
+   "message": "ACCEPTED -> FILLED (Filled 12 @ $508.66, fee $0.00)",
+   "price": 508.6641670000001,
+   "qty": 12,
+   "quantity": 12
+  },
+  {
+   "id": "ord_4b18f379cddc",
+   "timestamp": "15:07:15",
+   "type": "CANCEL_REQUEST",
+   "event_type": "CANCEL_REQUEST",
+   "symbol": "MSFT",
+   "message": "ACCEPTED -> CANCELLED (BRACKET_COMPLETED_PROFIT)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_44420c7bb1ba",
+   "timestamp": "16:49:03",
+   "type": "CANCEL_REQUEST",
+   "event_type": "CANCEL_REQUEST",
+   "symbol": "CDE",
+   "message": "ACCEPTED -> CANCELLED (BROKER_TERMINAL)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_7f5dde98732e",
+   "timestamp": "16:49:03",
+   "type": "CANCEL_REQUEST",
+   "event_type": "CANCEL_REQUEST",
+   "symbol": "CDE",
+   "message": "ACCEPTED -> CANCELLED (BROKER_TERMINAL)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ae474b984003",
+   "timestamp": "16:49:03",
+   "type": "ORDER_CREATED",
+   "event_type": "ORDER_CREATED",
+   "symbol": "CDE",
+   "message": "NONE -> CREATED (Order initialized)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ae474b984003",
+   "timestamp": "16:49:03",
+   "type": "SUBMITTED",
+   "event_type": "SUBMITTED",
+   "symbol": "CDE",
+   "message": "CREATED -> SUBMITTED (Dispatched to engine)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ae474b984003",
+   "timestamp": "16:49:03",
+   "type": "ACCEPTED",
+   "event_type": "ACCEPTED",
+   "symbol": "CDE",
+   "message": "SUBMITTED -> ACCEPTED (Pre-trade risk and margin passed)",
+   "price": 0.0,
+   "qty": 0,
+   "quantity": 0
+  },
+  {
+   "id": "ord_ae474b984003",
+   "timestamp": "16:49:05",
+   "type": "FULL_FILL",
+   "event_type": "FULL_FILL",
+   "symbol": "CDE",
+   "message": "ACCEPTED -> FILLED (Filled 1006 @ $17.57, fee $0.00)",
+   "price": 17.57,
+   "qty": 1006,
+   "quantity": 1006
+  }
+ ],
+ "swing": {
+  "status": "STANDBY",
+  "strategy_name": "2-Day Panic Dip (Connors RSI-2)",
+  "allocated_capital": 50000.0,
+  "slot_notional": 25000.0,
+  "max_slots": 2,
+  "active_slots_used": 0,
+  "available_slots": 2,
+  "flattening_exempt": true,
+  "candidates": [
+   {
+    "symbol": "LRCX",
+    "date": "2026-09-28",
+    "price": 314.51,
+    "close": 314.51,
+    "sma_200": 271.2122,
+    "sma_200_pass": true,
+    "above_200_sma": true,
+    "rs_stock_60d": -10.41,
+    "rs_qqq_60d": 3.47,
+    "rs_60d_stock": -10.41,
+    "rs_60d_qqq": 3.47,
+    "relative_strength_ok": false,
+    "rs_pass": false,
+    "rsi_2": 80.51,
+    "rsi_pass": false,
+    "panic_trigger": false,
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-21",
+    "next_earnings_date": "2026-10-21",
+    "daily_atr_14": 14.4621,
+    "atr_14": 14.4621,
+    "qualified": false,
+    "is_held": false,
+    "is_staged": false,
+    "status": "INELIGIBLE",
+    "rejection_reasons": [
+     "WEAKER_THAN_QQQ_STOCK_-10.41%_QQQ_+3.47%",
+     "RSI2_80.51_NOT_BELOW_10"
+    ]
+   },
+   {
+    "symbol": "KLAC",
+    "date": "2026-09-28",
+    "price": 189.36,
+    "close": 189.36,
+    "sma_200": 175.9564,
+    "sma_200_pass": true,
+    "above_200_sma": true,
+    "rs_stock_60d": -19.52,
+    "rs_qqq_60d": 3.47,
+    "rs_60d_stock": -19.52,
+    "rs_60d_qqq": 3.47,
+    "relative_strength_ok": false,
+    "rs_pass": false,
+    "rsi_2": 89.41,
+    "rsi_pass": false,
+    "panic_trigger": false,
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-29",
+    "next_earnings_date": "2026-10-29",
+    "daily_atr_14": 7.8986,
+    "atr_14": 7.8986,
+    "qualified": false,
+    "is_held": false,
+    "is_staged": false,
+    "status": "INELIGIBLE",
+    "rejection_reasons": [
+     "WEAKER_THAN_QQQ_STOCK_-19.52%_QQQ_+3.47%",
+     "RSI2_89.41_NOT_BELOW_10"
+    ]
+   },
+   {
+    "symbol": "MU",
+    "date": "2026-09-28",
+    "price": 1053.89,
+    "close": 1053.89,
+    "sma_200": 664.9711,
+    "sma_200_pass": true,
+    "above_200_sma": true,
+    "rs_stock_60d": 8.05,
+    "rs_qqq_60d": 3.47,
+    "rs_60d_stock": 8.05,
+    "rs_60d_qqq": 3.47,
+    "relative_strength_ok": true,
+    "rs_pass": true,
+    "rsi_2": 21.3,
+    "rsi_pass": false,
+    "panic_trigger": false,
+    "earnings_blackout": true,
+    "earnings_date": "2026-09-30",
+    "next_earnings_date": "2026-09-30",
+    "daily_atr_14": 48.3292,
+    "atr_14": 48.3292,
+    "qualified": false,
+    "is_held": false,
+    "is_staged": false,
+    "status": "BLOCKED",
+    "rejection_reasons": [
+     "RSI2_21.30_NOT_BELOW_10",
+     "EARNINGS_BLACKOUT_ACTIVE"
+    ]
+   },
+   {
+    "symbol": "AMD",
+    "date": "2026-09-28",
+    "price": 607.86,
+    "close": 607.86,
+    "sma_200": 366.6815,
+    "sma_200_pass": true,
+    "above_200_sma": true,
+    "rs_stock_60d": 17.39,
+    "rs_qqq_60d": 3.47,
+    "rs_60d_stock": 17.39,
+    "rs_60d_qqq": 3.47,
+    "relative_strength_ok": true,
+    "rs_pass": true,
+    "rsi_2": 23.07,
+    "rsi_pass": false,
+    "panic_trigger": false,
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-27",
+    "next_earnings_date": "2026-10-27",
+    "daily_atr_14": 25.3954,
+    "atr_14": 25.3954,
+    "qualified": false,
+    "is_held": false,
+    "is_staged": false,
+    "status": "WATCHING",
+    "rejection_reasons": [
+     "RSI2_23.07_NOT_BELOW_10"
+    ]
+   },
+   {
+    "symbol": "GS",
+    "date": "2026-09-28",
+    "price": 916.56,
+    "close": 916.56,
+    "sma_200": 951.6937,
+    "sma_200_pass": false,
+    "above_200_sma": false,
+    "rs_stock_60d": -9.79,
+    "rs_qqq_60d": 3.47,
+    "rs_60d_stock": -9.79,
+    "rs_60d_qqq": 3.47,
+    "relative_strength_ok": false,
+    "rs_pass": false,
+    "rsi_2": 21.68,
+    "rsi_pass": false,
+    "panic_trigger": false,
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-13",
+    "next_earnings_date": "2026-10-13",
+    "daily_atr_14": 26.1842,
+    "atr_14": 26.1842,
+    "qualified": false,
+    "is_held": false,
+    "is_staged": false,
+    "status": "INELIGIBLE",
+    "rejection_reasons": [
+     "CLOSE_916.56_BELOW_200_SMA_951.69",
+     "WEAKER_THAN_QQQ_STOCK_-9.79%_QQQ_+3.47%",
+     "RSI2_21.68_NOT_BELOW_10"
+    ]
+   }
+  ],
+  "positions": [],
+  "last_scan_time": "2026-09-28T20:00:01.919887+00:00",
+  "last_scan_session_date": "2026-09-28",
+  "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+  "last_close_data_note": null,
+  "last_close_entries_withheld": false
+ }
+}
