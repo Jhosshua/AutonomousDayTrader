@@ -556,7 +556,7 @@ def run_action_dispatch_checks(browser) -> None:
     page.goto(BASE_URL, wait_until="networkidle", timeout=15000)
     page.get_by_text("Day Trader", exact=False).first.wait_for(state="visible", timeout=10000)
 
-    # --- TIGHTEN_STOP via HoldingNow "Move safety exit to my buy price" (AAPL: stop 330 < entry 336.14 < market 340.20) ---
+    # --- TIGHTEN_STOP via HoldingNow "Move safety exit to my entry price" (AAPL: stop 330 < entry 336.14 < market 340.20) ---
     dispatched.clear()
     btn = page.locator('[data-testid="btn-break-even-AAPL"]')
     check(btn.is_visible(), "[actions] break-even button visible for AAPL")

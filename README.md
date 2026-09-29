@@ -110,7 +110,7 @@ Written for someone who knows nothing about stocks. Approved mockups: `docs/ui_r
 - **Look**: light cream ground, one muted color per strategy (Morning Breakout apricot, Ride the Trend sage, Big News rose, Snap Back lavender) used on its card, hours bar, and trade tags. Fonts Fraunces + Instrument Sans via `@fontsource` (no network needed at build).
 - **Top**: live balance, "Finished trades today" step chart (cumulative realized P&L, not a balance history), and a "Right now" sentence.
 - **Strategy cards**: plain name, one-line explanation, status chip from `window.state`, trading-hours bar from `window.ranges` with a now marker, and today's result from the durable ledger (`/api/trades?range=today`, all pages). Strategy counters are NOT used for display.
-- **Holding now**: each open quick trade with "Sell now"/"Close trade" and "Move safety exit to my buy price" (enabled only when it improves protection). Every action has confirm, sending, done, and "didn't go through" states.
+- **Holding now**: each open quick trade with "Sell now"/"Close trade" and "Move safety exit to my entry price" (enabled only when it improves protection). Every action has confirm, sending, done, and "didn't go through" states.
 - **Safety card**: daily loss limit from `/health` `limits`, closing time, and "Close all quick trades now" (intraday only; swing holdings are skipped and reported).
 - **Show pro words**: toggle reveals technical names, win rate, and the raw execution audit log.
 - Always visible warnings: price feed down, saving problems, daily loss limit hit, reconnecting.

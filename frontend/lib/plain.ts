@@ -620,7 +620,7 @@ export function adaptiveWhy(ctx: EntryContext, shares: number, isLong: boolean):
   const neutral = ctx.qty_if_neutral ?? null;
   const sizing = ctx.sizing_multiplier ?? 1;
   const timeMult = ctx.time_multiplier ?? 1;
-  const lead = fin != null && fin === shares ? "Bought" : "Sized at";
+  const lead = fin != null && fin === shares ? (isLong ? "Bought" : "Sold short") : "Sized at";
   let sizeLine: string;
   if (fin == null || neutral == null) {
     sizeLine = "The robot did not keep how this trade was sized.";
@@ -713,7 +713,7 @@ export function orbBoxText(o: OrbBoxInputs): string {
   }
   if (o.risk_usd != null) parts.push(`Risk on this trade: ${formatMoney(o.risk_usd)}.`);
   if (o.breakeven_r != null) {
-    parts.push(`Its stop moves to the buy price at +${o.breakeven_r}x its risk, and it can close early if the trade fails fast.`);
+    parts.push(`Its stop moves to its entry price at +${o.breakeven_r}x its risk, and it can close early if the trade fails fast.`);
   }
   return parts.join(" ");
 }

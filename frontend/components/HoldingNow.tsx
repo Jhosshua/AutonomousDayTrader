@@ -94,7 +94,7 @@ function HoldingRow({
   const sellLabel =
     sellButton.phase === "confirm" ? "Tap again to confirm" : sellButton.phase === "sending" ? "Selling…" : isLong ? "Sell now" : "Close trade";
   const beLabel =
-    breakEvenButton.phase === "sending" ? "Moving…" : breakEvenButton.phase === "done" ? "Moved" : breakEvenButton.phase === "failed" ? "Didn't go through" : "Move safety exit to my buy price";
+    breakEvenButton.phase === "sending" ? "Moving…" : breakEvenButton.phase === "done" ? "Moved" : breakEvenButton.phase === "failed" ? "Didn't go through" : "Move safety exit to my entry price";
 
   const why = kind === "adaptive" && ctx ? adaptiveWhy(ctx, position.shares, isLong) : null;
   const movedFrom = position.initial_stop != null && stop != null && Math.abs(position.initial_stop - stop) > 0.004 ? position.initial_stop : null;

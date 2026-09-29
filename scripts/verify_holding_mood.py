@@ -318,11 +318,12 @@ def run_matrix(s: Session) -> None:
     contains(s, "[data-testid=holding-row-NVDA]", "Bought 54 shares, fewer than the usual 67: jumpy market (70%).",
              "against the market's direction because the news was extreme and trading was heavy.",
              "Moves to break-even after the first target, then follows the price.", lab="NVDA card")
-    contains(s, "[data-testid=holding-row-MSFT]", "sold short at $512.00", "Normal size. The per-trade money cap was the limit",
+    contains(s, "[data-testid=holding-row-MSFT]", "sold short at $512.00", "Move safety exit to my entry price",
+             "Normal size. The per-trade money cap was the limit",
              "The market was flat, which this playbook allows.", "Safety exit placed a normal distance away.", lab="MSFT card")
     contains(s, "[data-testid=holding-row-PLTR]",
              "Traded after its 9:38 market check: SPY and QQQ data complete and the breakout list balanced "
-             "(40% bets down, needs 25% to 75%). Risk on this trade: $1,000.00. Its stop moves to the buy price at "
+             "(40% bets down, needs 25% to 75%). Risk on this trade: $1,000.00. Its stop moves to its entry price at "
              "+0.75x its risk, and it can close early if the trade fails fast.",
              "Sells by 11:00 AM at the latest", absent=["Tesla", "held at Alpaca", "Target"], lab="ORB card")
     contains(s, "[data-testid=holding-row-TSLA]", "Does the market change this trade? No, on purpose. It always risks 0.75% of the account",
@@ -341,7 +342,7 @@ def run_matrix(s: Session) -> None:
     check(s.wait_headline(mood_headline("nervous", "rising")), f"[{lab}/sized_down] headline")
     common(s, "sized_down", holders=["NVDA", "GOOGL", "AMZN"])
     contains(s, "[data-testid=holding-row-NVDA]", "Bought 54 shares, fewer than the usual 67: jumpy market (70%).", lab="NVDA sized down")
-    contains(s, "[data-testid=holding-row-GOOGL]", "Bought 35 shares, fewer than the usual 50: jumpy market (70%) and midday (half).", lab="GOOGL midday")
+    contains(s, "[data-testid=holding-row-GOOGL]", "Sold short 35 shares, fewer than the usual 50: jumpy market (70%) and midday (half).", lab="GOOGL midday")
     contains(s, "[data-testid=holding-row-AMZN]", "Bought 17 shares, fewer than the usual 49: panicky market (35%), and the account's limits trimmed it.", lab="AMZN trimmed")
     shot(s, "sized_down")
 

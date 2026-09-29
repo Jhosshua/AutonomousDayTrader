@@ -89,7 +89,7 @@ F2. `HoldingNow.tsx` card (keep testids `holding-row-<SYM>`, `btn-sell-now-<SYM>
 - Stock line: company, ticker, "bet it goes up/down", shares, "bought at $X" / "sold short at $X", "decided at 10:12" when entry_context exists.
 - Plan tiles: Safety exit (+ "started at $Y" when it moved; + "moves to break-even after the first target, then follows the price" before target 1 for ADT brackets), Target ("First part sells at $X, the rest follows the price" for TRAIL_ONLY; plain target otherwise), "Sells by 3:55 PM at the latest" (exit_due).
 - Adaptive: ONE visible sentence answering "why this size", honest from entry_context:
-  - qty_final < qty_if_neutral: "Bought N shares, fewer than the usual M: jumpy market (70%)" and/or "and midday (half)" and/or "the account's limits trimmed it".
+  - qty_final < qty_if_neutral: "Bought N shares" or "Sold short N shares," fewer than the usual M: jumpy market (70%) and/or midday (half) and/or the account's limits trimmed it.
   - otherwise: "Normal size. The per-trade money cap was the limit, so the market mood did not change the share count." (or "Bigger than usual: calm market" if qty_final > qty_if_neutral)
   - then one sentence on the safety exit from stop_basis / stop multiplier: "Safety exit placed below the dip's low" / "placed farther away because the market is jumpy" / "placed closer because the market is calm".
   - then "It bought because the market was rising too." (trend at entry; extreme-catalyst / heavy-trading exceptions in plain words; never the word RVOL)
@@ -97,7 +97,7 @@ F2. `HoldingNow.tsx` card (keep testids `holding-row-<SYM>`, `btn-sell-now-<SYM>
   - Last line vs now: "Market is Normal now. This trade keeps the size it got; its safety exit never moves farther away."
   - entry_context missing: "This trade started before the robot kept this record." Never invent values.
 - Fixed plans: "Does the market change this trade? No, on purpose. It always risks {plan_risk_pct}% of the account, its exits were set when it bought and never move, and it runs on its own clock." Keep the existing tranche tiles.
-- ORB: one short box from orb_context: "Traded after its 9:38 market check: SPY and QQQ data complete and the breakout list balanced (N% bets down, needs 25% to 75%). Risk on this trade: $X. Its stop moves to the buy price at +0.75x its risk, and it can close early if the trade fails fast." Do NOT repeat stop/target/"held at Alpaca" (the ORB strategy card has them). No "Tesla" text inside an ORB card.
+- ORB: one short box from orb_context: "Traded after its 9:38 market check: SPY and QQQ data complete and the breakout list balanced (N% bets down, needs 25% to 75%). Risk on this trade: $X. Its stop moves to its entry price at +0.75x its risk, and it can close early if the trade fails fast." Do NOT repeat stop/target/"held at Alpaca" (the ORB strategy card has them). No "Tesla" text inside an ORB card.
 
 F3. New `MarketMoodCard.tsx` (`data-testid="market-mood"`), one compact block:
 - Headline, decided in this order:
