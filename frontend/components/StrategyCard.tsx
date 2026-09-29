@@ -87,7 +87,13 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
   const theme = strategyTheme(strategy.id, strategy.name);
   const Icon = ICONS[strategy.id] || Waves;
   const win = strategy.window;
-  const chip = windowToChip(win);
+  const baseChip = windowToChip(win);
+  // ORB's off/shadow states arrive as a long blocker or a generic "limited" state; keep the chip short and true.
+  const chip = strategy.orb?.mode === "off" && !["MANAGING", "MARKET_CLOSED", "PAUSED"].includes(win?.state ?? "")
+    ? { label: "Switched off", tone: "grey" as const, breathing: false }
+    : strategy.orb?.mode === "shadow" && win?.state === "LIMITED"
+      ? { label: "Watching only (shadow)", tone: "sage" as const, breathing: true }
+      : baseChip;
   const chipStyle = CHIP_STYLES[chip.tone] || CHIP_STYLES.grey;
   const resting = win?.state === "DONE_FOR_DAY" || win?.state === "PAUSED" || win?.state === "MARKET_CLOSED";
 
@@ -104,7 +110,12 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
 
   // F9: an early-close day note must surface even when there's already a signals/orders lead.
   const earlyCloseNote = win?.notes?.find((n) => n.toLowerCase().includes("early"));
-  const note = strategyNoteLine(
+  // ORB: its current step is already in the ORB box above, and its decision rows (sat out, shadow,
+  // no decision) are not "chances skipped", so the note only counts real trades.
+  const orbOrders = strategy.decisions?.orders_today ?? 0;
+  const note = strategy.orb
+    ? (orbOrders > 0 ? `${orbOrders} ORB trade${orbOrders === 1 ? "" : "s"} today.` : "No ORB trades today.")
+    : strategyNoteLine(
     strategy.decisions,
     earlyCloseNote ? `${win?.market_text ?? ""} ${earlyCloseNote}`.trim() : win?.market_text,
     win?.notes?.[0]
@@ -119,8 +130,8 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
         className="flex flex-col gap-4 px-5 py-5"
         style={{ background: theme.band, filter: resting ? "saturate(0.55) brightness(1.03)" : undefined }}
       >
-        <div className="flex items-start justify-between">
-          <div className="bob flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl" style={{ background: theme.bar }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="bob flex h-11 w-11 flex-shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-2xl" style={{ background: theme.bar }}>
             <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" strokeWidth={1.9} aria-hidden="true" />
           </div>
           <span
@@ -130,7 +141,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
           >
             <span
               className={chip.breathing ? "breathe inline-block h-2 w-2 rounded-full" : "inline-block h-2 w-2 rounded-full"}
-              style={{ background: resting ? "#A7A2B8" : theme.bar }}
+              style={{ background: resting || chip.tone === "grey" ? "#A7A2B8" : theme.bar }}
             />
             {chip.label}
           </span>
@@ -218,7 +229,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
                 </div>
               );
             })}
-            {(strategy.orb.init_error || strategy.orb.errors.length > 0) && (
+            {(strategy.orb.init_error || strategy.orb.errors.some((e) => e.alarm !== "orb_alert" && !(strategy.orb?.orphans ?? []).some((o) => o.symbol === e.symbol))) && (
               <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
                 {strategy.orb.init_error || "ORB reported a problem; check the paper account."}
                 {showPro && strategy.orb.errors.length > 0 && <div className="mt-1 text-xs">{strategy.orb.errors.map((e) => e.alarm || e.kind).join(", ")}</div>}
