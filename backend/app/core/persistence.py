@@ -25,12 +25,41 @@ from pydantic import BaseModel
 log = logging.getLogger(__name__)
 
 
-SCHEMA_VERSION = 2
+# 3 (2026-09-28): ADT's ORB became ORBStraddle's rules. The old ORB strategy's per-symbol state
+# (SymbolORBState etc.) is dropped from schema-2 checkpoints at load time (never merged into the
+# new ORB), and the new ORB controller/scheduler keep their own durable rows in `orb_state`.
+SCHEMA_VERSION = 3
+READABLE_CHECKPOINT_SCHEMAS = (2, 3)
 ALLOWED_TYPE_PREFIX = "backend.app."
+ORB_STATE_SECTIONS = ("controller", "scheduler")
+
+# Base Strategy counters that survive the ORB replacement (today's stats and an operator pause).
+# Everything else the old bar-based ORB class saved is dropped.
+LEGACY_ORB_KEEP = ("strategy_id", "status", "daily_pnl", "trades_count", "wins_count",
+                   "losses_count", "win_rate", "_trade_pnls")
 
 
 class PersistenceError(RuntimeError):
     """Raised when durable state cannot be trusted."""
+
+
+def migrate_legacy_orb_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Runtime-state v1 -> v2 (checkpoint schema 2 -> 3), on the ENCODED payload, before any
+    persisted type is decoded: the old ORB's fields (symbol_states of SymbolORBState, range and
+    RVOL settings) are removed so they can never be merged into the new ORB strategy. Only the
+    base Strategy counters are kept. Idempotent; other strategies are untouched."""
+    if not isinstance(payload, dict):
+        raise PersistenceError("Checkpoint payload is not an object")
+    out = dict(payload)
+    strategies = out.get("strategies")
+    if isinstance(strategies, dict) and isinstance(strategies.get("orb"), dict):
+        strategies = dict(strategies)
+        old = strategies["orb"]
+        strategies["orb"] = {k: v for k, v in old.items() if k in LEGACY_ORB_KEEP}
+        out["strategies"] = strategies
+    if out.get("runtime_state_version") == 1:
+        out["runtime_state_version"] = 2
+    return out
 
 
 def _qualified_name(value: type) -> str:
@@ -204,6 +233,13 @@ class TradingStateStore:
                     created_at TEXT NOT NULL,
                     committed_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS orb_state (
+                    section TEXT PRIMARY KEY,
+                    revision INTEGER NOT NULL,
+                    saved_at TEXT NOT NULL,
+                    checksum TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
                 """
             )
             row = self._connection.execute(
@@ -242,6 +278,13 @@ class TradingStateStore:
                     "UPDATE schema_info SET schema_version = ? WHERE singleton = 1",
                     (SCHEMA_VERSION,),
                 )
+            elif int(row["schema_version"]) == 2:
+                # 2 -> 3 adds only the orb_state table (created above); the checkpoint row itself
+                # is migrated when it is read (load_checkpoint) and rewritten as schema 3.
+                self._connection.execute(
+                    "UPDATE schema_info SET schema_version = ? WHERE singleton = 1",
+                    (SCHEMA_VERSION,),
+                )
             elif int(row["schema_version"]) != SCHEMA_VERSION:
                 raise PersistenceError(
                     f"Unsupported persistence schema {row['schema_version']}; expected {SCHEMA_VERSION}"
@@ -273,7 +316,8 @@ class TradingStateStore:
             ).fetchone()
         if row is None:
             return None
-        if int(row["schema_version"]) != SCHEMA_VERSION:
+        schema = int(row["schema_version"])
+        if schema not in READABLE_CHECKPOINT_SCHEMAS:
             raise PersistenceError(
                 f"Checkpoint schema {row['schema_version']} is not supported"
             )
@@ -284,6 +328,9 @@ class TradingStateStore:
             payload = json.loads(raw_payload)
         except json.JSONDecodeError as exc:
             raise PersistenceError("Runtime checkpoint JSON is corrupt") from exc
+        if schema == 2:
+            payload = migrate_legacy_orb_payload(payload)
+            log.warning("Checkpoint schema 2 migrated to 3 at load: old ORB state dropped")
         self.last_checkpoint_at = str(row["saved_at"])
         self.restored_at = datetime.now(timezone.utc).isoformat()
         return payload, int(row["revision"]), str(row["saved_at"])
@@ -380,6 +427,53 @@ class TradingStateStore:
         if revision % 100 == 0:
             self.wal_checkpoint("PASSIVE")
         return revision, inserted_trades
+
+    def save_orb_state(self, section: str, payload: Dict[str, Any]) -> int:
+        """Durably write one ORB state section (controller / scheduler) BEFORE returning.
+        Thread-safe: ORB's worker threads call this; the store lock serializes it with the
+        runtime checkpoint. synchronous=FULL makes the autocommitted row durable on return."""
+        if section not in ORB_STATE_SECTIONS:
+            raise PersistenceError(f"Unknown ORB state section {section!r}")
+        raw = self._canonical_json(payload)
+        checksum = self._checksum(raw)
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            if self._closed:
+                raise PersistenceError("The durable store is closed")
+            connection = self._connection
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute("SELECT revision FROM orb_state WHERE section = ?", (section,)).fetchone()
+                revision = (int(row["revision"]) if row else 0) + 1
+                connection.execute(
+                    "INSERT INTO orb_state(section, revision, saved_at, checksum, payload) VALUES (?, ?, ?, ?, ?) "
+                    "ON CONFLICT(section) DO UPDATE SET revision=excluded.revision, saved_at=excluded.saved_at, "
+                    "checksum=excluded.checksum, payload=excluded.payload",
+                    (section, revision, now, checksum, raw),
+                )
+                connection.execute("COMMIT")
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
+        return revision
+
+    def load_orb_state(self, section: str) -> Optional[Dict[str, Any]]:
+        if section not in ORB_STATE_SECTIONS:
+            raise PersistenceError(f"Unknown ORB state section {section!r}")
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT checksum, payload FROM orb_state WHERE section = ?", (section,)
+            ).fetchone()
+        if row is None:
+            return None
+        raw = str(row["payload"])
+        if self._checksum(raw) != row["checksum"]:
+            raise PersistenceError(f"ORB {section} state checksum mismatch")
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise PersistenceError(f"ORB {section} state JSON is corrupt") from exc
 
     def begin_event(self, event_key: str, event_type: str, payload: Any) -> bool:
         """Durably stage an input before it may mutate trading state.

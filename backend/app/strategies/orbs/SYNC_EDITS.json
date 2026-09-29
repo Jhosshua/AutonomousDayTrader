@@ -1,0 +1,77 @@
+{
+  "source_repo": "ORBStraddle",
+  "source_commit": "71b001f",
+  "source_commit_full": "71b001fb2cb4f359eb85efb182795d11c54b9047",
+  "note": "Every copied file is ORBStraddle's file at 71b001f with ONLY these exact text replacements applied (each must match exactly `count` times) and a generated header prepended. scripts/orbs_parity/sync_copy.py regenerates the copies; backend/tests/unit/orbs/test_sync.py fails on any other difference.",
+  "source_sha256": {
+    "scanner.py": "777c0102d54f6b14c634b4f05dcd99961b3b33d99d8b2a102256a948acbb4905",
+    "orbproc.py": "0ddde179e033d7bc2903f491054a0d1ba3c0c349c5091e871f9c86da2df06a32",
+    "signals.py": "55084a16652d16dd176650d4627b4a168052d844597c574f7f9bfba266f8c627",
+    "flow.py": "bcc3c251e235ce1980659e0e139caebdf765618431ea37c3bc6cf1ed00deb9a5",
+    "adaptive.py": "008489d593a899e7e79157c1f25f27b60fbab96397b82c9c99927a11b9abded7",
+    "market.py": "c2743151645eaf9a711d0c53b673150ef6490cd19878afc76640496cf1c7ab79",
+    "ticks.py": "fd8f017eb858d1f2606e334346e5eb12f7c89b5860ecd982c8f0e5692e95dead",
+    "core.py": "56abe7d1cd55f278d5e8715ce8a61fbff4b9c39f7dd68e2e15ec333581d47432",
+    "config.py": "8f928d9746916c5a1e43de45887075b58b2208329bfc3043d2e4d254940f2ed8"
+  },
+  "files": {
+    "ticks.py": [],
+    "signals.py": [
+      {"why": "package-relative import of config", "count": 1,
+       "old": "    import config\n", "new": "    from . import config\n"}
+    ],
+    "orbproc.py": [
+      {"why": "package-relative imports (config, flow, signals, ticks)", "count": 1,
+       "old": "import config\nimport flow\nimport signals\nfrom ticks import _ts as parse_market_timestamp, _ts_parts\n",
+       "new": "from . import config\nfrom . import flow\nfrom . import signals\nfrom .ticks import _ts as parse_market_timestamp, _ts_parts\n"}
+    ],
+    "flow.py": [
+      {"why": "package-relative import of config", "count": 1,
+       "old": "\nimport config\n", "new": "\nfrom . import config\n"},
+      {"why": "package-relative lazy import of scanner", "count": 1,
+       "old": "    import scanner\n", "new": "    from . import scanner\n"},
+      {"why": "`import core` -> ADT shim (orbs/shim.py: now_et)", "count": 1,
+       "old": "    import core\n", "new": "    from . import shim as core\n"},
+      {"why": "package-relative import of ticks", "count": 2,
+       "old": "from ticks import", "new": "from .ticks import"},
+      {"why": "package-relative lazy import of adaptive", "count": 1,
+       "old": "    import adaptive\n", "new": "    from . import adaptive\n"}
+    ],
+    "market.py": [
+      {"why": "package-relative import of config, plus the shim that owns the HTTP transport", "count": 1,
+       "old": "\nimport config\n", "new": "\nfrom . import config\nfrom . import shim\n"},
+      {"why": "HTTP goes through shim.urlopen (default urllib.request.urlopen; injectable for replay)", "count": 1,
+       "old": "urllib.request.urlopen(req, timeout=min(self.timeout, remaining))",
+       "new": "shim.urlopen(req, timeout=min(self.timeout, remaining))"},
+      {"why": "package-relative import of ticks", "count": 2,
+       "old": "from ticks import", "new": "from .ticks import"},
+      {"why": "ORBS_* tunables come from PARITY_MANIFEST.json (config.getenv), never the process environment", "count": 5,
+       "old": "os.environ.get(\"ORBS_", "new": "config.getenv(\"ORBS_"}
+    ],
+    "scanner.py": [
+      {"why": "package-relative imports (config, flow, market, orbproc, signals, ticks)", "count": 1,
+       "old": "import config\nimport flow\nimport market\nimport orbproc\nimport signals\nfrom ticks import RestSource, _ts as parse_market_timestamp, _ts_key as parse_market_timestamp_key\n",
+       "new": "from . import config\nfrom . import flow\nfrom . import market\nfrom . import orbproc\nfrom . import signals\nfrom .ticks import RestSource, _ts as parse_market_timestamp, _ts_key as parse_market_timestamp_key\n"},
+      {"why": "ORBS_* tunables come from PARITY_MANIFEST.json (config.getenv), never the process environment", "count": 8,
+       "old": "os.environ.get(\"ORBS_", "new": "config.getenv(\"ORBS_"},
+      {"why": "`import core` -> ADT shim (status_heartbeat, _ledger, today, _superv_open, _todays)", "count": 3,
+       "old": "import core\n", "new": "from . import shim as core\n"}
+    ],
+    "adaptive.py": [
+      {"why": "package-relative imports; `core` -> ADT shim (today, now_et, _valid_card, long_only, urlopen)", "count": 1,
+       "old": "import config, core, signals\n", "new": "from . import config, signals\nfrom . import shim as core\n"},
+      {"why": "package-relative lazy import of flow", "count": 2,
+       "old": "import flow\n", "new": "from . import flow\n"},
+      {"why": "package-relative dynamic import of flow", "count": 1,
+       "old": "__import__(\"flow\")", "new": "__import__(__package__ + \".flow\", fromlist=[\"flow_refusal\"])"},
+      {"why": "HTTP goes through shim.urlopen (default urllib.request.urlopen; injectable for replay)", "count": 2,
+       "old": "urllib.request.urlopen(", "new": "core.urlopen("},
+      {"why": "ADT exclude_symbols: excluded names stay on the board (regime unchanged) but leave the eligible pool before pick 1 / pick 2; empty set = original behaviour", "count": 1,
+       "old": "                and c[\"utility\"][\"p_win\"] >= ADAPTIVE_CONFIG[\"MIN_WIN_PROB\"] and c[\"utility\"][\"utility\"] > 0]\n",
+       "new": "                and c[\"utility\"][\"p_win\"] >= ADAPTIVE_CONFIG[\"MIN_WIN_PROB\"] and c[\"utility\"][\"utility\"] > 0]\n    # ADT edit: exclude_symbols leave the pick pool here, after the board and the regime were judged, so the\n    # next eligible candidate is promoted to pick 1 / pick 2. An empty set is the exact ORBStraddle behaviour.\n    excluded_syms = {str(s).upper() for s in (getattr(config, \"EXCLUDE_SYMBOLS\", ()) or ())}\n    if excluded_syms:\n        eligible = [c for c in eligible if c[\"symbol\"] not in excluded_syms]\n"},
+      {"why": "ADT exclude_symbols: audit reason `excluded_symbol` for an excluded candidate", "count": 1,
+       "old": "            \"why\": cand[\"reason\"] if is_chosen else cand[\"reason\"] + \" | Not selected: EV/probability/utility hurdle, rank, pick cap, or sector constraint\",\n",
+       "new": "            \"why\": cand[\"reason\"] if is_chosen else (cand[\"reason\"] + \" | Not selected: excluded_symbol\" if sym in excluded_syms else cand[\"reason\"] + \" | Not selected: EV/probability/utility hurdle, rank, pick cap, or sector constraint\"),\n"}
+    ]
+  }
+}

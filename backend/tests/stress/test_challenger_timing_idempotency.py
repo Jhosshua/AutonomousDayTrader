@@ -893,7 +893,7 @@ class TestIntegratedTimelineArmIsolation:
         main.account.apply_fill(
             "fill_in", "AAPL", "BUY", 100, 150.0, 0.0,
             datetime(2026, 9, 24, 9, 35, 0, tzinfo=ET_TZ),
-            arm=TradingArm.INTRADAY, strategy_id="orb"
+            arm=TradingArm.INTRADAY, strategy_id="vwap_pullback"
         )
         assert "AAPL" in main.account.positions
 

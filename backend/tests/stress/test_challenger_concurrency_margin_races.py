@@ -175,7 +175,7 @@ class Test0930ConcurrencyRaces:
             order = eng.create_order(
                 symbol=sym, side=OrderSide.BUY, order_type=OrderType.LIMIT,
                 qty=qty, limit_price=price, stop_price=stop_p,
-                arm=TradingArm.INTRADAY, strategy_id="orb",
+                arm=TradingArm.INTRADAY, strategy_id="vwap_pullback",
             )
             approved, reason = main.pre_trade_risk_validator(order, acct)
             assert approved is True, f"Intraday order for {sym} failed: {reason}"
@@ -193,7 +193,7 @@ class Test0930ConcurrencyRaces:
         order_4 = eng.create_order(
             symbol="MSFT", side=OrderSide.BUY, order_type=OrderType.LIMIT,
             qty=50, limit_price=400.0, stop_price=392.0,
-            arm=TradingArm.INTRADAY, strategy_id="orb",
+            arm=TradingArm.INTRADAY, strategy_id="vwap_pullback",
         )
         approved_4, reason_4 = main.pre_trade_risk_validator(order_4, acct)
         assert approved_4 is False
@@ -262,13 +262,13 @@ class Test0930ConcurrencyRaces:
         assert len(acct.positions) == 2
 
         # 2. Fill 1 intraday position in AAPL
-        acct.apply_fill("in1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+        acct.apply_fill("in1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         assert len(acct.positions) == 3  # 2 swing + 1 intraday
 
         # 3. An intraday breakout signal arrives for TSLA (2nd intraday position, allowed up to 3)
         tsla_signal = SignalEvent(
             symbol="TSLA",
-            strategy_id="orb",
+            strategy_id="news_momentum",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
             entry_price=200.0,
@@ -372,7 +372,7 @@ class TestFlatteningRacesAndIsolation:
         acct.apply_fill("sw_lrcx", "LRCX", "BUY", 40, 600.0, 0.0, now_dt, arm=TradingArm.SWING, strategy_id="swing_panic_dip", stop_loss_price=555.0)
 
         # Open 2 Intraday positions
-        acct.apply_fill("in_aapl", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+        acct.apply_fill("in_aapl", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         acct.apply_fill("in_tsla", "TSLA", "BUY", 50, 200.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
 
         # Create working orders
@@ -386,7 +386,7 @@ class TestFlatteningRacesAndIsolation:
         # Intraday limit entry order (unfilled)
         aapl_limit = eng.create_order(
             symbol="AAPL", side=OrderSide.BUY, order_type=OrderType.LIMIT,
-            qty=50, limit_price=148.0, arm=TradingArm.INTRADAY, strategy_id="orb",
+            qty=50, limit_price=148.0, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback",
         )
         eng.submit_order(aapl_limit.id)
 
@@ -518,7 +518,7 @@ class TestAMDSymbolCollision:
             ord_intra = eng.create_order(
                 symbol="AMD", side=OrderSide.BUY, order_type=OrderType.LIMIT,
                 qty=100, limit_price=140.0, stop_price=137.0,
-                arm=TradingArm.INTRADAY, strategy_id="orb",
+                arm=TradingArm.INTRADAY, strategy_id="vwap_pullback",
             )
             ok_i, _ = main.pre_trade_risk_validator(ord_intra, acct)
             assert ok_i is True
@@ -568,7 +568,7 @@ class TestAMDSymbolCollision:
         ord_intra = eng.create_order(
             symbol="AMD", side=OrderSide.BUY, order_type=OrderType.LIMIT,
             qty=100, limit_price=140.0, stop_price=137.0,
-            arm=TradingArm.INTRADAY, strategy_id="orb",
+            arm=TradingArm.INTRADAY, strategy_id="vwap_pullback",
         )
         ok_i, reason_i = main.pre_trade_risk_validator(ord_intra, acct)
         assert ok_i is True
@@ -626,7 +626,7 @@ class TestSharedMarginCoordination:
         assert acct.status == AccountStatus.ACTIVE  # MUST NOT be MARGIN_CALL!
 
         # Intraday buys $25k of AAPL (cash becomes -$25k on margin)
-        acct.apply_fill("i1", "AAPL", "BUY", 166, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+        acct.apply_fill("i1", "AAPL", "BUY", 166, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         assert acct.cash == -24900.0
         assert acct.equity == 50000.0
         assert acct.maintenance_margin == 18725.0
@@ -647,7 +647,7 @@ class TestSharedMarginCoordination:
         assert acct.unrealized_pnl == -800.0
 
         # Intraday suffers -$750 realized loss
-        acct.apply_fill("i1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+        acct.apply_fill("i1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         acct.apply_fill("i1_exit", "AAPL", "SELL", 100, 142.50, 0.0, now_dt, arm=TradingArm.INTRADAY)
         assert acct.realized_pnl == -750.0
 

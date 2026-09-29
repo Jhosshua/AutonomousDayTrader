@@ -45,7 +45,8 @@ from backend.app.ingestion.stock_ws import StockWebSocketClient
 from backend.app.ingestion.vix_client import VixClient
 from backend.app.models.events import BarEvent, QuoteEvent, TradeEvent, NewsEvent, VixPrint, RelayStatusEvent
 from backend.app.strategies.base import Strategy, SignalEvent
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
+from backend.app.strategies.orb import OrbStrategy
+from backend.app.core.orb_integration import OrbIntegration, ORB_ID
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy  # v1 class: checkpoint decoding only
 from backend.app.strategies import vwap_pullback_v2
 from backend.app.strategies.vwap_pullback_v2 import VWAPPullbackV2Strategy
@@ -91,7 +92,9 @@ flattening_engine = ZeroOvernightFlatteningEngine()
 market_filter = MarketTrendFilter()
 
 # Strategies & Dynamic Self-Adaptation Engine
-orb_strategy = OpeningRangeBreakoutStrategy()
+# "orb" = Opening Range Breakout by ORBStraddle's rules. The strategy object only carries the id,
+# operator status and P&L counters; the ORB controller + scheduler (`orb`, below) trade it.
+orb_strategy = OrbStrategy()
 PART2_ALL_GATES = ("IMPULSE_DELTA", "RESUMPTION_DELTA", "ROLLING_DELTA", "SECTOR_DIRECTION", "SECTOR_RS", "DOLLAR_WIND", "RATES_WIND")
 _enforced_names = [str(g).strip().upper() for g in settings.RIDE_THE_TREND_ENFORCED_GATES]
 _unknown_gates = [g for g in _enforced_names if g not in PART2_ALL_GATES]
@@ -144,6 +147,8 @@ strategies: List[Strategy] = [
 strategy_map: Dict[str, Strategy] = {s.strategy_id: s for s in strategies}
 or15_controller = OR15ExecutionController(sys.modules[__name__])
 tri_controller = TriExecutionController(sys.modules[__name__], tri_strategies)
+# ORB controller + scheduler glue; built in lifespan (orb.start()) or by tests (orb.build()).
+orb = OrbIntegration(sys.modules[__name__])
 or15_sip_verified = False
 # OR15 was replaced by the TSLA/CDE asymmetric plan on 2026-09-25. It only
 # finishes a trade restored from a checkpoint; tests may re-enable it.
@@ -233,9 +238,11 @@ def _get_effective_committed_portfolio(
     Optionally filters by TradingArm (INTRADAY or SWING).
     """
     if arm == TradingArm.INTRADAY:
+        # ORB positions have their own slots (ORBStraddle's 4) and never count toward ADT's cap.
         committed_symbols = {
             sym for sym, pos in acct.positions.items()
             if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+            and getattr(pos, "strategy_id", "") != ORB_ID
         }
     elif arm == TradingArm.SWING:
         committed_symbols = {
@@ -243,7 +250,7 @@ def _get_effective_committed_portfolio(
             if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip"
         }
     else:
-        committed_symbols = set(acct.positions.keys())
+        committed_symbols = {sym for sym, pos in acct.positions.items() if getattr(pos, "strategy_id", "") != ORB_ID}
 
     existing_notional: dict[str, float] = {}
 
@@ -353,7 +360,23 @@ async def _broker_reconcile_once() -> None:
         log.warning("Alpaca sync failed (%s); new entries paused until a sync succeeds", exc)
         return
     broker_state["last_error"] = alpaca_broker.status.last_error
-    _compare_with_broker(dict(status.positions), status.equity)
+    positions = dict(status.positions)
+    # ORB fill lag must never pause entries (Codex P2 #4): book what ORB already knows, and for any
+    # symbol ORB owns where ADT's book and Alpaca still differ, make the controller re-read its own
+    # orders at once (worker thread), book the result, then compare. Non-ORB differences block as before.
+    try:
+        if orb.sync():
+            _checkpoint_runtime("ORB_SYNC")
+        local = _local_signed_positions(account)
+        orb_diff = sorted(s for s in set(local) | set(positions)
+                          if local.get(s, 0) != positions.get(s, 0) and orb.owns(s))
+        if orb_diff:
+            await asyncio.to_thread(orb.refresh_symbols, orb_diff)
+            if orb.sync():
+                _checkpoint_runtime("ORB_SYNC")
+    except Exception:
+        log.exception("ORB ledger sync before the broker check failed")
+    _compare_with_broker(positions, status.equity)
 
 
 def _settle_broker_orders() -> None:
@@ -459,6 +482,11 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     is_exit = False
     if existing_strat in TRI_IDS and order_strat != existing_strat:
         return False, "Fixed position is managed by its owning tranche controller"
+    if order_strat != ORB_ID and orb.owns(sym):
+        # ORB's shares sit under an Alpaca bracket; only the ORB controller may touch them (it cancels
+        # its legs first). Entries and exits from any other path are refused.
+        return False, (f"ORB_OWNED: {sym} is held or reserved by the Opening Range Breakout (ORBStraddle "
+                       "rules); only its own controller manages it")
     if existing_strat == OR15_ID and order_strat != OR15_ID:
         return False, "OR15 position is managed by its fixed exit controller"
     if getattr(order, "strategy_id", None) in (
@@ -506,6 +534,11 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
                 return False, detail
         if or15_controller.reserves(sym) and order_strat != OR15_ID:
             return False, "SYMBOL_RESERVED_FOR_OR15: first signal owns TSLA until resolved"
+        # One lock with ORB's reserve(): refuse a symbol ORB holds/reserved, else mark this entry in
+        # flight so ORB cannot take the symbol before the order is working.
+        orb_refusal = orb.claim_for_adt(sym, order, order_strat)
+        if orb_refusal:
+            return False, orb_refusal
         if order_strat == OR15_ID and (sym != "TSLA" or order.side != OrderSide.BUY or order.qty != 1):
             return False, "OR15 requires exactly one TSLA share, long only"
         if is_swing:
@@ -558,7 +591,8 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
     s_price = order.stop_price or (est_price * 0.98 if order.side == OrderSide.BUY else est_price * 1.02)
 
     active_cnt = (
-        sum(1 for p in acct.positions.values() if getattr(p, "arm", None) != TradingArm.SWING and getattr(p, "strategy_id", "") != "swing_panic_dip")
+        sum(1 for p in acct.positions.values() if getattr(p, "arm", None) != TradingArm.SWING
+            and getattr(p, "strategy_id", "") not in ("swing_panic_dip", ORB_ID))
         if (getattr(order, "strategy_id", None) == "MANUAL" and not is_swing)
         else committed_count
     )
@@ -588,6 +622,8 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
 
 engine = ExecutionEngine(account=account, risk_validator=pre_trade_risk_validator)
+# ORB's open + pending risk comes out of ADT's remaining daily-loss budget before other arms size.
+risk_engine.reserved_risk_fn = orb.open_risk
 engine.broker_gate = _broker_gate
 engine.before_fixed_broker_submit = or15_controller.before_submit
 
@@ -716,6 +752,7 @@ def _capture_checkpoint() -> Dict[str, Any]:
         daily_bar_store=daily_bar_store,
         decisions=decision_log.to_state(),
         research=research_safe(research_tracker.to_state, recorder=research_recorder),
+        orb=orb.ledger_state(),
         swing_scan={
             "last_scan": swing_strategy_engine.audit_log[-1] if swing_strategy_engine.audit_log else None,
             "last_close_data_note": getattr(swing_strategy_engine, "last_close_data_note", None),
@@ -856,6 +893,7 @@ def _restore_checkpoint() -> bool:
     risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.daily_starting_equity)
     decision_log.load_state(restored.get("decisions"))
     research_safe(research_tracker.load_state, restored.get("research"), recorder=research_recorder)
+    orb.load_ledger_state(restored.get("orb"))
     try:
         # v1 or older v2 symbol state is replayed through the v2 evaluator; no stored index is trusted.
         rebuilt = vwap_strategy.after_restore()
@@ -943,6 +981,8 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
     }
     if tri_controller.owns(symbol):
         pos_data.update(tri_controller.position_details(symbol))
+    if orb.owns(symbol):
+        pos_data.update(orb.position_details(symbol))
     if include_chart:
         history = market_history.get(symbol, [])
         pos_data["chart_points"] = list(history)[-120:]
@@ -1236,14 +1276,16 @@ def _release_dead_entry_brackets() -> None:
         bracket = bracket_manager.brackets.get(bracket_id)
         if bracket is not None:
             bracket_manager.cancel_pending_entry_bracket(bracket.symbol)
-        if order.strategy_id == "orb":
-            orb_strategy.notify_signal_rejected(order.symbol)
         entry_order_to_bracket.pop(order_id, None)
 
 
 def _flatten_symbol(sym: str, price: float, timestamp: datetime) -> List[Any]:
-    """Liquidate a full position, looping process_bar past the 10% volume participation cap."""
+    """Liquidate a full position, looping process_bar past the 10% volume participation cap.
+    An ORB position is never liquidated here: its controller cancels the bracket legs first."""
     fills: List[Any] = []
+    if orb.owns(sym):
+        orb.request_exit(sym, "FLATTEN")
+        return fills
     for _ in range(50):
         if sym not in account.positions:
             break
@@ -1258,6 +1300,8 @@ def _trip_circuit_breaker(timestamp: datetime) -> None:
     """Halt trading and liquidate all open intraday positions after a daily-loss breach. Swing positions are strictly exempt."""
     account.status = account.status.__class__.CIRCUIT_HALTED
     tri_controller.request_all_exits("CIRCUIT_BREAKER", timestamp)
+    # ORB: no new entries today and every ORB position exits (legs cancelled first)
+    orb.request_all_exits("CIRCUIT_BREAKER", block_entries=True)
     if tsla_or15_strategy.phase == "WAITING_ENTRY":
         tsla_or15_strategy.skip("CIRCUIT_BREAKER", timestamp)
     elif tsla_or15_strategy.phase == "ENTERING":
@@ -1265,7 +1309,7 @@ def _trip_circuit_breaker(timestamp: datetime) -> None:
     engine.cancel_all_orders("CIRCUIT_BREAKER_HALT", arm=TradingArm.INTRADAY)
     _release_dead_entry_brackets()
     for sym, pos in list(account.positions.items()):
-        if tri_controller.owns(sym):
+        if tri_controller.owns(sym) or orb.owns(sym):
             continue
         if or15_controller.owns(sym):
             or15_controller.request_exit("CIRCUIT_BREAKER", timestamp)
@@ -1307,6 +1351,9 @@ def _check_session_boundary(now_dt: datetime) -> None:
         tsla_or15_strategy.incomplete = True
         or15_controller.request_exit("SESSION_RECOVERY", now_dt)
         return  # retain previous-day ownership and native ids until broker flat
+    # ORB is flat by 11:00; anything still ORB's at a session boundary exits through its controller
+    # (legs cancelled first). Its shares stay on ORB's book, not the generic liquidation below.
+    orb.request_all_exits("SESSION_BOUNDARY_LIQUIDATION", block_entries=False)
     boundary_event_key: Optional[str] = None
     if not inflight_event_keys:
         should_process, boundary_event_key = _begin_durable_event(
@@ -1330,6 +1377,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
     intraday_positions = {
         sym: pos for sym, pos in account.positions.items()
         if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+        and not orb.owns(sym)
     }
     if intraday_positions:
         log.error(
@@ -1350,6 +1398,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
         remaining_intraday = {
             sym: pos for sym, pos in account.positions.items()
             if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+            and not orb.owns(sym)
         }
         if remaining_intraday:
             log.error(
@@ -1618,6 +1667,18 @@ def _strategy_cards(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     for s in strategies:
         if s.strategy_id == OR15_ID and not OR15_NEW_ENTRIES and not or15_controller.reserves("TSLA"):
             continue  # Retired protocol remains in checkpoint/history only.
+        if s.strategy_id == ORB_ID:
+            orb_blockers: List[str] = []
+            if risk_engine.status != BreakerStatus.ARMED:
+                orb_blockers.append("Daily loss limit hit: no new trades today.")
+            if state_store is not None and not persistence_healthy:
+                orb_blockers.append("Saving is failing: new trades blocked until fixed.")
+            if not simulation_mode and orb.mode == "live" and (engine.broker is None or broker_state["mismatch"]):
+                orb_blockers.append("Paper account is not ready.")
+            card = orb.card(now, s, orb_blockers)
+            card["decisions"] = decision_log.summary(s.strategy_id)
+            cards.append(card)
+            continue
         card = s.to_dict()
         extra_blockers: List[str] = []
         if s.strategy_id == "vwap_pullback":
@@ -1734,6 +1795,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
 
     # 1. Contradiction or Exit Signal
     if "CONTRADICTION" in signal.reason or "EXIT" in signal.reason:
+        if orb.owns(sym):
+            # ORB's shares sit under an Alpaca bracket: its controller cancels the legs, then closes.
+            orb.request_exit(sym, "NEWS_CONTRADICTION" if "CONTRADICTION" in signal.reason else "STRATEGY_EXIT")
+            return
         if existing_pos:
             if or15_controller.owns(sym) or tri_controller.owns(sym):
                 return
@@ -1759,6 +1824,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         return
 
     # 2. Position-opening entry signal
+    if signal.strategy_id == ORB_ID:
+        # ORB (ORBStraddle rules) never enters through this path: its controller places brackets.
+        log.error("Refusing an 'orb' signal on the generic entry path for %s", sym)
+        return
     # Research only: what each admission stage decided (never read by trading code).
     stages: Dict[str, Any] = {"decision_wall_at": datetime.now(timezone.utc).isoformat()}
     if signal.entry_price <= 0:
@@ -1818,8 +1887,6 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
     )
     if target_error:
         _record_decision(signal, "RISK", target_error, stages)
-        if signal.strategy_id == "orb":
-            orb_strategy.notify_signal_rejected(sym)
         return
     committed_symbols, committed_sectors, committed_count, notional_map = _get_effective_committed_portfolio(
         account, arm=TradingArm.INTRADAY
@@ -1836,8 +1903,6 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
                   committed_positions=committed_count)
     if not approved or qty <= 0:
         _record_decision(signal, classify_adaptation_reason(reason) if not approved else "SIZING", reason, stages)
-        if signal.strategy_id == "orb":
-            orb_strategy.notify_signal_rejected(sym)
         return
 
     # Admission and the final risk check use the same volatility-adjusted stop
@@ -1866,14 +1931,10 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
                   risk_authorized_qty=getattr(risk_preview, "authorized_qty", None))
     if not risk_preview.approved:
         _record_decision(signal, "RISK", _risk_reason_text(risk_preview), stages)
-        if signal.strategy_id == "orb":
-            orb_strategy.notify_signal_rejected(sym)
         return
     qty = min(qty, risk_preview.authorized_qty)
     if qty <= 0:
         _record_decision(signal, "SIZING", "risk engine authorized 0 shares", stages)
-        if signal.strategy_id == "orb":
-            orb_strategy.notify_signal_rejected(sym)
         return
 
     side = OrderSide.BUY if (signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY") else OrderSide.SELL
@@ -1894,7 +1955,6 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         stages.update(final_qty=qty, order_id=submitted.id, bracket_id=f"brk_{submitted.id}")
         signal_row = _record_decision(signal, "SUBMITTED", f"{side.value} {qty} {sym} order {submitted.id}", stages)
         ratio_strategy = {
-            "orb": orb_strategy,
             "news_momentum": news_strategy,
             "vwap_pullback": vwap_strategy,
         }.get(signal.strategy_id)
@@ -1923,8 +1983,6 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             fills = engine.process_bar(bar.symbol, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.timestamp)
             _reconcile_fills(fills)
     else:
-        if signal.strategy_id == "orb":
-            orb_strategy.notify_signal_rejected(sym)
         log.warning("Entry order %s rejected by execution engine: %s", submitted.id, submitted.reject_reason)
         _record_decision(signal, "ENGINE_REJECT", str(submitted.reject_reason), stages)
 
@@ -2192,8 +2250,8 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     if bar.symbol.upper() in settings.WATCHLIST_SYMBOLS:
         for strat in strategies:
             try:
-                if strat.strategy_id in FIXED_IDS:
-                    continue
+                if strat.strategy_id in FIXED_IDS or strat.strategy_id == ORB_ID:
+                    continue  # fixed plans and ORB (ORBStraddle rules) run on their own controllers
                 sigs = strat.on_bar(bar)
                 if sigs:
                     collected_signals.extend(sigs)
@@ -2206,8 +2264,6 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
         for sig in collected_signals:
             if id(sig) not in kept and sig.entry_price > 0:
                 _record_decision(sig, "ARBITRATION_LOST", "A higher-priority strategy signalled the same stock on this bar")
-                if sig.strategy_id == "orb":
-                    orb_strategy.notify_signal_rejected(sig.symbol)
         for sig in arbitrated:
             await execute_strategy_signal(sig)
 
@@ -2308,6 +2364,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         if not should_process:
             return
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
+    orb.note_price(quote.symbol, (quote.bid_price + quote.ask_price) / 2.0, quote.timestamp, "quote_mid")
     _mark_feed_event("quote")
     try:
         tick_tape.on_quote(
@@ -2439,6 +2496,8 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         if not should_process:
             return
     if directive.phase == FlatteningPhase.ORDER_PURGE:
+        # ORB is flat by 11:00: anything of ORB's still live at 15:50 exits through its controller.
+        orb.request_all_exits("EOD_ORDER_PURGE", block_entries=False)
         # Phase 2 (15:50 ET): Purge unfilled entry orders; preserve protective stops for open positions
         # Preserve swing orders (both protective stops and staged/entry orders)
         for order_id, order in list(engine.working_orders.items()):
@@ -2461,12 +2520,13 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
     if directive.liquidate_all_positions:
         now_dt = directive.timestamp
         tri_controller.request_all_exits("FORCED_FLAT", now_dt)
+        orb.request_all_exits("FORCED_FLAT", block_entries=False)
         if tsla_or15_strategy.phase == "WAITING_ENTRY":
             tsla_or15_strategy.skip("FORCED_FLAT", now_dt)
         elif tsla_or15_strategy.phase == "ENTERING":
             or15_controller.request_exit("FORCED_FLAT", now_dt)
         for sym, pos in list(account.positions.items()):
-            if tri_controller.owns(sym):
+            if tri_controller.owns(sym) or orb.owns(sym):
                 continue
             if or15_controller.owns(sym):
                 or15_controller.request_exit("FORCED_FLAT", now_dt)
@@ -2486,6 +2546,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
 
     if directive.run_audit:
         tri_controller.request_all_exits("EMERGENCY_SWEEP", directive.timestamp)
+        orb.request_all_exits("EMERGENCY_SWEEP", block_entries=False)
         if tsla_or15_strategy.phase == "WAITING_ENTRY":
             tsla_or15_strategy.skip("EMERGENCY_SWEEP", directive.timestamp)
         elif tsla_or15_strategy.phase == "ENTERING":
@@ -2500,7 +2561,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         if audit_res.liquidate_all_positions and account.positions:
             now_dt = audit_res.timestamp
             for sym, pos in list(account.positions.items()):
-                if tri_controller.owns(sym):
+                if tri_controller.owns(sym) or orb.owns(sym):
                     continue
                 if or15_controller.owns(sym):
                     or15_controller.request_exit("EMERGENCY_SWEEP", now_dt)
@@ -2704,6 +2765,27 @@ async def _swing_close_with_backfill(eval_date: date, max_wait_sec: float = 120.
 
 
 
+async def _runtime_clock_step(now_dt: datetime) -> None:
+    """One 1-second pass of the runtime clock (EOD controls, fixed plans, ORB's scheduler)."""
+    _check_session_boundary(now_dt)
+    adaptation_engine.update_clock(now_dt)
+    _expire_stale_staged_swing_orders(now_dt)
+    for strat in strategies:
+        try:
+            if strat.strategy_id in FIXED_IDS:
+                continue
+            strat.on_time_tick(now_dt)
+        except Exception as e:
+            log.error(f"Strategy {strat.strategy_id} error on time tick: {e}")
+    directive = flattening_engine.check_time_tick()
+    if directive:
+        await handle_flattening_directive(directive)
+    or15_controller.tick(now_dt)
+    tri_controller.tick(now_dt)
+    # ORB scheduler: starts/collects worker jobs only, never waits on the network.
+    orb.tick(now_dt)
+
+
 async def _runtime_clock_loop() -> None:
     """Keep EOD controls alive even when a market-data bar is delayed or absent."""
     last_clock_broadcast = 0.0
@@ -2719,21 +2801,7 @@ async def _runtime_clock_loop() -> None:
                 continue
             flattening_engine.clock.clear_simulated_time()
             now_dt = flattening_engine.clock.now()
-            _check_session_boundary(now_dt)
-            adaptation_engine.update_clock(now_dt)
-            _expire_stale_staged_swing_orders(now_dt)
-            for strat in strategies:
-                try:
-                    if strat.strategy_id in FIXED_IDS:
-                        continue
-                    strat.on_time_tick(now_dt)
-                except Exception as e:
-                    log.error(f"Strategy {strat.strategy_id} error on time tick: {e}")
-            directive = flattening_engine.check_time_tick()
-            if directive:
-                await handle_flattening_directive(directive)
-            or15_controller.tick(now_dt)
-            tri_controller.tick(now_dt)
+            await _runtime_clock_step(now_dt)
             # Cards must flip at window boundaries even when no bar arrives.
             if ui_clients and _time_mod.monotonic() - last_clock_broadcast >= 10.0:
                 last_clock_broadcast = _time_mod.monotonic()
@@ -2750,6 +2818,7 @@ async def handle_trade_event(trade: TradeEvent) -> None:
     """Track the latest trade print price; fold the print into the Ride the Trend tick tape."""
     if isinstance(trade.price, (int, float)) and math.isfinite(trade.price) and trade.price > 0:
         latest_market_prices[trade.symbol.upper()] = trade.price
+        orb.note_price(trade.symbol, trade.price, trade.timestamp, "sip_trade")
     _mark_feed_event("trade")
     try:
         tick_tape.on_trade(
@@ -2850,6 +2919,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     swing_strategy_engine.reset()
     tsla_or15_strategy.__init__()
     tri_controller.shutdown()
+    orb.reset()
     for fixed_strategy in tri_strategies:
         fixed_strategy.__init__(fixed_strategy.symbol)
     daily_bar_aggregator.reset_for_new_session()
@@ -2915,6 +2985,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             broker_state["last_error"] = f"startup sync failed: {exc}"
             broker_state["mismatch"] = True
             log.error("Alpaca startup sync failed (%s); new entries blocked until a sync succeeds", exc)
+    # ORB (ORBStraddle rules): controller + scheduler, restored from their durable rows before any
+    # replayed event can ask them for an exit. Entries stay refused until ORB's own startup
+    # reconciliation with Alpaca succeeds (the scheduler runs it on a worker thread).
+    orb.start()
     # Register bus event handlers
     event_bus.subscribe(BarEvent, handle_bar_event)
     event_bus.subscribe(QuoteEvent, handle_quote_event)
@@ -2999,6 +3073,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             pass
         ui_clients.discard(ws)
     tri_controller.shutdown()
+    # ORB: stop new entries/jobs, let a running exit finish (bounded), then refuse every broker write,
+    # all BEFORE the final checkpoint and the store close (Codex P1 #3). Its last fills are booked.
+    try:
+        unfinished = await asyncio.to_thread(orb.drain)
+        if unfinished:
+            log.error("ORB shutdown drain left: %s", unfinished)
+        orb.sync()
+    except Exception:
+        log.exception("ORB shutdown drain failed")
+    orb.shutdown()
     # Producers are fully stopped before the final durable checkpoint. Nothing
     # can fill or mutate the account after this point.
     checkpoint_saved = False
@@ -3084,6 +3168,7 @@ async def get_health() -> Dict[str, Any]:
         "research": research_recorder.health(),
         "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "profiles": profile_store.health(), "addons_enforced": settings.RIDE_THE_TREND_ADDONS_ENFORCED, "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
         "broker": _broker_health(),
+        "orb": _sanitize_for_json(_orb_health()),
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
                 "disabled" if state_store is None else "recovery_halt"
@@ -3146,6 +3231,90 @@ async def get_health() -> Dict[str, Any]:
             },
         },
     }
+
+
+def _orb_health() -> Dict[str, Any]:
+    st = orb.status()
+    lv = st.get("last_verdict") or {}
+    return {"mode": st.get("mode"), "configured_mode": st.get("configured_mode"), "ready": st.get("ready"),
+            "step": st.get("step"), "last_verdict": {k: lv.get(k) for k in ("wave", "verdict", "reason", "at")} if lv else None,
+            "picks": st.get("picks") or [], "open_trades": len(st.get("holdings") or []),
+            "errors": st.get("errors") or [], "init_error": st.get("init_error"),
+            "alerts": st.get("alerts") or [],
+            "halted": st.get("halted"), "entries_blocked": st.get("entries_blocked")}
+
+
+@app.get("/api/orb")
+async def get_orb() -> Dict[str, Any]:
+    """ORB (ORBStraddle rules): mode, current step, last verdict, picks, open trades, errors."""
+    return _sanitize_for_json(orb.status())
+
+
+class OrbResolveRequest(BaseModel):
+    symbol: str
+
+
+@app.post("/api/orb/resolve-orphan")
+async def resolve_orb_orphan(req: OrbResolveRequest) -> Dict[str, Any]:
+    """Operator action: after closing an unexplained ORB position at Alpaca by hand, clear it from ADT's
+    book. Allowed only when Alpaca (read now) shows no shares of the symbol and no live ORB orders."""
+    sym = req.symbol.strip().upper()
+    why = orb.resolve_refusal(sym)
+    if why:
+        raise HTTPException(status_code=409, detail=why)
+    try:
+        ok, detail = await asyncio.to_thread(orb.alpaca_clear_for, sym)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Alpaca could not be read: {exc}") from exc
+    if not ok:
+        raise HTTPException(status_code=409, detail=detail)
+    result = orb.apply_resolution(sym, datetime.now(timezone.utc))
+    if not result.get("resolved"):
+        raise HTTPException(status_code=503, detail=result.get("reason") or "not resolved")
+    await broadcast_ui_state(force=True)
+    return _sanitize_for_json(result)
+
+
+class OrbUnknownWriteRequest(BaseModel):
+    ref: str
+    note: str = ""
+
+
+@app.post("/api/orb/resolve-unknown-write")
+async def resolve_orb_unknown_write(req: OrbUnknownWriteRequest) -> Dict[str, Any]:
+    """Operator action: an order ORB sent right before a shutdown never showed up at Alpaca. After checking
+    Alpaca by hand, drop its marker so ORB can trade again. Refused while Alpaca (read now) shows it."""
+    ctl = orb.controller
+    if ctl is None or ctl.broker is None:
+        raise HTTPException(status_code=409, detail="ORB has no broker connection.")
+    ref = req.ref.strip()
+    marker = next((m for m in ctl.state.get("unresolved_writes") or [] if ref in (m.get("coid"), m.get("order_id"))), None)
+    if marker is None:
+        raise HTTPException(status_code=404, detail="No unresolved ORB write with that id.")
+
+    def still_unknown() -> Optional[str]:
+        why = ctl.account_refusal(ctl.broker.get_account_checked())
+        if why:
+            return f"The Alpaca account could not be verified: {why}"
+        got = (ctl.broker.get_order_by_client_id(marker["coid"]) if marker.get("coid")
+               else ctl.broker.get_order(marker["order_id"], True))
+        if isinstance(got, dict) and got.get("id"):
+            return "Alpaca shows this order now; ORB's next check will book it. Nothing to resolve."
+        return None
+    try:
+        why = await asyncio.to_thread(still_unknown)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Alpaca could not be read: {exc}") from exc
+    if why:
+        raise HTTPException(status_code=409, detail=why)
+    try:
+        hit = await asyncio.to_thread(ctl.resolve_unknown_write, ref, req.note or "operator checked Alpaca by hand")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"The change could not be saved: {exc}") from exc
+    decision_log.record(ORB_ID, str(marker.get("symbol") or "-"), "-", 0.0, "ORB_WRITE_RESOLVED",
+                        f"operator resolved unknown write {ref}", datetime.now(timezone.utc))
+    _checkpoint_runtime("ORB_WRITE_RESOLVED")
+    return _sanitize_for_json({"resolved": True, "write": hit})
 
 
 @app.get("/api/account")
@@ -3368,6 +3537,8 @@ async def submit_order(req: OrderCreateRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="STOP_LIMIT orders are not supported by the execution engine")
 
     symbol = req.symbol.upper()
+    if req.strategy_id.strip().lower() == ORB_ID:
+        raise HTTPException(status_code=400, detail="ORB orders are placed only by the ORB controller")
     existing_pos = account.positions.get(symbol)
     is_reducing = bool(
         existing_pos
@@ -3436,6 +3607,10 @@ async def cancel_order(order_id: str) -> Dict[str, Any]:
     try:
         if engine.orders.get(order_id) and engine.orders[order_id].execution_policy in FIXED_IDS:
             raise ValueError("Use Close trade for OR15 so broker protection is reconciled first")
+        target = engine.orders.get(order_id)
+        if target is not None and (target.strategy_id == ORB_ID or orb.owns(target.symbol)):
+            raise ValueError("ORB's orders are Alpaca brackets managed by the ORB controller; "
+                             "use Close trade for this stock so its legs are cancelled first")
         cancelled = engine.cancel_order(order_id, reason="API_REQUEST")
         _release_dead_entry_brackets()
         _checkpoint_runtime("API_ORDER_CANCEL")
@@ -3466,9 +3641,15 @@ async def _execute_manual_flatten(
     rejected: List[Dict[str, str]] = []
     fixed_requested = False
     tri_requested = []
+    orb_requested: List[str] = []
 
     for sym in target_symbols:
         pos = account.positions.get(sym)
+        if orb.owns(sym):
+            # ORB's bracket legs are cancelled and confirmed before its exact quantity is closed
+            orb.request_exit(sym, "MANUAL_FLATTEN")
+            orb_requested.append(sym)
+            continue
         if tri_controller.reserves(sym):
             tri_controller.request_exit(sym, "MANUAL_FLATTEN", now_dt)
             tri_requested.append(sym)
@@ -3532,6 +3713,14 @@ async def _execute_manual_flatten(
         "MANUAL_FLATTEN",
         (event_key, "MANUAL_FLATTEN") if event_key else None,
     )
+    if orb_requested:
+        for sym in orb_requested:
+            if sym in orb.alerts:
+                rejected.append({"symbol": sym, "reason": orb.alerts[sym]})
+            elif orb.owns(sym):
+                rejected.append({"symbol": sym, "reason": "Close requested; waiting for broker confirmation"})
+            else:
+                flattened.append(sym)
     if tri_requested:
         tri_controller.tick(now_dt)
         for sym in tri_requested:
@@ -3574,7 +3763,11 @@ async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]
             | {s.upper() for s in bracket_manager.symbol_to_bracket.keys()}
             | ({"TSLA"} if or15_controller.reserves("TSLA") else set())
             | {s.symbol for s in tri_strategies if tri_controller.reserves(s.symbol)}
+            | set(orb.symbols())
         )
+    if not (req and req.symbol):
+        # ORBStraddle's flatten-all rule: every ORB position exits and ORB opens nothing more today
+        orb.request_all_exits("MANUAL_FLATTEN_ALL", block_entries=True)
     payload = {"target_symbols": target_symbols, "timestamp": now_dt}
     should_process, event_key = _begin_durable_event("MANUAL_FLATTEN", payload)
     if not should_process:
@@ -3583,6 +3776,14 @@ async def manual_flatten(req: Optional[FlattenRequest] = None) -> Dict[str, Any]
             "remaining_positions": len(account.positions), "duplicate": True,
         }
     return await _execute_manual_flatten(target_symbols, now_dt, event_key)
+
+
+def _orb_tighten_refusal(sym: str) -> Optional[str]:
+    """Manual stop-tighten is refused for ORB: its stop is a leg of an Alpaca bracket."""
+    if orb.owns(sym):
+        return ("ORB's stop is held at Alpaca in its bracket and cannot be moved here. "
+                "Use Close trade to exit this stock.")
+    return None
 
 
 # Real-Time UI WebSocket Endpoint (Port 8005)
@@ -3616,6 +3817,10 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                     mkt_price = pos.market_price if pos else None
                     if tri_controller.owns(sym):
                         await websocket.send_json({"type": "error", "message": "This plan keeps its safety exit fixed"})
+                        continue
+                    orb_refusal = _orb_tighten_refusal(sym)
+                    if orb_refusal:
+                        await websocket.send_json({"type": "error", "message": orb_refusal})
                         continue
                     bracket_dir = bracket_manager.manual_tighten_stop(sym, new_stop, current_market_price=mkt_price)
                     if bracket_dir and getattr(bracket_dir, "orders_to_modify", None):

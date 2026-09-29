@@ -32,7 +32,6 @@ from backend.app.strategies.adaptation import (
     get_vix_regime,
 )
 from backend.app.strategies.base import SignalEvent
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.strategies.mean_reversion import MeanReversionStrategy
@@ -172,116 +171,8 @@ def test_oracle_crisis_vix_must_widen_stop_loss():
 # 2. TIME-OF-DAY BOUNDARY TRANSITIONS
 # ============================================================================
 
-def test_premarket_blocks_new_breakout_orders():
-    """Verify that during PRE_MARKET (< 09:30 ET):
-
-    1. ORB strategy discards pre-market bars and generates 0 signals.
-    2. DynamicAdaptationEngine rejects ORB signals via PHASE_GATE_DENIED.
-    """
-    engine = DynamicAdaptationEngine()
-    pre_market_dt = datetime(2026, 9, 21, 9, 15, 0, tzinfo=ET)
-    phase = engine.update_clock(pre_market_dt)
-    assert phase == "PRE_MARKET"
-    assert engine.market_status == "CLOSED"
-
-    # 1. ORB strategy on pre-market bar
-    orb = OpeningRangeBreakoutStrategy()
-    pre_bar = BarEvent(
-        symbol="AAPL",
-        open=150.0,
-        high=152.0,
-        low=149.0,
-        close=151.5,
-        volume=250000,
-        timestamp=pre_market_dt,
-    )
-    signals = orb.on_bar(pre_bar)
-    assert len(signals) == 0  # No breakout orders in pre-market
-
-    # 2. DynamicAdaptationEngine phase gate denial
-    test_sig = SignalEvent(
-        symbol="AAPL",
-        side=OrderSide.BUY,
-        order_type=OrderType.MARKET,
-        entry_price=151.5,
-        stop_loss=149.0,
-        take_profit_1=154.0,
-        take_profit_2=156.0,
-        strategy_id="orb",
-        confidence=0.85,
-        reason="PREMARKET_BREAKOUT_TEST",
-        timestamp=pre_market_dt,
-    )
-    approved, reason, qty = engine.evaluate_signal_admission(
-        signal=test_sig,
-        equity=50000.0,
-        current_positions_count=0,
-        is_symbol_active=False,
-    )
-    assert approved is False
-    assert "PHASE_GATE_DENIED" in reason
-    assert qty == 0
 
 
-def test_open_flush_allows_orb_establishment_and_breakout():
-    """Verify that during OPEN_VOLATILITY_FLUSH (09:30 - 10:00 ET):
-
-    1. Bars between 09:30 and 09:35 form the 5m opening range.
-    2. Range is established at 09:35 with exact high, low, and midpoint.
-    3. Adaptation engine permits ORB strategy during OPEN_VOLATILITY_FLUSH.
-    4. Breakout above range_high on RVOL >= 1.8 fires valid SignalEvent.
-    """
-    engine = DynamicAdaptationEngine()
-    orb = OpeningRangeBreakoutStrategy(range_minutes=5, min_rvol=1.80)
-
-    # Establish baseline volume
-    orb.set_baseline_volume("AAPL", 50000.0)
-
-    # Feed 5 opening bars (09:30 to 09:34)
-    bars_data = [
-        (150.0, 151.0, 149.5, 150.5, 20000),  # 09:30
-        (150.5, 151.5, 150.0, 151.0, 22000),  # 09:31
-        (151.0, 152.0, 150.8, 151.8, 25000),  # 09:32
-        (151.8, 152.5, 151.2, 152.0, 18000),  # 09:33
-        (152.0, 152.2, 151.5, 151.9, 19000),  # 09:34
-    ]
-
-    for i, (o, h, l, c, v) in enumerate(bars_data):
-        dt = datetime(2026, 9, 21, 9, 30 + i, 0, tzinfo=ET)
-        engine.update_clock(dt)
-        assert engine.current_time_phase == "OPEN_VOLATILITY_FLUSH"
-        b = BarEvent(symbol="AAPL", open=o, high=h, low=l, close=c, volume=v, timestamp=dt)
-        sigs = orb.on_bar(b)
-        assert len(sigs) == 0  # Still forming range
-
-    # At 09:35 (bar 6), range is established
-    breakout_bar_dt = datetime(2026, 9, 21, 9, 35, 0, tzinfo=ET)
-    engine.update_clock(breakout_bar_dt)
-    assert engine.current_time_phase == "OPEN_VOLATILITY_FLUSH"
-    assert engine.is_strategy_permitted("orb") is True
-
-    # High of bars is 152.5, low is 149.5, midpoint = 151.0
-    breakout_bar = BarEvent(
-        symbol="AAPL",
-        open=152.0,
-        high=153.2,
-        low=151.9,
-        close=153.0,  # Closes > 152.5 range high!
-        volume=60000,  # RVOL = 60000 / avg(recent) >= 1.8x
-        timestamp=breakout_bar_dt,
-    )
-    sigs = orb.on_bar(breakout_bar)
-    assert len(sigs) == 1
-    sig = sigs[0]
-    assert sig.side == OrderSide.BUY
-    assert sig.entry_price == 153.0
-    assert sig.stop_loss == 151.0  # Midpoint stop
-    assert sig.strategy_id == "orb"
-
-    # Verify admission by DynamicAdaptationEngine
-    appr, reason, qty = engine.evaluate_signal_admission(sig, 50000.0, 0, False)
-    assert appr is True
-    assert qty > 0
 
 
 def test_defect_midday_chop_blocks_trend_continuation():

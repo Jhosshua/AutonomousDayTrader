@@ -115,7 +115,7 @@ def test_unknown_market_limits_news_to_extreme_catalysts():
     w = strategy_window("news_momentum", _at(10, 15), GATE, market_trend="UNKNOWN")
     assert w["can_open_now"] is True and w["state"] == "LIMITED"
     assert any("only extreme news" in x for x in w["limits"])
-    flat = strategy_window("orb", _at(10, 15), GATE, market_trend="NEUTRAL")
+    flat = strategy_window("news_momentum", _at(10, 15), GATE, market_trend="NEUTRAL")
     assert flat["state"] == "LIMITED" and "2.2x" in flat["limits"][0]
 
 

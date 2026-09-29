@@ -48,7 +48,6 @@ from backend.app.strategies.adaptation import (
 )
 from backend.app.strategies.base import SignalEvent
 from backend.app.strategies.news_momentum import NewsMomentumStrategy, PendingCatalyst
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy
 from backend.app.main import app
 
@@ -392,35 +391,6 @@ def test_vwap_pullback_calibrated_targets_and_volume_floor():
     assert len(signals) == 0
 
 
-def test_orb_lockout_prevention_and_late_arrival_gating():
-    """Verify ORB reset on signal rejection and gating against late arrival >09:45."""
-    strategy = OpeningRangeBreakoutStrategy()
-
-    # Pre-set breakout fired
-    state = strategy._get_state("AAPL")
-    state.breakout_fired = True
-    # Downstream admission rejects signal -> notify strategy
-    strategy.notify_signal_rejected("AAPL")
-    assert state.breakout_fired is False
-
-    # Symbol arriving late at 09:50 ET (outside 09:30-09:45 ET)
-    late_time = datetime(2026, 9, 23, 9, 50, 0, tzinfo=ET)
-    late_bar = BarEvent(
-        symbol="LATE",
-        open=100.0,
-        high=102.0,
-        low=99.0,
-        close=101.0,
-        volume=10000,
-        timestamp=late_time,
-    )
-    signals = strategy.on_bar(late_bar)
-    assert len(signals) == 0
-    # Opening range must NOT be spuriously established
-    late_state = strategy._get_state("LATE")
-    assert len(late_state.opening_bars) == 0
-    assert late_state.range_high == 0.0
-    assert late_state.range_low == 0.0
 
 
 # =====================================================================

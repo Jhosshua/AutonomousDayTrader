@@ -78,6 +78,34 @@ export interface StrategyState {
     incomplete: boolean;
     tranches: FixedTranche[];
   };
+  orb?: {
+    mode: string;
+    mode_text: string;
+    step: string | null;
+    ready: boolean | null;
+    hours: string;
+    picks: { symbol: string; direction: string; tier: string | null }[];
+    open_trades: {
+      symbol: string;
+      direction: string;
+      qty: number;
+      avg_price: number | null;
+      stop: number | null;
+      target: number | null;
+      r: number | null;
+      last_price: number | null;
+      breakeven_locked: boolean | null;
+      exit_requested: string | null;
+      status: string;
+    }[];
+    realized_pnl: number;
+    unrealized_pnl: number;
+    open_risk: number | null;
+    errors: { kind?: string; alarm?: string; err?: string; reason?: string; note?: string; symbol?: string }[];
+    init_error: string | null;
+    alerts?: string[];
+    orphans?: { symbol: string; text: string }[];
+  };
   or15?: {
     phase: string;
     reason: string | null;

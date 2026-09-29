@@ -35,7 +35,6 @@ from backend.app.models.events import BarEvent, NewsEvent, OrderSide, OrderType,
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.strategies.base import SignalEvent
 from backend.app.strategies.news_momentum import NewsMomentumStrategy, PendingCatalyst
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.main import app, engine as global_engine, bracket_manager as global_bm, account as global_account, manual_flatten, FlattenRequest
 
 
@@ -605,19 +604,6 @@ class TestMutationVerification:
         # Working order was NOT cancelled by defective flattener
         assert order.id in engine.working_orders  # Mutant killed!
 
-    def test_mutation_orb_lockout_unreset_killed(self):
-        """Mutant: ORB notify_signal_rejected fails to reset breakout_fired."""
-        class MutantORBStrategy(OpeningRangeBreakoutStrategy):
-            def notify_signal_rejected(self, symbol: str) -> None:
-                # DEFECT: No-op!
-                pass
-
-        strategy = MutantORBStrategy()
-        state = strategy._get_state("AAPL")
-        state.breakout_fired = True
-        strategy.notify_signal_rejected("AAPL")
-        # Mutant leaves breakout_fired True
-        assert state.breakout_fired is True  # Mutant killed!
 
     def test_mutation_manual_stop_tighten_unclamped_killed(self):
         """Mutant: manual_tighten_stop fails to clamp new stop against current market price."""

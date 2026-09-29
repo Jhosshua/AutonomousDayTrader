@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Sunrise, Waves, Zap, Undo2, CornerDownRight } from "lucide-react";
+import { apiBase } from "@/lib/apiBase";
 import { StrategyState } from "@/types/trading";
 import {
   StrategyLedgerAgg,
@@ -40,14 +42,58 @@ const CHIP_STYLES: Record<string, { bg: string; fg: string }> = {
   sage: { bg: "#FFFFFF", fg: "#2F5A45" },
   lavender: { bg: "#FFFFFF", fg: "#3E4478" },
   grey: { bg: "#FFFFFF", fg: "#5D5A73" },
+  amber: { bg: "#FFFFFF", fg: "#8A5A12" },
   terracotta: { bg: "#FFFFFF", fg: "#8F4424" },
 };
+
+function OrbOrphanResolve({ symbol }: { symbol: string }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [armed, setArmed] = useState(false);
+  const resolve = async () => {
+    if (!armed) {
+      setArmed(true);
+      setMsg(`Only after you closed ${symbol} and cancelled ORB's orders on it at Alpaca. Tap again to confirm.`);
+      return;
+    }
+    setArmed(false);
+    setBusy(true);
+    try {
+      const res = await fetch(`${apiBase()}/api/orb/resolve-orphan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const body = await res.json().catch(() => ({}));
+      setMsg(res.ok ? `${symbol} cleared from the bot's book.` : String(body.detail || "Refused."));
+    } catch {
+      setMsg("Could not reach the bot. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={resolve} disabled={busy} data-testid="orb-resolve-orphan"
+        className="rounded-lg border border-[#8F4424]/60 bg-white px-3 py-1.5 text-xs font-semibold text-[#8F4424]">
+        {busy ? "Checking Alpaca…" : armed ? `Confirm: clear ${symbol}` : `I closed ${symbol} at Alpaca: clear it`}
+      </button>
+      {msg && <div className="mt-1 text-xs font-normal">{msg}</div>}
+    </div>
+  );
+}
 
 export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0 }: StrategyCardProps) {
   const theme = strategyTheme(strategy.id, strategy.name);
   const Icon = ICONS[strategy.id] || Waves;
   const win = strategy.window;
-  const chip = windowToChip(win);
+  const baseChip = windowToChip(win);
+  // ORB's off/shadow states arrive as a long blocker or a generic "limited" state; keep the chip short and true.
+  const chip = strategy.orb?.mode === "off" && !["MANAGING", "MARKET_CLOSED", "PAUSED"].includes(win?.state ?? "")
+    ? { label: "Switched off", tone: "grey" as const, breathing: false }
+    : strategy.orb?.mode === "shadow" && win?.state === "LIMITED"
+      ? { label: "Watching only (shadow)", tone: "sage" as const, breathing: true }
+      : baseChip;
   const chipStyle = CHIP_STYLES[chip.tone] || CHIP_STYLES.grey;
   const resting = win?.state === "DONE_FOR_DAY" || win?.state === "PAUSED" || win?.state === "MARKET_CLOSED";
 
@@ -56,13 +102,20 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
   const showNow = (win?.trading_day ?? true) && isWithinSession(nowMin);
   const nowLeft = sessionPct(nowMin);
 
-  const pnl = ledgerAgg?.realized_pnl ?? strategy.daily_pnl ?? 0;
-  const tradesCount = ledgerAgg?.trades_count ?? strategy.trades_count ?? 0;
+  // ORB: the bottom line includes its open (unrealized) P&L, not only closed trades
+  const orbOpen = strategy.orb ? (strategy.orb.unrealized_pnl ?? 0) : 0;
+  const pnl = (ledgerAgg?.realized_pnl ?? strategy.daily_pnl ?? 0) + orbOpen;
+  const tradesCount = (ledgerAgg?.trades_count ?? strategy.trades_count ?? 0) + (strategy.orb?.open_trades.length ?? 0);
   const pnlColor = pnl > 0 ? "#2F6B4C" : pnl < 0 ? "#8F4424" : "#5D5A73";
 
   // F9: an early-close day note must surface even when there's already a signals/orders lead.
   const earlyCloseNote = win?.notes?.find((n) => n.toLowerCase().includes("early"));
-  const note = strategyNoteLine(
+  // ORB: its current step is already in the ORB box above, and its decision rows (sat out, shadow,
+  // no decision) are not "chances skipped", so the note only counts real trades.
+  const orbOrders = strategy.decisions?.orders_today ?? 0;
+  const note = strategy.orb
+    ? (orbOrders > 0 ? `${orbOrders} ORB trade${orbOrders === 1 ? "" : "s"} today.` : "No ORB trades today.")
+    : strategyNoteLine(
     strategy.decisions,
     earlyCloseNote ? `${win?.market_text ?? ""} ${earlyCloseNote}`.trim() : win?.market_text,
     win?.notes?.[0]
@@ -77,8 +130,8 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
         className="flex flex-col gap-4 px-5 py-5"
         style={{ background: theme.band, filter: resting ? "saturate(0.55) brightness(1.03)" : undefined }}
       >
-        <div className="flex items-start justify-between">
-          <div className="bob flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl" style={{ background: theme.bar }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="bob flex h-11 w-11 flex-shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-2xl" style={{ background: theme.bar }}>
             <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" strokeWidth={1.9} aria-hidden="true" />
           </div>
           <span
@@ -88,7 +141,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
           >
             <span
               className={chip.breathing ? "breathe inline-block h-2 w-2 rounded-full" : "inline-block h-2 w-2 rounded-full"}
-              style={{ background: resting ? "#A7A2B8" : theme.bar }}
+              style={{ background: resting || chip.tone === "grey" ? "#A7A2B8" : theme.bar }}
             />
             {chip.label}
           </span>
@@ -149,6 +202,39 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
               </div>
             ))}
             {showPro && strategy.tri_engine.reason && <div className="mt-2 break-words">{planStatusText(strategy.tri_engine.reason)}</div>}
+          </div>
+        )}
+        {strategy.orb && (
+          <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="orb-details">
+            <div className="font-semibold">{strategy.orb.mode_text}</div>
+            <div>{strategy.orb.hours} ET</div>
+            {strategy.orb.step && <div className="mt-1">{strategy.orb.step}</div>}
+            {strategy.orb.open_trades.map((t) => (
+              <div key={t.symbol} className="mt-2 border-t pt-2" style={{ borderColor: theme.track }}>
+                <span className="font-semibold">{t.direction === "long" ? "Bought" : "Sold short"} {t.symbol} · {Math.abs(t.qty)} shares</span>
+                <div>Safety exit {t.stop != null ? formatMoney(t.stop) : "unknown"} · target {t.target != null ? formatMoney(t.target) : "none"} (held at Alpaca)</div>
+                {t.r != null && <div>Now {t.r >= 0 ? "+" : ""}{t.r.toFixed(2)}× its risk{t.breakeven_locked ? " · stop moved to the entry" : ""}</div>}
+                {t.exit_requested && <div>Closing: {t.exit_requested}</div>}
+              </div>
+            ))}
+            {(strategy.orb.realized_pnl !== 0 || strategy.orb.unrealized_pnl !== 0) && (
+              <div className="mt-2">Today: {formatSignedMoney(strategy.orb.realized_pnl)} closed{strategy.orb.open_trades.length > 0 ? `, ${formatSignedMoney(strategy.orb.unrealized_pnl)} open` : ""}</div>
+            )}
+            {(strategy.orb.alerts ?? []).map((a) => {
+              const orphan = (strategy.orb?.orphans ?? []).find((o) => o.text === a);
+              return (
+                <div key={a} role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/60 bg-white p-2 font-semibold text-[#8F4424]" data-testid="orb-alert">
+                  {a}
+                  {orphan && <OrbOrphanResolve symbol={orphan.symbol} />}
+                </div>
+              );
+            })}
+            {(strategy.orb.init_error || strategy.orb.errors.some((e) => e.alarm !== "orb_alert" && !(strategy.orb?.orphans ?? []).some((o) => o.symbol === e.symbol))) && (
+              <div role="alert" className="mt-2 break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-[#8F4424]">
+                {strategy.orb.init_error || "ORB reported a problem; check the paper account."}
+                {showPro && strategy.orb.errors.length > 0 && <div className="mt-1 text-xs">{strategy.orb.errors.map((e) => e.alarm || e.kind).join(", ")}</div>}
+              </div>
+            )}
           </div>
         )}
         {strategy.or15 && (

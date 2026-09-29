@@ -45,6 +45,28 @@ class BrokerReject(BrokerError):
     """Alpaca refused the order, or a safety gate refused to send it."""
 
 
+class BrokerHTTPError(BrokerReject):
+    """Alpaca answered with a non-success HTTP status (used by the bracket/ORB methods).
+
+    `status_code` is Alpaca's answer and `body` its JSON (or text). An explicit 4xx other
+    than 429 is a definitive refusal; 429 and 5xx prove nothing about the order.
+    """
+
+    def __init__(self, message: str, status_code: int, body: Any = None) -> None:
+        retry_sec = 5.0 if status_code == 429 else None
+        super().__init__(message, hard=400 <= status_code < 500 and status_code != 429, retry_sec=retry_sec)
+        self.status_code = status_code
+        self.body = body
+
+    @property
+    def definitive(self) -> bool:
+        return 400 <= self.status_code < 500 and self.status_code != 429
+
+
+class BrokerTransportError(BrokerError):
+    """The request never got an HTTP answer (timeout, dropped connection). Outcome unknown."""
+
+
 @dataclass
 class BrokerStatus:
     mode: str = "alpaca_paper"
@@ -125,9 +147,9 @@ class AlpacaBroker:
             raise BrokerError(f"position lookup {symbol} failed: {resp.status_code} {resp.text[:200]}")
         return int(float(resp.json()["qty"]))
 
-    def get_order(self, alpaca_id: str) -> Dict[str, Any]:
+    def get_order(self, alpaca_id: str, nested: bool = True) -> Dict[str, Any]:
         try:
-            resp = self._client.get(f"/v2/orders/{alpaca_id}", params={"nested": "true"})
+            resp = self._client.get(f"/v2/orders/{alpaca_id}", params={"nested": "true" if nested else "false"})
         except httpx.HTTPError as exc:
             raise BrokerError(f"order lookup {alpaca_id} failed: {exc}") from exc
         if resp.status_code != 200:
@@ -293,6 +315,192 @@ class AlpacaBroker:
         order = self.submit(symbol, side, qty, client_order_id, limit_price)
         order = self.wait(order, self.fill_wait_sec)
         return self.cancel_and_settle(order)
+
+    # ------------------------------------------------ ORB bracket lifecycle
+    # Used by core/orb_execution.py. Each method is one HTTP round trip (except
+    # cancel_order_and_confirm, which polls) and never retries a write on its own:
+    # the caller owns ambiguity (lookup by client id), exactly as ORBStraddle does.
+    @staticmethod
+    def _body(resp: httpx.Response) -> Any:
+        try:
+            return resp.json()
+        except ValueError:
+            return resp.text[:300]
+
+    def _http_error(self, what: str, resp: httpx.Response) -> BrokerHTTPError:
+        body = self._body(resp)
+        return BrokerHTTPError(f"{what}: HTTP {resp.status_code} {str(body)[:200]}", resp.status_code, body)
+
+    def get_order_by_client_id(self, client_order_id: str, nested: bool = True) -> Optional[Dict[str, Any]]:
+        """The order carrying this client id, or None when Alpaca says it has none (404).
+
+        Any other failure raises (BrokerTransportError / BrokerHTTPError): it proves nothing.
+        """
+        try:
+            resp = self._client.get("/v2/orders:by_client_order_id",
+                                    params={"client_order_id": client_order_id,
+                                            "nested": "true" if nested else "false"})
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"client id lookup {client_order_id} failed: {exc}") from exc
+        if resp.status_code == 404:
+            return None
+        if resp.status_code != 200:
+            raise self._http_error(f"client id lookup {client_order_id}", resp)
+        body = resp.json()
+        return body if isinstance(body, dict) and body.get("id") else None
+
+    def submit_bracket(self, symbol: str, qty: int, side: str, take_profit: float, stop_loss: float,
+                       client_order_id: str) -> Dict[str, Any]:
+        """POST one Alpaca bracket: market parent, day, take-profit limit + plain stop (2 dp).
+
+        Returns the parent order JSON. A lost reply raises BrokerTransportError and an HTTP
+        refusal raises BrokerHTTPError; the caller resolves both by client id (no resubmit).
+        """
+        side = side.lower()
+        if side not in ("buy", "sell"):
+            raise ValueError("bracket side must be buy or sell")
+        qty = int(qty)
+        if qty < 1:
+            raise ValueError("bracket qty must be at least 1")
+        tp, sl = float(take_profit), float(stop_loss)
+        if not (tp > 0 and sl > 0):
+            raise ValueError("bracket prices must be positive")
+        if (side == "buy" and not sl < tp) or (side == "sell" and not tp < sl):
+            raise ValueError(f"bracket levels on the wrong side: {side} tp={tp} sl={sl}")
+        body = {"symbol": symbol.upper(), "qty": str(qty), "side": side, "type": "market",
+                "time_in_force": "day", "order_class": "bracket",
+                "client_order_id": client_order_id[:128],
+                "take_profit": {"limit_price": f"{tp:.2f}"},
+                "stop_loss": {"stop_price": f"{sl:.2f}"}}
+        self.status.orders_sent += 1
+        self.status.last_order_at = datetime.now(timezone.utc).isoformat()
+        try:
+            resp = self._client.post("/v2/orders", json=body)
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"bracket POST {symbol} outcome unknown: {exc}") from exc
+        if resp.status_code in (200, 201):
+            return resp.json()
+        err = self._http_error(f"bracket {side} {qty} {symbol} refused", resp)
+        self.status.last_error = str(err)[:300]
+        raise err
+
+    def submit_market_order(self, symbol: str, side: str, qty: int, client_order_id: str) -> Dict[str, Any]:
+        """POST one plain market day order (the ORB exit). No lookup, no retry: the caller does that."""
+        side = side.lower()
+        if side not in ("buy", "sell") or int(qty) < 1:
+            raise ValueError("market order needs side buy/sell and qty >= 1")
+        body = {"symbol": symbol.upper(), "qty": str(int(qty)), "side": side, "type": "market",
+                "time_in_force": "day", "client_order_id": client_order_id[:128]}
+        self.status.orders_sent += 1
+        self.status.last_order_at = datetime.now(timezone.utc).isoformat()
+        try:
+            resp = self._client.post("/v2/orders", json=body)
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"market {side} {symbol} outcome unknown: {exc}") from exc
+        if resp.status_code in (200, 201):
+            return resp.json()
+        raise self._http_error(f"market {side} {qty} {symbol} refused", resp)
+
+    def patch_order(self, order_id: str, qty: Optional[int] = None, stop_price: Optional[float] = None,
+                    limit_price: Optional[float] = None) -> Dict[str, Any]:
+        """PATCH (replace) one working order. Returns the replacement order JSON (a new id).
+
+        A held bracket leg answers 422 on paper; that raises BrokerHTTPError like any refusal.
+        """
+        body: Dict[str, Any] = {}
+        if qty is not None:
+            body["qty"] = str(int(qty))
+        if stop_price is not None:
+            body["stop_price"] = f"{float(stop_price):.2f}"
+        if limit_price is not None:
+            body["limit_price"] = f"{float(limit_price):.2f}"
+        if not body:
+            raise ValueError("patch_order needs qty, stop_price or limit_price")
+        try:
+            resp = self._client.patch(f"/v2/orders/{order_id}", json=body)
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"PATCH {order_id} outcome unknown: {exc}") from exc
+        if resp.status_code in (200, 201):
+            return resp.json()
+        raise self._http_error(f"PATCH {order_id} refused", resp)
+
+    FINAL_FOR_CANCEL = TERMINAL_STATES | {"replaced", "done_for_day"}
+
+    def cancel_order_and_confirm(self, order_id: str, timeout: float = 6.0) -> Dict[str, Any]:
+        """DELETE one order, then poll it until it is final or the timeout's polls run out.
+
+        Returns the latest order JSON (nested), which may still be live if Alpaca never
+        confirmed; a fill that raced the cancel shows up as filled here. Raises only when
+        the order could not be read at all.
+        """
+        try:
+            resp = self._client.delete(f"/v2/orders/{order_id}")
+            if resp.status_code not in (200, 204, 404, 422):
+                log.warning("Cancel of Alpaca order %s answered %s", order_id, resp.status_code)
+        except httpx.HTTPError as exc:
+            log.warning("Cancel of Alpaca order %s failed: %s", order_id, exc)
+        step = max(self.poll_interval_sec, 0.05)
+        polls = max(1, int(round(timeout / step)))
+        order: Optional[Dict[str, Any]] = None
+        last_exc: Optional[Exception] = None
+        for i in range(polls):
+            try:
+                order = self.get_order(order_id)
+                last_exc = None
+            except BrokerError as exc:
+                last_exc = exc
+            if order is not None and order.get("status") in self.FINAL_FOR_CANCEL:
+                return order
+            if i < polls - 1:
+                self._sleep(self.poll_interval_sec)
+        if order is None:
+            raise BrokerError(f"cancel of {order_id} could not be confirmed: {last_exc}")
+        return order
+
+    def list_orders(self, status: str = "open", symbol: Optional[str] = None, after: Optional[str] = None,
+                    limit: int = 500, nested: bool = True) -> List[Dict[str, Any]]:
+        params: Dict[str, Any] = {"status": status, "limit": str(int(limit)),
+                                  "nested": "true" if nested else "false"}
+        if symbol:
+            params["symbols"] = symbol.upper()
+        if after:
+            params["after"] = after
+        try:
+            resp = self._client.get("/v2/orders", params=params)
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"order list failed: {exc}") from exc
+        if resp.status_code != 200:
+            raise self._http_error("order list", resp)
+        rows = resp.json()
+        if not isinstance(rows, list):
+            raise BrokerError("order list answered with something that is not a list")
+        return rows
+
+    def list_open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        return self.list_orders("open", symbol=symbol)
+
+    def get_positions_raw(self) -> List[Dict[str, Any]]:
+        """Every Alpaca position row as returned (qty, side, avg_entry_price, current_price)."""
+        try:
+            resp = self._client.get("/v2/positions")
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"positions read failed: {exc}") from exc
+        if resp.status_code != 200:
+            raise self._http_error("positions read", resp)
+        rows = resp.json()
+        if not isinstance(rows, list):
+            raise BrokerError("positions answered with something that is not a list")
+        return rows
+
+    def get_account_checked(self) -> Dict[str, Any]:
+        """GET /v2/account with typed errors (the plain get_account raises httpx errors)."""
+        try:
+            resp = self._client.get("/v2/account")
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"account read failed: {exc}") from exc
+        if resp.status_code != 200:
+            raise self._http_error("account read", resp)
+        return resp.json()
 
     def close(self) -> None:
         self._client.close()

@@ -39,7 +39,6 @@ from backend.app.core.engine import ExecutionEngine, OrderSide, OrderType
 from backend.app.core.flattening import ZeroOvernightFlatteningEngine
 from backend.app.core.risk import InstitutionalRiskEngine
 from backend.app.models.events import BarEvent, NewsEvent, QuoteEvent, VixPrint, VixRegime, CatalystCategory
-from backend.app.strategies.orb import OpeningRangeBreakoutStrategy
 from backend.app.strategies.news_momentum import NewsMomentumStrategy
 from backend.app.strategies.adaptation import DynamicAdaptationEngine
 from backend.app.ingestion.sentiment import sentiment_scorer

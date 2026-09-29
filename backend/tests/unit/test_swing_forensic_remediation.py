@@ -204,7 +204,7 @@ def test_defect_5_circuit_breaker_preserves_swing_positions():
     now_dt = datetime.now(timezone.utc)
     # Create 1 Swing position and 1 Intraday position
     acct.apply_fill("sw1", "MU", "BUY", 250, 100.0, 0.0, now_dt, arm=TradingArm.SWING, strategy_id="swing_panic_dip")
-    acct.apply_fill("in1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+    acct.apply_fill("in1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
 
     assert "MU" in acct.positions
     assert "AAPL" in acct.positions

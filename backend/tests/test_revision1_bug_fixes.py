@@ -57,7 +57,7 @@ def reset_test_state():
 # ---------------------------------------------------------------------------
 def test_b1_flatten_all_skips_swing_and_reports_truthfully():
     now_dt = datetime.now(timezone.utc)
-    main.account.apply_fill("f1", "AAPL", "BUY", 10, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+    main.account.apply_fill("f1", "AAPL", "BUY", 10, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
     main.account.apply_fill(
         "f2", "MU", "BUY", 20, 100.0, 0.0, now_dt, arm=TradingArm.SWING, strategy_id="swing_panic_dip"
     )

@@ -105,11 +105,11 @@ class TestCrossArmCircuitBreakerIsolation:
         acct.positions["LRCX"].entry_date = now_dt.date()
 
         # 2. Seed Intraday Positions (AAPL Long, TSLA Short)
-        acct.apply_fill("in_fill_1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+        acct.apply_fill("in_fill_1", "AAPL", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         acct.apply_fill("in_fill_2", "TSLA", "SELL", 50, 220.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
 
         # 3. Seed Working Orders (1 Intraday working order on NVDA, 1 Swing working order on KLAC)
-        ord_in = eng.create_order("NVDA", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=120.0, arm=TradingArm.INTRADAY, strategy_id="orb")
+        ord_in = eng.create_order("NVDA", OrderSide.BUY, OrderType.LIMIT, 50, limit_price=120.0, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         eng.submit_order(ord_in.id)
 
         ord_sw = eng.create_order("KLAC", OrderSide.BUY, OrderType.LIMIT, 35, limit_price=700.0, arm=TradingArm.SWING, strategy_id="swing_panic_dip")
@@ -186,7 +186,7 @@ class TestCrossArmCircuitBreakerIsolation:
         assert acct.status == AccountStatus.CIRCUIT_HALTED
 
         # Test pre_trade_risk_validator rejection
-        order_buy = eng.create_order("MSFT", OrderSide.BUY, OrderType.MARKET, 20, arm=TradingArm.INTRADAY, strategy_id="orb")
+        order_buy = eng.create_order("MSFT", OrderSide.BUY, OrderType.MARKET, 20, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         approved, reason = main.pre_trade_risk_validator(order_buy, acct)
         assert approved is False
         assert "CIRCUIT_BREAKER_HALTED" in reason
@@ -209,7 +209,7 @@ class TestAmdMutualExclusionLocking:
         main.reserve_symbol_for_swing("AMD")
         assert "AMD" in main.swing_reserved_symbols
 
-        ord_buy = main.engine.create_order("AMD", OrderSide.BUY, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="orb")
+        ord_buy = main.engine.create_order("AMD", OrderSide.BUY, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         approved, reason = main.pre_trade_risk_validator(ord_buy, main.account)
 
         assert approved is False
@@ -220,7 +220,7 @@ class TestAmdMutualExclusionLocking:
         main.reserve_symbol_for_swing("AMD")
         assert "AMD" in main.swing_reserved_symbols
 
-        ord_sell = main.engine.create_order("AMD", OrderSide.SELL, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="orb")
+        ord_sell = main.engine.create_order("AMD", OrderSide.SELL, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         approved, reason = main.pre_trade_risk_validator(ord_sell, main.account)
 
         assert approved is False
@@ -233,7 +233,7 @@ class TestAmdMutualExclusionLocking:
         assert "AMD" in main.account.positions
         assert main.account.positions["AMD"].arm == TradingArm.SWING
 
-        ord_buy = main.engine.create_order("AMD", OrderSide.BUY, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="orb")
+        ord_buy = main.engine.create_order("AMD", OrderSide.BUY, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         approved, reason = main.pre_trade_risk_validator(ord_buy, main.account)
 
         assert approved is False
@@ -250,7 +250,7 @@ class TestAmdMutualExclusionLocking:
         now_dt = datetime.now(timezone.utc)
         main.account.apply_fill("sw_amd", "AMD", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.SWING, strategy_id="swing_panic_dip")
 
-        ord_sell = main.engine.create_order("AMD", OrderSide.SELL, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="orb")
+        ord_sell = main.engine.create_order("AMD", OrderSide.SELL, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         approved, reason = main.pre_trade_risk_validator(ord_sell, main.account)
 
         # Invariant assertion: An intraday SELL order MUST be rejected when AMD is held by Swing
@@ -269,7 +269,7 @@ class TestAmdMutualExclusionLocking:
         main.release_symbol_for_swing("AMD")
         assert main.is_symbol_reserved_for_swing("AMD") is False
 
-        ord_buy = main.engine.create_order("AMD", OrderSide.BUY, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="orb")
+        ord_buy = main.engine.create_order("AMD", OrderSide.BUY, OrderType.MARKET, 50, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
         approved, reason = main.pre_trade_risk_validator(ord_buy, main.account)
 
         assert approved is True
@@ -278,7 +278,7 @@ class TestAmdMutualExclusionLocking:
     def test_reverse_intraday_held_amd_blocks_swing_entry(self):
         """When AMD is held by Intraday arm, Swing entry MUST be rejected."""
         now_dt = datetime.now(timezone.utc)
-        main.account.apply_fill("in_amd", "AMD", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+        main.account.apply_fill("in_amd", "AMD", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
 
         ord_sw = main.engine.create_order("AMD", OrderSide.BUY, OrderType.MARKET, 50, arm=TradingArm.SWING, strategy_id="swing_panic_dip")
         approved, reason = main.pre_trade_risk_validator(ord_sw, main.account)
@@ -292,7 +292,7 @@ class TestAmdMutualExclusionLocking:
         or mistakenly approved as APPROVED_EXIT?
         """
         now_dt = datetime.now(timezone.utc)
-        main.account.apply_fill("in_amd", "AMD", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="orb")
+        main.account.apply_fill("in_amd", "AMD", "BUY", 100, 150.0, 0.0, now_dt, arm=TradingArm.INTRADAY, strategy_id="vwap_pullback")
 
         ord_sw_sell = main.engine.create_order("AMD", OrderSide.SELL, OrderType.MARKET, 50, arm=TradingArm.SWING, strategy_id="swing_panic_dip")
         approved, reason = main.pre_trade_risk_validator(ord_sw_sell, main.account)
