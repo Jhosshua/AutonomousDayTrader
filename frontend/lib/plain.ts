@@ -6,6 +6,8 @@
  * words, colors, and layout math the mockups (docs/ui_redesign_2026_09_24/*.dc.html) specify.
  */
 
+import type { EntryContext } from "@/types/trading";
+
 // ---------------------------------------------------------------------------
 // Strategy identity: friendly names, colors ("muted palette"), and copy
 // ---------------------------------------------------------------------------
@@ -459,4 +461,256 @@ export function shortDate(iso: string | null | undefined): string {
 export function trancheName(index: number, count: number): string {
   if (count <= 1) return "Whole position";
   return index === 0 ? "First half" : "Second half";
+}
+
+// ---------------------------------------------------------------------------
+// Market mood + "why this trade" (2026-09-29). Every sentence is built from values the backend sent
+// (recorded at entry, or live config); nothing here invents a number.
+// ---------------------------------------------------------------------------
+
+/** Playbooks that size and place stops by the market mood. */
+export const ADAPTIVE_IDS = ["vwap_pullback", "news_momentum", "mean_reversion"];
+/** Playbooks with fixed plans that never react to the mood. */
+export const FIXED_PLAN_IDS = ["tsla_asymmetric_dual", "cde_asymmetric_dual", "tsla_or15_retest"];
+
+/** Fear gauge level (backend vix_regime) -> plain adjective for a sentence, and chip label. */
+export const LEVEL_WORD: Record<string, string> = { LOW: "calm", NORMAL: "normal", ELEVATED: "nervous", CRISIS: "panicky" };
+export const LEVEL_CHIP: Record<string, string> = { LOW: "Calm", NORMAL: "Normal", ELEVATED: "Nervous", CRISIS: "Panic" };
+/** One neutral scale (grey, then deepening amber). Never the strategy colors, never terracotta. */
+export const LEVEL_COLORS: Record<string, { bg: string; ink: string }> = {
+  LOW: { bg: "#ECE9DE", ink: "#4A4760" },
+  NORMAL: { bg: "#E9E5D6", ink: "#4A4760" },
+  ELEVATED: { bg: "#F2E2BC", ink: "#5C4310" },
+  CRISIS: { bg: "#E6C57E", ink: "#4A3208" },
+};
+
+export const TREND_WORD: Record<string, string> = { BULLISH: "rising", BEARISH: "falling", NEUTRAL: "flat", UNKNOWN: "unclear" };
+
+export const PHASE_PLAIN: Record<string, string> = {
+  PRE_MARKET: "Before the open",
+  OPEN_VOLATILITY_FLUSH: "Opening rush",
+  TREND_CONTINUATION: "Morning",
+  MIDDAY_CHOP: "Midday",
+  AFTERNOON_PUSH: "Afternoon",
+  POWER_HOUR: "Last hour",
+  EOD_FLATTEN: "Closing time",
+  POST_MARKET: "After the close",
+};
+
+export function levelWord(regime: string | null | undefined): string {
+  return LEVEL_WORD[(regime || "").toUpperCase()] || "unclear";
+}
+
+/** "0.7" -> "70%" (a sizing multiplier as a share of the usual amount). */
+export function pctOfUsual(multiplier: number): string {
+  return `${Math.round(multiplier * 100)}%`;
+}
+
+/** "11:30" -> "11:30 AM" */
+export function hmLabel(hm: string | null | undefined): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hm || "");
+  if (!m) return "";
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+export function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] || "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+function strategyNames(ids: string[]): string[] {
+  return ids.map((id) => STRATEGY_THEMES[id]?.name ?? id);
+}
+
+export interface MoodInputs {
+  vix: number | null | undefined;
+  vix_regime?: string | null;
+  market_status?: string | null;
+  sizing_multiplier?: number | null;
+  time_multiplier?: number | null;
+  market_trend?: string | null;
+  adaptive_strategies?: string[] | null;
+}
+
+export interface MoodHeadline {
+  tone: "grey" | "level";
+  text: string;
+  /** Second line, only when the robot is trading by the mood. */
+  note: string | null;
+}
+
+/** The mood card's one-sentence answer, decided in this order: closed, no data, trend unclear, normal. */
+export function moodHeadline(ctx: MoodInputs, tradingDay: boolean | undefined): MoodHeadline {
+  const status = (ctx.market_status || "").toUpperCase();
+  if (tradingDay === false || status === "CLOSED") {
+    return {
+      tone: "grey",
+      text: "Market closed. When it opens, the robot will size and place new trades for the market's mood.",
+      note: null,
+    };
+  }
+  const trend = ctx.market_trend ? ctx.market_trend.toUpperCase() : null;
+  if (ctx.vix == null && trend == null) return { tone: "grey", text: "Waiting for market data.", note: null };
+  const on = ctx.adaptive_strategies ?? null;
+  const ownChecks = "ORB and the Tesla/Coeur plans use their own checks.";
+  if (trend === "UNKNOWN") {
+    const names = on ? strategyNames(on) : [];
+    const who = on ? (names.length === 0 ? "No mood-sized playbook is switched on. " : `${joinNames(names)} ${names.length === 1 ? "is" : "are"} waiting until the robot can see SPY and QQQ again. `) : "The mood-sized playbooks are waiting until the robot can see SPY and QQQ again. ";
+    return { tone: "grey", text: `${who}${ownChecks}`, note: null };
+  }
+  const level = levelWord(ctx.vix_regime);
+  const direction = trend ? TREND_WORD[trend] ?? "unclear" : null;
+  const opening = direction ? `The market is ${level} and ${direction}.` : `The market is ${level}.`;
+  const names = on ? strategyNames(on) : null;
+  const m = ctx.sizing_multiplier ?? null;
+  let body: string;
+  if (names && names.length === 0) {
+    body = "No mood-sized playbook is switched on right now.";
+  } else {
+    const subject = names ? joinNames(names) : "The mood-sized playbooks";
+    const plural = names ? names.length > 1 : true;
+    const verb = plural ? "risk" : "risks";
+    if (m == null) body = `${subject} size each trade for the mood.`;
+    else if (m === 1) body = `${subject} ${verb} the usual amount per trade.`;
+    else {
+      const smaller = m < 1;
+      body = `${subject} ${verb} ${pctOfUsual(m)} of the usual amount per trade; only trades with a wide safety exit end up ${smaller ? "smaller" : "bigger"}.`;
+    }
+    if (ctx.time_multiplier != null && ctx.time_multiplier < 1) body += " Midday halves that.";
+  }
+  return { tone: "level", text: `${opening} ${body}`, note: "ORB and the Tesla/Coeur plans do not change with the mood." };
+}
+
+/** What the market direction means for new trades (live rules of the three mood-sized playbooks). */
+export function trendEffect(trend: string | null | undefined): string {
+  switch ((trend || "").toUpperCase()) {
+    case "BULLISH": return "Rising: these playbooks only buy.";
+    case "BEARISH": return "Falling: these playbooks only sell short.";
+    case "NEUTRAL": return "Flat: Ride the Trend waits for a direction. Snap Back trades both ways.";
+    case "UNKNOWN": return "SPY and QQQ can't be read, so new trades wait.";
+    default: return "Direction not reported yet.";
+  }
+}
+
+/** "1.4" -> "placed 40% farther away", "0.85" -> "placed 15% closer". */
+function stopDistancePhrase(mult: number | null | undefined): "farther" | "closer" | "normal" | null {
+  if (mult == null) return null;
+  if (mult > 1.001) return "farther";
+  if (mult < 0.999) return "closer";
+  return "normal";
+}
+
+export interface WhyLine { label: string; value: string }
+
+export interface AdaptiveWhy {
+  sizeLine: string;
+  stopLine: string | null;
+  trendLine: string | null;
+  rows: WhyLine[];
+}
+
+/** The one-sentence "why this size" plus the closed-by-default factor rows, honest to what was recorded. */
+export function adaptiveWhy(ctx: EntryContext, shares: number, isLong: boolean): AdaptiveWhy {
+  const verb = isLong ? "bought" : "sold short";
+  const fin = ctx.qty_final ?? null;
+  const neutral = ctx.qty_if_neutral ?? null;
+  const sizing = ctx.sizing_multiplier ?? 1;
+  const timeMult = ctx.time_multiplier ?? 1;
+  const lead = fin != null && fin === shares ? "Bought" : "Sized at";
+  let sizeLine: string;
+  if (fin == null || neutral == null) {
+    sizeLine = "The robot did not keep how this trade was sized.";
+  } else if (fin < neutral) {
+    const parts: string[] = [];
+    if (sizing < 1) parts.push(`${ctx.vix_regime === "CRISIS" ? "panicky" : "jumpy"} market (${pctOfUsual(sizing)})`);
+    if (timeMult < 1) parts.push("midday (half)");
+    let why = parts.join(" and ");
+    if (ctx.size_limited_by === "account_limits") why = why ? `${why}, and the account's limits trimmed it` : "the account's limits trimmed it";
+    sizeLine = `${lead} ${fin} shares, fewer than the usual ${neutral}${why ? `: ${why}` : ""}.`;
+  } else if (fin > neutral) {
+    sizeLine = `Bigger than usual: ${lead.toLowerCase()} ${fin} shares instead of ${neutral} because the market was calm (${pctOfUsual(sizing)}).`;
+  } else if (ctx.size_limited_by === "notional_cap") {
+    sizeLine = "Normal size. The per-trade money cap was the limit, so the market mood did not change the share count.";
+  } else {
+    sizeLine = "Normal size. The market mood did not change the share count.";
+  }
+
+  const dist = stopDistancePhrase(ctx.stop_multiplier);
+  let stopLine: string | null = null;
+  if (ctx.stop_basis === "structure") {
+    stopLine = isLong ? "Safety exit placed below the dip's low." : "Safety exit placed above the bounce's high.";
+  } else if (ctx.stop_basis === "floor") {
+    stopLine = "Safety exit placed at the closest distance the robot allows.";
+  } else if (dist === "farther") {
+    stopLine = "Safety exit placed farther away because the market is jumpy.";
+  } else if (dist === "closer") {
+    stopLine = "Safety exit placed closer because the market is calm.";
+  } else if (dist === "normal") {
+    stopLine = "Safety exit placed a normal distance away.";
+  }
+
+  let trendLine: string | null = null;
+  const trend = (ctx.market_trend || "").toUpperCase();
+  if (ctx.trend_reason === "APPROVED_EXTREME_CATALYST") {
+    trendLine = `It ${verb} against the market's direction because the news was extreme and trading was heavy.`;
+  } else if (ctx.trend_reason === "APPROVED_IDIOSYNCRATIC_BREAKOUT") {
+    trendLine = "It traded in a flat market because this stock was trading far more than normal.";
+  } else if (trend === "BULLISH" && isLong) trendLine = "It bought because the market was rising too.";
+  else if (trend === "BEARISH" && !isLong) trendLine = "It sold short because the market was falling too.";
+  else if (trend === "NEUTRAL") trendLine = "The market was flat, which this playbook allows.";
+
+  const rows: WhyLine[] = [];
+  if (ctx.vix != null) {
+    rows.push({
+      label: "Fear gauge",
+      value: `${ctx.vix.toFixed(1)}${ctx.vix_regime ? `, ${levelWord(ctx.vix_regime)}` : ""}${ctx.vix_stale ? " (reading was old)" : ""}: risks ${pctOfUsual(sizing)} of usual`,
+    });
+  }
+  if (ctx.time_phase) {
+    rows.push({ label: "Time of day", value: `${PHASE_PLAIN[ctx.time_phase] ?? ctx.time_phase}: ${timeMult < 1 ? "half size" : "full size"}` });
+  }
+  if (trend) {
+    rows.push({ label: "Market direction", value: `${TREND_WORD[trend] ?? "unclear"}` });
+  }
+  if (ctx.macro) {
+    rows.push({ label: "News calendar", value: ctx.macro === "MACRO_CLEAR" ? "No big news release blocking" : "Checked before buying" });
+  }
+  if (ctx.rs) {
+    rows.push({ label: "Stronger than SPY", value: ctx.rs.day && ctx.rs.recent ? "Yes, today and the last 30 minutes" : "Not on both measures" });
+  }
+  return { sizeLine, stopLine, trendLine, rows };
+}
+
+/** Sentence for the "Now" line under an adaptive trade. */
+export function stillHeldLine(regimeNow: string | null | undefined): string {
+  const keep = "This trade keeps the size it got; its safety exit never moves farther away.";
+  return regimeNow ? `Market is ${levelWord(regimeNow)} now. ${keep}` : keep;
+}
+
+export interface OrbBoxInputs {
+  classification: string | null;
+  short_frac: number | null;
+  short_bounds: { min: number; max: number } | null;
+  risk_usd: number | null;
+  breakeven_r: number | null;
+}
+
+/** ORB's short box: its own 9:38 check, the risk on this trade, when its stop moves. No stop/target repeat. */
+export function orbBoxText(o: OrbBoxInputs): string {
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const parts: string[] = [];
+  if (o.classification === "CALM_TREND") {
+    const bal = o.short_frac != null && o.short_bounds
+      ? `the breakout list balanced (${pct(o.short_frac)} bets down, needs ${pct(o.short_bounds.min)} to ${pct(o.short_bounds.max)})`
+      : "the breakout list balanced";
+    parts.push(`Traded after its 9:38 market check: SPY and QQQ data complete and ${bal}.`);
+  } else {
+    parts.push("Traded after passing its own 9:38 market check (the robot did not keep the numbers).");
+  }
+  if (o.risk_usd != null) parts.push(`Risk on this trade: ${formatMoney(o.risk_usd)}.`);
+  if (o.breakeven_r != null) {
+    parts.push(`Its stop moves to the buy price at +${o.breakeven_r}x its risk, and it can close early if the trade fails fast.`);
+  }
+  return parts.join(" ");
 }

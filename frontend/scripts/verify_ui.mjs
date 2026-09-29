@@ -29,6 +29,7 @@ const requiredFiles = [
   "components/StrategyCard.tsx",
   "components/StrategyCarousel.tsx",
   "components/HoldingNow.tsx",
+  "components/MarketMoodCard.tsx",
   "components/RecentTrades.tsx",
   "components/SafetyCard.tsx",
   "components/ExecutionLog.tsx",
@@ -125,6 +126,7 @@ const testidLocations = {
   "swing-candidate-watchlist": "components/SwingCandidateWatchlist.tsx",
   "swing-schedule": "components/SwingTelemetryBar.tsx",
   "active-swing-positions": "components/ActiveSwingPositionsTable.tsx",
+  "market-mood": "components/MarketMoodCard.tsx",
 };
 for (const [testid, file] of Object.entries(testidLocations)) {
   const content = fs.readFileSync(path.join(FRONTEND_DIR, file), "utf8");

@@ -10,6 +10,7 @@ import BalanceCard from "@/components/BalanceCard";
 import RightNowCard from "@/components/RightNowCard";
 import StrategyCarousel from "@/components/StrategyCarousel";
 import HoldingNow from "@/components/HoldingNow";
+import MarketMoodCard from "@/components/MarketMoodCard";
 import RecentTrades from "@/components/RecentTrades";
 import SafetyCard from "@/components/SafetyCard";
 import SwingTelemetryBar from "@/components/SwingTelemetryBar";
@@ -115,7 +116,7 @@ export default function Home() {
 
         {showPro && (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-white/70 px-4 py-2 text-xs text-muted">
-            <span>VIX regime: {state.market_context.vix_regime} ({state.market_context.vix.toFixed(1)})</span>
+            <span>VIX regime: {state.market_context.vix_regime} ({state.market_context.vix != null ? state.market_context.vix.toFixed(1) : "no reading"})</span>
             {Object.entries(state.ingestion || {}).map(([feed, status]) => (
               <span key={feed} className="flex items-center gap-1.5">
                 <span
@@ -190,9 +191,16 @@ export default function Home() {
 
         {mode === "intraday" ? (
           <div className="fadein flex flex-col gap-6 sm:gap-7">
-            <StrategyCarousel strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} />
+            <HoldingNow
+              positions={intradayPositions}
+              marketContext={state.market_context}
+              onFlattenPosition={flattenPosition}
+              onTightenStop={tightenStop}
+            />
 
-            <HoldingNow positions={intradayPositions} onFlattenPosition={flattenPosition} onTightenStop={tightenStop} />
+            <MarketMoodCard context={state.market_context} tradingDay={firstTradingDayFlag} />
+
+            <StrategyCarousel strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} />
 
             <section className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
               <RecentTrades
