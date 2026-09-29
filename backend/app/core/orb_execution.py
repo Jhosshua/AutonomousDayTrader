@@ -544,7 +544,7 @@ class OrbExecutionController:
         t = now.time()
         if not (fr <= t < fl):
             return False, f"outside the execution window ({fr.strftime('%H:%M')}-{fl.strftime('%H:%M')} ET)"
-        if t >= co:
+        if t > co:
             return False, f"past the {co.strftime('%H:%M')} entry cutoff: no new entries permitted"
         return True, ""
 

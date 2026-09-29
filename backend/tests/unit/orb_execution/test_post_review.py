@@ -43,13 +43,13 @@ def test_an_entry_delayed_until_the_cutoff_is_never_posted(delay_at):
     assert h.ctl.day_risk_used() == 0 and not h.ctl.owns("APP") and not h.reserved
 
 
-def test_the_cutoff_minute_itself_refuses_entries():
+def test_the_exact_cutoff_keeps_orbstraddles_inclusive_boundary():
     h = Harness()
     h.clock.set(at(10, 15))
     h.alpaca.prices["APP"] = 100.2
     out = h.ctl.execute([pick("APP", "long", 100.0, 98.0)])
-    assert not out["ok"] and "cutoff" in out["reason"]
-    assert not brackets(h)
+    assert out["ok"], out
+    assert len(brackets(h)) == 1
 
 
 @pytest.mark.parametrize("changes_at", ["macro", "persist", "budget"])
