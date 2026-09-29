@@ -434,12 +434,25 @@ class OrbIntegration:
             if sym in self._orb_reserved:
                 return True
         ctl = self.controller
-        if ctl is not None and ctl.owns(sym):
+        if ctl is not None and self._ctl_owns(sym):
             return True
         if self.is_orphan(sym):
             self._orphan_alarm(sym)
             return True
         return False
+
+    def _ctl_owns(self, sym: str) -> bool:
+        """controller.owns, but a broken ORB state never breaks ADT: ORB alone stops (alert, unready) and
+        only ADT's own book (an 'orb' position) still marks the symbol as ORB's."""
+        ctl = self.controller
+        try:
+            return bool(ctl.owns(sym))
+        except Exception as exc:
+            log.exception("ORB ownership check failed for %s", sym)
+            self._alert("_state", f"ORB's saved state is damaged ({type(exc).__name__}); ORB opens nothing "
+                                  "new until a person checks it. ADT's other strategies are unaffected.")
+            ctl.ready = False
+            return False
 
     def is_orphan(self, symbol: str) -> bool:
         sym = symbol.upper()
@@ -447,7 +460,7 @@ class OrbIntegration:
         if pos is None or getattr(pos, "strategy_id", "") != ORB_ID:
             return False
         ctl = self.controller
-        return not (ctl is not None and ctl.owns(sym))
+        return not (ctl is not None and self._ctl_owns(sym))
 
     def orphan_targets(self) -> List[str]:
         """ORB shares in ADT's book the controller cannot explain, and live adt-orb orders it does not know."""
@@ -496,7 +509,17 @@ class OrbIntegration:
         owns, else record the in-flight entry so ORB cannot take the symbol meanwhile."""
         sym = symbol.upper()
         with self.lock:
-            if strategy_id != ORB_ID and self.owns(sym):
+            try:
+                orb_has_it = self.owns(sym)
+            except Exception as exc:
+                # a broken ORB state must never block ADT's other strategies: ORB alone stops
+                log.exception("ORB ownership check failed for %s", sym)
+                self._alert("_state", f"ORB's saved state is damaged ({type(exc).__name__}); ORB opens nothing "
+                                      "new until a person checks it. ADT's other strategies are unaffected.")
+                if self.controller is not None:
+                    self.controller.ready = False
+                orb_has_it = False
+            if strategy_id != ORB_ID and orb_has_it:
                 return (f"ORB_OWNED: {sym} is held or reserved by the Opening Range Breakout (ORBStraddle "
                         "rules); other strategies cannot trade it until ORB is done with it")
             if order is not None and getattr(order, "id", None):

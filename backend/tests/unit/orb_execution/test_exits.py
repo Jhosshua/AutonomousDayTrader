@@ -471,7 +471,9 @@ def test_exit_intent_is_persisted_uncapped_before_the_read_and_capped_after_the_
     h.clock.set(at(11, 0))
     h.ctl.tick()
     assert seen[0] == (454, None)               # intent: coid + the uncapped upper bound, unsent
-    assert seen[1][0] == 354 and seen[1][1]     # capped qty + order id, right after the POST
+    # (the exit is prepared before the legs are cancelled, so the latch and cancel saves come next)
+    first_with_id = next(x for x in seen if x[1])
+    assert first_with_id[0] == 354              # capped qty + order id, right after the POST
     assert [r[2]["qty"] for r in h.alpaca.requests if r[0] == "POST" and r[2].get("side") == "sell"] == ["354"]
 
 

@@ -258,9 +258,11 @@ class FakeAlpaca:
                 err = {"code": 40310000, "message": f"insufficient qty available for order (requested: {qty}, available: {available})"}
                 self.refused_403.append(err)
                 return httpx.Response(403, json=err)
+        if body.get("stop_price"):
+            row["stop_price"] = body["stop_price"]
         self.orders[oid] = row
         self.order_seq.append(oid)
-        if self.market_fills:
+        if self.market_fills and row["type"] == "market":       # a stop rests until triggered
             self.fill(oid)
         return httpx.Response(200, json=self.view(row, True))
 
@@ -324,7 +326,7 @@ class FakeFacade:
         self.calls: List[tuple] = []
         self.recheck_result = (True, "")
         self.recheck_by_symbol: Dict[str, tuple] = {}
-        self.macro_result = (True, "")
+        self.macro_result = (False, "")       # the real facade's contract: (vetoed, why)
         self.trade_override: Dict[str, Any] = {}
         self.absorption: Dict[str, dict] = {}
         self.scan_results: List[Any] = []      # consumed in order; a callable is called

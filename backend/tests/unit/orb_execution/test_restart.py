@@ -153,9 +153,12 @@ def test_state_round_trip_is_json_and_versioned():
 
 def lost_entry_marked_never_reached():
     """An entry whose POST reply was lost and whose by-coid lookups kept answering 404 until the
-    grace ran out: ORB concluded it never reached the broker. It actually did (and filled)."""
+    grace ran out while the account held nothing: ORB concluded it never reached the broker. It
+    actually did, and fills afterwards. (While the account HOLDS the shares ORB never concludes
+    never-sent: see orb_attack test_entry_hidden_from_client_id_lookups...)"""
     h = Harness()
     h.alpaca.prices["APP"] = 100.2
+    h.alpaca.entry_mode = "new"                                           # accepted, not filled yet
     h.alpaca.fail.append({"method": "POST", "path": "/v2/orders", "kind": "lost"})
     h.alpaca.fail.append({"method": "GET", "path": "/v2/orders:by_client_order_id", "kind": "status",
                           "status": 404, "times": 4})
@@ -164,7 +167,9 @@ def lost_entry_marked_never_reached():
     h.ctl.tick()
     h.ctl.tick()
     assert h.pos()["status"] == "CLOSED" and "never reached" in h.pos()["closed_reason"]
-    assert h.ctl.own_qty("APP") == 0 and "APP" in h.alpaca.positions      # the broker holds 454
+    assert h.ctl.own_qty("APP") == 0 and "APP" not in h.alpaca.positions
+    h.alpaca.fill(h.alpaca.by_coid(h.pos()["coid"])["id"])               # ... and then it fills
+    assert "APP" in h.alpaca.positions                                    # the broker holds 454
     assert h.alpaca.fail[-1]["times"] == 0                                # the next lookup finds it
     return h
 

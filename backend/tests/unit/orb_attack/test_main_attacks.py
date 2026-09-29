@@ -88,10 +88,6 @@ def test_shadow_morning_then_live_restart_never_re_runs_the_primary_decision(mai
 
 
 # ----------------------------------------------------------------------------- corrupt state
-@pytest.mark.xfail(strict=True, reason="BUG P2: a version-1 ORB state row with a malformed position (no "
-                                        "'symbol') passes from_state(); afterwards every ADT entry admission "
-                                        "raises inside orb.claim_for_adt -> controller.owns -> _position_for "
-                                        "(KeyError), so ORB's corrupt row blocks ADT's OTHER strategies")
 def test_semantically_corrupt_orb_state_never_blocks_adts_other_strategies(main_runtime):
     r = main_runtime
     h = MainOrb(r)
@@ -352,3 +348,15 @@ def test_half_day_trades_the_morning_and_is_flat_by_eleven(main_runtime):
     assert [b["symbol"] for b in brackets(h)] == ["APP"]
     run(h, _t(day, 10, 59, 55), _t(day, 11, 0, 30))
     assert "APP" not in h.alpaca.positions and "APP" not in r.account.positions
+
+
+def test_an_orb_ownership_check_that_raises_refuses_orb_only(main_runtime, monkeypatch):
+    r = main_runtime
+    h = MainOrb(r)
+
+    def broken(sym):
+        raise KeyError("symbol")
+    monkeypatch.setattr(h.ctl, "owns", broken)
+    ok, why = r.pre_trade_risk_validator(adt_order(r, "NVDA"), r.account)
+    assert not why.startswith("ORB_OWNED")
+    assert "_state" in r.orb.alerts and h.ctl.ready is False

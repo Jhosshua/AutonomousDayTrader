@@ -26,9 +26,6 @@ def _recover_and_supervise(h, passes=6):
 
 
 # ----------------------------------------------------------------------------- persistence
-@pytest.mark.xfail(strict=True, reason="BUG P0: a failing ORB state write after the legs were cancelled "
-                                        "blocks the exit POST forever (orb_execution._submit_exit persists the "
-                                        "exit record first and gives up), leaving the shares with no stop")
 def test_disk_failure_during_an_exit_never_leaves_the_shares_naked():
     h = opened()
     h.persist_raises[0] = True              # the durable store starts failing (disk full / db locked)
@@ -50,9 +47,6 @@ def test_disk_failure_before_an_entry_post_sends_nothing():
 
 
 # ----------------------------------------------------------------------------- request budget
-@pytest.mark.xfail(strict=True, reason="BUG P1: the exit budget token is taken only AFTER the legs are "
-                                        "cancelled (orb_execution._submit_exit); a throttled token leaves the "
-                                        "position with no stop and no exit order")
 def test_budget_exhausted_between_the_leg_cancels_and_the_close_never_leaves_it_naked():
     h = Harness(reconcile=False, freeze=False)
     budget = SwitchBudget()
@@ -89,11 +83,6 @@ def test_budget_exhausted_before_the_exit_touches_nothing():
 
 
 # ----------------------------------------------------------------------------- broker errors at the close
-@pytest.mark.xfail(strict=True, reason="BUG P0: one 5xx on the account position read right before the exit "
-                                        "POST (after the legs are cancelled) aborts the exit; the exit decision "
-                                        "is not latched, so when the price recovers the position is held with "
-                                        "no broker stop (orb_execution._supervise_one re-derives triggers "
-                                        "each pass; pos['exit_reason'] is never used as a trigger)")
 def test_position_read_5xx_at_the_close_then_price_recovers_leaves_no_naked_position():
     h = opened()
     h.alpaca.fail.append({"method": "GET", "path": "/v2/positions/APP", "kind": "status", "status": 503})
@@ -102,10 +91,6 @@ def test_position_read_5xx_at_the_close_then_price_recovers_leaves_no_naked_posi
     assert protected_or_flat(h), "legs cancelled, exit aborted, price recovered: position held naked"
 
 
-@pytest.mark.xfail(strict=True, reason="BUG P1: a 429 on the exit POST is treated as 'maybe sent' and the "
-                                        "exit record blocks every retry for PENDING_GRACE_S (60 s) while the "
-                                        "legs are already cancelled (orb_execution._cancel_own_live counts the "
-                                        "id-less exit record as an unresolved cancel)")
 def test_exit_post_429_does_not_leave_the_shares_naked_for_a_minute():
     h = opened()
     h.alpaca.fail.append({"method": "POST", "path": "/v2/orders", "kind": "status", "status": 429})
@@ -143,9 +128,6 @@ def test_exit_reply_lost_every_time_sells_exactly_once():
 
 
 # ----------------------------------------------------------------------------- crash mid-exit
-@pytest.mark.xfail(strict=True, reason="BUG P1: a process killed between the leg cancels and the close "
-                                        "restarts with shares and no bracket; nothing re-arms a stop or "
-                                        "finishes the exit unless a software rule fires again")
 def test_kill_between_leg_cancel_and_close_then_restart_is_not_naked():
     h = opened()
 
@@ -181,10 +163,6 @@ def test_kill_after_the_close_post_restart_books_it_and_never_sells_again():
 
 
 # ----------------------------------------------------------------------------- both legs / races
-@pytest.mark.xfail(strict=True, reason="BUG P1: when both bracket legs fill (broker OCO failure) ORB's own qty "
-                                        "turns short on a LONG position; _supervise_one computes R with the "
-                                        "position's long sign, so a rally against the accidental short looks "
-                                        "like profit and nothing buys it back")
 def test_target_and_stop_both_filling_is_bought_back_to_flat():
     h = opened()
     parent = h.parent()
@@ -284,10 +262,6 @@ def test_manual_close_at_alpaca_never_makes_orb_cross_flat():
     assert h.alpaca._pos_qty("APP") == 0 and h.ctl.own_qty("APP") == 0
 
 
-@pytest.mark.xfail(strict=True, reason="BUG P2: after a manual close at Alpaca (legs cancelled, shares gone) "
-                                        "ORB keeps supervising a phantom position (slot, reservation, ADT book "
-                                        "and mismatch pause) until a software rule or 11:00 fires; it never "
-                                        "notices its bracket is gone and the account is flat")
 def test_manual_close_at_alpaca_is_noticed_without_waiting_for_a_price_rule():
     h = opened()
     for leg in h.parent()["legs_ids"]:
@@ -298,3 +272,34 @@ def test_manual_close_at_alpaca_is_noticed_without_waiting_for_a_price_rule():
         h.clock.advance(5)
         h.ctl.tick()
     assert h.pos()["status"] == "CLOSED" and not h.ctl.owns("APP")
+
+
+def test_a_close_that_keeps_failing_after_the_cancels_re_arms_a_protective_stop():
+    """P0-2: once the legs are gone the exit is latched and retried every pass; if the close cannot be
+    sent within the bound, a stop is re-placed at the ORIGINAL stop price for exactly ORB's shares."""
+    from backend.app.core.broker import BrokerHTTPError
+    h = opened()
+    real_close = h.broker.submit_market_order
+
+    def refuse(*a, **kw):
+        raise BrokerHTTPError("market order refused (test)", 422)
+    h.broker.submit_market_order = refuse             # every CLOSE is refused; stops still go through
+    _fast_fail(h)
+    assert not live_stop_at_broker(h) and h.pos()["exit_latched"]
+    h.alpaca.prices["APP"] = 100.2                     # price recovers: the latched exit is still retried
+    rearmed = None
+    for _ in range(8):
+        h.clock.advance(5)
+        h.ctl.tick()
+        stops = [o for o in h.alpaca.orders.values() if o["type"] == "stop" and o["client_order_id"].startswith("adt-orb-S-")]
+        if stops:
+            rearmed = stops[-1]
+            break
+    assert rearmed and rearmed["stop_price"] == "98.00" and int(rearmed["qty"]) == 454 and rearmed["side"] == "sell"
+    assert h.alpaca._pos_qty("APP") == 454 and h.alpaca.refused_403 == []
+    h.broker.submit_market_order = real_close          # the broker accepts closes again
+    for _ in range(3):
+        h.clock.advance(5)
+        h.ctl.tick()
+    assert h.alpaca._pos_qty("APP") == 0 and h.own_fill_sum() == 0
+    assert not live_stop_at_broker(h)                 # the re-armed stop was cancelled before the close

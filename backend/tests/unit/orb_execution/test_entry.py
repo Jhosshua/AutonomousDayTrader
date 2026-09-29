@@ -152,7 +152,7 @@ def test_recheck_and_late_macro_veto():
     assert "candle rule" in dict(out["refused"])["PLTR"]
     h2 = Harness()
     h2.alpaca.prices["APP"] = 100.2
-    h2.facade.macro_result = (False, "SPY is down")
+    h2.facade.macro_result = (True, "SPY is down")          # (vetoed, why)
     out2 = h2.ctl.execute([pick("APP", "long", 100.0, 98.0)])
     assert not out2["ok"] and not [r for r in h2.alpaca.requests if r[0] == "POST"]
     assert h2.pos()["status"] == "SKIPPED" and h2.ctl.day_risk_used() == 0

@@ -39,12 +39,6 @@ def real_facade(tmp_path):
     config.set_exclude_symbols(())
 
 
-@pytest.mark.xfail(strict=True, reason="BUG P0: OrbsFacade.macro_veto returns (vetoed, why) but "
-                                        "OrbExecutionController._late_macro reads it as (ok, why): with the real "
-                                        "facade every clean pick is refused ('macro veto: ') right before the "
-                                        "POST, and a pick the macro rule vetoes is SENT. The FakeFacade encodes "
-                                        "the controller's reading (macro_result=(True, '') = ok), so no existing "
-                                        "test sees it")
 def test_real_facade_macro_clear_pick_is_sent(real_facade, monkeypatch):
     monkeypatch.setattr(flow, "macro_refusals",
                         lambda picks, now=None: {p["symbol"]: None for p in picks})   # SPY/sector: no veto
@@ -56,8 +50,6 @@ def test_real_facade_macro_clear_pick_is_sent(real_facade, monkeypatch):
     assert out["ok"] and len(bracket_posts(h)) == 1, out
 
 
-@pytest.mark.xfail(strict=True, reason="BUG P0: same inverted macro_veto contract: a pick the fresh macro "
-                                        "check VETOES (SPY falling against a long) is sent to Alpaca")
 def test_real_facade_macro_vetoed_pick_is_never_sent(real_facade, monkeypatch):
     monkeypatch.setattr(flow, "macro_refusals",
                         lambda picks, now=None: {p["symbol"]: "SPY is down 0.30% since the decision" for p in picks})
@@ -71,10 +63,6 @@ def test_real_facade_macro_vetoed_pick_is_never_sent(real_facade, monkeypatch):
 
 
 # ----------------------------------------------------------------------------- breaker / flatten-all mid-execute
-@pytest.mark.xfail(strict=True, reason="BUG P1: ADT's account loss stop is read once at the top of "
-                                        "execute(); a breaker trip while the picks are being priced/checked "
-                                        "does not stop the POST (_late_checks/entry_gate never re-read "
-                                        "account_halt)")
 def test_breaker_trip_right_before_the_post_blocks_the_entry():
     h = Harness()
     h.alpaca.prices["APP"] = 100.2
@@ -88,9 +76,6 @@ def test_breaker_trip_right_before_the_post_blocks_the_entry():
     assert not bracket_posts(h), "entry POST sent after ADT's daily loss stop tripped"
 
 
-@pytest.mark.xfail(strict=True, reason="BUG P1: MANUAL flatten-all (entries_blocked) during an execute does "
-                                        "not stop the pending POST: entries_blocked is read once at the top of "
-                                        "execute()")
 def test_flatten_all_during_execute_blocks_the_pending_entry():
     h = Harness()
     h.alpaca.prices["APP"] = 100.2
@@ -104,10 +89,6 @@ def test_flatten_all_during_execute_blocks_the_pending_entry():
     assert not bracket_posts(h), "entry POST sent after the operator's flatten-all"
 
 
-@pytest.mark.xfail(strict=True, reason="BUG P1: a supervisor pass that honours flatten-all while the execute is "
-                                        "between its plan and its POST closes the PENDING position and drops the "
-                                        "exit request; the POST then opens a real position that is reopened as a "
-                                        "normal trade and HELD (flatten-all silently defeated)")
 def test_flatten_all_racing_a_supervisor_pass_and_an_execute_ends_flat():
     h = Harness()
     h.alpaca.prices["APP"] = 100.2
@@ -241,10 +222,6 @@ def test_shadow_mode_with_a_broker_never_writes_even_with_adt_exit_requests():
 
 
 # ----------------------------------------------------------------------------- stuck symbol / slot / risk
-@pytest.mark.xfail(strict=True, reason="BUG P2: a kill right after the entry INTENT is durable but before the "
-                                        "order record is saved leaves a PENDING->UNKNOWN position with no order: "
-                                        "_flat_proven() needs at least one own order, so it holds a slot, the "
-                                        "symbol reservation and its day risk until the 11:00 flatten")
 def test_kill_between_intent_and_order_record_frees_the_slot_symbol_and_risk():
     h = Harness()
     h.alpaca.prices["APP"] = 100.2
@@ -267,10 +244,6 @@ def test_kill_between_intent_and_order_record_frees_the_slot_symbol_and_risk():
     assert not ctl.owns("APP") and ctl.day_risk_used() == 0 and ctl.slots_available() == 4
 
 
-@pytest.mark.xfail(strict=True, reason="BUG P2: an entry Alpaca accepted but whose client id lookups 404 for "
-                                        "longer than PENDING_GRACE_S is declared never-sent: the position is "
-                                        "closed, the symbol released to ADT's other arms and its day risk given "
-                                        "back while Alpaca holds the shares under ORB's bracket")
 def test_entry_hidden_from_client_id_lookups_is_never_released_while_alpaca_holds_it():
     h = Harness()
     h.alpaca.prices["APP"] = 100.2
@@ -284,3 +257,20 @@ def test_entry_hidden_from_client_id_lookups_is_never_released_while_alpaca_hold
         h.ctl.tick()
     assert h.alpaca._pos_qty("APP") == 454
     assert h.ctl.owns("APP") and "APP" in h.reserved and h.ctl.day_risk_used() > 0
+
+
+def test_a_pending_entry_closed_by_a_supervisor_pass_is_never_sent():
+    """A one-symbol exit request (no day block) lands while the entry is between its plan and its POST;
+    the supervisor closes the still-pending position. The POST must not go out afterwards."""
+    h = Harness()
+    h.alpaca.prices["APP"] = 100.2
+
+    def gate(sym):
+        h.ctl.request_exit("APP", "MANUAL_FLATTEN")
+        h.ctl.tick()
+        return None
+    h.ctl.entry_gate = gate
+    out = h.ctl.execute([pick("APP", "long", 100.0, 98.0)])
+    h.ctl.entry_gate = None
+    assert not bracket_posts(h) and h.ctl.entries_blocked() is None
+    assert "no longer pending" in str(out)

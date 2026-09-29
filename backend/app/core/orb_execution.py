@@ -68,6 +68,7 @@ OWN_REFRESH_MIN_S = 10.0       # a live non-entry own order is refetched at most
 RECHECK_NOT_FOUND_S = 60.0     # an inferred never-reached entry is asked again this often
 PENDING_GRACE_S = 60.0         # a lost submit is not called "never reached the broker" sooner
 EXIT_CONFIRM_S = 10.0          # _verified_flatten confirm_s
+REARM_AFTER_S = 30.0           # a latched exit still not closed after this: a protective stop is re-placed
 ESCALATED_CONFIRM_S = 20.0
 CANCEL_CONFIRM_S = 6.0         # EXIT_CANCEL_POLLS (6) x 0.5-1 s
 COID_LOOKUPS = 3               # orders.reconcile_order_by_coid: 3 tries ...
@@ -365,6 +366,8 @@ class OrbExecutionController:
         self._writes_in_flight = 0
         self._inflight_writes: Dict[int, dict] = {}     # slot id -> what is being written (coid / order id)
         self._resolving: Optional[str] = None            # unknown-write marker an operator is removing
+        self._last_position_qtys: Optional[Dict[str, int]] = None   # symbol -> Alpaca qty, last positions read
+        self._state_problem: Optional[str] = None       # malformed rows found at restore: never ready
         self._slot_seq = 0
         self.on_event = on_event
         self.sleep = sleep or _time.sleep
@@ -415,15 +418,58 @@ class OrbExecutionController:
                 base = self._empty_state()
                 base.update(copy.deepcopy(state))
                 self.state = base
+                self._state_problem = self._validate_rows()
                 # a POST recorded in flight by an earlier process can no longer be in flight
                 for rec in self.state["orders"].values():
-                    if rec.get("submit_state") == "in_flight":
+                    if rec.get("submit_state") == "prepared":
+                        # an exit prepared before the protection was cancelled but never marked in flight:
+                        # its POST provably never happened
+                        rec.update(status="not_sent", terminal=True, submit_state="answered",
+                                   note="prepared before a restart; never sent")
+                    elif rec.get("submit_state") == "in_flight":
                         rec["submit_state"] = "unanswered"
                         rec["restart_recovered"] = True
-                for pos in self.state["positions"].values():
+                for key, pos in self.state["positions"].items():
                     if pos.get("status") == "PENDING_SUBMIT":
-                        pos["status"] = "UNKNOWN"
+                        has_record = any(k == key or r.get("position") == key
+                                         for k, r in self.state["orders"].items())
+                        if not has_record:
+                            # the entry record is saved BEFORE the POST: no record = never sent
+                            pos.update(status="SKIPPED", closed_reason="intent only: the order was never sent "
+                                       "(the app stopped before it)")
+                            for rr in self.state["risk"].get(pos.get("day") or "", []):
+                                if rr.get("coid") == pos.get("coid"):
+                                    rr["result"] = "not_sent"
+                        else:
+                            pos["status"] = "UNKNOWN"
             self.ready = False
+
+    def _validate_rows(self) -> Optional[str]:
+        """Move malformed position/order rows aside (never used, kept for a human) so a corrupt row can
+        never crash ORB's (or ADT's) checks; returns why ORB must stay unready, or None."""
+        bad = []
+        for bucket, need in (("positions", ("symbol", "status")), ("orders", ("symbol",))):
+            rows = self.state.get(bucket)
+            if not isinstance(rows, dict):
+                self.state[bucket] = {}
+                bad.append((bucket, "*", rows))
+                continue
+            for k in list(rows):
+                row = rows[k]
+                if not isinstance(row, dict) or any(not isinstance(row.get(f), str) or not row.get(f) for f in need):
+                    bad.append((bucket, k, rows.pop(k)))
+                    continue
+                row["symbol"] = row["symbol"].upper()
+                row.setdefault("key", k)
+                if bucket == "orders":
+                    row.setdefault("terminal", False)
+                    row.setdefault("filled_qty", 0)
+                    row.setdefault("role", "unknown")
+        if bad:
+            self.state.setdefault("invalid_rows", []).extend(
+                [{"bucket": b, "key": k, "row": r} for b, k, r in bad])
+            return f"{len(bad)} malformed ORB state row(s) set aside; a person must check them"
+        return None
 
     def _persist(self) -> None:
         if self.persist_cb is None:
@@ -750,6 +796,21 @@ class OrbExecutionController:
         """ownership.OwnBook.mark_not_found: a 404 only proves a submit never reached the broker
         once nothing can still be carrying it (not in flight, past the grace, or the submitter's
         own definitive refusal)."""
+        with self._lock:
+            rec0 = dict(self.state["orders"].get(key) or {})
+        if rec0 and not confirmed and rec0.get("role") == "entry" and not rec0.get("terminal") and self.broker is not None:
+            # an entry the broker may hold under a lookup that keeps failing: never declared never-sent
+            # while the account holds shares on that side
+            try:
+                net = int(self._call("exit", self.broker.position_qty, rec0["symbol"]))
+            except Exception:
+                return False
+            if net and (net > 0) == (rec0.get("side") == "buy"):
+                with self._lock:
+                    r = self.state["orders"].get(key)
+                    if r is not None:
+                        r["note"] = "client id lookup finds nothing but the account holds the shares: kept"
+                return False
         with self._lock:
             rec = self.state["orders"].get(key)
             if rec is None or rec["terminal"] or int(rec.get("filled_qty") or 0) > 0:
@@ -1244,11 +1305,14 @@ class OrbExecutionController:
             rows = self._call("normal", self.broker.get_positions_raw)
         except Exception:
             return None
-        out = {}
+        out, qtys = {}, {}
         for p in rows:
             px = _f(p.get("current_price")) if isinstance(p, dict) else None
+            if isinstance(p, dict) and p.get("symbol"):
+                qtys[str(p["symbol"]).upper()] = _i(p.get("qty"))
             if px and px > 0 and p.get("symbol"):
                 out[str(p["symbol"]).upper()] = px
+        self._last_position_qtys = qtys
         return out
 
     # ------------------------------------------------------------------ fresh price
@@ -1412,6 +1476,10 @@ class OrbExecutionController:
             if self.owns(sym) or any(pl["symbol"] == sym for pl in plan):
                 self._event({"kind": "skip_occupied", "symbol": sym})
                 refused.append((sym, "already held by this account")); continue
+            if sym in set(self.symbols_today()):
+                # never trust only the facade's filter: one execution per symbol per day
+                self._event({"kind": "skip_executed_today", "symbol": sym})
+                refused.append((sym, "already executed today")); continue
             try:
                 occ = bool(self.is_occupied(sym))
             except Exception as exc:
@@ -1540,11 +1608,21 @@ class OrbExecutionController:
                 self._drop_position(pl["key"], skip)
                 continue
             with self._sym_lock(sym):
+                stop = self._entry_stop_reason(pl)
+                if stop:
+                    placed.append(dict(pl, outcome="skipped", result={"error": stop}))
+                    self._drop_position(pl["key"], stop)
+                    continue
                 okm, whym = self._late_macro(pl)
                 if not okm:
                     refused.append((sym, "macro veto: " + whym))
                     placed.append(dict(pl, outcome="skipped", result={"error": "macro veto before the order: " + whym}))
                     self._drop_position(pl["key"], "macro veto before the order: " + whym)
+                    continue
+                stop = self._entry_stop_reason(pl)       # anything that changed during the macro read
+                if stop:
+                    placed.append(dict(pl, outcome="skipped", result={"error": stop}))
+                    self._drop_position(pl["key"], stop)
                     continue
                 key = self._record_submit(pl["coid"], sym, "buy" if pl["direction"] == "long" else "sell",
                                           pl["shares"], "entry", pl["key"])
@@ -1620,6 +1698,9 @@ class OrbExecutionController:
             if why:
                 self._event({"kind": "skip_entry_gate", "symbol": sym, "why": str(why)[:200]})
                 return f"ADT entry gate: {why}"
+        stop = self._entry_stop_reason(pl)
+        if stop:
+            return stop
         try:
             if self.is_occupied(sym):
                 self._event({"kind": "skip_occupied", "symbol": sym, "late": True})
@@ -1633,9 +1714,36 @@ class OrbExecutionController:
             return f"occupancy re-check failed: {exc}"
         return None
 
+    def _entry_stop_reason(self, pl: dict) -> Optional[str]:
+        """Re-read everything that may have stopped ORB since execute() began (a breaker trip, the
+        operator's flatten-all, ORB's own halt, the mode, shutdown) and that the pending position was not
+        closed meanwhile (a supervisor pass honouring flatten-all). Called before and, under the symbol
+        lock, right before the entry record/POST."""
+        if self.mode != "live":
+            return f"ORB is {self.mode}: no new entries"
+        if self._entries_closed:
+            return f"{self._entries_closed}: no new entries"
+        ah = self._account_halt_reason()
+        if ah:
+            return f"{ah}: no new entries"
+        h = self.halted()
+        if h:
+            return f"Daily loss halt active ({h}): no new entries allowed today"
+        blk = self.entries_blocked()
+        if blk:
+            return f"ORB positions were flattened today ({blk}): no new entries until tomorrow"
+        with self._lock:
+            pos = self.state["positions"].get(pl["key"]) or {}
+            st = pos.get("status")
+        if st != "PENDING_SUBMIT":
+            return f"the planned position is no longer pending ({st})"
+        return None
+
     def _late_macro(self, pl: dict) -> Tuple[bool, str]:
+        # OrbsFacade.macro_veto returns (VETOED, why): True means the trade must NOT be placed
         try:
-            ok, why = self.facade.macro_veto(pl["symbol"], pl["direction"], self._now())
+            vetoed, why = self.facade.macro_veto(pl["symbol"], pl["direction"], self._now())
+            ok = vetoed is False
         except Exception as exc:
             ok, why = False, f"macro check failed: {exc}"
         if not ok:
@@ -1905,7 +2013,8 @@ class OrbExecutionController:
     def _is_working_exit(self, r: dict) -> bool:
         return r.get("role") == "exit" and bool(r.get("id")) and r.get("status") not in QUIESCENT
 
-    def _cancel_own_live(self, sym: str) -> Tuple[List[str], List[dict]]:
+    def _cancel_own_live(self, sym: str, exclude: Optional[str] = None) -> Tuple[List[str], List[dict]]:
+        """exclude: the exit intent this pass prepared (not sent yet): never a thing to cancel."""
         try:
             for o in self._call("exit", self.broker.list_open_orders, sym):
                 if isinstance(o, dict):
@@ -1916,7 +2025,7 @@ class OrbExecutionController:
         asked: set = set()
         for _round in range(3):
             live = [(k, r) for k, r in self._live(sym)
-                    if r.get("status") not in QUIESCENT and not self._is_working_exit(r)]
+                    if r.get("status") not in QUIESCENT and not self._is_working_exit(r) and k != exclude]
             if not live:
                 break
             live.sort(key=lambda kr: 0 if kr[1].get("role") == "entry" else 1)     # parents first
@@ -1936,11 +2045,11 @@ class OrbExecutionController:
                         cancelled.append(rec["id"])
                 except Exception as exc:
                     log.warning("cancel of own order %s failed: %s", rec.get("id"), exc)
-            if not [1 for k, r in self._live(sym) if k not in asked
+            if not [1 for k, r in self._live(sym) if k not in asked and k != exclude
                     and r.get("status") not in QUIESCENT and not self._is_working_exit(r)]:
                 break
-        unresolved = [r for _k, r in self._live(sym)
-                      if r.get("status") not in QUIESCENT and not self._is_working_exit(r)]
+        unresolved = [r for k, r in self._live(sym)
+                      if r.get("status") not in QUIESCENT and not self._is_working_exit(r) and k != exclude]
         return cancelled, unresolved
 
     def _cap_to_account(self, sym: str, own: int, net: int, why: str, defer: Optional[list] = None) -> int:
@@ -1973,17 +2082,37 @@ class OrbExecutionController:
         n = self._next("exit_seq", f"{sym}|{day}")
         return f"{self.cfg['coid_prefix']}-X-{sym}-{day}-{n}-{secrets.token_hex(3)}"
 
-    def _submit_exit(self, sym: str, own: int, why: str, pos_key: Optional[str]) -> Tuple[Optional[str], Optional[str], int, str]:
+    def _abort_ctx(self, ctx: Optional[dict], note: str) -> None:
+        if not ctx:
+            return
+        with self._lock:
+            rec = self.state["orders"].get(ctx["key"])
+            if rec is not None and not rec.get("id"):
+                rec.update(status="not_sent", terminal=True, submit_state="answered", note=note)
+        self._persist_quiet()
+
+    def _submit_exit(self, sym: str, own: int, why: str, pos_key: Optional[str],
+                     ctx: Optional[dict] = None) -> Tuple[Optional[str], Optional[str], int, str]:
         side, n = ("sell" if own > 0 else "buy"), abs(own)
-        day = self.state.get("day") or self._day(self._now())
-        coid = self._next_exit_coid(sym, day)
-        key = self._record_submit(coid, sym, side, n, "exit", pos_key)
-        try:
-            self._persist()
-        except Exception as exc:
+        if ctx is not None and ctx["side"] == side:
+            # prepared before the protection was cancelled: intent durable, token held, position read
+            coid, key = ctx["coid"], ctx["key"]
             with self._lock:
-                self.state["orders"].pop(key, None)
-            return None, f"could not save the exit record ({exc}); nothing sent", n, side
+                rec = self.state["orders"].get(key)
+                if rec is not None:
+                    rec["qty"] = n
+        else:
+            self._abort_ctx(ctx, "the exit side changed after the cancels")
+            ctx = None
+            day = self.state.get("day") or self._day(self._now())
+            coid = self._next_exit_coid(sym, day)
+            key = self._record_submit(coid, sym, side, n, "exit", pos_key)
+            try:
+                self._persist()
+            except Exception as exc:
+                with self._lock:
+                    self.state["orders"].pop(key, None)
+                return None, f"could not save the exit record ({exc}); nothing sent", n, side
         # The intent (coid + the UNCAPPED planned qty, an upper bound) was persisted above. From here
         # to the POST nothing slow may run: destination check and budget token first, then the
         # position read, the cap, and the POST immediately. The capped qty and the order id are
@@ -1998,17 +2127,28 @@ class OrbExecutionController:
             for ev in deferred:
                 self._emit_cap(ev)
             self._persist_quiet()
-        try:
-            self._verify_destination_for_write()
-            self.budget.acquire("exit")
-        except (BudgetThrottled, DestinationRefused) as exc:
-            not_sent(f"not sent: {exc}")
-            return None, str(exc), n, side
+        if ctx is not None:
+            # from here the POST may happen: a restart must look for it by client id
+            with self._lock:
+                rec = self.state["orders"].get(key)
+                if rec is not None and rec.get("submit_state") == "prepared":
+                    rec["submit_state"] = "in_flight"
+            self._persist_quiet()
+        if ctx is None or not ctx.get("token"):
+            try:
+                self._verify_destination_for_write()
+                self.budget.acquire("exit")
+            except (BudgetThrottled, DestinationRefused) as exc:
+                not_sent(f"not sent: {exc}")
+                return None, str(exc), n, side
         try:
             net = int(self._call("exit", self.broker.position_qty, sym))
         except Exception as exc:
-            not_sent("position unreadable right before the POST")
-            return None, f"could not read the account position for {sym} before the exit; retrying ({exc})", n, side
+            if ctx is not None and ctx.get("net") is not None:
+                net = int(ctx["net"])       # the read taken before the cancels: never leave it naked
+            else:
+                not_sent("position unreadable right before the POST")
+                return None, f"could not read the account position for {sym} before the exit; retrying ({exc})", n, side
         capped = self._cap_to_account(sym, self.own_qty(sym), net, why, defer=deferred)
         if capped == 0 or (capped > 0) != (own > 0):
             not_sent("nothing left to exit: fully offset by an outside trade")
@@ -2037,6 +2177,10 @@ class OrbExecutionController:
             return None, str(exc), n, side
         except Exception as exc:
             err = str(exc)[:200]
+            if isinstance(exc, BrokerHTTPError) and exc.status_code == 429:
+                # rate limited: Alpaca did not accept it. Never "maybe sent": retry next pass
+                not_sent(f"not accepted (HTTP 429): {err}")
+                return None, f"exit not accepted (HTTP 429); retrying next pass", n, side
             definitive = isinstance(exc, BrokerHTTPError) and exc.definitive
             with self._lock:
                 rec = self.state["orders"].get(key)
@@ -2055,20 +2199,85 @@ class OrbExecutionController:
             return None, err + " (outcome unknown; tracked by coid)", n, side
         return None, err, n, side
 
+    def _protection_live(self, sym: str) -> bool:
+        """Any own live order other than an exit (bracket parent remainder, legs, a re-armed stop)."""
+        return any(not self._is_working_exit(r) and r.get("role") != "exit" and r.get("status") not in QUIESCENT
+                   for _k, r in self._live(sym))
+
+    def _exit_preflight(self, sym: str, own: int, why: str, pos_key: Optional[str]) -> Tuple[Optional[dict], Optional[str]]:
+        """Everything that can fail, done BEFORE ORB's protection is cancelled (Codex/attack P0): the exit
+        intent is durable, the destination verified, the exit budget token held and the account position
+        readable. A failure here leaves the bracket untouched. Returns (ctx, None) or (None, why)."""
+        side, n = ("sell" if own > 0 else "buy"), abs(own)
+        day = self.state.get("day") or self._day(self._now())
+        coid = self._next_exit_coid(sym, day)
+        key = self._record_submit(coid, sym, side, n, "exit", pos_key)
+        with self._lock:
+            self.state["orders"][key]["submit_state"] = "prepared"     # not in flight until just before the POST
+        try:
+            self._persist()
+        except Exception as exc:
+            with self._lock:
+                self.state["orders"].pop(key, None)
+            return None, f"could not save the exit record ({exc}); protection left in place"
+        ctx = {"key": key, "coid": coid, "side": side, "n": n, "token": False, "net": None}
+
+        def abort(note):
+            with self._lock:
+                rec = self.state["orders"].get(key)
+                if rec is not None:
+                    rec.update(status="not_sent", terminal=True, submit_state="answered", note=note)
+            self._persist_quiet()
+            return None, note
+        try:
+            self._verify_destination_for_write()
+            self.budget.acquire("exit")
+            ctx["token"] = True
+        except (BudgetThrottled, DestinationRefused) as exc:
+            return abort(f"not sent: {exc}; protection left in place")
+        try:
+            ctx["net"] = int(self._call("exit", self.broker.position_qty, sym))
+        except Exception as exc:
+            return abort(f"could not read the account position for {sym} ({exc}); protection left in place")
+        return ctx, None
+
+    def _latch_exit(self, pos_key: Optional[str], why: str) -> None:
+        """Once ORB's protection is (about to be) cancelled, the exit is owed until the position is flat:
+        every later pass retries it whatever the price does (survives a restart)."""
+        if not pos_key:
+            return
+        with self._lock:
+            pos = self.state["positions"].get(pos_key)
+            if pos is not None and not pos.get("exit_latched"):
+                pos["exit_latched"] = why
+                pos["exit_latched_at"] = self._now().timestamp()
+                pos.pop("rearmed_stop", None)
+        self._persist_quiet()
+
     def _exit_own_locked(self, sym: str, why: str, confirm_s: float, t0: float) -> dict:
         pos = self._position_for(sym)
         pos_key = pos["key"] if pos else None
-        cancelled, unresolved = self._cancel_own_live(sym)
+        ctx = None
+        own0 = self.own_qty(sym)
+        if own0 != 0 and self._protection_live(sym):
+            ctx, perr = self._exit_preflight(sym, own0, why, pos_key)
+            if ctx is None:
+                self._event({"kind": "exit_preflight_failed", "symbol": sym, "why": why, "reason": perr})
+                return self._exit_result(sym, why, t0, False, False, reason=perr)
+            self._latch_exit(pos_key, why)
+        cancelled, unresolved = self._cancel_own_live(sym, exclude=ctx["key"] if ctx else None)
         if unresolved:
             why_u = "own order(s) not confirmed cancelled: " + ", ".join(
                 f"{r.get('id') or r.get('coid')}={r.get('status')}" for r in unresolved[:4])
             self._event({"kind": "exit_waiting_on_cancel", "symbol": sym, "why": why, "reason": why_u})
+            self._abort_ctx(ctx, "own orders not confirmed cancelled")
             return self._exit_result(sym, why, t0, False, False, reason=why_u, cancelled=cancelled)
         own = self.own_qty(sym)
         if own == 0:
+            self._abort_ctx(ctx, "nothing left to exit")
             return self._exit_result(sym, why, t0, True, True, cancelled=cancelled)
         working = next((r for _k, r in self._live(sym) if r.get("role") == "exit" and r.get("id")
-                        and r.get("status") not in QUIESCENT), None)
+                        and r.get("status") not in QUIESCENT and (not ctx or _k != ctx["key"])), None)
         err = None
         if working:
             # a working own exit larger than what the account still holds would cross flat when it
@@ -2098,9 +2307,10 @@ class OrbExecutionController:
                 if own == 0:
                     return self._exit_result(sym, why, t0, True, True, cancelled=cancelled)
         if working:
+            self._abort_ctx(ctx, "an own exit is already working")
             order_id, n = working["id"], abs(own)
         else:
-            order_id, err, n, _side = self._submit_exit(sym, own, why, pos_key)
+            order_id, err, n, _side = self._submit_exit(sym, own, why, pos_key, ctx)
         flat = False
         if order_id:
             for _p in range(max(1, int(round(confirm_s)))):
@@ -2177,6 +2387,7 @@ class OrbExecutionController:
     def _tick_locked(self, now: datetime) -> dict:
         if self.broker is None:
             return {"active": 0}
+        self._last_position_qtys = None          # only a read from THIS pass may prove an outside close
         if self.needs_supervision():
             try:
                 self.refresh_own_orders()
@@ -2236,6 +2447,16 @@ class OrbExecutionController:
         entry_rec = self.state["orders"].get(key) or {}
         has_fill = int(entry_rec.get("filled_qty") or 0) > 0
         own_q = self.own_qty(sym)
+        L0 = pos["direction"] == "long"
+        # closed at Alpaca outside ORB (e.g. by hand): no own order is live and the account holds nothing
+        acct = self._last_position_qtys
+        if own_q != 0 and acct is not None and int(acct.get(sym, 0)) == 0 and not self._live(sym):
+            self._cap_to_account(sym, own_q, 0, "closed outside ORB")
+            if self._flat_proven(pos):
+                self._close_position(key, "closed outside ORB (the account is flat and ORB's orders are gone)")
+                return None
+        crossed = own_q != 0 and ((own_q > 0) != L0)
+        latched = pos.get("exit_latched")
         px = (pos_map or {}).get(sym)
         if px is None and own_q != 0:
             # no position row (a broker-side exit not refreshed yet, or an unreadable snapshot):
@@ -2251,6 +2472,10 @@ class OrbExecutionController:
         r = 0.0
         claw = ff = be_exit = absorb = False
         upd: Dict[str, Any] = {}
+        if crossed:
+            force = force or "both bracket legs filled: buying back to flat"
+        elif latched and not force:
+            force = f"{latched} (retrying)"
         if px is None:
             if not (force or requested or flat_now or carry):
                 return None
@@ -2336,6 +2561,8 @@ class OrbExecutionController:
                     self._event({"kind": "unprotected_position", "symbol": sym,
                                  "reason": f"escalated own exit FAILED ({er.get('reason')})"})
                 res = er
+        if not okf:
+            self._maybe_rearm(key, now)
         self._event({"kind": "flatten" if okf else "flatten_fail", "symbol": sym, "why": why, "r": round(r, 2),
                      "exit": px, "reason": res.get("reason")})
         if okf:
@@ -2345,6 +2572,57 @@ class OrbExecutionController:
                     live.pop("exit_since", None)
             self._close_position(key, why)
         return {"symbol": sym, "why": why, "flat": okf, "reason": res.get("reason")}
+
+    def _maybe_rearm(self, key: str, now: datetime) -> None:
+        """A latched exit that could not close within REARM_AFTER_S: re-place a protective stop at the
+        original stop price for exactly what the account still holds of ORB's own, so the shares are never
+        left naked. Only when nothing of ORB's is live on the symbol (no exit whose outcome is unknown)."""
+        with self._lock:
+            pos = dict(self.state["positions"].get(key) or {})
+        sym = pos.get("symbol")
+        since = pos.get("exit_latched_at")
+        if not sym or not pos.get("exit_latched") or since is None:
+            return
+        if now.timestamp() - float(since) < REARM_AFTER_S or self._live(sym):
+            return
+        own = self.own_qty(sym)
+        stop = _f(pos.get("initial_stop")) or _f(pos.get("stop"))
+        if own == 0 or not stop:
+            return
+        with self._sym_lock(sym):
+            try:
+                net = int(self._call("exit", self.broker.position_qty, sym))
+            except Exception:
+                return
+            qty = min(abs(own), max(net, 0) if own > 0 else max(-net, 0))
+            if qty <= 0:
+                return
+            side = "sell" if own > 0 else "buy"
+            day = self.state.get("day") or self._day(now)
+            coid = f"{self.cfg['coid_prefix']}-S-{sym}-{day}-{self._next('exit_seq', sym + '|' + day)}-{secrets.token_hex(3)}"
+            k = self._record_submit(coid, sym, side, qty, "leg", key)
+            with self._lock:
+                self.state["orders"][k]["leg_kind"] = "sl"
+            try:
+                self._persist()
+                body = self._write("exit", self.broker.submit_stop_order, sym, side, qty, round(stop, 2), coid)
+                self._merge(dict(body, client_order_id=body.get("client_order_id") or coid))
+            except Exception as exc:
+                with self._lock:
+                    rec = self.state["orders"].get(k)
+                    if rec is not None and not rec.get("id"):
+                        rec.update(status="not_sent", terminal=True, submit_state="answered")
+                self._persist_quiet()
+                self._alarm(f"rearm_failed_{sym}", {"symbol": sym, "error": str(exc)[:200]})
+                return
+            with self._lock:
+                live = self.state["positions"].get(key)
+                if live is not None:
+                    live["rearmed_stop"] = coid
+                    live["exit_latched_at"] = now.timestamp()      # next close attempt, next re-arm window
+            self._event({"kind": "protective_stop_rearmed", "symbol": sym, "qty": qty, "stop": round(stop, 2),
+                         "note": "the close could not be sent; a stop protects the shares meanwhile"})
+            self._persist_quiet()
 
     # ------------------------------------------------------------------ startup
     def reconcile_on_startup(self, now: Optional[datetime] = None) -> dict:
@@ -2411,6 +2689,8 @@ class OrbExecutionController:
                                                or m not in markers]
         if resolving is not None:
             report["errors"].append("an operator is resolving an unknown write; no new ORB entries until it is saved")
+        if self._state_problem:
+            report["errors"].append(self._state_problem)
         if left:
             report["errors"].append(f"{len(left)} write(s) sent just before the last shutdown have no answer "
                                     "from Alpaca yet; no new ORB entries until they are found or resolved")
