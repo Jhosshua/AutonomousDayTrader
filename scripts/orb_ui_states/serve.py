@@ -78,7 +78,8 @@ def board(*syms, board_id=None):
 
 
 def decision(*picks, verdict="trade", reason=None):
-    return {"verdict": verdict, "reason": reason, "picks": list(picks), "regime": {"action": "TRADE"},
+    return {"verdict": verdict, "reason": reason, "picks": list(picks),
+            "regime": {"action": "TRADE_NORMAL", "classification": "CALM_TREND", "short_frac": 0.4},
             "audit": [{"symbol": p["symbol"], "direction": p["direction"], "tier": p.get("tier"), "chosen": True}
                       for p in picks]}
 
@@ -112,9 +113,49 @@ def mark(h, sym, price):
     r.orb.mark_positions(h.clock.now, force_eval=True)
 
 
+_REAL_FILTER = r.adaptation_engine.market_filter
+
+
+class _DevFilter:
+    """DEV ONLY stand-in for SPY/QQQ bars: says the market is rising and permits the trade."""
+    def get_current_trend(self, asof=None):
+        from backend.app.core.market_filter import MarketTrend
+        return MarketTrend.BULLISH, "OK"
+
+    def is_signal_permitted(self, **_kw):
+        return True, "APPROVED: aligned with the market"
+
+
+def inject_adaptive_holding(h, sym="NVDA", entry=184.0, raw_stop=179.4):
+    """An adaptive (Big News) holding whose entry_context is built by the REAL main._build_entry_context
+    while the engine is nervous. Position and bracket are put straight into the book (no order path)."""
+    from types import SimpleNamespace
+    from backend.app.core.account import Position, PositionSide
+    from backend.app.models.events import OrderSide, OrderType
+    from backend.app.strategies.base import SignalEvent
+    eng = r.adaptation_engine
+    eng.market_filter = _DevFilter()
+    eng.on_vix_print(SimpleNamespace(value=27.0, received_at=h.clock.now))
+    sig = SignalEvent(symbol=sym, side=OrderSide.BUY, order_type=OrderType.MARKET, entry_price=entry, stop_loss=raw_stop,
+                      take_profit_1=entry + 2, take_profit_2=entry + 4, strategy_id="news_momentum", confidence=0.9,
+                      reason="DEV", timestamp=h.clock.now)
+    sig.features = {}
+    stop = eng.calculate_adapted_stop(sig)
+    qty = eng.calculate_adapted_size(r.account.equity, entry, stop)
+    ctx = r._build_entry_context(sig, {"admission_qty": qty}, qty, stop)
+    r.account.positions[sym] = Position(symbol=sym, side=PositionSide.LONG, shares=qty, avg_entry_price=entry,
+                                        market_price=entry + 1.1, strategy_id="news_momentum")
+    b = r.bracket_manager.create_bracket(f"brk_dev_{sym}", sym, "LONG", qty, entry, stop, strategy_id="news_momentum",
+                                         timestamp=h.clock.now)
+    b.entry_context = ctx
+
+
 def build_state(name: str):
     r.relay_statuses.clear()
     r.alpaca_broker, r.engine.broker = None, None
+    r.adaptation_engine.market_filter = _REAL_FILTER      # a state never inherits the previous state's injections
+    from types import SimpleNamespace as _NS
+    r.adaptation_engine.on_vix_print(_NS(value=20.0, received_at=__import__('datetime').datetime.now()))   # back to NORMAL
     if name == "waiting":
         h = session()
         run(h, at(9, 10), at(9, 20))
@@ -131,6 +172,16 @@ def build_state(name: str):
         mark(h, "APP", 101.1)
         run(h, at(9, 38, 45), at(9, 52), step=5.0)
         mark(h, "APP", 101.1)
+    elif name == "live_trade_adaptive":
+        # the ORB live trade plus an adaptive holding: both must reach the websocket with their context
+        h = session()
+        h.facade.scan_results = [board("APP", "PLTR"), board("APP", "PLTR", board_id="final")]
+        h.facade.decide_results = [decision(pick("APP", "long", 100.0, 98.0))]
+        run(h, at(9, 10), at(9, 38, 40), step=5.0)
+        mark(h, "APP", 101.1)
+        run(h, at(9, 38, 45), at(9, 52), step=5.0)
+        mark(h, "APP", 101.1)
+        inject_adaptive_holding(h)
     elif name == "sat_out":
         h = session()
         h.facade.scan_results = [board("APP"), board("APP", board_id="final")]

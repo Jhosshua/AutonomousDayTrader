@@ -535,6 +535,8 @@ export interface MoodInputs {
 
 export interface MoodHeadline {
   tone: "grey" | "level";
+  /** Show the three tiles (market open and data seen). Closed and waiting states are the headline alone. */
+  tiles: boolean;
   text: string;
   /** Second line, only when the robot is trading by the mood. */
   note: string | null;
@@ -546,18 +548,19 @@ export function moodHeadline(ctx: MoodInputs, tradingDay: boolean | undefined): 
   if (tradingDay === false || status === "CLOSED") {
     return {
       tone: "grey",
+      tiles: false,
       text: "Market closed. When it opens, the robot will size and place new trades for the market's mood.",
       note: null,
     };
   }
   const trend = ctx.market_trend ? ctx.market_trend.toUpperCase() : null;
-  if (ctx.vix == null && trend == null) return { tone: "grey", text: "Waiting for market data.", note: null };
+  if (ctx.vix == null && trend == null) return { tone: "grey", tiles: false, text: "Waiting for market data.", note: null };
   const on = ctx.adaptive_strategies ?? null;
   const ownChecks = "ORB and the Tesla/Coeur plans use their own checks.";
   if (trend === "UNKNOWN") {
     const names = on ? strategyNames(on) : [];
     const who = on ? (names.length === 0 ? "No mood-sized playbook is switched on. " : `${joinNames(names)} ${names.length === 1 ? "is" : "are"} waiting until the robot can see SPY and QQQ again. `) : "The mood-sized playbooks are waiting until the robot can see SPY and QQQ again. ";
-    return { tone: "grey", text: `${who}${ownChecks}`, note: null };
+    return { tone: "grey", tiles: true, text: `${who}${ownChecks}`, note: null };
   }
   const level = levelWord(ctx.vix_regime);
   const direction = trend ? TREND_WORD[trend] ?? "unclear" : null;
@@ -579,7 +582,7 @@ export function moodHeadline(ctx: MoodInputs, tradingDay: boolean | undefined): 
     }
     if (ctx.time_multiplier != null && ctx.time_multiplier < 1) body += " Midday halves that.";
   }
-  return { tone: "level", text: `${opening} ${body}`, note: "ORB and the Tesla/Coeur plans do not change with the mood." };
+  return { tone: "level", tiles: true, text: `${opening} ${body}`, note: "ORB and the Tesla/Coeur plans do not change with the mood." };
 }
 
 /** What the market direction means for new trades (live rules of the three mood-sized playbooks). */

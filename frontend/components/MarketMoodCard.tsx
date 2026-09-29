@@ -57,7 +57,7 @@ export default function MarketMoodCard({ context, tradingDay }: MarketMoodCardPr
   const midday = context.midday ? `${hmLabel(context.midday.start)} to ${hmLabel(context.midday.end)}` : null;
   const sizing = context.sizing_multiplier ?? null;
   const stale = context.vix_stale === true;
-  const known = head.tone === "level";
+  const known = head.tiles;
   const tiers = context.vix_tiers && context.vix_tiers.length > 0 ? context.vix_tiers : null;
 
   return (
@@ -77,7 +77,7 @@ export default function MarketMoodCard({ context, tradingDay }: MarketMoodCardPr
         </div>
       </div>
 
-      {head.tone === "level" && (
+      {head.tiles && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" data-testid="mood-tiles">
           <Tile label="Fear gauge" testid="mood-tile-fear">
             <div className="flex flex-wrap items-center gap-2">

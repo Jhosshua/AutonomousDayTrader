@@ -1,0 +1,404 @@
+{
+ "account": {
+  "buying_power": 200000.0,
+  "cash": 50000.0,
+  "daily_drawdown": 0.0,
+  "daily_drawdown_pct": 0.0,
+  "daily_pnl": 0.0,
+  "daily_pnl_pct": 0.0,
+  "daily_starting_equity": 50000.0,
+  "equity": 50000.0,
+  "is_circuit_broken": false,
+  "risk_level": "NORMAL",
+  "status": "ACTIVE"
+ },
+ "all_positions": [],
+ "ingestion": {
+  "news": "connected",
+  "stock": "connected",
+  "vix": "connected"
+ },
+ "ledger_revision": 1,
+ "market_context": {
+  "adaptive_strategies": [
+   "vwap_pullback",
+   "news_momentum",
+   "mean_reversion"
+  ],
+  "base_risk_pct": 1.0,
+  "market_status": "OPEN",
+  "market_trend": null,
+  "market_trend_reason": null,
+  "max_concurrent_positions": 3,
+  "midday": {
+   "end": "14:00",
+   "start": "11:30"
+  },
+  "notional_cap_pct": 25.0,
+  "sizing_multiplier": 1.0,
+  "stop_multiplier": 1.0,
+  "time_multiplier": 1.0,
+  "time_phase": "TREND_CONTINUATION",
+  "vix": null,
+  "vix_age_seconds": null,
+  "vix_regime": "NORMAL",
+  "vix_stale": null,
+  "vix_tiers": [
+   {
+    "lower": null,
+    "name": "LOW",
+    "sizing": 1.2,
+    "stop": 0.85,
+    "upper": 15.0
+   },
+   {
+    "lower": 15.0,
+    "name": "NORMAL",
+    "sizing": 1.0,
+    "stop": 1.0,
+    "upper": 25.0
+   },
+   {
+    "lower": 25.0,
+    "name": "ELEVATED",
+    "sizing": 0.7,
+    "stop": 1.4,
+    "upper": 35.0
+   },
+   {
+    "lower": 35.0,
+    "name": "CRISIS",
+    "sizing": 0.35,
+    "stop": 2.0,
+    "upper": null
+   }
+  ]
+ },
+ "persistence": {
+  "last_checkpoint_at": "2026-09-24T17:09:00Z",
+  "restored_at": "2026-09-24T15:36:00Z",
+  "status": "durable"
+ },
+ "positions_count": 0,
+ "primary_position": null,
+ "recent_activity": [],
+ "recent_news": [],
+ "strategies": [
+  {
+   "daily_pnl": 0.0,
+   "decisions": {
+    "blocked_by_reason": {},
+    "blocked_today": 0,
+    "orders_today": 1,
+    "signals_today": 1,
+    "top_block_reason": null,
+    "top_block_text": null
+   },
+   "id": "orb",
+   "name": "Opening Range Breakout",
+   "sharpe": 0.0,
+   "status": "ACTIVE",
+   "trades_count": 0,
+   "win_rate": 0.0,
+   "window": {
+    "blockers": [],
+    "can_open_now": false,
+    "evaluated_at": "2026-09-24T13:10:57-04:00",
+    "headline": "Done for today",
+    "hours": "09:30 - 11:30",
+    "in_hours": false,
+    "limits": [],
+    "market_text": "Market is rising: buys only.",
+    "next_change_at": null,
+    "notes": [],
+    "ranges": [
+     [
+      "09:30",
+      "11:30"
+     ]
+    ],
+    "schedule_text": "Done for today",
+    "state": "DONE_FOR_DAY",
+    "trading_day": true
+   }
+  },
+  {
+   "daily_pnl": 0.0,
+   "decisions": {
+    "blocked_by_reason": {},
+    "blocked_today": 17,
+    "orders_today": 0,
+    "signals_today": 17,
+    "top_block_reason": "MARKET_FILTER",
+    "top_block_text": "Blocked by the market-direction check"
+   },
+   "id": "vwap_pullback",
+   "name": "VWAP Trend Pullback & Continuation",
+   "sharpe": 0.0,
+   "status": "ACTIVE",
+   "trades_count": 0,
+   "win_rate": 0.0,
+   "window": {
+    "blockers": [],
+    "can_open_now": false,
+    "evaluated_at": "2026-09-24T13:10:57-04:00",
+    "headline": "Opens 2:00 PM",
+    "hours": "09:30 - 11:30, 14:00 - 15:45",
+    "in_hours": false,
+    "limits": [],
+    "market_text": "Market is rising: buys only.",
+    "next_change_at": null,
+    "notes": [],
+    "ranges": [
+     [
+      "09:30",
+      "11:30"
+     ],
+     [
+      "14:00",
+      "15:45"
+     ]
+    ],
+    "schedule_text": "Opens 2:00 PM",
+    "state": "WAITING",
+    "trading_day": true
+   }
+  },
+  {
+   "daily_pnl": 0.0,
+   "decisions": {
+    "blocked_by_reason": {},
+    "blocked_today": 0,
+    "orders_today": 0,
+    "signals_today": 0,
+    "top_block_reason": null,
+    "top_block_text": null
+   },
+   "id": "news_momentum",
+   "name": "Catalyst News Momentum Breakout",
+   "sharpe": 0.0,
+   "status": "ACTIVE",
+   "trades_count": 0,
+   "win_rate": 0.0,
+   "window": {
+    "blockers": [],
+    "can_open_now": true,
+    "evaluated_at": "2026-09-24T13:10:57-04:00",
+    "headline": "Can open trades now",
+    "hours": "09:30 - 15:45",
+    "in_hours": true,
+    "limits": [],
+    "market_text": "Market is rising: buys only.",
+    "next_change_at": null,
+    "notes": [],
+    "ranges": [
+     [
+      "09:30",
+      "15:45"
+     ]
+    ],
+    "schedule_text": "Can open trades now",
+    "state": "CAN_TRADE",
+    "trading_day": true
+   }
+  },
+  {
+   "daily_pnl": 0.0,
+   "decisions": {
+    "blocked_by_reason": {},
+    "blocked_today": 9,
+    "orders_today": 0,
+    "signals_today": 9,
+    "top_block_reason": "MARKET_FILTER",
+    "top_block_text": "Blocked by the market-direction check"
+   },
+   "id": "mean_reversion",
+   "name": "Statistical Mean Reversion / Exhaustion Fades",
+   "sharpe": 0.0,
+   "status": "ACTIVE",
+   "trades_count": 0,
+   "win_rate": 0.0,
+   "window": {
+    "blockers": [],
+    "can_open_now": true,
+    "evaluated_at": "2026-09-24T13:10:57-04:00",
+    "headline": "Can trade, with limits",
+    "hours": "10:00 - 15:45",
+    "in_hours": true,
+    "limits": [],
+    "market_text": "Market is rising: buys only.",
+    "next_change_at": null,
+    "notes": [],
+    "ranges": [
+     [
+      "10:00",
+      "15:45"
+     ]
+    ],
+    "schedule_text": "Can trade, with limits",
+    "state": "LIMITED",
+    "trading_day": true
+   }
+  }
+ ],
+ "swing": {
+  "active_slots_used": 0,
+  "allocated_capital": 50000.0,
+  "available_slots": 2,
+  "candidates": [
+   {
+    "above_200_sma": true,
+    "atr_14": 12.4,
+    "close": 307.28,
+    "daily_atr_14": 12.4,
+    "date": "2026-09-23",
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-21",
+    "is_held": false,
+    "is_staged": false,
+    "next_earnings_date": "2026-10-21",
+    "panic_trigger": false,
+    "price": 307.28,
+    "qualified": false,
+    "rejection_reasons": [],
+    "relative_strength_ok": false,
+    "rs_60d_qqq": 2.5,
+    "rs_60d_stock": -8.2,
+    "rs_pass": false,
+    "rs_qqq_60d": 2.5,
+    "rs_stock_60d": -8.2,
+    "rsi_2": 65.0,
+    "rsi_pass": false,
+    "sma_200": 276.55199999999996,
+    "sma_200_pass": true,
+    "status": "WATCHING",
+    "symbol": "LRCX"
+   },
+   {
+    "above_200_sma": true,
+    "atr_14": 12.4,
+    "close": 187.86,
+    "daily_atr_14": 12.4,
+    "date": "2026-09-23",
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-29",
+    "is_held": false,
+    "is_staged": false,
+    "next_earnings_date": "2026-10-29",
+    "panic_trigger": false,
+    "price": 187.86,
+    "qualified": false,
+    "rejection_reasons": [],
+    "relative_strength_ok": false,
+    "rs_60d_qqq": 2.5,
+    "rs_60d_stock": -8.2,
+    "rs_pass": false,
+    "rs_qqq_60d": 2.5,
+    "rs_stock_60d": -8.2,
+    "rsi_2": 65.0,
+    "rsi_pass": false,
+    "sma_200": 169.074,
+    "sma_200_pass": true,
+    "status": "WATCHING",
+    "symbol": "KLAC"
+   },
+   {
+    "above_200_sma": true,
+    "atr_14": 12.4,
+    "close": 1071.88,
+    "daily_atr_14": 12.4,
+    "date": "2026-09-23",
+    "earnings_blackout": false,
+    "earnings_date": "2026-09-30",
+    "is_held": false,
+    "is_staged": false,
+    "next_earnings_date": "2026-09-30",
+    "panic_trigger": false,
+    "price": 1071.88,
+    "qualified": false,
+    "rejection_reasons": [],
+    "relative_strength_ok": false,
+    "rs_60d_qqq": 2.5,
+    "rs_60d_stock": -8.2,
+    "rs_pass": false,
+    "rs_qqq_60d": 2.5,
+    "rs_stock_60d": -8.2,
+    "rsi_2": 65.0,
+    "rsi_pass": false,
+    "sma_200": 964.6920000000001,
+    "sma_200_pass": true,
+    "status": "WATCHING",
+    "symbol": "MU"
+   },
+   {
+    "above_200_sma": true,
+    "atr_14": 12.4,
+    "close": 614.61,
+    "daily_atr_14": 12.4,
+    "date": "2026-09-23",
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-27",
+    "is_held": false,
+    "is_staged": false,
+    "next_earnings_date": "2026-10-27",
+    "panic_trigger": false,
+    "price": 614.61,
+    "qualified": false,
+    "rejection_reasons": [],
+    "relative_strength_ok": true,
+    "rs_60d_qqq": 2.5,
+    "rs_60d_stock": 12.5,
+    "rs_pass": true,
+    "rs_qqq_60d": 2.5,
+    "rs_stock_60d": 12.5,
+    "rsi_2": 65.0,
+    "rsi_pass": false,
+    "sma_200": 553.149,
+    "sma_200_pass": true,
+    "status": "WATCHING",
+    "symbol": "AMD"
+   },
+   {
+    "above_200_sma": false,
+    "atr_14": 12.4,
+    "close": 936.36,
+    "daily_atr_14": 12.4,
+    "date": "2026-09-23",
+    "earnings_blackout": false,
+    "earnings_date": "2026-10-13",
+    "is_held": false,
+    "is_staged": false,
+    "next_earnings_date": "2026-10-13",
+    "panic_trigger": false,
+    "price": 936.36,
+    "qualified": false,
+    "rejection_reasons": [],
+    "relative_strength_ok": false,
+    "rs_60d_qqq": 2.5,
+    "rs_60d_stock": -8.2,
+    "rs_pass": false,
+    "rs_qqq_60d": 2.5,
+    "rs_stock_60d": -8.2,
+    "rsi_2": 65.0,
+    "rsi_pass": false,
+    "sma_200": 842.724,
+    "sma_200_pass": false,
+    "status": "WATCHING",
+    "symbol": "GS"
+   }
+  ],
+  "flattening_exempt": true,
+  "last_close_data_note": null,
+  "last_close_entries_withheld": false,
+  "last_scan_time": "2026-09-23T16:00:00-04:00",
+  "max_slots": 2,
+  "positions": [],
+  "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
+  "slot_notional": 25000.0,
+  "status": "STANDBY",
+  "strategy_name": "2-Day Panic Dip (Connors RSI-2)"
+ },
+ "timestamp": "2026-09-29T15:20:00Z",
+ "type": "STATE_UPDATE",
+ "working_orders_count": 0
+}
