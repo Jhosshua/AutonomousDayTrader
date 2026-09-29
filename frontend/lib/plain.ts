@@ -582,7 +582,7 @@ export function moodHeadline(ctx: MoodInputs, tradingDay: boolean | undefined): 
     }
     if (ctx.time_multiplier != null && ctx.time_multiplier < 1) body += " Midday halves that.";
   }
-  return { tone: "level", tiles: true, text: `${opening} ${body}`, note: "ORB and the Tesla/Coeur plans do not change with the mood." };
+  return { tone: "level", tiles: true, text: `${opening} ${body}`, note: "ORB uses its own 9:38 market check instead. The Tesla/Coeur plans do not change with the mood." };
 }
 
 /** What the market direction means for new trades (live rules of the three mood-sized playbooks). */

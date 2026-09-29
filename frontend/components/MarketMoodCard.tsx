@@ -115,7 +115,7 @@ export default function MarketMoodCard({ context, tradingDay }: MarketMoodCardPr
       )}
 
       <details className="group" data-testid="mood-details">
-        <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold text-ink">How the robot adapts</summary>
+        <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold text-ink">See the rules</summary>
         <div className="flex flex-col gap-2 pb-1 text-sm text-ink">
           {tiers && (
             <table className="w-full border-separate border-spacing-y-1 text-left" data-testid="mood-tier-table">

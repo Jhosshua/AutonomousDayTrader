@@ -248,12 +248,12 @@ function HoldingRow({
             type="button"
             onClick={breakEvenButton.trigger}
             disabled={!breakEvenEnabled || breakEvenButton.phase === "sending"}
-            title={position.fixed_protection ? "This plan keeps its safety exit fixed" : "Before fees"}
+            title={position.strategy_id === "orb" ? "ORB moves its own stop at Alpaca" : position.fixed_protection ? "This plan keeps its safety exit fixed" : "Before fees"}
             data-testid={`btn-break-even-${position.symbol}`}
             className="min-h-[44px] flex-1 min-w-[180px] rounded-xl border px-4 text-sm font-semibold disabled:opacity-40"
             style={{ borderColor: "#D5E2D6", color: "#2F5A45", background: "#EDF3EE" }}
           >
-            {position.fixed_protection ? "Safety exit stays fixed" : beLabel}
+            {position.strategy_id === "orb" ? "ORB moves its own stop" : position.fixed_protection ? "Safety exit stays fixed" : beLabel}
           </button>
         </div>
       </div>
