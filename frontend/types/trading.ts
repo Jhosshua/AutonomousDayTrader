@@ -101,7 +101,7 @@ export interface StrategyState {
     realized_pnl: number;
     unrealized_pnl: number;
     open_risk: number | null;
-    errors: { kind?: string; alarm?: string; err?: string; reason?: string; note?: string }[];
+    errors: { kind?: string; alarm?: string; err?: string; reason?: string; note?: string; symbol?: string }[];
     init_error: string | null;
     alerts?: string[];
     orphans?: { symbol: string; text: string }[];

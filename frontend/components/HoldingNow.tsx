@@ -52,7 +52,8 @@ function HoldingRow({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-base sm:text-lg font-semibold text-ink">
-            {companyName(position.symbol)} <span className="text-xs font-medium text-muted">{position.symbol}</span>
+            {companyName(position.symbol)}
+            {companyName(position.symbol) !== position.symbol.toUpperCase() && <> <span className="text-xs font-medium text-muted">{position.symbol}</span></>}
           </div>
           <div className="text-sm text-muted">{isLong ? "bet it goes up" : "bet it goes down"} &middot; {position.shares} shares &middot; entered at {formatMoney(entry)}</div>
         </div>
@@ -79,8 +80,9 @@ function HoldingRow({
       )}
       {position.fixed_protection && !position.tranches && (
         <div className="text-sm text-muted">
-          Fixed Tesla plan · Target: {position.take_profit_1 != null ? formatMoney(position.take_profit_1) : "Setting up"}
+          {position.strategy_id === "orb" ? "Opening Range Breakout" : "Fixed Tesla plan"} · Target: {position.take_profit_1 != null ? formatMoney(position.take_profit_1) : "Setting up"}
           {position.exit_due && <> · Close by {etTimeLabel(position.exit_due)} ET</>}
+          {position.strategy_id === "orb" && <> · Safety exit and target held at Alpaca</>}
         </div>
       )}
       <div className="flex flex-wrap gap-2">
