@@ -155,3 +155,67 @@ def test_a_process_that_cannot_start_is_reported_down(tmp_path):
     with pytest.raises(FacadeDown, match="could not start"):
         proxy.start()
     assert not proxy.healthy()
+
+
+def test_shutdown_during_a_stalled_start_is_bounded_and_leaves_no_child(tmp_path):
+    import os
+    import threading
+    import time
+    from backend.app.core.orb_facade_proc import FacadeProxy
+    from backend.app.strategies.orbs import config as ocfg
+    from backend.tests.unit.orbs._heavy_http import make_stall_at_start
+    proxy = FacadeProxy(str(tmp_path / "orbs"), "https://relay.invalid", "t", ocfg.load_manifest(),
+                        http_factory=make_stall_at_start)
+    out = {}
+
+    def start():
+        try:
+            proxy.start()
+        except Exception as exc:
+            out["exc"] = exc
+    t = threading.Thread(target=start)
+    t.start()
+    deadline = time.monotonic() + 10
+    while proxy._starting is None and time.monotonic() < deadline:
+        time.sleep(0.02)
+    child = proxy._starting[0]
+    time.sleep(1.0)                                   # the child is up but never becomes ready
+    t0 = time.monotonic()
+    proxy.close(timeout=1.0)
+    took = time.monotonic() - t0
+    t.join(5)
+    assert took < 4.0, took                           # not the 120 s readiness wait
+    assert not t.is_alive() and isinstance(out.get("exc"), FacadeDown)
+    assert not child.is_alive() and child.exitcode is not None
+    try:
+        os.kill(child.pid, 0)
+        alive = True
+    except OSError:
+        alive = False
+    assert not alive and not proxy.healthy()
+
+
+def test_a_scanner_restart_during_the_9_38_scan_says_so_plainly(main_runtime):
+    from backend.tests.unit.orb_integration.test_fake_session import board, run, session
+    r = main_runtime
+    h = session(r)
+
+    def down():
+        raise FacadeDown("the ORB decision process is down (the process exited)")
+    h.facade.scan_results = [board("APP"), down, down]
+    run(h, at(9, 10), at(9, 40), step=10)
+    card = next(c for c in r._strategy_cards(at(9, 45)) if c["id"] == "orb")
+    assert card["window"]["state"] == "NO_TRADE_TODAY"
+    assert card["window"]["market_text"] == "No trade today: ORB's scanner restarted during the 9:38 scan."
+
+
+def test_a_restart_after_the_scan_explains_the_undecided_board(main_runtime):
+    from backend.tests.unit.orb_integration.test_fake_session import board, run, session
+    r = main_runtime
+    h = session(r)
+    h.facade.scan_results = [board("APP"), board("APP", board_id="final")]
+    h.facade.decide_results = [{"verdict": "refused", "reason": "board is not the last successful primary scan",
+                                "picks": [], "audit": []}]
+    run(h, at(9, 10), at(9, 40), step=10)
+    step = next(c for c in r._strategy_cards(at(9, 41)) if c["id"] == "orb")["orb"]["step"]
+    assert step.startswith("ORB's scanner restarted after the scan, so that board was not decided")

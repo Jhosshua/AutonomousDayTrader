@@ -1006,6 +1006,9 @@ class OrbIntegration:
         final = st.get("final") or {}
         if final.get("state") == "failed":
             detail = str(final.get("detail") or "")
+            if "decision process" in detail:
+                # accepted (Codex on dea7192): like ORBStraddle when its scan fails, ORB sits out today
+                return "ORB's scanner restarted during the 9:38 scan"
             why = ("too few stocks answered" if "coverage" in detail or "covered only" in detail
                    else "relay error" if detail else "no answer")
             return f"the 9:38 scan failed ({why})"
@@ -1188,6 +1191,10 @@ class OrbIntegration:
         s = sched.status()
         c = ctl.status()
         holdings = c.get("holdings") or []
+        lv = s.get("last_verdict") or {}
+        if not holdings and lv.get("verdict") == "refused" and "not the last successful" in str(lv.get("reason")):
+            s = dict(s, step="ORB's scanner restarted after the scan, so that board was not decided (no trade from "
+                             "it). " + ("Watching for new breakouts." if (sched.state.get("final_ok")) else ""))
         if holdings:
             # while a trade is open the card talks about the trade, not the latest (sat-out) verdict
             s = dict(s, step=" ".join(self._trade_sentence(h) for h in holdings))

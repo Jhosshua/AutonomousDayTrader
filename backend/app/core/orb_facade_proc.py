@@ -123,29 +123,61 @@ class FacadeProxy:
         self.started_at: Optional[float] = None
         self.restarts = 0
         self._stopping = False
+        self._starting = None                  # (proc, conn) while a start waits for the child to be ready
 
     # ---- lifecycle
-    def start(self) -> None:
+    def start(self, timeout: float = START_TIMEOUT_S) -> None:
+        """Spawn the child and wait for it to be ready WITHOUT holding the lifecycle lock, so close() can
+        cancel a start that stalls (it kills and reaps the starting child)."""
         with self._lock:
             self._stop_locked(kill=True)
+            self._stopping = False
             parent, child = self._ctx.Pipe(duplex=True)
             proc = self._ctx.Process(target=_child_main, args=(child, *self._spec), name="orb-facade", daemon=True)
             proc.start()
             child.close()
-            if not parent.poll(START_TIMEOUT_S):
-                proc.kill()
-                raise FacadeDown("the ORB decision process did not start in time")
-            tag, ok, err = parent.recv()
-            if not ok:
-                proc.join(5)
+            self._starting = (proc, parent)
+        ready, err = False, "did not start in time"
+        deadline = _time.monotonic() + timeout
+        try:
+            while _time.monotonic() < deadline and not self._stopping:
+                if parent.poll(0.1):
+                    _tag, ready, err = parent.recv()
+                    break
+                if not proc.is_alive():
+                    err = f"exited during start (code {proc.exitcode})"
+                    break
+        except (EOFError, OSError) as exc:
+            ready, err = False, f"exited during start ({exc})"
+        with self._lock:
+            if self._starting is None or self._starting[0] is not proc:
+                raise FacadeDown("the ORB decision process start was cancelled")
+            self._starting = None
+            if self._stopping or not ready:
+                self._reap(proc, parent)
+                if self._stopping:
+                    raise FacadeDown("the ORB decision process start was cancelled")
                 raise FacadeDown(f"the ORB decision process could not start: {err}")
             self._proc, self._conn, self._up = proc, parent, True
-            self._stopping = False
             self.started_at = _time.monotonic()
             self._reader = threading.Thread(target=self._read_loop, args=(parent, proc), name="OrbFacadeReader",
                                             daemon=True)
             self._reader.start()
         log.info("ORB decision process started (pid %s)", proc.pid)
+
+    @staticmethod
+    def _reap(proc, conn, timeout: float = 2.0) -> None:
+        """Bounded kill + reap of a child (starting or stalled)."""
+        try:
+            if proc.is_alive():
+                proc.kill()
+            proc.join(timeout)
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     def restart(self) -> None:
         self.restarts += 1
@@ -158,8 +190,12 @@ class FacadeProxy:
         return self._proc.pid if self._proc is not None else None
 
     def close(self, timeout: float = 5.0) -> None:
+        """Bounded: a starting child is killed and reaped; a running one gets `timeout` to exit, then is killed."""
+        self._stopping = True                  # a start waiting for readiness sees this within 0.1 s
         with self._lock:
-            self._stopping = True
+            starting, self._starting = self._starting, None
+            if starting is not None:
+                self._reap(*starting)
             self._stop_locked(kill=False, timeout=timeout)
 
     def _stop_locked(self, kill: bool, timeout: float = 5.0) -> None:

@@ -39,3 +39,8 @@ class Stall:
 
 def make_stall():
     return Stall()
+
+
+def make_stall_at_start():
+    """The decision process never becomes ready (its construction hangs)."""
+    time.sleep(300)
