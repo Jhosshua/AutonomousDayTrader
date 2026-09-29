@@ -46,6 +46,7 @@ import math
 import secrets
 import threading
 import time as _time
+from contextlib import nullcontext
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -415,6 +416,7 @@ class OrbExecutionController:
         with self._lock:
             if not state:
                 self.state = self._empty_state()
+                self._state_problem = None
             else:
                 if state.get("version") != STATE_VERSION:
                     raise ValueError(f"unsupported ORB execution state version {state.get('version')!r}")
@@ -471,7 +473,9 @@ class OrbExecutionController:
         if bad:
             self.state.setdefault("invalid_rows", []).extend(
                 [{"bucket": b, "key": k, "row": r} for b, k, r in bad])
-            return f"{len(bad)} malformed ORB state row(s) set aside; a person must check them"
+        quarantined = self.state.get("invalid_rows") or []
+        if quarantined:
+            return f"{len(quarantined)} malformed ORB state row(s) set aside; a person must check them"
         return None
 
     def _persist(self) -> None:
@@ -540,7 +544,7 @@ class OrbExecutionController:
         t = now.time()
         if not (fr <= t < fl):
             return False, f"outside the execution window ({fr.strftime('%H:%M')}-{fl.strftime('%H:%M')} ET)"
-        if t > co:
+        if t >= co:
             return False, f"past the {co.strftime('%H:%M')} entry cutoff: no new entries permitted"
         return True, ""
 
@@ -1286,7 +1290,8 @@ class OrbExecutionController:
             return {"kind": name, "symbol": a[0] if a else None, "coid": a[3] if len(a) > 3 else kw.get("client_order_id")}
         return {"kind": name, "order_id": a[0] if a else kw.get("order_id")}
 
-    def _write(self, prio: str, fn: Callable, *a, _pretaken: bool = False, **kw):
+    def _write(self, prio: str, fn: Callable, *a, _pretaken: bool = False,
+               _before_post: Optional[Callable[[], Optional[str]]] = None, **kw):
         """A broker WRITE: pinned account verified first, then the budget token (unless already held).
         The call itself runs inside a write slot (see close_writes)."""
         entry = self.broker is not None and fn == getattr(self.broker, "submit_bracket", None)
@@ -1295,6 +1300,10 @@ class OrbExecutionController:
         self._verify_destination_for_write()
         if not _pretaken:
             self.budget.acquire(prio)
+        if _before_post is not None:
+            why = _before_post()
+            if why:
+                raise DestinationRefused(why)       # nothing sent, even if the preceding work took seconds
         slot = self._acquire_write_slot(entry, self._describe_write(fn, a, kw))
         try:
             return fn(*a, **kw)
@@ -1700,14 +1709,6 @@ class OrbExecutionController:
     def _late_checks(self, pl: dict, now: datetime) -> Optional[str]:
         """Right before the POST: re-read ADT's book and Alpaca's positions/open orders."""
         sym = pl["symbol"]
-        if self.entry_gate is not None:
-            try:
-                why = self.entry_gate(sym)
-            except Exception as exc:
-                why = f"the entry gate could not be read ({exc})"
-            if why:
-                self._event({"kind": "skip_entry_gate", "symbol": sym, "why": str(why)[:200]})
-                return f"ADT entry gate: {why}"
         stop = self._entry_stop_reason(pl)
         if stop:
             return stop
@@ -1733,6 +1734,12 @@ class OrbExecutionController:
             return f"ORB is {self.mode}: no new entries"
         if self._entries_closed:
             return f"{self._entries_closed}: no new entries"
+        now = self._now()
+        if self._day(now) != pl["day"]:
+            return "the planned entry is from a previous session: no new entries"
+        ok, why = self.session_ok(now)
+        if not ok:
+            return why
         ah = self._account_halt_reason()
         if ah:
             return f"{ah}: no new entries"
@@ -1745,8 +1752,19 @@ class OrbExecutionController:
         with self._lock:
             pos = self.state["positions"].get(pl["key"]) or {}
             st = pos.get("status")
+            exiting = self.state["exit_requests"].get(pl["symbol"])
+        if exiting:
+            return f"an exit was requested for this symbol ({exiting}): no new entry"
         if st != "PENDING_SUBMIT":
             return f"the planned position is no longer pending ({st})"
+        if self.entry_gate is not None:
+            try:
+                why = self.entry_gate(pl["symbol"])
+            except Exception as exc:
+                why = f"the entry gate could not be read ({exc})"
+            if why:
+                self._event({"kind": "skip_entry_gate", "symbol": pl["symbol"], "why": str(why)[:200]})
+                return f"ADT entry gate: {why}"
         return None
 
     def _late_macro(self, pl: dict) -> Tuple[bool, str]:
@@ -1791,7 +1809,8 @@ class OrbExecutionController:
         try:
             try:
                 res = self._write("normal", self.broker.submit_bracket, sym, pl["shares"], side,
-                                 pl["target"], pl["stop"], pl["coid"])
+                                 pl["target"], pl["stop"], pl["coid"],
+                                 _before_post=lambda: self._entry_stop_reason(pl))
             finally:
                 if after_post is not None:
                     after_post()              # the POST happened (or not): blockers may run now
@@ -1971,7 +1990,7 @@ class OrbExecutionController:
         return {"refreshed": ok, "failed": failed, "skipped_locked": skipped}
 
     # ------------------------------------------------------------------ exits
-    def request_exit(self, symbol: str, reason: str) -> bool:
+    def request_exit(self, symbol: str, reason: str, *, persist: bool = True) -> bool:
         """Ask the next tick to exit ORB's own position in symbol. False if ORB owns nothing there."""
         sym = symbol.upper()
         if not self.owns(sym):
@@ -1979,16 +1998,20 @@ class OrbExecutionController:
         with self._lock:
             self.state["exit_requests"].setdefault(sym, reason)
         self._event({"kind": "exit_requested", "symbol": sym, "reason": reason})
-        self._persist_quiet()
+        if persist:
+            self._persist_quiet()
         return True
 
-    def request_all_exits(self, reason: str, block_entries: bool = True) -> List[str]:
+    def request_all_exits(self, reason: str, block_entries: bool = True, *, wait_for_entry: bool = True,
+                          persist: bool = True) -> List[str]:
         """ADT breaker / flatten / manual / session paths: exit everything ORB owns at the next
         tick (own orders cancelled and confirmed first). block_entries: no new ORB entries for
-        the rest of the day (ORBStraddle's manual flatten_all rule)."""
-        with self._admission_lock:           # an entry mid-POST finishes first, then is exited too
-            syms = sorted({p["symbol"] for p in self._active_positions()} | set(self._own_open_symbols()))
+        the rest of the day (ORBStraddle's manual flatten_all rule). ADT's event loop uses
+        wait_for_entry=False: publish the stop/requests immediately, including every pending intent.
+        The supervisor's symbol lock waits for an in-flight POST before cancelling or closing it."""
+        with self._admission_lock if wait_for_entry else nullcontext():
             with self._lock:
+                syms = sorted({p["symbol"] for p in self._active_positions()} | set(self._own_open_symbols()))
                 for s in syms:
                     self.state["exit_requests"].setdefault(s, reason)
                 if block_entries:
@@ -1996,7 +2019,8 @@ class OrbExecutionController:
                                                      "reason": reason}
         self._event({"kind": "exit_all_requested", "reason": reason, "symbols": syms,
                      "entries_blocked": block_entries})
-        self._persist_quiet()
+        if persist:
+            self._persist_quiet()
         return syms
 
     def _own_open_symbols(self) -> List[str]:

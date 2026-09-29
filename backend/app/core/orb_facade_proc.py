@@ -113,6 +113,7 @@ class FacadeProxy:
         self._ctx = mp.get_context("spawn")
         self._lock = threading.Lock()
         self._send_lock = threading.Lock()
+        self._pending_lock = threading.Lock()
         self._pending: Dict[int, Future] = {}
         self._ids = itertools.count(1)
         self._proc = None
@@ -221,18 +222,22 @@ class FacadeProxy:
         self._proc, self._conn = None, None
         self._fail_pending(FacadeDown("the ORB decision process stopped"))
 
-    def _mark_down(self, why: str) -> None:
-        if self._up:
-            log.error("ORB decision process down: %s", why)
-        self._up = False
-        self.last_error = why
-        self._fail_pending(FacadeDown(f"the ORB decision process is down ({why})"))
+    def _mark_down(self, why: str, conn=None) -> None:
+        with self._lock:
+            if conn is not None and self._conn is not conn:
+                return                    # a late failure from an old child cannot stop its replacement
+            if self._up:
+                log.error("ORB decision process down: %s", why)
+            self._up = False
+            self.last_error = why
+            self._fail_pending(FacadeDown(f"the ORB decision process is down ({why})"))
 
     def _fail_pending(self, exc: Exception) -> None:
-        pending, self._pending = self._pending, {}
-        for fut in pending.values():
-            if not fut.done():
-                fut.set_exception(exc)
+        with self._pending_lock:
+            pending, self._pending = self._pending, {}
+            for fut in pending.values():
+                if not fut.done():
+                    fut.set_exception(exc)
 
     def _read_loop(self, conn, proc) -> None:
         while True:
@@ -240,41 +245,49 @@ class FacadeProxy:
                 rid, ok, payload = conn.recv()
             except (EOFError, OSError):
                 if self._conn is conn and not self._stopping:
-                    self._mark_down("the process exited" if not proc.is_alive() else "its pipe closed")
+                    self._mark_down("the process exited" if not proc.is_alive() else "its pipe closed", conn)
                 return
             except Exception as exc:  # a reply that could not be unpickled
                 log.error("ORB decision process reply unreadable: %s", exc)
                 continue
-            fut = self._pending.pop(rid, None)
-            if fut is None or fut.done():
-                continue
-            if ok:
-                fut.set_result(payload)
-            else:
-                name, msg, tb = payload
-                exc = _BUILTIN_ERRORS.get(name, RuntimeError)(f"{msg}" if name in _BUILTIN_ERRORS else f"{name}: {msg}")
-                fut.set_exception(exc)
+            with self._pending_lock:
+                fut = self._pending.pop(rid, None)
+                if fut is None or fut.done():
+                    continue
+                if ok:
+                    fut.set_result(payload)
+                else:
+                    name, msg, tb = payload
+                    exc = _BUILTIN_ERRORS.get(name, RuntimeError)(f"{msg}" if name in _BUILTIN_ERRORS else f"{name}: {msg}")
+                    fut.set_exception(exc)
 
     # ---- calls
     def _call(self, method: str, *args, **kwargs) -> Any:
-        if not self.healthy():
-            raise FacadeDown(f"the ORB decision process is not running ({self.last_error or 'not started'})")
-        rid = next(self._ids)
-        fut: Future = Future()
-        self._pending[rid] = fut
+        with self._lock:
+            if not self.healthy():
+                raise FacadeDown(f"the ORB decision process is not running ({self.last_error or 'not started'})")
+            conn = self._conn
+            rid = next(self._ids)
+            fut: Future = Future()
+            with self._pending_lock:
+                self._pending[rid] = fut
         try:
             with self._send_lock:
-                self._conn.send((rid, method, args, kwargs))
+                conn.send((rid, method, args, kwargs))
         except Exception as exc:
-            self._pending.pop(rid, None)
-            self._mark_down(f"send failed: {exc}")
+            with self._pending_lock:
+                self._pending.pop(rid, None)
+            self._mark_down(f"send failed: {exc}", conn)
             raise FacadeDown(f"the ORB decision process is down ({exc})") from exc
         timeout = self.timeouts.get(method, 60.0)
         try:
             return fut.result(timeout=timeout)
         except _FutTimeout:
-            self._pending.pop(rid, None)
-            raise FacadeTimeout(f"the ORB decision process did not answer {method} within {timeout:.0f} s")
+            with self._pending_lock:
+                self._pending.pop(rid, None)
+            why = f"did not answer {method} within {timeout:.0f} s"
+            self._mark_down(why, conn)
+            raise FacadeTimeout(f"the ORB decision process {why}")
 
     def ping(self) -> bool:
         try:

@@ -102,6 +102,12 @@ class OrbIntegration:
         self._sched_busy = False
         self._sched_error: Optional[str] = None
         self._sched_thread: Optional[threading.Thread] = None
+        self._ctl_cond = threading.Condition()
+        self._ctl_pending = False
+        self._ctl_busy = False
+        self._ctl_error: Optional[str] = None
+        self._ctl_thread: Optional[threading.Thread] = None
+        self._ctl_stopping = False
         self._writes_closed = False
         self.facade_proc = None                  # FacadeProxy (child process) when started by start()
         self._facade_restart: Optional[threading.Thread] = None
@@ -143,6 +149,8 @@ class OrbIntegration:
             raise ValueError(f"ORB_MODE must be one of {MODES}, not {mode!r}")
         self.shutdown(close_facade=facade is not self.facade_proc)
         self._writes_closed = False
+        self._ctl_stopping = False
+        self._ctl_error = None
         self._persist_enabled = persist
         manifest = manifest if manifest is not None else self.effective_manifest()
         ctl = OrbExecutionController(
@@ -246,6 +254,10 @@ class OrbIntegration:
             self.flush_scheduler_state(timeout=5.0)
         except Exception as exc:
             log.error("ORB scheduler state flush at shutdown failed: %s", exc)
+        try:
+            self.flush_controller_state(timeout=5.0)
+        except Exception as exc:
+            log.error("ORB controller state flush at shutdown failed: %s", exc)
         unfinished = [n for n, j in (sched._jobs.items() if sched is not None else []) if j.future in pending]
         if pending:
             log.error("ORB shutdown drain: %d job(s) did not finish in %.0f s; their broker writes are refused",
@@ -263,6 +275,16 @@ class OrbIntegration:
             self.facade_proc = None
         if self.controller is not None:
             self.controller.close_writes("ORB was stopped")
+        try:
+            self.flush_controller_state(timeout=5.0)
+        except Exception as exc:
+            log.error("ORB controller state flush at shutdown failed: %s", exc)
+        with self._ctl_cond:
+            self._ctl_stopping = True
+            self._ctl_cond.notify_all()
+            writer = self._ctl_thread
+        if writer is not None:
+            writer.join(timeout=2.0)
         if self.scheduler is not None:
             try:
                 self.scheduler.shutdown()
@@ -314,7 +336,50 @@ class OrbIntegration:
                     store.save_orb_state(section, state)       # durable before return; raises on failure
                 else:
                     self._mem_state[section] = copy.deepcopy(state)
+                if section == "controller":
+                    self._ctl_error = None
         return persist
+
+    def _queue_controller_state(self) -> None:
+        with self._ctl_cond:
+            self._ctl_pending = True
+            if self._ctl_thread is None or not self._ctl_thread.is_alive():
+                self._ctl_thread = threading.Thread(target=self._ctl_writer, name="OrbCtlStateWriter", daemon=True)
+                self._ctl_thread.start()
+            self._ctl_cond.notify_all()
+
+    def _ctl_writer(self) -> None:
+        while True:
+            with self._ctl_cond:
+                while not self._ctl_pending:
+                    if self._ctl_stopping or not self._ctl_cond.wait(timeout=30.0):
+                        self._ctl_thread = None
+                        return
+                self._ctl_pending = False
+                self._ctl_busy = True
+            try:
+                if self.controller is not None:
+                    self.controller._persist()     # re-snapshot under the section lock, durable on return
+                self._ctl_error = None
+            except Exception as exc:
+                self._ctl_error = f"{type(exc).__name__}: {exc}"
+                log.error("ORB controller command save failed: %s", exc)
+                self._err({"kind": "controller_state_save", "err": self._ctl_error})
+            finally:
+                with self._ctl_cond:
+                    self._ctl_busy = False
+                    self._ctl_cond.notify_all()
+
+    def flush_controller_state(self, timeout: float = 10.0) -> None:
+        deadline = _time.monotonic() + timeout
+        with self._ctl_cond:
+            while self._ctl_pending or self._ctl_busy:
+                left = deadline - _time.monotonic()
+                if left <= 0:
+                    raise RuntimeError("ORB controller command state was not saved in time")
+                self._ctl_cond.wait(timeout=left)
+        if self._ctl_error:
+            raise RuntimeError(f"ORB controller command state could not be saved: {self._ctl_error}")
 
     # ---- scheduler state writer (one background thread, latest snapshot wins)
     def _queue_scheduler_state(self, state: dict) -> None:
@@ -567,6 +632,12 @@ class OrbIntegration:
         """ADT's _broker_gate for ORB entries: regular hours only, no broker position mismatch, and a
         healthy durable ledger. Exits never pass through here."""
         r = self.r
+        strategy = r.strategy_map.get(ORB_ID)
+        status = getattr(strategy, "status", None)
+        if strategy is None or getattr(status, "value", status) != "ACTIVE":
+            return f"ORB_STRATEGY_INACTIVE: ORB is {getattr(status, 'value', status) or 'unavailable'}"
+        if self._ctl_error:
+            return "PERSISTENCE_RECOVERY_HALT: ORB's controller command state could not be saved"
         if r.simulation_mode:
             return "replay mode never sends real orders"
         down = self.facade_down()
@@ -1093,13 +1164,29 @@ class OrbIntegration:
                 r.research_safe(r.research_recorder.record, "signals", rec["row_id"], rec, recorder=r.research_recorder)
 
     # ------------------------------------------------------------------ exit dispatch (ADT paths)
+    def _persist_exit_request(self) -> None:
+        """Only exit-request saves may queue from the loop. Every controller pre-POST save remains
+        synchronous and durable, regardless of the caller's thread."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            on_loop = False
+        else:
+            on_loop = True
+        if on_loop and self.r.state_store is not None and not self.r.simulation_mode:
+            self._queue_controller_state()
+        elif self.controller is not None:
+            self.controller._persist_quiet()
+
     def request_exit(self, symbol: str, reason: str) -> bool:
         """An ADT path (manual flatten, news exit, ...) wants ORB's position in symbol closed. The
         controller cancels ORB's parent + legs first, then closes exactly ORB's quantity."""
         ctl = self.controller
         sym = symbol.upper()
         if ctl is not None and ctl.owns(sym):
-            ok = ctl.request_exit(sym, reason)
+            ok = ctl.request_exit(sym, reason, persist=False)
+            if ok:
+                self._persist_exit_request()
             if ok and self.scheduler is not None:
                 self.scheduler.kick_supervisor()
             return ok
@@ -1118,7 +1205,8 @@ class OrbIntegration:
         # idempotent: the breaker path runs on every quote while halted; persist only on a change
         if not (syms - pending) and not (block_entries and not ctl.entries_blocked()):
             return sorted(syms)
-        out = ctl.request_all_exits(reason, block_entries=block_entries)
+        out = ctl.request_all_exits(reason, block_entries=block_entries, wait_for_entry=False, persist=False)
+        self._persist_exit_request()
         if out and self.scheduler is not None:
             self.scheduler.kick_supervisor()
         return out

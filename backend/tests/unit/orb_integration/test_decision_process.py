@@ -157,6 +157,27 @@ def test_a_process_that_cannot_start_is_reported_down(tmp_path):
     assert not proxy.healthy()
 
 
+def test_a_timed_out_call_marks_the_child_down_so_it_can_be_restarted(tmp_path):
+    from backend.app.core.orb_facade_proc import FacadeProxy, FacadeTimeout
+    from backend.app.strategies.orbs import config as ocfg
+    from backend.tests.unit.orbs._heavy_http import make_stall
+    proxy = FacadeProxy(str(tmp_path / "orbs"), "https://relay.invalid", "t", ocfg.load_manifest(),
+                        http_factory=make_stall, timeouts={"prep": 0.1})
+    proxy.start()
+    child = proxy._proc
+    try:
+        with pytest.raises(FacadeTimeout):
+            proxy.prep(at(9, 20).date())
+        assert not proxy.healthy(), "a stuck worker still looks healthy, so ADT never restarts it"
+        with pytest.raises(FacadeDown):
+            proxy.effective_config()
+        proxy.restart()
+        assert not child.is_alive() and child.exitcode is not None
+        assert proxy.healthy() and proxy.ping()
+    finally:
+        proxy.close(timeout=0.1)
+
+
 def test_shutdown_during_a_stalled_start_is_bounded_and_leaves_no_child(tmp_path):
     import os
     import threading

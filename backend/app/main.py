@@ -1124,7 +1124,9 @@ def _session_summary(session_day: Any, source: str = "SYSTEM") -> Dict[str, Any]
         if trade.get("session_date") == session_date:
             trades_by_id[trade["trade_id"]] = trade
     session_fees = sum(float(trade.get("fees", 0.0)) for trade in trades_by_id.values())
-    return {
+    # Fixed-plan tranche records contain datetime objects. Immutable summaries go straight to
+    # SQLite's JSON writer, unlike recovery state, so normalize them before queuing the summary.
+    return _sanitize_for_json({
         "session_date": session_date,
         "opening_equity": round(account.daily_starting_equity, 2),
         "closing_equity": round(account.equity, 2),
@@ -1148,7 +1150,7 @@ def _session_summary(session_day: Any, source: str = "SYSTEM") -> Dict[str, Any]
         "tsla_or15_implementation_sha256": or15_implementation_hash,
         "source": source,
         "aggregate_only": source == "LEGACY_SUMMARY_IMPORT",
-    }
+    })
 
 
 def _record_completed_bracket(bracket_id: str) -> None:
