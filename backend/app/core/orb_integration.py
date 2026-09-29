@@ -824,6 +824,10 @@ class OrbIntegration:
         ctl = self.controller
         broker = ctl.broker
         prefix = str(ctl.cfg.get("coid_prefix") or "adt-orb") + "-"
+        # the flat reads prove nothing unless they come from ORB's pinned account (same check as writes)
+        why = ctl.account_refusal(broker.get_account_checked())
+        if why:
+            return False, f"The Alpaca account could not be verified, so nothing was changed: {why}"
         qty = int(broker.position_qty(sym))
         if qty != 0:
             return False, (f"Alpaca still holds {qty} {sym} shares. Close them at Alpaca first (after cancelling "
@@ -849,6 +853,11 @@ class OrbIntegration:
             return {"resolved": False, "reason": f"{sym} has no ORB position in ADT's book any more"}
         qty, side = pos.shares, pos.side.value
         px = float(pos.market_price or pos.avg_entry_price)
+        # undo data: the change is kept only if the checkpoint that records it is durable
+        acct_before = copy.deepcopy({k: v for k, v in vars(r.account).items()})
+        alert_before = self.alerts.get(sym)
+        orders_before = set(r.engine.orders)
+        n_decisions = len(r.decision_log.records)
         rec = {"symbol": sym, "side": "sell" if side == "LONG" else "buy", "qty": qty, "filled_qty": qty,
                "coid": f"operator-resolve-{sym}-{now.isoformat()}", "id": None, "role": "operator_resolve",
                "position": f"operator:{sym}"}
@@ -862,10 +871,26 @@ class OrbIntegration:
         self.ledger.setdefault("resolved", []).append(note)
         r.decision_log.record(ORB_ID, sym, "BUY" if side == "SHORT" else "SELL", px, "ORB_ORPHAN_RESOLVED",
                               f"operator resolved orphan: {qty} shares removed from ADT's book", now)
-        log.warning("ORB orphan %s resolved by the operator: %s", sym, note)
         self.alerts.pop(sym, None)
         self._orphans.discard(sym)
-        r._checkpoint_runtime("ORB_ORPHAN_RESOLVED")
+        if not r._checkpoint_runtime("ORB_ORPHAN_RESOLVED"):
+            # not durable: put everything back exactly as it was and say so
+            vars(r.account).clear()
+            vars(r.account).update(acct_before)
+            for oid in set(r.engine.orders) - orders_before:
+                r.engine.orders.pop(oid, None)
+                r.engine.working_orders.pop(oid, None)
+            del r.decision_log.records[n_decisions:]
+            per = r.decision_log.counts.get(ORB_ID, {})
+            if per.get("ORB_ORPHAN_RESOLVED"):
+                per["ORB_ORPHAN_RESOLVED"] -= 1
+            self.ledger["resolved"].remove(note)
+            if alert_before is not None:
+                self.alerts[sym] = alert_before
+            log.error("ORB orphan %s resolution NOT saved (checkpoint failed); nothing changed", sym)
+            return {"resolved": False, "reason": "The change could not be saved, so nothing was changed. "
+                                                 "Try again once saving works."}
+        log.warning("ORB orphan %s resolved by the operator: %s", sym, note)
         return {"resolved": True, **note}
 
     def _alert(self, sym: str, text: str) -> None:

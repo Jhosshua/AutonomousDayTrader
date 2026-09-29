@@ -1144,6 +1144,24 @@ class OrbExecutionController:
         with self._write_gate:
             return [dict(v) for v in self._inflight_writes.values()]
 
+    def resolve_unknown_write(self, ref: str, note: str) -> Optional[dict]:
+        """Operator: drop one unresolved-write marker (by client id or order id) after checking Alpaca by
+        hand. Returns the removed marker (audited in the events) or None if there is no such marker."""
+        with self._lock:
+            rows = list(self.state.get("unresolved_writes") or [])
+            hit = next((m for m in rows if ref in (m.get("coid"), m.get("order_id"))), None)
+            if hit is None:
+                return None
+            self.state["unresolved_writes"] = [m for m in rows if m is not hit]
+        try:
+            self._persist()
+        except Exception:
+            with self._lock:                  # not durable: the marker stays
+                self.state["unresolved_writes"] = rows
+            raise
+        self._event({"kind": "unresolved_write_resolved_by_operator", "write": hit, "note": note})
+        return hit
+
     def mark_unresolved_writes(self) -> List[dict]:
         """Shutdown with a write still in flight: record what it was (client id / order id) durably, so
         the next startup reconciliation resolves its outcome at Alpaca before any entry."""
@@ -2335,26 +2353,33 @@ class OrbExecutionController:
         with self._lock:
             markers = list(self.state.get("unresolved_writes") or [])
         report["unresolved_writes"] = markers
+        # A marker is cleared ONLY when Alpaca shows the order: "not found" proves nothing (a POST can
+        # still land late), so ORB stays unready for entries and the scheduler retries this every
+        # reconcile interval, until the order appears or an operator resolves the marker. Exits and
+        # supervision of known positions keep running meanwhile.
         left = []
         for m in markers:
+            found = False
             try:
                 if m.get("coid"):
                     got = self._call("exit", self.broker.get_order_by_client_id, m["coid"])
                     if isinstance(got, dict) and got.get("id"):
                         self._merge(dict(got, client_order_id=got.get("client_order_id") or m["coid"]))
+                        found = True
                 elif m.get("order_id"):
                     got = self._call("exit", self.broker.get_order, m["order_id"], True)
                     if isinstance(got, dict) and got.get("id"):
                         self._merge(got)
-            except BrokerHTTPError as exc:
-                if exc.status_code != 404:
-                    left.append(m)
+                        found = True
             except Exception:
-                left.append(m)
+                found = False
+            if not found:
+                left.append(dict(m, checks=int(m.get("checks") or 0) + 1, last_check=now.isoformat()))
         with self._lock:
             self.state["unresolved_writes"] = left
         if left:
-            report["errors"].append(f"{len(left)} write(s) from before the restart could not be resolved yet")
+            report["errors"].append(f"{len(left)} write(s) sent just before the last shutdown have no answer "
+                                    "from Alpaca yet; no new ORB entries until they are found or resolved")
         with self._lock:
             pending = [(k, dict(r)) for k, r in self.state["orders"].items() if not r["terminal"]]
             pending += [(k, dict(self.state["orders"][k])) for k in self._recheck_candidates()]

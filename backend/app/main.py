@@ -3269,8 +3269,52 @@ async def resolve_orb_orphan(req: OrbResolveRequest) -> Dict[str, Any]:
     if not ok:
         raise HTTPException(status_code=409, detail=detail)
     result = orb.apply_resolution(sym, datetime.now(timezone.utc))
+    if not result.get("resolved"):
+        raise HTTPException(status_code=503, detail=result.get("reason") or "not resolved")
     await broadcast_ui_state(force=True)
     return _sanitize_for_json(result)
+
+
+class OrbUnknownWriteRequest(BaseModel):
+    ref: str
+    note: str = ""
+
+
+@app.post("/api/orb/resolve-unknown-write")
+async def resolve_orb_unknown_write(req: OrbUnknownWriteRequest) -> Dict[str, Any]:
+    """Operator action: an order ORB sent right before a shutdown never showed up at Alpaca. After checking
+    Alpaca by hand, drop its marker so ORB can trade again. Refused while Alpaca (read now) shows it."""
+    ctl = orb.controller
+    if ctl is None or ctl.broker is None:
+        raise HTTPException(status_code=409, detail="ORB has no broker connection.")
+    ref = req.ref.strip()
+    marker = next((m for m in ctl.state.get("unresolved_writes") or [] if ref in (m.get("coid"), m.get("order_id"))), None)
+    if marker is None:
+        raise HTTPException(status_code=404, detail="No unresolved ORB write with that id.")
+
+    def still_unknown() -> Optional[str]:
+        why = ctl.account_refusal(ctl.broker.get_account_checked())
+        if why:
+            return f"The Alpaca account could not be verified: {why}"
+        got = (ctl.broker.get_order_by_client_id(marker["coid"]) if marker.get("coid")
+               else ctl.broker.get_order(marker["order_id"], True))
+        if isinstance(got, dict) and got.get("id"):
+            return "Alpaca shows this order now; ORB's next check will book it. Nothing to resolve."
+        return None
+    try:
+        why = await asyncio.to_thread(still_unknown)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Alpaca could not be read: {exc}") from exc
+    if why:
+        raise HTTPException(status_code=409, detail=why)
+    try:
+        hit = await asyncio.to_thread(ctl.resolve_unknown_write, ref, req.note or "operator checked Alpaca by hand")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"The change could not be saved: {exc}") from exc
+    decision_log.record(ORB_ID, str(marker.get("symbol") or "-"), "-", 0.0, "ORB_WRITE_RESOLVED",
+                        f"operator resolved unknown write {ref}", datetime.now(timezone.utc))
+    _checkpoint_runtime("ORB_WRITE_RESOLVED")
+    return _sanitize_for_json({"resolved": True, "write": hit})
 
 
 @app.get("/api/account")

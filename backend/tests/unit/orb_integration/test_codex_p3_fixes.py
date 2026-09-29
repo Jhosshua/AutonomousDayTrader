@@ -450,3 +450,94 @@ def test_the_card_offers_the_resolve_action_for_each_orphan(main_runtime):
     h = _orphan(r)
     card = next(c for c in r._strategy_cards(h.clock.now) if c["id"] == "orb")
     assert card["orb"]["orphans"] == [{"symbol": "APP", "text": r.orb.alerts["APP"]}]
+
+
+# ------------------------------------------------------------------ final check: markers, pin, durable resolve
+def _marker_after_restart(r, coid="adt-orb-X-APP-2026-09-28-1-9"):
+    h = MainOrb(r)
+    h.open_bracket()
+    with h.ctl._lock:
+        h.ctl.state["unresolved_writes"] = [{"kind": "submit_market_order", "symbol": "APP", "coid": coid}]
+    h.ctl._persist()
+    r.orb.build(h.broker, h.facade, "live", clock=h.clock, inline=True, monotonic=lambda: h.clock.now.timestamp(),
+                budget=RequestBudget(10 ** 6, 10 ** 6), sleep=h.clock.sleep, is_session=lambda d: True)
+    h.ctl, h.sched = r.orb.controller, r.orb.scheduler
+    return h
+
+
+def test_a_not_found_unresolved_write_keeps_its_marker_and_entries_off_until_it_appears(main_runtime):
+    r = main_runtime
+    h = _marker_after_restart(r)
+    rep = h.ctl.reconcile_on_startup()
+    assert not rep["ok"] and not h.ctl.ready
+    assert h.ctl.state["unresolved_writes"][0]["checks"] == 1           # kept, not dropped on a 404
+    h.alpaca.prices["PLTR"] = 50.1
+    assert "reconciliation" in h.ctl.execute([pick("PLTR", "long", 50.0, 49.0)], h.clock.now)["reason"]
+    # the scheduler keeps retrying while unready; the late POST finally shows up at Alpaca
+    h.broker.submit_market_order("ZZZ", "buy", 1, "adt-orb-X-APP-2026-09-28-1-9")
+    h.clock.advance(61)
+    h.sched.tick(h.clock.now)
+    assert h.ctl.ready and h.ctl.state["unresolved_writes"] == []
+
+
+def test_supervision_of_known_positions_runs_while_a_marker_is_unresolved(main_runtime):
+    r = main_runtime
+    h = _marker_after_restart(r)
+    h.ctl.reconcile_on_startup()
+    n = len(h.alpaca.requests)
+    h.clock.set(at(11, 0, 5))
+    h.run_supervisor(passes=3)
+    assert not h.ctl.ready and h.alpaca_positions() == {}
+    assert h.pos()["status"] == "CLOSED"
+
+
+def test_operator_can_resolve_an_unknown_write_only_while_alpaca_does_not_show_it(main_runtime):
+    from fastapi import HTTPException
+    r = main_runtime
+    h = _marker_after_restart(r)
+    h.ctl.reconcile_on_startup()
+    out = asyncio.run(r.resolve_orb_unknown_write(r.OrbUnknownWriteRequest(ref="adt-orb-X-APP-2026-09-28-1-9")))
+    assert out["resolved"] and h.ctl.state["unresolved_writes"] == []
+    assert any(d["outcome"] == "ORB_WRITE_RESOLVED" for d in r.decision_log.recent(10, "orb"))
+    assert h.ctl.reconcile_on_startup()["ok"]
+    # visible at Alpaca -> refused (ORB books it itself)
+    h2 = _marker_after_restart(r, coid="adt-orb-X-APP-2026-09-28-1-8")
+    h2.broker.submit_market_order("ZZZ", "buy", 1, "adt-orb-X-APP-2026-09-28-1-8")
+    with h2.ctl._lock:
+        h2.ctl.state["unresolved_writes"] = [{"kind": "submit_market_order", "coid": "adt-orb-X-APP-2026-09-28-1-8"}]
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(r.resolve_orb_unknown_write(r.OrbUnknownWriteRequest(ref="adt-orb-X-APP-2026-09-28-1-8")))
+    assert err.value.status_code == 409 and "Alpaca shows this order now" in err.value.detail
+
+
+def test_resolve_orphan_refuses_reads_from_another_account(main_runtime):
+    from fastapi import HTTPException
+    r = main_runtime
+    h = _orphan(r)
+    for o in h.alpaca.orders.values():
+        if o["status"] in ("new", "held", "accepted"):
+            o["status"] = "canceled"
+    h.alpaca._apply_position("APP", "sell", 454, 100.5)
+    h.alpaca.account["account_number"] = "PA-SOMEONE-ELSE"
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(r.resolve_orb_orphan(r.OrbResolveRequest(symbol="APP")))
+    assert err.value.status_code == 409 and "account could not be verified" in err.value.detail
+    assert r.account.positions["APP"].shares == 454 and "APP" in r.orb.alerts
+
+
+def test_resolve_orphan_changes_nothing_when_the_checkpoint_fails(main_runtime, monkeypatch):
+    from fastapi import HTTPException
+    r = main_runtime
+    h = _orphan(r)
+    for o in h.alpaca.orders.values():
+        if o["status"] in ("new", "held", "accepted"):
+            o["status"] = "canceled"
+    h.alpaca._apply_position("APP", "sell", 454, 100.5)
+    eq, cash, n_orders = r.account.equity, r.account.cash, len(r.engine.orders)
+    monkeypatch.setattr(r, "_checkpoint_runtime", lambda reason, *a, **k: False)
+    with pytest.raises(HTTPException) as err:
+        asyncio.run(r.resolve_orb_orphan(r.OrbResolveRequest(symbol="APP")))
+    assert err.value.status_code == 503 and "could not be saved" in err.value.detail
+    assert r.account.positions["APP"].shares == 454 and (r.account.equity, r.account.cash) == (eq, cash)
+    assert len(r.engine.orders) == n_orders and "APP" in r.orb.alerts and not r.orb.ledger["resolved"]
+    assert not any(d["outcome"] == "ORB_ORPHAN_RESOLVED" for d in r.decision_log.recent(10, "orb"))
