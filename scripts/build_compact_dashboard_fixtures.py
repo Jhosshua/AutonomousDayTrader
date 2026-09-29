@@ -15,6 +15,7 @@ Derived frames (written next to it):
   branches.json        the source with the rare branches the plan attack listed: an ORB open trade (R, break-even,
                        exit requested), Ride the Trend switched off with add-ons off and refused setups, an OR15
                        plan holding with protection not yet confirmed, an early-close note
+  branches_confirmed.json  branches.json with the OR15 plan's broker protection confirmed
 
     python3 scripts/build_compact_dashboard_fixtures.py
 """
@@ -96,7 +97,11 @@ def main() -> None:
                     "protection_confirmed": False, "version": "TSLA_OR15_RETEST_2R_BROKER_PAPER_V1", "incomplete": False}
     br["strategies"].append(or15)
     (OUT / "branches.json").write_text(json.dumps(br, indent=1))
-    print("wrote live.json, live_one.json, alarms.json, branches.json")
+
+    confirmed = copy.deepcopy(br)
+    strategy(confirmed, "tsla_or15_retest")["or15"]["protection_confirmed"] = True
+    (OUT / "branches_confirmed.json").write_text(json.dumps(confirmed, indent=1))
+    print("wrote live.json, live_one.json, alarms.json, branches.json, branches_confirmed.json")
 
 
 if __name__ == "__main__":

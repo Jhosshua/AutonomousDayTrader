@@ -443,3 +443,19 @@ right. Run the mutation check.
 **What worked instead:** a critique agent actually ran `calculate_position_size` on $50k at $100: stops of 0.5%, 1% and 2% give 125 shares in every VIX level, because the 25%-of-equity notional cap binds before the risk budget. The card now records `qty_if_neutral` and claims a size change only when the shares really differ.
 
 **Note for next time:** before any UI copy says a rule changed an outcome, compute the outcome with and without the rule on realistic inputs. A multiplier in the code is not a change in the result when a later min() caps it.
+
+## 2026-09-29: compacting the holding rows took four tries to reach the height cap
+
+**What did not work:** (1) buttons on the first line next to strategy, stock and P&L: they did not fit at 1440 px, wrapped to their own line, and the row stayed three lines tall. (2) a wider safety-exit tile (1.6fr): the other two tiles got narrower, wrapped more, and the page grew 18 px.
+
+**What worked instead:** measure every block's height in the browser first (holding rows 278 px each, mood 244, table 419), then fix the biggest: buttons in their own right-hand column on desktop (grid `minmax(0,1fr)_190px`, buttons `row-span-3`), the "Why this size?" and "See the rules" summaries absolutely positioned in the box corner on `lg` (a closed disclosure no longer takes a line), the "today" note on a second full-width line of each playbook row.
+
+**Note for next time:** measure block heights on the real fixtures before moving anything; the costly block is rarely the one that looks big in the screenshot. A flex-wrap row that "should" fit silently wraps, so check the rendered line count, not the intent.
+
+## 2026-09-29: polling `railway deployment list` every 15-20 s from two loops got the account rate-limited
+
+**What did not work:** a background until-loop and a Monitor both polled `railway deployment list` during a queued deploy; after about 15 minutes every CLI call answered "You are being ratelimited. Try again in about 36 minutes".
+
+**What worked instead:** stopped both loops; verified the deploy through the service itself (`/health`, and for the dashboard, the new markup in the served page).
+
+**Note for next time:** poll Railway at most once a minute and from one loop only, or skip the CLI and watch the service's own health/page for the change.

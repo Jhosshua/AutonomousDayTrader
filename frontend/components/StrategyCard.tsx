@@ -140,8 +140,8 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
   const orb = strategy.orb;
   const trendOff = strategy.id === "vwap_pullback" && strategy.mode === "off";
   const trendAddonsOff = strategy.id === "vwap_pullback" && !strategy.addons_enforced;
-  const or15Unconfirmed = strategy.or15?.phase === "HOLDING" && strategy.or15.mode !== "offline_raw_open" && !strategy.or15.protection_confirmed;
-  const hasStatus = !!orb?.step || (orb?.open_trades.length ?? 0) > 0 || trendOff || trendAddonsOff || or15Unconfirmed;
+  const or15Holding = strategy.or15?.phase === "HOLDING";
+  const hasStatus = !!orb?.step || (orb?.open_trades.length ?? 0) > 0 || trendOff || trendAddonsOff || or15Holding;
   const detailsId = `strategy-details-${strategy.id}`;
 
   return (
@@ -151,7 +151,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-controls={detailsId}
+        aria-controls={open ? detailsId : undefined}
         data-testid="strategy-row-toggle"
         className={`${ROW_GRID} min-h-[52px] w-full items-center gap-y-1 px-4 py-2 text-left transition-colors hover:bg-[#FBF8F2] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#4A5190]`}
       >
@@ -217,7 +217,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
         <div className={`${UNDER_ROW} flex flex-col gap-1.5 text-[13px] leading-snug text-[#3E3A57]`} data-testid="strategy-status">
           {trendOff && <div className="font-semibold">New entries switched off</div>}
           {trendAddonsOff && <div>Extra flow, spread and prior-volume checks switched off.</div>}
-          {or15Unconfirmed && <div>Confirming protection with the broker.</div>}
+          {or15Holding && <div>{strategy.or15?.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : strategy.or15?.protection_confirmed ? "Safety exit and target held at the broker." : "Confirming protection with the broker."}</div>}
           {orb?.step && <div>{orb.step}</div>}
           {orb?.open_trades.map((t) => (
             <div key={t.symbol} className="rounded-lg px-3 py-1.5" style={{ background: theme.tint, color: theme.ink }}>
@@ -324,7 +324,6 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
               <div className="rounded-xl px-3 py-2 text-sm leading-relaxed" style={{ background: theme.tint, color: theme.ink }} data-testid="or15-details">
                 <span className="font-semibold">1 share · {strategy.or15.mode === "offline_raw_open" ? "Offline replay" : "Paper account"}</span>
                 <div>Watches 9:45–11:30 AM ET</div>
-                {strategy.or15.phase === "HOLDING" && !or15Unconfirmed && <div>{strategy.or15.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : "Safety exit and target held at the broker."}</div>}
                 {showPro && strategy.or15.reason && <div className="break-words">{planStatusText(strategy.or15.reason)}</div>}
               </div>
             )}

@@ -13,12 +13,12 @@ an earlier frame), fonts are awaited before measuring.
 Checks
   1. Height: new page under a hard cap AND a set fraction of the old page on the same frame (plan section 8).
   2. Text parity: every visible DOM text node of the old page (all <details> opened) must be on the new page
-     (every playbook row and <details> opened), compared case-folded as a MULTISET PER REGION (holding row,
+     (every playbook row and <details> opened), compared with exact case as a MULTISET PER REGION (holding row,
      playbook, mood card, safety card, rest). A node counts only if it has a >= 2 px box inside every clipping
      ancestor and passes checkVisibility (so sr-only, truncated, clipped or collapsed text counts as missing).
      Pro words are checked too (desktop, live + branches).
   3. Alarms: with every row and <details> closed, each alarm and page banner is outside the playbook details
-     panel and is the element actually hit at its own centre.
+     panel and is the element actually hit at its centre and four inner points.
   4. Playbook rows: aria-expanded flips, the panel appears, Enter/Space toggle it, an open row stays open
      across pushed frames.
   5. No horizontal overflow; every visible button and summary >= 44 px; no console or page errors; the page
@@ -74,6 +74,7 @@ FRAMES: Dict[str, Tuple[Path, List[Dict[str, Any]]]] = {
     "busy": (MOOD_FIX / "busy.json", base.BUSY_TODAY_TRADES),
     "alarms": (COMPACT_FIX / "alarms.json", LIVE_TRADES),
     "branches": (COMPACT_FIX / "branches.json", LIVE_TRADES),
+    "branches_confirmed": (COMPACT_FIX / "branches_confirmed.json", LIVE_TRADES),
     "waiting": (MOOD_FIX / "waiting.json", []),
     "weekend": (MOOD_FIX / "weekend.json", []),
     "stale_vix": (MOOD_FIX / "stale_vix.json", []),
@@ -97,7 +98,7 @@ RATIO = {"desktop": 0.60, "phone": 0.75}
 SHARED_ONCE: Dict[str, str] = {
     "9:30": "one shared hours axis above the playbook rows replaces one axis per card",
     "noon": "one shared hours axis above the playbook rows replaces one axis per card",
-    "4 pm": "one shared hours axis above the playbook rows replaces one axis per card",
+    "4 PM": "one shared hours axis above the playbook rows replaces one axis per card",
 }
 # Old-page text allowed to be missing entirely, each with its reason (empty on purpose).
 ALLOWED_MISSING: Dict[str, str] = {}
@@ -173,7 +174,7 @@ JS_NODES = """() => {
   const root = document.querySelector('main') || document.body;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    const text = n.textContent.replace(/\\s+/g, ' ').trim().toLowerCase();
+    const text = n.textContent.replace(/\\s+/g, ' ').trim();  // DOM text, exact case (CSS text-transform does not apply)
     if (!text || /^[·|•,.:;()\\-–—]+$/.test(text)) continue;
     const el = n.parentElement;
     if (!el || !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) continue;
@@ -220,8 +221,10 @@ JS_HIT = """async (sel) => {
     await new Promise(r => setTimeout(r, 60));
     const r = e.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) { res.push('no box'); continue; }
-    const hit = document.elementFromPoint(r.left + Math.min(8, r.width / 2), r.top + Math.min(8, r.height / 2));
-    res.push(hit && (hit === e || e.contains(hit)) ? 'ok' : 'covered or hidden');
+    // centre plus four inner points: every one must land on the alarm itself
+    const pts = [[0.5, 0.5], [0.15, 0.25], [0.85, 0.25], [0.15, 0.75], [0.85, 0.75]];
+    const ok = pts.every(([fx, fy]) => { const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy); return hit && (hit === e || e.contains(hit)); });
+    res.push(ok ? 'ok' : 'covered or hidden');
   }
   window.scrollTo(0, 0);
   return res;
@@ -318,7 +321,7 @@ def frame_checks(browser, name: str, vp: str, report: List[str]) -> None:
     report.append(f"| {name} | {vp} | {old_h} | {new_h} | {round(100 * new_h / old_h)}% |")
     if (name, vp) in CAP:
         check(new_h <= CAP[(name, vp)], f"[{lab}] height {new_h} <= cap {CAP[(name, vp)]}")
-        check(new_h <= RATIO[vp] * old_h, f"[{lab}] height {new_h} <= {int(RATIO[vp] * 100)}% of old {old_h}")
+    check(new_h <= RATIO[vp] * old_h, f"[{lab}] height {new_h} <= {int(RATIO[vp] * 100)}% of old {old_h}")
     if name in ("idle", "live", "live_one", "busy", "alarms", "branches"):
         new.page.screenshot(path=str(SHOTS / f"{name}_{vp}.png"), full_page=True)
 
@@ -352,6 +355,10 @@ def frame_checks(browser, name: str, vp: str, report: List[str]) -> None:
                      "Bought APP (long), 40 shares"):
             loc = new.page.locator("[data-testid=strategy-status]", has_text=text)
             check(loc.count() >= 1 and loc.first.is_visible(), f"[{lab}] shown with rows closed: {text}")
+
+    if name == "branches_confirmed":
+        loc = new.page.locator("[data-testid=strategy-status]", has_text="Safety exit and target held at the broker.")
+        check(loc.count() == 1 and loc.first.is_visible(), f"[{lab}] OR15 confirmed protection shown with rows closed")
 
     if name == "live":
         rows = new.page.locator("[data-testid=strategy-row-toggle]")
