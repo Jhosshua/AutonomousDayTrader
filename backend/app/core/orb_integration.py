@@ -40,6 +40,7 @@ from zoneinfo import ZoneInfo
 from concurrent.futures import wait as _wait_futures
 
 from backend.app.core.engine import ORB_POLICY, OrderSide, OrderType
+from backend.app.core.log_limit import warn_rate_limited
 
 log = logging.getLogger("orb_integration")
 ET = ZoneInfo("America/New_York")
@@ -1123,7 +1124,7 @@ class OrbIntegration:
                                              "short_frac": _f(reg.get("short_frac")), "wave": wave, "at": at}
             self.ledger["regime"] = saved
         except Exception:
-            log.warning("ORB regime note failed", exc_info=True)
+            warn_rate_limited(log, "display:orb_regime_note", "ORB regime note failed")
 
     def _on_decision(self, row: dict) -> None:
         """Scheduler hook (tick thread = event loop in production): decisions log + research rows."""
@@ -1298,7 +1299,7 @@ class OrbIntegration:
             if h is not None:
                 ctx["risk_usd"] = _f(h.get("risk_usd"))
         except Exception:
-            log.warning("ORB context failed for %s", symbol, exc_info=True)
+            warn_rate_limited(log, "display:orb_context", "ORB context failed for %s", symbol)   # runs every frame
         return ctx
 
     @staticmethod

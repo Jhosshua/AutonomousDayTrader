@@ -57,12 +57,14 @@ from backend.app.strategies.tsla_or15_retest import (
     implementation_sha256, session_bounds as or15_session_bounds,
 )
 from backend.app.core.or15_execution import OR15ExecutionController
-from backend.app.strategies.tri_engine import AsymmetricDualStrategy, TRI_IDS, FIXED_IDS, TRI_RISK_PCT, SOURCE_PATH as TRI_SOURCE_PATH, SOURCE_SHA256 as TRI_SOURCE_HASH
+from backend.app.strategies.tri_engine import AsymmetricDualStrategy, TRI_IDS, FIXED_IDS, SOURCE_PATH as TRI_SOURCE_PATH, SOURCE_SHA256 as TRI_SOURCE_HASH
 from backend.app.core.tri_execution import TriExecutionController
+from backend.app.strategies import tri_engine as tri_engine_mod
 from backend.app.strategies.adaptation import DynamicAdaptationEngine, calculate_position_size
 from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
 from backend.app.core.decisions import decision_log, classify_adaptation_reason
 from backend.app.core import research as research_mod
+from backend.app.core.log_limit import warn_rate_limited
 from backend.app.core.research import ResearchRecorder, safe as research_safe
 from backend.app.core.research_tracker import ResearchTracker
 from backend.app.core.trading_windows import is_trading_day, session_close, session_minutes, strategy_window
@@ -953,12 +955,13 @@ def _atr_estimate(symbol: str, bar: BarEvent, period: int = 14) -> float:
     return max(0.01, sum(true_ranges) / len(true_ranges))
 
 
-def _try_or_none(fn: Any) -> Any:
-    """Display-only fields: a bug in one of them becomes None, never a broken frame."""
+def _try_or_none(name: str, fn: Any) -> Any:
+    """Display-only fields: a bug in one of them becomes None, never a broken frame. Runs for every
+    position on every websocket frame, so the warning is rate-limited per field name."""
     try:
         return fn()
     except Exception:
-        log.warning("Display field failed", exc_info=True)
+        warn_rate_limited(log, f"display:{name}", "Display field %s failed", name)
         return None
 
 
@@ -992,12 +995,12 @@ def _market_context() -> Dict[str, Any]:
         return round((datetime.now(timezone.utc) - last_vix_print.asof).total_seconds(), 1)
     try:
         return adaptation_engine.get_market_context(
-            vix_stale=_try_or_none(_vix_stale_now),
-            vix_age_seconds=_try_or_none(_age),
-            adaptive_strategies=_try_or_none(_adaptive_strategies_on),
+            vix_stale=_try_or_none("market.vix_stale", _vix_stale_now),
+            vix_age_seconds=_try_or_none("market.vix_age", _age),
+            adaptive_strategies=_try_or_none("market.adaptive_strategies", _adaptive_strategies_on),
         )
     except Exception:
-        log.warning("Market context failed", exc_info=True)
+        warn_rate_limited(log, "display:market_context", "Market context failed")
         return {}
 
 
@@ -1036,23 +1039,23 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
     }
     # Display-only context for the "Holding now" card. Every key is always present (None when
     # unknown) because the UI merges streamed frames. Each field is fail-soft on its own.
-    pos_data["entry_context"] = _try_or_none(lambda: bracket.entry_context if bracket else None)
-    pos_data["initial_stop"] = _try_or_none(lambda: bracket.initial_stop_price if bracket else None)
-    pos_data["bracket_status"] = _try_or_none(lambda: bracket.status.value if bracket else None)
-    pos_data["runner_policy"] = _try_or_none(lambda: bracket.runner_policy if bracket else None)
-    pos_data["target_1_filled"] = _try_or_none(lambda: bool(bracket.target_1_filled) if bracket else None)
+    pos_data["entry_context"] = _try_or_none("entry_context", lambda: bracket.entry_context if bracket else None)
+    pos_data["initial_stop"] = _try_or_none("initial_stop", lambda: bracket.initial_stop_price if bracket else None)
+    pos_data["bracket_status"] = _try_or_none("bracket_status", lambda: bracket.status.value if bracket else None)
+    pos_data["runner_policy"] = _try_or_none("runner_policy", lambda: bracket.runner_policy if bracket else None)
+    pos_data["target_1_filled"] = _try_or_none("target_1_filled", lambda: bool(bracket.target_1_filled) if bracket else None)
     pos_data["orb_context"] = None
     pos_data["plan_risk_pct"] = None
     pos_data["r_multiple"] = None
     if bracket and bracket.target_2_order_id is None and bracket.runner_policy == "TRAIL_ONLY":
         pos_data["take_profit_2"] = None      # a trailing runner has no second target (display only)
     if not bracket:
-        pos_data["strategy_id"] = _try_or_none(lambda: str(pos.strategy_id or "manual").lower()) or "manual"
+        pos_data["strategy_id"] = _try_or_none("strategy_id", lambda: str(pos.strategy_id or "manual").lower()) or "manual"
     if pos_data["exit_due"] is None and pos.arm == TradingArm.INTRADAY:
-        pos_data["exit_due"] = _try_or_none(_liquidation_due_iso)
+        pos_data["exit_due"] = _try_or_none("exit_due", _liquidation_due_iso)
     if tri_controller.owns(symbol):
         pos_data.update(tri_controller.position_details(symbol))
-        pos_data["plan_risk_pct"] = round(TRI_RISK_PCT * 100.0, 4)
+        pos_data["plan_risk_pct"] = round(tri_engine_mod.TRI_RISK_PCT * 100.0, 4)
     if orb.owns(symbol):
         pos_data.update(orb.position_details(symbol))
     if include_chart:
@@ -1929,7 +1932,7 @@ def _entry_context_safe(signal: SignalEvent, stages: Dict[str, Any], qty: int, a
     try:
         return _build_entry_context(signal, stages, qty, adapted_stop)
     except Exception:
-        log.warning("entry_context failed for %s", getattr(signal, "symbol", "?"), exc_info=True)
+        warn_rate_limited(log, "display:entry_context", "entry_context failed for %s", getattr(signal, "symbol", "?"))
         return None
 
 

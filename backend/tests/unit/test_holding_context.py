@@ -25,6 +25,7 @@ from backend.app.models.events import (
 from backend.app.strategies.adaptation import DynamicAdaptationEngine, calculate_position_size, get_time_of_day_phase
 from backend.app.strategies.base import SignalEvent
 from backend.app.strategies.tri_engine import TRI_RISK_PCT
+from backend.tests.unit.test_tri_broker_lifecycle import arm, tri_paper  # noqa: F401  (fixture + helper)
 
 T0 = datetime(2026, 9, 24, 14, 0, tzinfo=timezone.utc)  # 10:00 ET
 
@@ -369,3 +370,66 @@ def test_ride_the_trend_entry_context_through_the_real_pipeline():
         v2.TAPE, v2.PROFILE = old, old_prof
         for x in r.strategies:
             x.status = statuses[x.strategy_id]
+
+
+# Tri risk percent is ONE constant: sizing, the strategy card and the holding label all read it ----------
+@pytest.mark.parametrize("pct", [0.0075, 0.00375, 0.005])
+def test_tri_risk_pct_moves_sizing_the_card_and_the_holding_label_together(tri_paper, monkeypatch, pct):
+    from backend.app.strategies import tri_engine
+    r, x = tri_paper
+    monkeypatch.setattr(tri_engine, "TRI_RISK_PCT", pct)
+    s = arm(r, x, "TSLA", "LONG")
+    assert s.phase == "HOLDING", s.last_error
+    per_share = (x.entry_price + 0.01) - s.stop                # sized off the ask
+    budget = s.session_equity * pct                           # under the 1.5% combined cap
+    # tri_execution's entry sizing: floor(budget / risk per share). One share of slack for the exact quote used.
+    assert budget - 2 * per_share < s.quantity * per_share <= budget + per_share
+    assert s.quantity > 1
+    assert s.to_dict()["tri_engine"]["risk_budget"] == pytest.approx(s.session_equity * pct)
+    assert r._serialize_position("TSLA", include_chart=False)["plan_risk_pct"] == pytest.approx(pct * 100)
+
+
+# Fail-soft display code runs on every frame: one persistent bug must not flood the logs ------------------
+def test_a_persistent_display_bug_logs_once_then_at_most_every_ten_minutes(caplog):
+    import logging
+    from backend.app.core import log_limit
+    log_limit.reset_for_tests()
+    clock = [1000.0]
+    lg = logging.getLogger("holding_context_test")
+    with caplog.at_level(logging.WARNING, logger="holding_context_test"):
+        for _ in range(2000):                                     # ~8 minutes of frames at 4 a second
+            try:
+                raise ValueError("bad field")
+            except ValueError:
+                log_limit.warn_rate_limited(lg, "display:x", "Display field %s failed", "x", now=lambda: clock[0])
+            clock[0] += 0.25
+        assert len(caplog.records) == 1 and caplog.records[0].exc_info      # first failure: full traceback
+        clock[0] += 600.0
+        try:
+            raise ValueError("bad field")
+        except ValueError:
+            assert log_limit.warn_rate_limited(lg, "display:x", "Display field %s failed", "x", now=lambda: clock[0])
+        assert len(caplog.records) == 2 and not caplog.records[1].exc_info
+        assert "1999 more" in caplog.records[1].getMessage()
+        try:                                                      # a different field has its own first traceback
+            raise ValueError("other")
+        except ValueError:
+            assert log_limit.warn_rate_limited(lg, "display:y", "Display field %s failed", "y", now=lambda: clock[0])
+        assert len(caplog.records) == 3 and caplog.records[2].exc_info
+
+
+def test_serialize_position_with_a_broken_field_warns_once_not_per_frame(rt, monkeypatch, caplog):
+    import logging
+    from backend.app.core import log_limit
+    log_limit.reset_for_tests()
+    rt.account.positions["AAPL"] = _position(strategy="news_momentum")
+    rt.bracket_manager.create_bracket("brk_l", "AAPL", "LONG", 100, 100.0, 98.0, strategy_id="news_momentum")
+
+    def no_clock():
+        raise RuntimeError("no clock")
+    monkeypatch.setattr(rt, "_liquidation_due_iso", no_clock)
+    with caplog.at_level(logging.WARNING, logger="AutonomousDayTrader"):
+        for _ in range(500):
+            assert rt._serialize_position("AAPL", include_chart=False)["exit_due"] is None
+    warns = [x for x in caplog.records if "Display field exit_due failed" in x.getMessage()]
+    assert len(warns) == 1 and warns[0].exc_info
