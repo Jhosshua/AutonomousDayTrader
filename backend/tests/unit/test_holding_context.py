@@ -9,6 +9,7 @@ import json
 import math
 from datetime import datetime, time as dtime, timedelta, timezone
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import create_model
@@ -219,6 +220,18 @@ def test_serialize_position_intraday_exit_due_follows_the_flattening_schedule(rt
         assert (due.hour, due.minute) == (15, 30)                                # read, not hard-coded
     finally:
         rt.flattening_engine.schedule.phase3_liquidation_time = old
+
+
+def test_holding_exit_due_matches_the_early_close_liquidation_time(rt):
+    rt.account.positions["AAPL"] = _position()
+    rt.bracket_manager.create_bracket("brk_early", "AAPL", "LONG", 100, 100.0, 98.0, strategy_id="news_momentum")
+    et = ZoneInfo("America/New_York")
+    rt.flattening_engine.clock.set_simulated_time(datetime(2026, 11, 27, 9, 5, tzinfo=et))
+    rt.flattening_engine.check_time_tick()  # synchronize the schedule for Black Friday's 1:00 PM close
+
+    due = datetime.fromisoformat(rt._serialize_position("AAPL", include_chart=False)["exit_due"])
+    assert (due.hour, due.minute) == (12, 55)
+    assert due.date().isoformat() == "2026-11-27"
 
 
 def test_bracketless_position_falls_back_to_its_own_strategy_then_manual(rt):

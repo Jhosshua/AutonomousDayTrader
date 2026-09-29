@@ -55,6 +55,39 @@ def test_four_phase_flattening_progression():
     assert engine.audit_passed is True
 
 
+def test_early_close_moves_all_flattening_phases_before_market_close():
+    clock = MarketClock(datetime(2026, 11, 27, 12, 44, 0, tzinfo=ET))
+    engine = ZeroOvernightFlatteningEngine(clock=clock)
+
+    assert engine.check_time_tick() is None
+    assert engine.schedule.phase1_lockout_time.hour == 12
+    assert engine.schedule.phase1_lockout_time.minute == 45
+    assert engine.schedule.phase2_purge_time.minute == 50
+    assert engine.schedule.phase3_liquidation_time.minute == 55
+    assert engine.schedule.phase4_audit_time.minute == 58
+    assert engine.schedule.market_close_time.hour == 13
+
+    clock.set_simulated_time(datetime(2026, 11, 27, 12, 45, 0, tzinfo=ET))
+    assert engine.check_time_tick().phase == FlatteningPhase.ENTRY_LOCKOUT
+    clock.set_simulated_time(datetime(2026, 11, 27, 12, 50, 0, tzinfo=ET))
+    assert engine.check_time_tick().phase == FlatteningPhase.ORDER_PURGE
+    clock.set_simulated_time(datetime(2026, 11, 27, 12, 55, 0, tzinfo=ET))
+    liquidation = engine.check_time_tick()
+    assert liquidation.phase == FlatteningPhase.MANDATORY_LIQUIDATION
+    assert liquidation.liquidate_all_positions is True
+    clock.set_simulated_time(datetime(2026, 11, 27, 12, 58, 0, tzinfo=ET))
+    assert engine.check_time_tick().phase == FlatteningPhase.ZERO_AUDIT
+    clock.set_simulated_time(datetime(2026, 11, 27, 13, 0, 0, tzinfo=ET))
+    assert engine.check_time_tick().phase == FlatteningPhase.MARKET_CLOSED
+
+    # A regular session after an early close restores the configured 3:55 schedule.
+    clock.set_simulated_time(datetime(2026, 11, 30, 15, 44, 0, tzinfo=ET))
+    engine.reset_for_new_session()
+    assert engine.schedule.phase3_liquidation_time.hour == 15
+    assert engine.schedule.phase3_liquidation_time.minute == 55
+    assert engine.check_time_tick() is None
+
+
 def test_flattening_audit_retry_on_lingering_position():
     clock = MarketClock()
     engine = ZeroOvernightFlatteningEngine(clock=clock)

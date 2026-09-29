@@ -139,10 +139,10 @@ Push `main` (Railway redeploys on push). Window: after 16:05 ET or before 9:10 E
 
 Additive. `git revert` + push. Old code ignores `entry_context` in the checkpoint and the new ORB ledger key (verify the ORB ledger loader tolerates an unknown key before shipping; if not, store it where it does).
 
-## Known issue found, NOT fixed here (out of scope, reported to the operator)
+## Early-close follow-up fixed during final review
 
-`FlatteningSchedule` is fixed at 15:55 and ignores `NYSE_EARLY_CLOSES` (next: 2026-11-27, 1:00 PM close), so intraday positions would not be flattened before an early close and the card would say 3:55 PM that day.
+Final review found that `FlatteningSchedule` still used 3:55 PM on NYSE early-close days, even though the card now reports its configured liquidation time. The engine now shifts lockout, purge, liquidation, and audit to 12:45, 12:50, 12:55, and 12:58 PM before a 1:00 PM close, then restores the normal configured schedule on the next regular session. A regression test covers the transitions and schedule restoration.
 
 ## Out of scope
 
-Trading rule changes; swing tab; closed-trade history; the early-close bug above.
+Swing tab; closed-trade history.

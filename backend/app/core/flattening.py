@@ -2,7 +2,7 @@
 Automated 4-Phase Zero-Overnight Flattening State Machine and Market Clock Abstraction.
 """
 from __future__ import annotations
-from datetime import datetime, time
+from datetime import date, datetime, time, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -10,18 +10,19 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
 
 from backend.app.core.account import TradingArm
+from backend.app.core.trading_windows import session_close
 
 ET_TZ = ZoneInfo("America/New_York")
 
 
 class FlatteningPhase(str, Enum):
     PRE_MARKET = "PRE_MARKET"                       # Before 09:30:00 ET
-    NORMAL_TRADING = "NORMAL_TRADING"               # 09:30:00 - 15:44:59 ET
-    ENTRY_LOCKOUT = "ENTRY_LOCKOUT"                 # 15:45:00 - 15:49:59 ET (Phase 1)
-    ORDER_PURGE = "ORDER_PURGE"                     # 15:50:00 - 15:54:59 ET (Phase 2)
-    MANDATORY_LIQUIDATION = "MANDATORY_LIQUIDATION" # 15:55:00 - 15:57:59 ET (Phase 3)
-    ZERO_AUDIT = "ZERO_AUDIT"                       # 15:58:00 - 15:59:59 ET (Phase 4)
-    MARKET_CLOSED = "MARKET_CLOSED"                 # 16:00:00+ ET
+    NORMAL_TRADING = "NORMAL_TRADING"               # 09:30 ET until the session's entry lockout
+    ENTRY_LOCKOUT = "ENTRY_LOCKOUT"                 # 15 minutes before close (Phase 1)
+    ORDER_PURGE = "ORDER_PURGE"                     # 10 minutes before close (Phase 2)
+    MANDATORY_LIQUIDATION = "MANDATORY_LIQUIDATION" # 5 minutes before close (Phase 3)
+    ZERO_AUDIT = "ZERO_AUDIT"                       # 2 minutes before close (Phase 4)
+    MARKET_CLOSED = "MARKET_CLOSED"                 # At the session close
 
 
 class MarketClock:
@@ -82,10 +83,10 @@ class ZeroOvernightFlatteningEngine:
     """
     Automated 4-Phase Zero-Overnight Flattening State Machine.
     Eliminates overnight gap risk by executing phased closeout:
-    - 15:45: Phase 1 Entry Lockout
-    - 15:50: Phase 2 Working Order Purge
-    - 15:55: Phase 3 Mandatory Market Liquidation
-    - 15:58: Phase 4 Zero-Overnight Position Audit
+    - 15 minutes before close: Phase 1 Entry Lockout
+    - 10 minutes before close: Phase 2 Working Order Purge
+    - 5 minutes before close: Phase 3 Mandatory Market Liquidation
+    - 2 minutes before close: Phase 4 Zero-Overnight Position Audit
     """
 
     def __init__(
@@ -94,7 +95,9 @@ class ZeroOvernightFlatteningEngine:
         schedule: Optional[FlatteningSchedule] = None,
     ) -> None:
         self.clock: MarketClock = clock or MarketClock()
-        self.schedule: FlatteningSchedule = schedule or FlatteningSchedule()
+        self._base_schedule: FlatteningSchedule = schedule or FlatteningSchedule()
+        self.schedule: FlatteningSchedule = self._base_schedule.model_copy(deep=True)
+        self._schedule_date: Optional[date] = None
         self.current_phase: FlatteningPhase = FlatteningPhase.NORMAL_TRADING
         self.phase1_executed: bool = False
         self.phase2_executed: bool = False
@@ -102,6 +105,35 @@ class ZeroOvernightFlatteningEngine:
         self.phase4_executed: bool = False
         self.audit_passed: bool = False
         self.audit_retries: int = 0
+
+    def _sync_session_schedule(self, session_date: date) -> None:
+        """Move the end-of-day phases earlier when NYSE closes early.
+
+        The phase offsets remain the same: entry lockout 15 minutes before close,
+        order purge 10 minutes before, liquidation 5 minutes before, and audit
+        2 minutes before. On regular sessions, the configured schedule is
+        preserved exactly; early-close sessions shift those phases by the
+        difference between the regular 4:00 PM close and that day's close.
+        """
+        if self._schedule_date == session_date:
+            return
+        close = session_close(session_date)
+        if close == time(16, 0):
+            self.schedule = self._base_schedule.model_copy(deep=True)
+        else:
+            delta_minutes = close.hour * 60 + close.minute - (16 * 60)
+
+            def shift(value: time) -> time:
+                return (datetime.combine(session_date, value) + timedelta(minutes=delta_minutes)).time()
+
+            self.schedule = self._base_schedule.model_copy(update={
+                "phase1_lockout_time": shift(self._base_schedule.phase1_lockout_time),
+                "phase2_purge_time": shift(self._base_schedule.phase2_purge_time),
+                "phase3_liquidation_time": shift(self._base_schedule.phase3_liquidation_time),
+                "phase4_audit_time": shift(self._base_schedule.phase4_audit_time),
+                "market_close_time": close,
+            }, deep=True)
+        self._schedule_date = session_date
 
     def check_time_tick(
         self,
@@ -115,9 +147,10 @@ class ZeroOvernightFlatteningEngine:
             self.clock.set_simulated_time(current_time_override)
 
         now_dt = self.clock.now()
+        self._sync_session_schedule(now_dt.astimezone(ET_TZ).date())
         t = now_dt.time()
 
-        # Phase 4 Audit: 15:58:00 - 15:59:59
+        # Phase 4 audit runs during the final two minutes before the session close.
         if t >= self.schedule.phase4_audit_time and t < self.schedule.market_close_time:
             if not self.phase4_executed or not self.audit_passed:
                 self.phase4_executed = True
@@ -131,28 +164,28 @@ class ZeroOvernightFlatteningEngine:
                     run_audit=True,
                 )
 
-        # Phase 3 Mandatory Liquidation: 15:55:00 - 15:57:59
+        # Phase 3 mandatory liquidation runs from five until two minutes before close.
         elif t >= self.schedule.phase3_liquidation_time and t < self.schedule.phase4_audit_time:
             if not self.phase3_executed:
                 self.phase3_executed = True
                 self.current_phase = FlatteningPhase.MANDATORY_LIQUIDATION
                 return self.execute_phase_3_liquidation()
 
-        # Phase 2 Working Order Purge: 15:50:00 - 15:54:59
+        # Phase 2 working-order purge runs from ten until five minutes before close.
         elif t >= self.schedule.phase2_purge_time and t < self.schedule.phase3_liquidation_time:
             if not self.phase2_executed:
                 self.phase2_executed = True
                 self.current_phase = FlatteningPhase.ORDER_PURGE
                 return self.execute_phase_2_purge()
 
-        # Phase 1 Entry Lockout: 15:45:00 - 15:49:59
+        # Phase 1 entry lockout runs from fifteen until ten minutes before close.
         elif t >= self.schedule.phase1_lockout_time and t < self.schedule.phase2_purge_time:
             if not self.phase1_executed:
                 self.phase1_executed = True
                 self.current_phase = FlatteningPhase.ENTRY_LOCKOUT
                 return self.execute_phase_1_lockout()
 
-        # After Market Close: 16:00:00+
+        # After the session close.
         elif t >= self.schedule.market_close_time:
             if self.current_phase != FlatteningPhase.MARKET_CLOSED:
                 self.current_phase = FlatteningPhase.MARKET_CLOSED
@@ -177,7 +210,7 @@ class ZeroOvernightFlatteningEngine:
         return None
 
     def execute_phase_1_lockout(self) -> FlatteningDirective:
-        """Phase 1 (15:45 ET): Entry Lockout."""
+        """Phase 1: Entry Lockout."""
         self.phase1_executed = True
         self.current_phase = FlatteningPhase.ENTRY_LOCKOUT
         return FlatteningDirective(
@@ -188,7 +221,7 @@ class ZeroOvernightFlatteningEngine:
         )
 
     def execute_phase_2_purge(self) -> FlatteningDirective:
-        """Phase 2 (15:50 ET): Working Order Purge."""
+        """Phase 2: Working Order Purge."""
         self.phase2_executed = True
         self.current_phase = FlatteningPhase.ORDER_PURGE
         return FlatteningDirective(
@@ -200,7 +233,7 @@ class ZeroOvernightFlatteningEngine:
         )
 
     def execute_phase_3_liquidation(self) -> FlatteningDirective:
-        """Phase 3 (15:55 ET): Mandatory Market Liquidation."""
+        """Phase 3: Mandatory Market Liquidation."""
         self.phase3_executed = True
         self.current_phase = FlatteningPhase.MANDATORY_LIQUIDATION
         return FlatteningDirective(
@@ -218,7 +251,7 @@ class ZeroOvernightFlatteningEngine:
         working_orders: List[Any],
     ) -> FlatteningDirective:
         """
-        Phase 4 (15:58 ET): Zero-Overnight Position Audit.
+        Phase 4 (two minutes before close): Zero-Overnight Position Audit.
         Verifies open INTRADAY positions count == 0 and INTRADAY working orders count == 0.
         Swing positions and swing working orders are strictly exempt.
         If intraday positions exist, issues emergency IOC market liquidation directive.
@@ -270,6 +303,8 @@ class ZeroOvernightFlatteningEngine:
 
     def reset_for_new_session(self) -> None:
         """Reset phase execution flags for the next trading day."""
+        self._schedule_date = None
+        self._sync_session_schedule(self.clock.now().astimezone(ET_TZ).date())
         self.current_phase = FlatteningPhase.NORMAL_TRADING
         self.phase1_executed = False
         self.phase2_executed = False
@@ -280,6 +315,7 @@ class ZeroOvernightFlatteningEngine:
 
     def get_phase_at_time(self, t: time) -> FlatteningPhase:
         """Return the scheduled FlatteningPhase for any given ET time-of-day."""
+        self._sync_session_schedule(self.clock.now().astimezone(ET_TZ).date())
         if t < self.schedule.market_open_time:
             return FlatteningPhase.PRE_MARKET
         elif t < self.schedule.phase1_lockout_time:
