@@ -282,7 +282,7 @@ class OrbIntegration:
             if not self._persist_enabled:
                 return            # fallback build over an unreadable row: never overwrite that row
             if section == "scheduler" and self.r.state_store is not None and not self.r.simulation_mode:
-                self._queue_scheduler_state()          # never on the event loop; flushed before orders
+                self._queue_scheduler_state(state)     # never on the event loop; flushed before orders
                 return
             with self._persist_locks[section]:
                 # Callers snapshot before calling; two threads can race, so the snapshot actually written is
@@ -298,9 +298,12 @@ class OrbIntegration:
         return persist
 
     # ---- scheduler state writer (one background thread, latest snapshot wins)
-    def _queue_scheduler_state(self) -> None:
+    def _queue_scheduler_state(self, state: dict) -> None:
+        """The scheduler hands over its own snapshot (it persists only from its tick thread, so snapshots
+        arrive in order). The writer never takes the scheduler's lock: an order job waiting on the
+        barrier can never wait on a scheduler that is itself waiting (inline mode deadlocked before)."""
         with self._sched_cond:
-            self._sched_pending = True
+            self._sched_pending = copy.deepcopy(state)
             if self._sched_thread is None or not self._sched_thread.is_alive():
                 self._sched_thread = threading.Thread(target=self._sched_writer, name="OrbSchedStateWriter",
                                                       daemon=True)
@@ -314,13 +317,13 @@ class OrbIntegration:
                     if not self._sched_cond.wait(timeout=30.0):
                         self._sched_thread = None
                         return
-                self._sched_pending = None
+                snapshot, self._sched_pending = self._sched_pending, None
                 self._sched_busy = True
             try:
-                sched, store = self.scheduler, self.r.state_store
-                if sched is not None and store is not None and self._persist_enabled:
+                store = self.r.state_store
+                if store is not None and self._persist_enabled:
                     with self._persist_locks["scheduler"]:
-                        store.save_orb_state("scheduler", sched.to_state())   # fresh snapshot
+                        store.save_orb_state("scheduler", snapshot)   # latest snapshot wins
                 self._sched_error = None
             except Exception as exc:
                 self._sched_error = f"{type(exc).__name__}: {exc}"
@@ -469,21 +472,24 @@ class OrbIntegration:
             if pos is not None and getattr(pos, "strategy_id", "") == ORB_ID:
                 self._alert(sym, f"{sym}: ADT's book holds {pos.shares} ORB shares that no ORB order at Alpaca "
                                  "explains. Nothing will sell them automatically and no other strategy may touch "
-                                 "them. Check Alpaca by hand: cancel any ORB bracket orders on it, then close it.")
+                                 "them. Close it at Alpaca by hand (cancel ORB's bracket orders on it first), then press "
+                                 "the button below to clear it here.")
             else:
                 self._alert(sym, f"{sym}: Alpaca has a live ORB order that ORB's saved state does not know. It was "
                                  "not touched, and ORB opens no new trades until it is resolved. Check it by hand.")
         for sym in [s for s in self.alerts if s not in targets and not s.startswith("_")]:
             self.alerts.pop(sym, None)
+            self._drop_errors(sym)
 
     def _orphan_alarm(self, sym: str) -> None:
         if sym in self._orphans:
             return
         self._orphans.add(sym)
-        msg = (f"{sym}: ADT's book has an ORB position the ORB controller does not know. ORB will cancel "
-               "its bracket orders at Alpaca and close exactly its shares; nothing else may touch it.")
+        msg = (f"{sym}: ADT's book has an ORB position ORB cannot explain. Nothing sells it automatically and "
+               "no other strategy may touch it. Close it at Alpaca by hand (cancel ORB's bracket orders on it "
+               "first), then press the button on the ORB card to clear it here.")
         log.error(msg)
-        self.errors.append({"kind": "orphan_orb_position", "symbol": sym, "note": msg})
+        self._err({"kind": "orphan_orb_position", "symbol": sym, "note": msg})
 
     def claim_for_adt(self, symbol: str, order: Any, strategy_id: Optional[str]) -> Optional[str]:
         """ADT entry admission (pre-trade validator), atomically with ORB's reserve(): refuse a symbol ORB
@@ -541,7 +547,7 @@ class OrbIntegration:
                                "execution_intent", "exit_requested", "exit_all_requested"):
             self._dirty.set()
         if row.get("kind") in ("alarm", "supervision_symbol_error"):
-            self.errors.append({k: row.get(k) for k in ("ts", "kind", "alarm", "symbol", "err", "reason", "note")})
+            self._err({k: row.get(k) for k in ("ts", "kind", "alarm", "symbol", "err", "reason", "note")})
 
     def _wake(self) -> None:
         loop = self._loop
@@ -558,7 +564,7 @@ class OrbIntegration:
                 self.r._checkpoint_runtime("ORB_FILL")
         except Exception as exc:
             log.exception("ORB ledger sync failed")
-            self.errors.append({"kind": "ledger_sync", "err": str(exc)[:200]})
+            self._err({"kind": "ledger_sync", "err": str(exc)[:200]})
 
     # ------------------------------------------------------------------ event-loop side
     def tick(self, now: datetime) -> None:
@@ -570,12 +576,12 @@ class OrbIntegration:
             self.check_orphans()
         except Exception as exc:
             log.exception("ORB orphan check failed")
-            self.errors.append({"kind": "orphan_check", "err": str(exc)[:200]})
+            self._err({"kind": "orphan_check", "err": str(exc)[:200]})
         try:
             self.scheduler.tick(now)
         except Exception as exc:
             log.exception("ORB scheduler tick failed")
-            self.errors.append({"kind": "scheduler_tick", "err": str(exc)[:200]})
+            self._err({"kind": "scheduler_tick", "err": str(exc)[:200]})
         mono = _time.monotonic()
         if self._dirty.is_set() or mono - self._last_sync >= SYNC_EVERY_S:
             self._last_sync = mono
@@ -584,12 +590,12 @@ class OrbIntegration:
                     self.r._checkpoint_runtime("ORB_SYNC")
             except Exception as exc:
                 log.exception("ORB ledger sync failed")
-                self.errors.append({"kind": "ledger_sync", "err": str(exc)[:200]})
+                self._err({"kind": "ledger_sync", "err": str(exc)[:200]})
         try:
             self.mark_positions(now)
         except Exception as exc:
             log.exception("ORB price marking failed")
-            self.errors.append({"kind": "mark", "err": str(exc)[:200]})
+            self._err({"kind": "mark", "err": str(exc)[:200]})
 
     def _local_order(self, key: str, rec: dict) -> Any:
         r = self.r
@@ -873,7 +879,11 @@ class OrbIntegration:
                               f"operator resolved orphan: {qty} shares removed from ADT's book", now)
         self.alerts.pop(sym, None)
         self._orphans.discard(sym)
+        errors_before = list(self.errors)
+        self._drop_errors(sym)
         if not r._checkpoint_runtime("ORB_ORPHAN_RESOLVED"):
+            self.errors.clear()
+            self.errors.extend(errors_before)
             # not durable: put everything back exactly as it was and say so
             vars(r.account).clear()
             vars(r.account).update(acct_before)
@@ -893,10 +903,53 @@ class OrbIntegration:
         log.warning("ORB orphan %s resolved by the operator: %s", sym, note)
         return {"resolved": True, **note}
 
+    def _err(self, row: dict) -> None:
+        """Errors are scoped: stamped with the session day (only today's are shown) and dropped when their
+        condition resolves (an orphan resolved, a symbol no longer in trouble)."""
+        row = dict(row)
+        row.setdefault("day", self.clock().astimezone(ET).date().isoformat())
+        self.errors.append(row)
+
+    def _drop_errors(self, sym: str) -> None:
+        keep = [e for e in self.errors if e.get("symbol") != sym]
+        self.errors.clear()
+        self.errors.extend(keep)
+
+    def current_errors(self) -> List[dict]:
+        today = self.clock().astimezone(ET).date().isoformat()
+        return [e for e in self.errors if e.get("day") == today][-10:]
+
+    def no_trade_reason(self) -> Optional[str]:
+        """Why ORB cannot open any trade for the rest of today (None if it still can)."""
+        ctl, sched = self.controller, self.scheduler
+        if ctl is None or sched is None or ctl.mode == "off":
+            return None
+        st = sched.state.get("steps") or {}
+        final = st.get("final") or {}
+        if final.get("state") == "failed":
+            detail = str(final.get("detail") or "")
+            why = ("too few stocks answered" if "coverage" in detail or "covered only" in detail
+                   else "relay error" if detail else "no answer")
+            return f"the 9:38 scan failed ({why})"
+        if final.get("state") == "skipped":
+            return "the app was not running in time for the 9:38 scan"
+        if ctl.halted():
+            return f"ORB's own daily loss halt ({ctl.halted()})"
+        if ctl.entries_blocked():
+            return f"ORB positions were closed for the day ({ctl.entries_blocked()})"
+        ah = self.account_halt()
+        if ah:
+            return ah
+        snap = ctl.session_sizing()
+        eq = float(snap["equity"]) if snap else None
+        if eq and ctl.slots_available() > 0 and ctl.day_risk_used() >= ctl.max_day_risk(eq):
+            return "today's ORB risk budget is used up"
+        return None
+
     def _alert(self, sym: str, text: str) -> None:
         if self.alerts.get(sym) != text:
             log.error("ORB ALERT %s", text)
-            self.errors.append({"kind": "alarm", "alarm": "orb_alert", "symbol": sym, "note": text})
+            self._err({"kind": "alarm", "alarm": "orb_alert", "symbol": sym, "note": text})
         self.alerts[sym] = text
 
     # ------------------------------------------------------------------ decisions log / research
@@ -1031,7 +1084,7 @@ class OrbIntegration:
                                "rules": "ORBStraddle adaptive-v1.6.0-flow-rules (@71b001f)",
                                "exclude_symbols": list(self.r.settings.ORB_EXCLUDE_SYMBOLS),
                                "expected_account": self.r.settings.ORB_EXPECTED_ACCOUNT,
-                               "init_error": self.init_error, "errors": list(self.errors)[-10:],
+                               "init_error": self.init_error, "errors": self.current_errors(),
                                "alerts": list(self.alerts.values()),
                                "marks": {k: {"price": v[0], "at": v[1].isoformat(), "source": v[2]}
                                          for k, v in self.marks.items()}}
@@ -1072,8 +1125,10 @@ class OrbIntegration:
             if ctl.entries_blocked():
                 extra.append(f"No new ORB trades today ({ctl.entries_blocked()}).")
         mode = st.get("mode") or "off"
+        no_trade = self.no_trade_reason()
         card["window"] = orb_window(now, mode=mode, step_text=str(st.get("step") or ""), holding=bool(holdings),
-                                    blockers=extra, operator_status=card.get("status", "ACTIVE"))
+                                    blockers=extra, operator_status=card.get("status", "ACTIVE"),
+                                    no_trade_reason=no_trade)
         card["orb"] = {
             "mode": mode,
             "mode_text": {"shadow": "Shadow: watching only, no orders", "live": "Live: paper account orders",
@@ -1082,6 +1137,7 @@ class OrbIntegration:
             "last_verdict": st.get("last_verdict"), "picks": st.get("picks") or [],
             "open_trades": trades, "realized_pnl": round(float(strategy.daily_pnl or 0.0), 2),
             "unrealized_pnl": round(unreal, 2), "open_risk": st.get("open_risk"),
+            "total_pnl": round(float(strategy.daily_pnl or 0.0) + unreal, 2), "no_trade_reason": no_trade,
             "hours": "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
             "errors": st.get("errors") or [], "init_error": st.get("init_error"),
             "alerts": st.get("alerts") or [],

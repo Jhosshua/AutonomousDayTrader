@@ -80,7 +80,7 @@ def test_live_session_pick_bracket_breakeven_exit_secondary_and_eleven_flatten(m
     assert setups and setups[-1]["verdict"] == "trade" and setups[-1]["picks"][0]["symbol"] == "APP"
     card = next(c for c in r._strategy_cards(h.clock.now) if c["id"] == "orb")
     assert card["name"] == "Opening Range Breakout (ORBStraddle rules)"
-    assert card["window"]["state"] == "MANAGING" and "picked APP long" in card["orb"]["step"]
+    assert card["window"]["state"] == "MANAGING" and "Bought APP (long)" in card["orb"]["step"]
     trade = card["orb"]["open_trades"][0]
     assert (trade["symbol"], trade["stop"], trade["target"], trade["qty"]) == ("APP", 98.0, 101.85, 454)
 

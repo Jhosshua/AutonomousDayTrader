@@ -59,7 +59,7 @@ def test_full_morning_timeline_primary_trade():
     assert s.state["steps"]["primary_decision"]["state"] == "done"
     assert "1 order(s) placed" in s.state["steps"]["primary_decision"]["detail"]
     assert h.pos()["status"] == "OPEN" and h.ctl.own_qty("APP") == 454
-    assert "picked APP long" in s.status()["step"]
+    assert "Bought APP (long)" in s.status()["step"]
     assert states and states[-1]["last_verdict"]["picks"][0]["symbol"] == "APP"
 
 

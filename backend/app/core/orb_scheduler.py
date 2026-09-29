@@ -690,7 +690,15 @@ class OrbScheduler:
             elif picked and self.c.mode == "shadow":
                 base = f"Shadow mode (watching only, no orders): would have placed {plain}."
             elif picked:
-                base = f"Last decision: picked {picked}."
+                ex = lv.get("execution") or {}
+                did = ", ".join(("Bought " if p.get("direction") == "long" else "Shorted ") + str(p["symbol"])
+                                + (" (long)" if p.get("direction") == "long" else " (short)")
+                                for p in lv.get("picks") or [])
+                if ex and not ex.get("accepted"):
+                    names = ", ".join(str(p["symbol"]) for p in lv.get("picks") or [])
+                    base = f"Picked {names}, but no order went out: {ex.get('reason') or 'refused'}."
+                else:
+                    base = f"Last decision: {did}."
             elif lv.get("verdict") in ("refused", "error", "no_decision"):
                 base = f"No decision: {lv.get('reason') or lv.get('verdict')}."
             else:

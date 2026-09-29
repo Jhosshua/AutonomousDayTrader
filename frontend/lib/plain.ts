@@ -166,7 +166,7 @@ export function companyName(ticker: string | undefined | null): string {
 // Trading-window state -> status chip (color family + label)
 // ---------------------------------------------------------------------------
 
-export type ChipTone = "sage" | "lavender" | "grey" | "terracotta";
+export type ChipTone = "sage" | "lavender" | "grey" | "terracotta" | "amber";
 
 export interface StatusChip {
   label: string;
@@ -188,6 +188,9 @@ export function windowToChip(win: { state: string; headline: string; blockers?: 
       return { label: win.headline || "Waiting", tone: "lavender", breathing: false };
     case "DONE_FOR_DAY":
       return { label: "Done for today", tone: "grey", breathing: false };
+    case "NO_TRADE_TODAY":
+      // cannot trade for the rest of the day (e.g. ORB's 9:38 scan failed): amber, never "watching"
+      return { label: win.headline || "No trade today", tone: "amber", breathing: false };
     case "BLOCKED":
       return { label: win.blockers?.[0] ? `Paused: ${win.blockers[0]}` : "Paused right now", tone: "grey", breathing: false };
     case "PAUSED":

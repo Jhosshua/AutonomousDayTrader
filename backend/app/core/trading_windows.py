@@ -258,8 +258,10 @@ def orb_window(
     holding: bool,
     blockers: Optional[List[str]] = None,
     operator_status: str = "ACTIVE",
+    no_trade_reason: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Card window for ORB (ORBStraddle rules). Its hours come from its own scheduler, not ADT's
+    """Card window for ORB (ORBStraddle rules). `no_trade_reason`: ORB cannot open any trade for the rest
+    of today (the 9:38 scan failed, a loss halt, ...): state NO_TRADE_TODAY (amber, never "watching"). Its hours come from its own scheduler, not ADT's
     phase gate: one decision at 9:38 AM, new trades until 10:15 AM, every ORB trade closed by
     11:00 AM. `step_text` is the scheduler's plain sentence for what ORB is doing now."""
     shown = (now if now.tzinfo else now.replace(tzinfo=ET)).astimezone(ET)
@@ -277,6 +279,8 @@ def orb_window(
         state, headline = "MARKET_CLOSED", "Market closed"
     elif holding:
         state, headline = "MANAGING", "Managing an open trade"
+    elif no_trade_reason and mode != "off" and t < ORB_FLATTEN:
+        state, headline = "NO_TRADE_TODAY", "No trade today"
     elif t < ORB_DECIDE:
         state, headline = "WAITING", "Decides at 9:38 AM"
     elif in_hours and blockers:
@@ -315,7 +319,8 @@ def orb_window(
         "next_change_at": None,
         "blockers": blockers if (in_hours or holding) else [b for b in blockers if "switched off" in b or "Paused" in b],
         "limits": limits,
-        "market_text": step_text or schedule_text,
+        "market_text": (f"No trade today: {no_trade_reason}." if state == "NO_TRADE_TODAY"
+                        else step_text or schedule_text),
         "notes": notes,
         "evaluated_at": shown.isoformat(timespec="seconds"),
     }

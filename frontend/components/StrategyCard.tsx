@@ -42,6 +42,7 @@ const CHIP_STYLES: Record<string, { bg: string; fg: string }> = {
   sage: { bg: "#FFFFFF", fg: "#2F5A45" },
   lavender: { bg: "#FFFFFF", fg: "#3E4478" },
   grey: { bg: "#FFFFFF", fg: "#5D5A73" },
+  amber: { bg: "#FFFFFF", fg: "#8A5A12" },
   terracotta: { bg: "#FFFFFF", fg: "#8F4424" },
 };
 
@@ -95,8 +96,10 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, delayMs = 0
   const showNow = (win?.trading_day ?? true) && isWithinSession(nowMin);
   const nowLeft = sessionPct(nowMin);
 
-  const pnl = ledgerAgg?.realized_pnl ?? strategy.daily_pnl ?? 0;
-  const tradesCount = ledgerAgg?.trades_count ?? strategy.trades_count ?? 0;
+  // ORB: the bottom line includes its open (unrealized) P&L, not only closed trades
+  const orbOpen = strategy.orb ? (strategy.orb.unrealized_pnl ?? 0) : 0;
+  const pnl = (ledgerAgg?.realized_pnl ?? strategy.daily_pnl ?? 0) + orbOpen;
+  const tradesCount = (ledgerAgg?.trades_count ?? strategy.trades_count ?? 0) + (strategy.orb?.open_trades.length ?? 0);
   const pnlColor = pnl > 0 ? "#2F6B4C" : pnl < 0 ? "#8F4424" : "#5D5A73";
 
   // F9: an early-close day note must surface even when there's already a signals/orders lead.
