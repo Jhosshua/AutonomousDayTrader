@@ -1,5 +1,70 @@
 # ORB inside ADT: full dry run on 5 recorded days (2026-09-28)
 
+## Final code (orb-integration @48038e9, re-run 2026-09-28 night)
+
+Everything below this section is the FIRST run (before the fixes); this section supersedes it.
+
+**What changed in the harness:** branch `orb-dryrun` fast-forwarded to `orb-integration` 48038e9. The
+harness-only macro-veto flip is removed (plain `ORB_MODE=live`). ORB's decision code now runs in its real child
+process (`backend/app/core/orb_facade_proc.py`, started by `orb.start()` in lifespan). The harness gives that
+child the recorded relay through the proxy's own `http_factory` hook (`scripts/orb_dry_run/child_replay.py`):
+the child blocks every socket, answers every relay request from the recorded cache, and reads the simulated
+time from an 8-byte shared file the parent updates each step. Every run below went through the child
+process path (there is no in-process facade in these runs). 0 relay misses, 0 child restarts, 0 run errors.
+
+**Verdict:** ADT's ORB now behaves like ORBStraddle end to end. All 160 boards and all 130 decisions (full
+adaptive reply) are identical to ORBStraddle's ORIGINAL code on the same boards at the same times, plain live
+mode places, manages and exits trades, shadow makes the same decisions with zero broker writes, and every
+restart gives the same ledger.
+
+### Per day (ORB_MODE=live, fake broker from the recorded tape; shadow decisions identical every day)
+
+| Day | 09:38 verdict | Picks | Entries | Exits | ORB P&L | vs original code | vs ORBStraddle live |
+|---|---|---|---|---|---|---|---|
+| 09-22 | pass | 09:46 SOFI short, 09:47 SKHY long (MU, MRNA, WDC later refused: 2 structure slots used) | SOFI 1,461 @ 17.385 (ref 17.44, stop 18.12, tgt 16.93, risk $993.48); SKHY 28 @ 192.765 (stop 183.96, tgt 199.45, risk $247.77 = rest of 2.5%) | SOFI absorption 10:30:13 @ 17.0301; SKHY 11:00 flatten @ 193.66 | +$543.57 | 32/32 boards, 28/28 decisions | live ran v1.4.2; it also picked SOFI 09:46 and SKHY 09:47 but executed nothing |
+| 09-23 | pass | none | none | none | $0 | 32/32, 26/26 | live v1.4.2 traded HOOD, C (other rules) |
+| 09-24 | sit out (ONE_SIDED) | none | none | none | $0 | 32/32, 28/28 | same 09:38 sit-out; later trades were v1.4.2 |
+| 09-25 | pass | none | none | none | $0 | 32/32, 22/22 | live v1.4.2 traded BMNR, NKE |
+| 09-28 | sit out (ONE_SIDED 83.7% short) | 10:05 APP short | APP 62 @ 311.4689 (ref 310.70, stop 326.64, tgt 298.75, rd 15.9397, risk $988.26) | 11:00 flatten, filled 11:00:03 @ 309.645 | +$113.08 | 32/32, 26/26 | **match**: same sit-out (0.837), same APP short from the same 10:05 board, same stop and formulas, same exit path (11:00 flatten). Live decided 3.5 min later (late scans) at 313.03, 106 shares on its $72k account: +$309.52 |
+
+Entry math re-computed independently for all 3 entries (fresh price, stop, rd, target, shares = floor(2% x
+$49,702.10 / rd), capped by the 2.5% day budget): all equal, and equal to the bracket payload sent.
+These results are identical to the first run's adapter runs (same fills, same P&L), so the P0 fix changes
+nothing but the contract.
+
+### Restarts (09-28, live, new process on the same state and fake account)
+
+| Scenario | Ledger vs uninterrupted | Orders | Notes |
+|---|---|---|---|
+| Hard kill 09:38:45 | identical (+$113.08) | 1 bracket + 1 exit | 9:38 decision not re-run; startup reconcile ok, 0 unknown orders |
+| Hard kill 10:30:03 (mid-trade) | identical | 1 + 1 | position rebuilt, 11:00 flatten |
+| Graceful stop 10:30:03 | identical | 1 + 1 | drain + final checkpoint, then restore |
+| Kill inside the APP bracket POST | +$113.70 (exit 1 s earlier @ 309.635) | 1 + 1, no duplicate | fill found by client id; supervisor 5 s phase shifted 1 s |
+
+### ADT side effects (all 10 day runs)
+
+Broker mismatch never latched; zero Alpaca 403s; other arms refused ORB symbols (`ORB_OWNED`); breaker drawdown
+equals ORB's unrealized loss (checked while holding); zero broker writes after 11:01 (15:55 flatten untouched);
+end-of-day checkpoint restored in a new process with the same account and trades on all 5 days; ORB Alpaca
+requests max 2,347 per morning, never throttled.
+
+### Event-loop lag, 09:36-10:15 (ORB decision code in the child process)
+
+- **Clean measurement (one run alone, parent tape not preloaded, 09-28 to 10:08 incl. the APP entry): max 13.7 ms,
+  0 samples over 100 ms** of 50,135. Target < 100 ms: met. First run (decision code in-process): 1.6-2.6 s.
+- The 14-run matrix shows one sample per run between 145 and 244 ms. Traced: a full (generation 2) garbage
+  collection of 115.7 ms at 10:06:30, caused by the harness itself: it preloaded the whole recorded tape (millions
+  of rows) into the parent, which production never holds. With the preload off, no collection over 20 ms. The
+  matrix numbers also include CPU contention (7 runs + 7 child processes at once). Preload is now opt-in.
+- ADT's own loop work: `_runtime_clock_step` max 21-29 ms (one 196 ms outlier in the parallel 09-22 shadow run).
+
+### Bugs (final code)
+
+- **BUG 1 (P0) macro veto read backwards: FIXED** in `orb_execution.py:1752-1761`; my 2 regression tests pass.
+- RISK 1 (GIL stalls): **resolved** by the child process (see lag above).
+- P3 (card step text while a trade is open): **resolved**; at 10:16 on 09-28 the card reads "Shorted APP (short), 62 shares, now -0.09x its risk; stop 326.64, target 298.75 (held at Alpaca); closes by 11:00 AM."
+- No new bugs found.
+
 Branch `orb-dryrun` (from `orb-integration` @1c9a47c). Harness: `scripts/orb_dry_run/`. No real orders, no real
 Alpaca, no network during a run (every socket connect raises). Relay answers came from the recorded parity cache
 plus a small read-only top-up (see "Inputs").

@@ -146,13 +146,15 @@ def checks(res):
             "mismatch_seen": res.get("mismatch_seen"), "arm_refusals": [(a["strategy"], a["allowed"], (a["why"] or "")[:60]) for a in arm],
             "breaker_math_ok": breaker_ok, "risk_while_holding": rw, "loop": res.get("loop"),
             "budget": res.get("budget"), "orb_errors": res.get("orb_errors"), "orb_alerts": res.get("orb_alerts"),
-            "misses": res.get("transport", {}).get("misses"), "run_errors": res.get("errors")}
+            "misses": (res.get("transport", {}).get("misses") or []) + ((res.get("child_transport") or {}).get("misses") or []),
+            "child": {k: v for k, v in (res.get("child_transport") or {}).items() if k != "misses"},
+            "run_errors": res.get("errors")}
 
 
 def summarize(run_dir):
     res = load(os.path.join(run_dir, "result.json"))
     day = res["date"]
-    out = {"run": os.path.basename(run_dir), "date": day, "mode": res["mode"], "adapter": res.get("macro_adapter"),
+    out = {"run": os.path.basename(run_dir), "date": day, "mode": res["mode"], "facade": res.get("facade"),
            "boards": boards_vs_replay(res, day), "replay_decisions": decisions_vs_replay_steps(res, day),
            "executions": executions(res), "fills": res.get("fills"), "trades": trades(res), "checks": checks(res),
            "snapshots": res.get("snapshots")}

@@ -1,5 +1,6 @@
 """ORB dry run: ADT's REAL app (backend.app.main: lifespan, runtime clock step, ORB controller + scheduler,
-real OrbsFacade on ORBStraddle's copied decision code, ledger, breaker, EOD flatten, broker mismatch check,
+real OrbsFacade on ORBStraddle's copied decision code in its real child process (orb_facade_proc,
+replay injected through the proxy's http_factory, see child_replay.py), ledger, breaker, EOD flatten, broker mismatch check,
 checkpoints) on one recorded session, with a FAKE Alpaca that fills from the recorded SIP tape.
 
     python scripts/orb_dry_run/run_day.py --date 2026-09-28 --mode live --out DIR
@@ -47,6 +48,7 @@ class SimClock:
     def __init__(self, t: datetime):
         self._t = t
         self._lock = threading.Lock()
+        self.clock_file = None
 
     @property
     def now(self) -> datetime:
@@ -58,6 +60,8 @@ class SimClock:
     def set(self, t: datetime) -> None:
         with self._lock:
             self._t = t
+            if self.clock_file is not None:
+                self.clock_file.write(self.now_ns())
 
     def now_ns(self) -> int:
         t = self._t.astimezone(timezone.utc)
@@ -210,9 +214,9 @@ def main():
     ap.add_argument("--stop-kind", choices=("hard", "graceful"), default="hard")
     ap.add_argument("--kill-on-post", default=None)
     ap.add_argument("--reconcile-every", type=float, default=30.0)
-    ap.add_argument("--no-preload", action="store_true")
-    ap.add_argument("--macro-adapter", action="store_true",
-                    help="flip OrbsFacade.macro_veto's answer into the (ok, why) the controller expects (BUG 1)")
+    ap.add_argument("--preload", action="store_true",
+                    help="read the whole tape into THIS process first (only useful when the decision code ran "
+                         "in-process; it adds millions of objects that slow the parent's full GC ~115 ms)")
     ap.add_argument("--relay-latency-ms", type=float, default=0.0,
                     help="sleep this long in every relay answer (network wait; releases the GIL like real I/O)")
     args = ap.parse_args()
@@ -228,6 +232,9 @@ def main():
     start = datetime.combine(day, hms(args.start), tzinfo=ET)
     end = datetime.combine(day, hms(args.end), tzinfo=ET)
     sim = SimClock(start)
+    from child_replay import ChildReplay, ClockFile
+    sim.clock_file = ClockFile(os.path.join(args.out, "sim_clock.bin"))
+    sim.set(start)
     rec = Recorder(sim)
 
     import store
@@ -239,7 +246,7 @@ def main():
 
     import httpx
     from tape_broker import TapeAlpaca
-    if not args.no_preload:
+    if args.preload:
         # read every tape file BEFORE the clock starts, so file I/O and line splitting (harness work that
         # production does not have) cannot hold the GIL while the event-loop lag is being measured
         from concurrent.futures import ThreadPoolExecutor
@@ -260,6 +267,18 @@ def main():
     from backend.app.strategies.orbs import shim, flow
     from backend.app.models.events import TradeEvent
 
+    # ORB's decision code runs in a spawned child (orb_facade_proc.FacadeProxy, built by orb.start()): give it the
+    # replay transport and the simulated clock through the proxy's own http_factory hook
+    from backend.app.core import orb_facade_proc
+    real_proxy = orb_facade_proc.FacadeProxy
+
+    class ReplayFacadeProxy(real_proxy):
+        def __init__(self, *a, **kw):
+            kw.setdefault("http_factory", None)
+            if kw["http_factory"] is None:
+                kw["http_factory"] = ChildReplay(args.date, sim.clock_file.path, args.relay_latency_ms / 1000.0)
+            super().__init__(*a, **kw)
+    orb_facade_proc.FacadeProxy = ReplayFacadeProxy
     real_broker_cls = broker_mod.AlpacaBroker
 
     def fake_broker_factory(api_key, secret_key, base_url=broker_mod.PAPER_BASE_URL, **kw):
@@ -306,7 +325,7 @@ def main():
     def budget_sleep(s):
         budget_off[0] += s
 
-    out = {"date": args.date, "mode": args.mode, "macro_adapter": args.macro_adapter, "start": args.start, "end": args.end, "resume": args.resume,
+    out = {"date": args.date, "mode": args.mode, "facade": "child process", "start": args.start, "end": args.end, "resume": args.resume,
            "stop_at": args.stop_at, "stop_kind": args.stop_kind, "kill_on_post": args.kill_on_post,
            "snapshots": {}, "loop": {}, "errors": []}
 
@@ -389,6 +408,12 @@ def main():
                 await asyncio.sleep(0.01)
                 ms = (_wall.perf_counter() - t0 - 0.01) * 1000
                 lag["samples"] += 1
+                if dtime(9, 36) <= sim.now.astimezone(ET).time() <= dtime(10, 15):
+                    w = lag.setdefault("scan_window", {"max_ms": 0.0, "over_100": 0, "over_200": 0, "samples": 0})
+                    w["samples"] += 1
+                    w["max_ms"] = max(w["max_ms"], ms)
+                    w["over_100"] += ms > 100
+                    w["over_200"] += ms > 200
                 if ms > lag["max_ms"]:
                     lag["max_ms"], lag["worst_at"] = ms, sim.now.astimezone(ET).isoformat()
                 if ms > 200:
@@ -398,6 +423,23 @@ def main():
                         lag["events"].append({"sim": sim.now.astimezone(ET).isoformat(), "ms": round(ms, 1),
                                               "jobs": sorted(sched._jobs) if sched is not None else []})
 
+        import gc
+        gc_log, gc_t0 = [], {}
+
+        def gc_cb(phase, info):
+            if phase == "start":
+                gc_t0["t"] = _wall.perf_counter()
+            elif "t" in gc_t0:
+                ms = (_wall.perf_counter() - gc_t0.pop("t")) * 1000
+                if ms > 20 and len(gc_log) < 500 and info.get("generation") == 2:
+                    gc_log.append({"tracked_objects": len(gc.get_objects()),
+                                   "harness_record_rows": len(rec.rows),
+                                   "harness_card_dicts": sum(len(r.get("cards") or []) for r in rec.rows)})
+                if ms > 20 and len(gc_log) < 500:
+                    gc_log.append({"sim": sim.now.astimezone(ET).isoformat(), "gen": info.get("generation"),
+                                   "ms": round(ms, 1), "collected": info.get("collected")})
+        gc.callbacks.append(gc_cb)
+        out["gc_pauses"] = gc_log
         steps_ms = {"clock_step_max_ms": 0.0, "clock_step_worst_at": None, "reconcile_max_ms": 0.0,
                     "trade_event_max_ms": 0.0, "clock_steps": 0}
         async with r.lifespan(r.app):
@@ -425,15 +467,6 @@ def main():
             r.orb.build(r.alpaca_broker, fac, r.orb.mode, clock=sim, monotonic=sim.mono,
                         sleep=broker_fake.confirm_sleep, budget=budget)
             instrument_facade(fac, rec, sim)
-            if args.macro_adapter:
-                # HARNESS ADAPTER for BUG 1 (see the report): OrbsFacade.macro_veto answers (vetoed, why) but the
-                # controller reads (ok, why). Flip it so the rest of the live path can be exercised.
-                recorded_macro = fac.macro_veto
-
-                def adapted_macro(symbol, direction, now):
-                    vetoed, why = recorded_macro(symbol, direction, now)
-                    return (not vetoed), why
-                fac.macro_veto = adapted_macro
             wd = asyncio.get_running_loop().create_task(watchdog())
             client = httpx.AsyncClient(transport=httpx.ASGITransport(app=r.app), base_url="http://dryrun")
             prev_steps = {}
@@ -535,6 +568,11 @@ def main():
                 out["orb_alerts"] = dict(r.orb.alerts)
                 out["broker_state_end"] = {k: v for k, v in r.broker_state.items() if k != "status"}
                 out["mismatch_seen"] = mismatch_seen
+                try:
+                    out["child_transport"] = {"counts": fac.http_attr("counts"), "misses": fac.http_attr("misses"),
+                                              "pid": fac.pid(), "restarts": fac.restarts}
+                except Exception as exc:
+                    out["child_transport"] = {"error": str(exc)}
                 out["budget"] = {"used": budget.used, "throttled": budget.throttled, "borrowed": budget.borrowed}
             finally:
                 running[0] = False
