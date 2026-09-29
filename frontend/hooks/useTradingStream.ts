@@ -65,7 +65,7 @@ const INITIAL_STATE: TradingState = {
     status: "WAITING_FOR_BACKEND",
   },
   market_context: {
-    vix: 0.0,
+    vix: null,
     vix_regime: "UNKNOWN",
     time_phase: "WAITING_FOR_BACKEND",
     market_status: "UNKNOWN",

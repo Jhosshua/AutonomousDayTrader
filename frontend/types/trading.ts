@@ -11,12 +11,72 @@ export interface AccountState {
   status: string;
 }
 
+export interface VixTier {
+  name: string;
+  lower: number | null;
+  upper: number | null;
+  sizing: number;
+  stop: number;
+}
+
+/** Every key after `sizing_multiplier` is optional so an older backend during a deploy still renders;
+ * the UI treats a missing key as unknown. A new backend always sends every key (null when unknown). */
 export interface MarketContext {
-  vix: number;
+  vix: number | null;
   vix_regime: string;
   time_phase: string;
   market_status: string;
   sizing_multiplier?: number;
+  stop_multiplier?: number | null;
+  vix_stale?: boolean | null;
+  vix_age_seconds?: number | null;
+  time_multiplier?: number | null;
+  market_trend?: string | null;
+  market_trend_reason?: string | null;
+  max_concurrent_positions?: number | null;
+  notional_cap_pct?: number | null;
+  base_risk_pct?: number | null;
+  midday?: { start: string; end: string } | null;
+  vix_tiers?: VixTier[] | null;
+  adaptive_strategies?: string[] | null;
+}
+
+/** What the robot saw when it bought (backend entry_context). Null on trades from before it was kept. */
+export interface EntryContext {
+  decided_at?: string | null;
+  time_phase?: string | null;
+  time_multiplier?: number | null;
+  vix?: number | null;
+  vix_regime?: string | null;
+  sizing_multiplier?: number | null;
+  stop_multiplier?: number | null;
+  vix_stale?: boolean | null;
+  qty_adaptation?: number | null;
+  qty_final?: number | null;
+  qty_if_neutral?: number | null;
+  size_limited_by?: "notional_cap" | "risk" | "account_limits" | string | null;
+  market_trend?: string | null;
+  trend_reason?: string | null;
+  stop_raw?: number | null;
+  stop_adapted?: number | null;
+  /** Ride the Trend only */
+  stop_basis?: "volatility" | "structure" | "floor" | string | null;
+  rs?: { day: boolean; recent: boolean } | null;
+  macro?: string | null;
+  regime_enforced?: string[] | null;
+}
+
+/** ORB's 9:38 market check and rules for one trade (backend orb_context). Fields are null when unknown. */
+export interface OrbContext {
+  classification: string | null;
+  short_frac: number | null;
+  wave: string | null;
+  decided_at: string | null;
+  short_bounds: { min: number; max: number } | null;
+  flow_rules_on: string[] | null;
+  breakeven_r: number | null;
+  risk_usd: number | null;
+  flatten_at: string | null;
 }
 
 export interface StrategyWindow {
@@ -165,6 +225,15 @@ export interface Position {
   entry_date?: string | null;
   fixed_protection?: boolean;
   exit_due?: string | null;
+  entry_context?: EntryContext | null;
+  initial_stop?: number | null;
+  bracket_status?: string | null;
+  runner_policy?: string | null;
+  target_1_filled?: boolean | null;
+  orb_context?: OrbContext | null;
+  /** Fixed plans: percent of the account the plan risks (0.75 = 0.75%). */
+  plan_risk_pct?: number | null;
+  r_multiple?: number | null;
 }
 
 export interface AuditRecord {

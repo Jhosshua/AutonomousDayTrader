@@ -19,6 +19,7 @@ from backend.app.core.broker import BrokerError, BrokerReject, filled_avg, fille
 from backend.app.core.trading_windows import ET
 from backend.app.core.persistence import PersistenceError
 from backend.app.models.events import OrderSide, OrderState, OrderType
+from backend.app.strategies import tri_engine
 from backend.app.strategies.base import StrategyStatus
 from backend.app.strategies.tri_engine import (
     ACTIVE_PHASES, TRI_IDS, VERSION, SOURCE_SHA256, AsymmetricDualStrategy,
@@ -352,7 +353,7 @@ class TriExecutionController:
             s.skip("NON_POSITIVE_RISK", now)
             return
         s.session_equity = s.session_equity or r.account.daily_starting_equity
-        budget = min(s.session_equity*.0075, max(0., s.session_equity*.015-self.open_risk()))
+        budget = min(s.session_equity*tri_engine.TRI_RISK_PCT, max(0., s.session_equity*.015-self.open_risk()))
         qty = int(max(0, min(budget/risk, r.account.buying_power/estimate)))
         # Tight-stop shorts (100% margin under $5) can need more buying power
         # than the account has: shrink to the largest affordable size instead
@@ -551,7 +552,7 @@ class TriExecutionController:
         risk = direction*(price-s.stop)
         if order.filled_qty != order.qty:
             s.note("PARTIAL_ENTRY_KEPT", at, filled=qty, ordered=order.qty)
-        budget = (s.session_equity or 0)*.0075
+        budget = (s.session_equity or 0)*tri_engine.TRI_RISK_PCT
         actual = max(0., risk)*qty
         if risk <= 0 or (budget and actual > budget*FILL_RISK_TOLERANCE):
             s.exit_reason = s.exit_reason or "INVALID_FILL_RISK"

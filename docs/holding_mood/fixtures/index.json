@@ -1,0 +1,30 @@
+{
+ "states": [
+  "idle",
+  "weekend",
+  "waiting",
+  "mood_calm_rising",
+  "mood_calm_flat",
+  "mood_calm_falling",
+  "mood_calm_unknown",
+  "mood_normal_rising",
+  "mood_normal_flat",
+  "mood_normal_falling",
+  "mood_normal_unknown",
+  "mood_nervous_rising",
+  "mood_nervous_flat",
+  "mood_nervous_falling",
+  "mood_nervous_unknown",
+  "mood_panic_rising",
+  "mood_panic_flat",
+  "mood_panic_falling",
+  "mood_panic_unknown",
+  "mood_nervous_rising_midday",
+  "stale_vix",
+  "busy",
+  "sized_down",
+  "pre_release_and_unlinked",
+  "old_backend"
+ ],
+ "built_from": "backend.app.main serializers"
+}

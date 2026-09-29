@@ -65,6 +65,9 @@ class BracketOrder(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     arm: TradingArm = TradingArm.INTRADAY
     fixed_single_target: bool = False
+    # Display only: what the robot saw when it admitted the trade (main.py _entry_context_safe).
+    # None on brackets from before this field; nothing in the bracket logic reads it.
+    entry_context: Optional[Dict[str, Any]] = None
 
     @property
     def target_1_remaining_qty(self) -> int:

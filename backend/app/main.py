@@ -44,7 +44,7 @@ from backend.app.ingestion.news_ws import NewsWebSocketClient
 from backend.app.ingestion.stock_ws import StockWebSocketClient
 from backend.app.ingestion.vix_client import VixClient
 from backend.app.models.events import BarEvent, QuoteEvent, TradeEvent, NewsEvent, VixPrint, RelayStatusEvent
-from backend.app.strategies.base import Strategy, SignalEvent
+from backend.app.strategies.base import Strategy, SignalEvent, StrategyStatus
 from backend.app.strategies.orb import OrbStrategy
 from backend.app.core.orb_integration import OrbIntegration, ORB_ID
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy  # v1 class: checkpoint decoding only
@@ -59,9 +59,12 @@ from backend.app.strategies.tsla_or15_retest import (
 from backend.app.core.or15_execution import OR15ExecutionController
 from backend.app.strategies.tri_engine import AsymmetricDualStrategy, TRI_IDS, FIXED_IDS, SOURCE_PATH as TRI_SOURCE_PATH, SOURCE_SHA256 as TRI_SOURCE_HASH
 from backend.app.core.tri_execution import TriExecutionController
-from backend.app.strategies.adaptation import DynamicAdaptationEngine
+from backend.app.strategies import tri_engine as tri_engine_mod
+from backend.app.strategies.adaptation import DynamicAdaptationEngine, calculate_position_size
 from backend.app.strategies.swing_indicators import DailyBarStore, DailyBarAggregator
 from backend.app.core.decisions import decision_log, classify_adaptation_reason
+from backend.app.core import research as research_mod
+from backend.app.core.log_limit import warn_rate_limited
 from backend.app.core.research import ResearchRecorder, safe as research_safe
 from backend.app.core.research_tracker import ResearchTracker
 from backend.app.core.trading_windows import is_trading_day, session_close, session_minutes, strategy_window
@@ -952,6 +955,61 @@ def _atr_estimate(symbol: str, bar: BarEvent, period: int = 14) -> float:
     return max(0.01, sum(true_ranges) / len(true_ranges))
 
 
+def _try_or_none(name: str, fn: Any) -> Any:
+    """Display-only fields: a bug in one of them becomes None, never a broken frame. Runs for every
+    position on every websocket frame, so the warning is rate-limited per field name."""
+    try:
+        return fn()
+    except Exception:
+        warn_rate_limited(log, f"display:{name}", "Display field %s failed", name)
+        return None
+
+
+ADAPTIVE_STRATEGY_IDS = ("vwap_pullback", "news_momentum", "mean_reversion")
+
+
+def _adaptive_strategies_on() -> List[str]:
+    """Ids of the three strategies that size and place stops by the market mood and are switched on."""
+    out = []
+    for strat in strategies:
+        if strat.strategy_id not in ADAPTIVE_STRATEGY_IDS or strat.status != StrategyStatus.ACTIVE:
+            continue
+        if strat.strategy_id == "vwap_pullback" and vwap_strategy.mode != "v2_live":
+            continue
+        out.append(strat.strategy_id)
+    return out
+
+
+def _vix_stale_now() -> Optional[bool]:
+    """Same expression as _strategy_cards; None when no print has ever arrived."""
+    if last_vix_print is None:
+        return None
+    return bool(getattr(last_vix_print, "is_stale", False) or getattr(last_vix_print, "is_fallback", False))
+
+
+def _market_context() -> Dict[str, Any]:
+    """Market mood for the UI (websocket frame and REST). Fail-soft: never raises."""
+    def _age() -> Optional[float]:
+        if last_vix_print is None:
+            return None
+        return round((datetime.now(timezone.utc) - last_vix_print.asof).total_seconds(), 1)
+    try:
+        return adaptation_engine.get_market_context(
+            vix_stale=_try_or_none("market.vix_stale", _vix_stale_now),
+            vix_age_seconds=_try_or_none("market.vix_age", _age),
+            adaptive_strategies=_try_or_none("market.adaptive_strategies", _adaptive_strategies_on),
+        )
+    except Exception:
+        warn_rate_limited(log, "display:market_context", "Market context failed")
+        return {}
+
+
+def _liquidation_due_iso() -> Optional[str]:
+    """Today's forced-liquidation moment (ET), read from the flattening engine's schedule."""
+    now_et = flattening_engine.clock.now().astimezone(ET_TZ)
+    return datetime.combine(now_et.date(), flattening_engine.schedule.phase3_liquidation_time, ET_TZ).isoformat()
+
+
 def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, Any]:
     """Serialize one position with the bracket and chart data that actually backs the UI."""
     pos = account.positions[symbol]
@@ -979,8 +1037,25 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
         "fixed_protection": bool(bracket and bracket.fixed_single_target),
         "exit_due": tsla_or15_strategy.exit_due.isoformat() if bracket and bracket.strategy_id == OR15_ID and tsla_or15_strategy.exit_due else None,
     }
+    # Display-only context for the "Holding now" card. Every key is always present (None when
+    # unknown) because the UI merges streamed frames. Each field is fail-soft on its own.
+    pos_data["entry_context"] = _try_or_none("entry_context", lambda: bracket.entry_context if bracket else None)
+    pos_data["initial_stop"] = _try_or_none("initial_stop", lambda: bracket.initial_stop_price if bracket else None)
+    pos_data["bracket_status"] = _try_or_none("bracket_status", lambda: bracket.status.value if bracket else None)
+    pos_data["runner_policy"] = _try_or_none("runner_policy", lambda: bracket.runner_policy if bracket else None)
+    pos_data["target_1_filled"] = _try_or_none("target_1_filled", lambda: bool(bracket.target_1_filled) if bracket else None)
+    pos_data["orb_context"] = None
+    pos_data["plan_risk_pct"] = None
+    pos_data["r_multiple"] = None
+    if bracket and bracket.target_2_order_id is None and bracket.runner_policy == "TRAIL_ONLY":
+        pos_data["take_profit_2"] = None      # a trailing runner has no second target (display only)
+    if not bracket:
+        pos_data["strategy_id"] = _try_or_none("strategy_id", lambda: str(pos.strategy_id or "manual").lower()) or "manual"
+    if pos_data["exit_due"] is None and pos.arm == TradingArm.INTRADAY:
+        pos_data["exit_due"] = _try_or_none("exit_due", _liquidation_due_iso)
     if tri_controller.owns(symbol):
         pos_data.update(tri_controller.position_details(symbol))
+        pos_data["plan_risk_pct"] = round(tri_engine_mod.TRI_RISK_PCT * 100.0, 4)
     if orb.owns(symbol):
         pos_data.update(orb.position_details(symbol))
     if include_chart:
@@ -1577,7 +1652,7 @@ async def broadcast_ui_state(force: bool = False) -> None:
             "status": snapshot.status,
             "daily_starting_equity": account.daily_starting_equity,
         },
-        "market_context": adaptation_engine.get_market_context(),
+        "market_context": _market_context(),
         "strategies": _strategy_cards(),
         "primary_position": primary_pos,
         "all_positions": [_serialize_position(symbol, include_chart=False) for symbol in active_position_symbols],
@@ -1790,6 +1865,77 @@ def _intraday_target_overrides(
     return signal.take_profit_1, signal.take_profit_2, None
 
 
+def _build_entry_context(signal: SignalEvent, stages: Dict[str, Any], qty: int, adapted_stop: float) -> Dict[str, Any]:
+    """What the robot saw when it admitted a trade, read from the engine (never recomputed from times)."""
+    eng = adaptation_engine
+    entry = float(signal.entry_price)
+    equity = float(account.equity)
+    is_buy = signal.side == OrderSide.BUY or str(signal.side).upper() == "BUY"
+    qty_adaptation = stages.get("admission_qty")
+    qty_neutral = calculate_position_size(
+        equity=equity, entry_price=entry, stop_loss_price=adapted_stop, risk_pct=eng.base_risk_pct,
+        max_alloc_pct=eng.max_alloc_pct, vix_multiplier=1.0,
+    )
+    dist = abs(entry - adapted_stop)
+    by_cap = math.floor(equity * eng.max_alloc_pct / entry) if entry > 0 else 0
+    by_risk = math.floor(equity * eng.base_risk_pct * eng.current_sizing_multiplier * eng.time_multiplier / dist) if dist > 0.001 else 0
+    if qty_adaptation is not None and qty < qty_adaptation:
+        limited_by = "account_limits"
+    else:
+        limited_by = "notional_cap" if by_cap <= by_risk else "risk"
+    ctx: Dict[str, Any] = {
+        "decided_at": (signal.timestamp + timedelta(minutes=1)).isoformat(),
+        "time_phase": eng.current_time_phase,
+        "time_multiplier": eng.time_multiplier,
+        "vix": eng.current_vix,
+        "vix_regime": eng.current_vix_regime,
+        "sizing_multiplier": eng.current_sizing_multiplier,
+        "stop_multiplier": eng.current_stop_multiplier,
+        "vix_stale": _vix_stale_now(),
+        "qty_adaptation": qty_adaptation,
+        "qty_final": qty,
+        "qty_if_neutral": qty_neutral,
+        "size_limited_by": limited_by,
+        "market_trend": None,
+        "trend_reason": None,
+        "stop_raw": signal.stop_loss,
+        "stop_adapted": adapted_stop,
+    }
+    if eng.market_filter is not None:
+        ctx["market_trend"] = eng.market_filter.get_current_trend(signal.timestamp)[0].value
+        _ok, why = eng.market_filter.is_signal_permitted(
+            strategy_id=signal.strategy_id, side=signal.side, symbol=signal.symbol, asof=signal.timestamp,
+            catalyst_sentiment=getattr(signal, "catalyst_sentiment", None),
+            volume_surge=getattr(signal, "volume_surge", None), rvol=getattr(signal, "rvol", None),
+        )
+        ctx["trend_reason"] = str(why).split(":")[0].strip()[:60]
+    if signal.strategy_id == "vwap_pullback":
+        feats = signal.features or {}
+        atr_c, struct_c = feats.get("stop_atr_candidate"), feats.get("stop_structure_candidate")
+        floor_c = vwap_pullback_v2.MIN_STOP_DISTANCE_PCT * entry
+        if atr_c is not None and struct_c is not None:
+            ctx["stop_basis"] = "volatility" if atr_c >= struct_c and atr_c >= floor_c else (
+                "structure" if struct_c >= floor_c else "floor")
+        else:
+            ctx["stop_basis"] = None
+        rs_day, rs_30 = stages.get("rs_day"), stages.get("rs_30")
+        ctx["rs"] = None if rs_day is None or rs_30 is None else {
+            "day": bool(rs_day >= 0 if is_buy else rs_day <= 0), "recent": bool(rs_30 >= 0 if is_buy else rs_30 <= 0)}
+        ctx["macro"] = str(stages.get("macro"))[:60] if stages.get("macro") is not None else None
+        ctx["regime_enforced"] = list(stages.get("regime_enforced") or [])
+    # Nothing unencodable (NaN, datetime, enum, numpy) may ever reach the checkpoint.
+    return json.loads(json.dumps(research_mod.json_safe(ctx), allow_nan=False))
+
+
+def _entry_context_safe(signal: SignalEvent, stages: Dict[str, Any], qty: int, adapted_stop: float) -> Optional[Dict[str, Any]]:
+    """Display-only record for the Holding card. Any failure is a WARNING and None, never a blocked order."""
+    try:
+        return _build_entry_context(signal, stages, qty, adapted_stop)
+    except Exception:
+        warn_rate_limited(log, "display:entry_context", "entry_context failed for %s", getattr(signal, "symbol", "?"))
+        return None
+
+
 async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] = None) -> None:
     """Evaluate and route strategy signals through adaptation and risk engines."""
     sym = signal.symbol.upper()
@@ -1979,6 +2125,7 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
         entry_order_to_bracket[submitted.id] = bracket.bracket_id
         if signal.strategy_id == "vwap_pullback" and hasattr(vwap_strategy, "notify_admitted"):
             vwap_strategy.notify_admitted(sym)
+        bracket.entry_context = _entry_context_safe(signal, stages, qty, adapted_stop)
         if settings.RESEARCH_ENABLED:
             research_safe(research_tracker.open_bracket, bracket, signal_row, submitted, recorder=research_recorder)
         if bar:
@@ -3389,7 +3536,7 @@ async def get_decisions(limit: int = 50, strategy: Optional[str] = None) -> Dict
 @app.get("/api/market-context")
 async def get_market_context() -> Dict[str, Any]:
     """Current VIX volatility regime and Time-of-Day execution phase."""
-    return adaptation_engine.get_market_context()
+    return _market_context()
 
 
 @app.get("/api/audit")
