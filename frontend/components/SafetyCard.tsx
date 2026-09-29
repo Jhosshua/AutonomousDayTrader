@@ -71,7 +71,7 @@ export default function SafetyCard({
       <div className="flex items-start gap-3">
         <Target className="h-5 w-5 flex-shrink-0" style={{ color: "#3F7D5C" }} aria-hidden="true" />
         <div className="text-sm leading-relaxed">
-          <b>Small bets.</b> Keeps each bet small ({riskPctLabel}).
+          <b>Small bets.</b> Keeps each bet small ({riskPctLabel}). Exception: Opening Range Breakout follows ORBStraddle's sizing, 2% on its first trade of the day and 2.5% in total.
         </div>
       </div>
       <div className="flex items-start gap-3">
