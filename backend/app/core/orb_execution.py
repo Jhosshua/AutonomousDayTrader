@@ -2165,6 +2165,13 @@ class OrbExecutionController:
             except (BudgetThrottled, DestinationRefused) as exc:
                 not_sent(f"not sent: {exc}")
                 return None, str(exc), n, side
+        # never a second exit while one of ours may still be working (checked in the preparation when there
+        # was one, i.e. before the legs were cancelled, so no budget refusal can strand the close here)
+        if ctx is None or not ctx.get("open_checked"):
+            why_live = self._live_own_exit_at_broker(sym, coid)
+            if why_live:
+                not_sent(why_live)
+                return None, why_live, n, side
         try:
             net = int(self._call("exit", self.broker.position_qty, sym))
         except Exception as exc:
@@ -2202,10 +2209,9 @@ class OrbExecutionController:
         except Exception as exc:
             err = str(exc)[:200]
             definitive = isinstance(exc, BrokerHTTPError) and exc.definitive
-            # a non-definitive answer (429, 5xx) or a lost reply is ambiguous: the client id stays unresolved
-            # and is looked up below. Only a 429 (rate limited: not processed) followed by a 404 on that lookup
-            # closes it at once; anything else waits out the grace (a 5xx may still have created the order)
-            answered = isinstance(exc, BrokerHTTPError) and exc.status_code == 429
+            # a non-definitive answer (429 or 5xx) or a lost reply is ambiguous: the client id stays unresolved
+            # through the full grace window (lookup visibility can lag); it is reconciled by client id before
+            # any new exit POST, never closed early on a 404
             with self._lock:
                 rec = self.state["orders"].get(key)
                 if rec and rec.get("submit_state") == "in_flight":
@@ -2218,9 +2224,7 @@ class OrbExecutionController:
             self._merge(dict(got, client_order_id=got.get("client_order_id") or coid))
             return got.get("id"), None, n, side
         if not_found:
-            # the broker answered the POST (e.g. 429) and has no order with this client id: not placed.
-            # A lost reply (no HTTP answer) is never closed early: the grace rule applies.
-            self._mark_not_found(key, confirmed=definitive or answered)
+            self._mark_not_found(key, confirmed=definitive)
         if not (self.state["orders"].get(key) or {}).get("terminal"):
             return None, err + " (outcome unknown; tracked by coid)", n, side
         return None, err, n, side
@@ -2261,11 +2265,31 @@ class OrbExecutionController:
             ctx["token"] = True
         except (BudgetThrottled, DestinationRefused) as exc:
             return abort(f"not sent: {exc}; protection left in place")
+        why_live = self._live_own_exit_at_broker(sym, coid)
+        if why_live:
+            return abort(why_live + "; protection left in place")
+        ctx["open_checked"] = True
         try:
             ctx["net"] = int(self._call("exit", self.broker.position_qty, sym))
         except Exception as exc:
             return abort(f"could not read the account position for {sym} ({exc}); protection left in place")
         return ctx, None
+
+    def _live_own_exit_at_broker(self, sym: str, coid: str) -> Optional[str]:
+        """Alpaca's open orders for the symbol must show no live ORB exit other than `coid`; an unreadable
+        list is a refusal too. Returns why not to send, or None."""
+        prefix_x = f"{self.cfg['coid_prefix']}-X-"
+        try:
+            rows = self._call("exit", self.broker.list_open_orders, sym)
+        except Exception as exc:
+            return f"could not list open orders for {sym} before the exit; retrying ({exc})"
+        live = [o for o in rows if isinstance(o, dict) and str(o.get("client_order_id") or "").startswith(prefix_x)
+                and o.get("client_order_id") != coid and o.get("status") not in QUIESCENT]
+        if not live:
+            return None
+        for o in live:
+            self._merge(o)
+        return f"an own exit order ({live[0].get('client_order_id')}) is still live at Alpaca; not sending another"
 
     def _latch_exit(self, pos_key: Optional[str], why: str) -> None:
         """Once ORB's protection is (about to be) cancelled, the exit is owed until the position is flat:

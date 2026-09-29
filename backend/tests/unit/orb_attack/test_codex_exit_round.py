@@ -108,14 +108,60 @@ def test_exit_429_after_the_broker_accepted_it_never_sells_twice():
     assert [f[5] for f in h.fills] == ["entry", "exit"]
 
 
-def test_exit_429_that_created_nothing_is_retried_promptly():
+def test_exit_429_that_created_nothing_waits_out_the_grace_then_sells_once():
+    """Final Codex pass: a 429 is ambiguous like a 5xx (lookups can lag), so its client id stays unresolved
+    through the full grace window; after it, one new exit goes out."""
     h = opened()
     h.alpaca.fail.append({"method": "POST", "path": "/v2/orders", "kind": "status", "status": 429})
     h.alpaca.prices["APP"] = 99.30
-    for _ in range(3):                                         # 15 s, well inside the 60 s grace
+    for _ in range(9):                                         # 45 s: inside the 60 s grace, nothing new sent
+        h.clock.advance(5)
+        h.ctl.tick()
+    assert h.alpaca._pos_qty("APP") == 454 and not _sells(h)
+    for _ in range(6):                                         # past the grace
         h.clock.advance(5)
         h.ctl.tick()
     assert h.alpaca._pos_qty("APP") == 0 and len([o for o in _sells(h) if o["status"] == "filled"]) == 1
+
+
+def test_exit_429_accepted_but_invisible_for_45_s_sells_exactly_once_and_never_crosses_flat():
+    h = opened()
+    h.alpaca.fail += [{"method": "POST", "path": "/v2/orders", "kind": "status_after", "status": 429},
+                      {"method": "GET", "path": "/v2/orders:by_client_order_id", "kind": "status", "status": 404,
+                       "times": 10 ** 6}]
+    h.alpaca.prices["APP"] = 99.30
+    t = 0
+    while t < 45:                                              # the order exists, but no lookup sees it
+        h.clock.advance(5)
+        t += 5
+        h.ctl.tick()
+        assert h.alpaca._pos_qty("APP") >= 0, "crossed flat"
+    h.alpaca.fail = [r for r in h.alpaca.fail if r["path"] != "/v2/orders:by_client_order_id"]   # visible again
+    for _ in range(6):
+        h.clock.advance(5)
+        h.ctl.tick()
+    assert len(_sells(h)) == 1 and h.alpaca._pos_qty("APP") == 0 and h.alpaca.refused_403 == []
+    assert h.own_fill_sum() == 0 and h.pos()["status"] == "CLOSED"
+    assert not any(e["kind"] == "exit_capped_outside_trade" for e in h.ctl.state["events"])
+
+
+def test_a_live_own_exit_at_alpaca_blocks_any_new_exit_post():
+    """Even if ORB's record of it were lost, a live adt-orb-X order on the symbol refuses a new exit."""
+    h = opened()
+    h.alpaca.market_fills = False                              # exits rest (e.g. a halted stock)
+    h.alpaca.prices["APP"] = 99.30
+    h.clock.advance(5)
+    h.ctl.tick()
+    first = _sells(h)
+    assert len(first) == 1 and first[0]["status"] == "new"
+    with h.ctl._lock:                                          # ORB forgets it (lost state row)
+        for k in [k for k, r in h.ctl.state["orders"].items() if r.get("role") == "exit"]:
+            h.ctl.state["orders"].pop(k)
+    for _ in range(3):
+        h.clock.advance(5)
+        h.ctl.tick()
+    assert len(_sells(h)) == 1 and len(posts(h, side="sell")) == 1   # never a second exit next to the first
+    assert h.alpaca.refused_403 == []
 
 
 # 5. the in-flight mark is a hard barrier
@@ -171,3 +217,21 @@ def test_exit_5xx_that_did_create_the_order_is_never_written_off_while_lookups_l
         h.ctl.tick()
     assert len(_sells(h)) == 1 and h.alpaca._pos_qty("APP") == 0 and h.own_fill_sum() == 0
     assert not any(e["kind"] == "exit_capped_outside_trade" for e in h.ctl.state["events"])
+
+
+def test_a_live_own_exit_seen_while_preparing_leaves_the_bracket_untouched():
+    """The preparation (before any leg is cancelled) also refuses when Alpaca shows a live ORB exit ORB's
+    records do not know (lost row): the bracket stays in place and nothing is sent."""
+    h = opened()
+    h.alpaca._apply_position("APP", "buy", 100, 100.0)               # 100 more shares at Alpaca
+    h.alpaca.market_fills = False
+    real_reserved, h.alpaca._reserved_for_exit = h.alpaca._reserved_for_exit, lambda *a: 0
+    h.broker.submit_market_order("APP", "sell", 100, "adt-orb-X-APP-2026-09-28-9-lost00")   # resting, unknown
+    h.alpaca._reserved_for_exit = real_reserved
+    h.alpaca.market_fills = True
+    n = len(h.alpaca.requests)
+    h.alpaca.prices["APP"] = 99.30
+    h.clock.advance(5)
+    h.ctl.tick()
+    assert not [w for w in h.alpaca.requests[n:] if w[0] in ("DELETE", "POST")]
+    assert live_stop_at_broker(h)

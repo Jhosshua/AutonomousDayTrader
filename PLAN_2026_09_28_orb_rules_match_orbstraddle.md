@@ -7,7 +7,10 @@ deployed. Next: deploy after 16:00 in `ORB_MODE=shadow` (section 10 step 4). Dev
 are listed in MEMORY.md (2026-09-28 evening entry). 9.6 "and vice versa" stays UNBUILT on purpose
 (operator/coordinator ruling 2026-09-28): ORB's sizing stays exactly ORBStraddle's and never shrinks
 for other arms' losses; ADT's daily loss stop still halts ORB, and ORB's open risk is reserved out of
-ADT's budget. The shadow input fingerprints (9.8) are not built; the Alpaca limiter is ORB's own budget (100/min +
+ADT's budget. Known risks ACCEPTED (ORBStraddle parity, alarms escalate at 30 s / 2 min / 10 min):
+after a conclusively rejected close ORB restores no protection (the legs are already cancelled; the exit
+retries every pass), and after an ambiguous close answer (429 / 5xx / lost reply) the shares are unprotected
+for up to the 60 s grace before a new exit may go out. The shadow input fingerprints (9.8) are not built; the Alpaca limiter is ORB's own budget (100/min +
 50 exit reserve), not one limiter shared with ADT (8.9).
 
 Operator request (2026-09-28): ADT's general ORB must execute exactly like ORBStraddle. Clarified after a
