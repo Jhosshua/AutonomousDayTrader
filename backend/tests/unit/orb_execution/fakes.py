@@ -154,6 +154,8 @@ class FakeAlpaca:
         if rule and rule["kind"] == "status":
             return httpx.Response(rule["status"], json={"message": rule.get("message", "simulated")})
         resp = self._route(method, path, body, request.url.params)
+        if rule and rule["kind"] == "status_after":       # the broker DID act, but answered an error
+            return httpx.Response(rule["status"], json={"message": rule.get("message", "simulated")})
         if rule and rule["kind"] == "lost":
             raise httpx.ReadTimeout("simulated lost reply", request=request)
         return resp

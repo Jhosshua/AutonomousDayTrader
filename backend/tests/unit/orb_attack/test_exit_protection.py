@@ -272,34 +272,3 @@ def test_manual_close_at_alpaca_is_noticed_without_waiting_for_a_price_rule():
         h.clock.advance(5)
         h.ctl.tick()
     assert h.pos()["status"] == "CLOSED" and not h.ctl.owns("APP")
-
-
-def test_a_close_that_keeps_failing_after_the_cancels_re_arms_a_protective_stop():
-    """P0-2: once the legs are gone the exit is latched and retried every pass; if the close cannot be
-    sent within the bound, a stop is re-placed at the ORIGINAL stop price for exactly ORB's shares."""
-    from backend.app.core.broker import BrokerHTTPError
-    h = opened()
-    real_close = h.broker.submit_market_order
-
-    def refuse(*a, **kw):
-        raise BrokerHTTPError("market order refused (test)", 422)
-    h.broker.submit_market_order = refuse             # every CLOSE is refused; stops still go through
-    _fast_fail(h)
-    assert not live_stop_at_broker(h) and h.pos()["exit_latched"]
-    h.alpaca.prices["APP"] = 100.2                     # price recovers: the latched exit is still retried
-    rearmed = None
-    for _ in range(8):
-        h.clock.advance(5)
-        h.ctl.tick()
-        stops = [o for o in h.alpaca.orders.values() if o["type"] == "stop" and o["client_order_id"].startswith("adt-orb-S-")]
-        if stops:
-            rearmed = stops[-1]
-            break
-    assert rearmed and rearmed["stop_price"] == "98.00" and int(rearmed["qty"]) == 454 and rearmed["side"] == "sell"
-    assert h.alpaca._pos_qty("APP") == 454 and h.alpaca.refused_403 == []
-    h.broker.submit_market_order = real_close          # the broker accepts closes again
-    for _ in range(3):
-        h.clock.advance(5)
-        h.ctl.tick()
-    assert h.alpaca._pos_qty("APP") == 0 and h.own_fill_sum() == 0
-    assert not live_stop_at_broker(h)                 # the re-armed stop was cancelled before the close

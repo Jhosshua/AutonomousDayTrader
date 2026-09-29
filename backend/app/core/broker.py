@@ -401,24 +401,6 @@ class AlpacaBroker:
             return resp.json()
         raise self._http_error(f"market {side} {qty} {symbol} refused", resp)
 
-    def submit_stop_order(self, symbol: str, side: str, qty: int, stop_price: float, client_order_id: str) -> Dict[str, Any]:
-        """POST one plain stop day order (ORB's re-armed protection). No lookup, no retry: the caller does."""
-        side = side.lower()
-        if side not in ("buy", "sell") or int(qty) < 1 or not stop_price or stop_price <= 0:
-            raise ValueError("stop order needs side buy/sell, qty >= 1 and a positive stop price")
-        body = {"symbol": symbol.upper(), "qty": str(int(qty)), "side": side, "type": "stop",
-                "stop_price": f"{float(stop_price):.2f}", "time_in_force": "day",
-                "client_order_id": client_order_id[:128]}
-        self.status.orders_sent += 1
-        self.status.last_order_at = datetime.now(timezone.utc).isoformat()
-        try:
-            resp = self._client.post("/v2/orders", json=body)
-        except httpx.HTTPError as exc:
-            raise BrokerTransportError(f"stop {side} {symbol} outcome unknown: {exc}") from exc
-        if resp.status_code in (200, 201):
-            return resp.json()
-        raise self._http_error(f"stop {side} {qty} {symbol} refused", resp)
-
     def patch_order(self, order_id: str, qty: Optional[int] = None, stop_price: Optional[float] = None,
                     limit_price: Optional[float] = None) -> Dict[str, Any]:
         """PATCH (replace) one working order. Returns the replacement order JSON (a new id).
