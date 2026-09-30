@@ -619,7 +619,8 @@ class OvernightController:
         room = self.room_multiple * equity - swing - others
         bp_left = bp - others
         allowed = min(wanted * price, room, bp_left)
-        qty = max(0, min(wanted, int(allowed // price))) if allowed > 0 else 0
+        # full size when nothing binds: allowed // price can land one share short in floating point
+        qty = wanted if allowed >= wanted * price else (max(0, min(wanted, int(allowed // price))) if allowed > 0 else 0)
         n["wanted_qty"] = wanted
         if qty < wanted:
             n["shrunk"] = {"wanted": wanted, "qty": qty, "price": price, "room": room, "buying_power_left": bp_left,

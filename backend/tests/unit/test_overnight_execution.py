@@ -596,6 +596,18 @@ def test_size_is_20pct_of_equity_capped_at_25000():
     assert rig.alpaca.buys("NVDA")[0][1]["qty"] == "250"
 
 
+def test_full_size_is_not_lost_to_floating_point_when_nothing_binds():
+    """D2 is floor(0.20 x equity / price). At NVDA 228.87 on $49,700 that is 43 shares. 43 x 228.87
+    divided back by 228.87 is 42.99999 in floating point, which used to buy 42 and log a false X11."""
+    rig = new()
+    rig.alpaca.account.update(equity=49_700.0, buying_power=198_800.0)
+    rig.alpaca.price.update(NVDA=228.87, IREN=41.73, HUT=92.75)
+    rig.run(T(THU, 15, 44), T(THU, 15, 46, 6))
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "43"), ("IREN", "238"), ("HUT", "107")]
+    assert rig.night("NVDA")["shrunk"] is None
+    assert not any(r["event"] == "X11_SHRUNK" for r in rig.ctl.state["log"])
+
+
 def test_room_shrinks_in_nvda_iren_hut_order_and_logs_x11():
     hooks = Hooks(swing_market_value=lambda: 85_000.0)
     rig = new(hooks=hooks)
