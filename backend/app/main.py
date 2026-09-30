@@ -1074,6 +1074,7 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
     pos_data["runner_policy"] = _try_or_none("runner_policy", lambda: bracket.runner_policy if bracket else None)
     pos_data["target_1_filled"] = _try_or_none("target_1_filled", lambda: bool(bracket.target_1_filled) if bracket else None)
     pos_data["orb_context"] = None
+    pos_data["overnight"] = False
     pos_data["plan_risk_pct"] = None
     pos_data["r_multiple"] = None
     if bracket and bracket.target_2_order_id is None and bracket.runner_policy == "TRAIL_ONLY":
