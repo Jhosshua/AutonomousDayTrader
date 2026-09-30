@@ -1065,24 +1065,127 @@ def test_split_10_for_1_adjusts_the_hold_and_replaces_the_sale():
     assert nv["state"] == SOLD and nv["realized"] == pytest.approx(550 * 0.5) and not rig.ctl.reserves("NVDA")
 
 
-def test_reverse_split_with_symbol_change_needs_a_look_and_sells_the_new_symbol():
+def test_confirmed_symbol_change_converts_the_hold_before_selling_the_new_symbol():
+    """IREN becomes IRNX, one new share for two old. The hold is converted first (248 IREN at 40
+    become 124 IRNX at 80, same strategy), the old queued sale is cancelled, then IRNX is sold and
+    booked as the hold (with its result), and the reservation moves to IRNX."""
     rig = new()
     _to_morning(rig)
     rig.alpaca.positions.pop("IREN")
-    rig.alpaca.positions["IRNX"] = 24
-    rig.alpaca.price["IRNX"] = 400.0
+    rig.alpaca.positions["IRNX"] = 124
+    rig.alpaca.price["IRNX"] = 82.0
     rig.alpaca.corporate_actions = [{"kind": "reverse_split", "old_symbol": "IREN", "new_symbol": "IRNX",
-                                     "ratio": 0.1, "ex_date": FRI.isoformat()}]
+                                     "ratio": 0.5, "ex_date": FRI.isoformat()}]
+    booked_when_sent = []
+    real_post = rig.alpaca.submit_on_auction
+
+    def spy(symbol, side, qty, client_order_id, tif):
+        if symbol == "IRNX":
+            booked_when_sent.append([e.get("kind") for e in rig.booked])
+        return real_post(symbol, side, qty, client_order_id, tif)
+
+    rig.alpaca.submit_on_auction = spy
     rig.run(T(FRI, 9, 0), T(FRI, 9, 1))
     ir = rig.night("IREN")
-    assert osch.CORPORATE_ACTION in ir["needs_look"]
+    change = [e for e in rig.booked if e.get("kind") == "symbol_change"]
+    assert change == [{"kind": "symbol_change", "strategy_id": "overnight_iren", "symbol": "IREN", "new_symbol": "IRNX",
+                       "buy_date": THU.isoformat(), "ratio": 0.5, "old_qty": 248, "new_qty": 124, "old_avg": 40.0,
+                       "new_avg": 80.0}]
+    # the conversion was booked before the IRNX sale was sent
+    assert len(booked_when_sent) == 1 and "symbol_change" in booked_when_sent[0]
+    assert ir["needs_look"] == [] and ir["held_qty"] == 124 and ir["buy_avg"] == pytest.approx(80.0)
+    assert any("IREN became IRNX overnight" in r.get("text", "") for r in rig.ctl.state["log"])
     assert [(b["symbol"], b["qty"], b["client_order_id"]) for _, b in rig.alpaca.sells() if b["symbol"] in ("IREN", "IRNX")] == [
-        ("IREN", "248", "adt-ovn-IREN-20261001-sell-1"), ("IRNX", "24", "adt-ovn-IRNX-20261001-sell-1")]
+        ("IREN", "248", "adt-ovn-IREN-20261001-sell-1"), ("IRNX", "124", "adt-ovn-IRNX-20261001-sell-1")]
     assert ir["legs"][0]["attempts"][0]["id"] in rig.alpaca.cancels
+    assert rig.ctl.reserves("IRNX") and not rig.ctl.reserves("IREN") and rig.ctl.sale_due("IRNX") is not None
+    assert rig.ctl.locks_all("IRNX") and not rig.ctl.locks_all("IREN")
     rig.alpaca.clock.now = T(FRI, 9, 30)
     rig.alpaca.open_auction()
     rig.run(T(FRI, 9, 30), T(FRI, 9, 32))
-    assert ir["state"] == SOLD and rig.alpaca.positions.get("IRNX", 0) == 0 and not rig.ctl.reserves("IREN")
+    sale = [e for e in rig.booked if e.get("role") == "sell" and e["symbol"] == "IRNX"]
+    assert sale and sale[0]["hold_symbol"] == "IRNX" and sale[0]["stock"] == "IREN"
+    assert sale[0]["realized"] == pytest.approx(124 * 2.0)
+    assert ir["state"] == SOLD and ir["realized"] == pytest.approx(248.0) and ir["released"]
+    assert rig.alpaca.positions.get("IRNX", 0) == 0 and "IREN" not in rig.alpaca.positions
+    assert not rig.ctl.reserves("IRNX") and not rig.ctl.reserves("IREN")
+
+
+UNCLEAR_CHANGES = {
+    # a 1 for 10 reverse split pays cash for the fraction: 24.8 owed, Alpaca shows 24
+    "fraction": ([{"kind": "reverse_split", "old_symbol": "IREN", "new_symbol": "IRNX", "ratio": 0.1}], {"IRNX": 24}),
+    "no ratio": ([{"kind": "reverse_split", "old_symbol": "IREN", "new_symbol": "IRNX", "ratio": None}], {"IRNX": 124}),
+    "no new symbol": ([{"kind": "merger", "old_symbol": "IREN", "new_symbol": "IREN", "ratio": 0.5}], {"IRNX": 124}),
+    "shares do not match": ([{"kind": "merger", "old_symbol": "IREN", "new_symbol": "IRNX", "ratio": 0.5}], {"IRNX": 100}),
+    "old shares still there": ([{"kind": "merger", "old_symbol": "IREN", "new_symbol": "IRNX", "ratio": 0.5}],
+                               {"IREN": 100, "IRNX": 74}),
+}
+
+
+@pytest.mark.parametrize("case", sorted(UNCLEAR_CHANGES))
+def test_unclear_symbol_change_sells_nothing_and_is_never_released(case):
+    actions, held = UNCLEAR_CHANGES[case]
+    rig = new()
+    _to_morning(rig)
+    rig.alpaca.positions.pop("IREN")
+    rig.alpaca.positions.update(held)
+    rig.alpaca.price["IRNX"] = 82.0
+    rig.alpaca.corporate_actions = [dict(a, ex_date=FRI.isoformat()) for a in actions]
+    rig.run(T(FRI, 9, 0), T(FRI, 9, 1))
+    ir = rig.night("IREN")
+    assert ir["needs_look"] == [osch.SYMBOL_CHANGE_UNCLEAR] and ir["frozen"] == osch.SYMBOL_CHANGE_UNCLEAR
+    text = next(a[1] for a in rig.alerts if a[2].get("reason") == osch.SYMBOL_CHANGE_UNCLEAR)
+    assert "Nothing was sold" in text and "sell the shares there by hand" in text
+    assert ir["legs"][0]["attempts"][0]["id"] in rig.alpaca.cancels          # the queued IREN sale is cancelled
+    assert not any(e.get("kind") == "symbol_change" for e in rig.booked)
+    rig.alpaca.clock.now = T(FRI, 9, 30)
+    rig.alpaca.open_auction()
+    rig.run(T(FRI, 9, 30), T(FRI, 9, 40), step=5)
+    sells_fri = [b for t, b in rig.alpaca.sells() if t.date() == FRI and b["symbol"] in ("IREN", "IRNX")]
+    assert sells_fri == []                                                    # no automatic sale at all
+    assert all(rig.alpaca.positions.get(s) == q for s, q in held.items())
+    assert ir["state"] == HELD and not ir["released"] and ir["legs"][0]["sold"] == 0
+    assert rig.ctl.reserves("IREN") and rig.ctl.locks_all("IREN")
+    assert rig.ctl.unsold_after_0931(T(FRI, 9, 40)) == ["IREN"]
+    assert not any(e.get("role") == "sell" and e["hold_symbol"] == "IREN" for e in rig.booked)
+    assert len(ir["legs"][0]["attempts"]) == 1                                # no new sale attempt is even made
+
+
+def test_unclear_symbol_change_never_resends_a_sale_whose_post_was_lost():
+    """The 19:00 sale's POST never got an answer (no Alpaca id). Once the change is unclear the id
+    is only looked up at 09:00, never sent again."""
+    rig = new()
+    buy_day(rig)
+    rig.alpaca.fail_posts = [("transport", False)] * 40
+    rig.run(T(THU, 19, 0), T(THU, 19, 1), step=5)
+    rig.alpaca.fail_posts = []
+    att = rig.night("IREN")["legs"][0]["attempts"][-1]
+    assert att["id"] is None and not att["final"]
+    rig.alpaca.positions.pop("IREN")
+    rig.alpaca.positions["IRNX"] = 24
+    rig.alpaca.corporate_actions = [{"kind": "reverse_split", "old_symbol": "IREN", "new_symbol": "IRNX", "ratio": 0.1,
+                                     "ex_date": FRI.isoformat()}]
+    rig.run(T(FRI, 9, 0), T(FRI, 9, 35), step=5)
+    ir = rig.night("IREN")
+    assert ir["frozen"] == osch.SYMBOL_CHANGE_UNCLEAR
+    assert [b for t, b in rig.alpaca.sells() if t.date() == FRI and b["symbol"] in ("IREN", "IRNX")] == []
+    assert ir["state"] == HELD and not ir["released"]
+
+
+def test_a_symbol_change_the_book_refuses_sells_nothing():
+    rig = new()
+    _to_morning(rig)
+    rig.alpaca.positions.pop("IREN")
+    rig.alpaca.positions["IRNX"] = 124
+    rig.alpaca.price["IRNX"] = 82.0
+    rig.alpaca.corporate_actions = [{"kind": "merger", "old_symbol": "IREN", "new_symbol": "IRNX", "ratio": 0.5,
+                                     "ex_date": FRI.isoformat()}]
+    rig.ctl.book = lambda e: False if e.get("kind") == "symbol_change" else True
+    rig.run(T(FRI, 9, 0), T(FRI, 9, 35))
+    ir = rig.night("IREN")
+    assert ir["frozen"] == osch.BOOKING_REFUSED and osch.BOOKING_REFUSED in ir["needs_look"]
+    assert [b for t, b in rig.alpaca.sells("IRNX")] == [] and ir["hold_symbol"] is None
+    assert ir["state"] == HELD and not ir["released"] and rig.alpaca.positions["IRNX"] == 124
 
 
 def test_split_with_a_missing_ratio_needs_a_look_and_never_sells_more_than_the_hold():

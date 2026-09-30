@@ -230,11 +230,18 @@ class OvernightController:
     def _left(self, n: Dict[str, Any]) -> int:
         return sum(leg["qty"] - leg["sold"] for leg in n["legs"]) if n["legs"] else n["held_qty"]
 
+    @staticmethod
+    def _cur(n: Dict[str, Any]) -> str:
+        """The symbol this night's shares carry in ADT's book and at Alpaca: the stock itself, or
+        the new symbol after a confirmed symbol change (the night key and strategy stay)."""
+        return n.get("hold_symbol") or n["symbol"]
+
     # ---------------------------------------------------------------- queries
     def reserves(self, symbol: str) -> bool:
         """True while any night in this stock is not released (15:45 until the sale is booked and
-        Alpaca shows it flat, or until the buy is given up)."""
-        return any(n["symbol"] == symbol.upper() and not n["released"] for n in self.state["nights"].values())
+        Alpaca shows it flat, or until the buy is given up). After a symbol change the reservation
+        is on the new symbol."""
+        return any(self._cur(n) == symbol.upper() and not n["released"] for n in self.state["nights"].values())
 
     def holds(self) -> List[Dict[str, Any]]:
         return [n for n in self._nights() if n["state"] in HOLD_STATES and self._left(n) > 0]
@@ -243,7 +250,7 @@ class OvernightController:
         """S1: once a buy intent exists (sent, accepted, held, queued for sale, or sold but Alpaca
         not yet shown flat) every other order in this stock is refused."""
         sym = symbol.upper()
-        return any(n["symbol"] == sym and not n["released"]
+        return any(self._cur(n) == sym and not n["released"]
                    and (n["state"] not in (IDLE, SKIPPED) or n["held_qty"] > 0)
                    for n in self.state["nights"].values())
 
@@ -251,7 +258,7 @@ class OvernightController:
         """S17: when the hold in this stock sells (the sale date at 09:30 ET), or None."""
         sym = symbol.upper()
         for n in self.holds():
-            if n["symbol"] == sym and self._sd(n) is not None:
+            if self._cur(n) == sym and self._sd(n) is not None:
                 return et(self._sd(n), osch.SALE_POLL_FROM)
         return None
 
@@ -320,7 +327,7 @@ class OvernightController:
         for n in self.holds():
             sd = self._sd(n)
             if sd is not None and now >= et(sd, osch.SALE_FALLBACK_AT):
-                out.append(n["symbol"])
+                out.append(self._cur(n))
         return out
 
     def health(self, now: datetime) -> Dict[str, Any]:
@@ -427,7 +434,8 @@ class OvernightController:
                 "margin_ratio": None, "shrunk": None, "bars": None, "entries_cancelled": False, "day_close_requested": False,
                 "fallback_buy": False, "alerted_1547": False, "late_check": False, "buy": [],
                 "held_qty": 0, "buy_cost": 0.0, "buy_avg": None, "legs": [], "booked": {},
-                "morning_checked": False, "splits": [], "realized": 0.0, "fidelity": {}, "last_error": None}
+                "morning_checked": False, "splits": [], "hold_symbol": None, "symbol_change": None, "frozen": None,
+                "realized": 0.0, "fidelity": {}, "last_error": None}
 
     def _alerts(self, now: datetime) -> None:
         for n in self._nights():
@@ -881,11 +889,11 @@ class OvernightController:
             px = avg
         at = _parse_time(row.get("filled_at") or row.get("updated_at"), now)
         realized = None
-        if role == "sell" and leg is not None and leg["symbol"] == n["symbol"] and n["buy_avg"]:
+        if role == "sell" and leg is not None and leg["symbol"] == self._cur(n) and n["buy_avg"]:
             realized = delta * (px - n["buy_avg"])
         event = {"kind": "fill", "role": role, "strategy_id": n["strategy_id"], "symbol": row.get("symbol") or att["symbol"],
-                 "hold_symbol": n["symbol"], "buy_date": n["buy_date"], "qty": delta, "price": px, "at": _iso(at),
-                 "alpaca_order_id": oid, "client_order_id": att["cid"], "realized": realized}
+                 "hold_symbol": self._cur(n), "stock": n["symbol"], "buy_date": n["buy_date"], "qty": delta,
+                 "price": px, "at": _iso(at), "alpaca_order_id": oid, "client_order_id": att["cid"], "realized": realized}
         accepted = self.book(event)           # raises -> nothing recorded, retried at the next read
         n["booked"][oid] = {"qty": total, "notional": notional}
         att["filled_qty"], att["avg"] = total, avg
@@ -950,6 +958,10 @@ class OvernightController:
         if att is not None and not att["final"]:
             self._poll_sale(n, i, leg, att, now)
             return
+        if n.get("frozen"):
+            return      # an unclear symbol change: nothing is sold automatically (needs look)
+        if i > 0 and any(not a["final"] for a in n["legs"][0]["attempts"]):
+            return      # a new symbol leg waits until the old symbol's sale is final (cancelled)
         left = leg["qty"] - leg["sold"]
         if left <= 0:
             return
@@ -1004,7 +1016,9 @@ class OvernightController:
 
     def _sale_attempt_io(self, n: Dict[str, Any], leg: Dict[str, Any], att: Dict[str, Any], now: datetime) -> None:
         broker, sym = self.broker, leg["symbol"]
-        allow = self._tif_open(n, att, now)
+        # never (re)send for an unclear symbol change or a leg with nothing left (the old symbol's
+        # leg after a confirmed symbol change): only look the id up
+        allow = self._tif_open(n, att, now) and not n.get("frozen") and leg["qty"] > leg["sold"]
         if allow:
             att["sent"] = True
         wanted = att["qty"]
@@ -1102,8 +1116,9 @@ class OvernightController:
 
     def _morning_check(self, n: Dict[str, Any], now: datetime) -> None:
         """09:00: Alpaca's shares equal the ledger and the queued sale is live and for that count.
-        Otherwise a matching split adjusts the hold; anything else needs a look and sells
-        min(hold, Alpaca) of the old and any new symbol (never more than the hold)."""
+        Otherwise a matching split adjusts the hold, a merger or symbol change goes to
+        _symbol_change (converted when confirmed, else nothing sold), and anything else needs a look
+        and sells min(hold, Alpaca) of the old symbol (never more than the hold)."""
         leg0 = n["legs"][0]
         sym, bd, sd = n["symbol"], self._bd(n), self._sd(n)
         att = leg0["attempts"][-1] if leg0["attempts"] and not leg0["attempts"][-1]["final"] else None
@@ -1122,7 +1137,8 @@ class OvernightController:
             if qty != out["left"]:
                 try:
                     out["actions"] = broker.get_corporate_actions(sym, bd.isoformat(), sd.isoformat())
-                    news = {a["new_symbol"] for a in out["actions"] if a.get("new_symbol") not in (None, sym)}
+                    news = {a["new_symbol"] for a in out["actions"]
+                            if a.get("old_symbol") == sym and a.get("new_symbol") not in (None, sym)}
                     out["new_qty"] = {s: broker.position_qty(s) for s in sorted(news)}
                 except Exception as exc:
                     out["ca_err"] = str(exc)[:200]
@@ -1162,8 +1178,8 @@ class OvernightController:
                     and abs(left * ratio - alpaca) < 1e-6 and abs(left * ratio - round(left * ratio)) < 1e-6):
                 split = a
                 break
-        n["morning_checked"] = True
         if split is not None:
+            n["morning_checked"] = True
             ratio = float(split["ratio"])
             old_qty, old_avg = n["held_qty"], n["buy_avg"]
             n["held_qty"] = leg0["qty"] = alpaca
@@ -1177,6 +1193,12 @@ class OvernightController:
             if live is not None:
                 live["cancel_wanted"] = True
             return
+        renames = [a for a in actions if a.get("old_symbol") == sym
+                   and (a.get("kind") == "merger" or a.get("new_symbol") not in (None, sym))]
+        if renames:
+            self._symbol_change(n, leg0, live, renames, left, alpaca, out.get("new_qty") or {}, now)
+            return
+        n["morning_checked"] = True
         reason = osch.CORPORATE_ACTION if actions else (
             osch.CORPORATE_ACTIONS_UNAVAILABLE if "ca_err" in out else osch.SHARES_UNEXPLAINED)
         self._needs_look(n, reason, now, f"Alpaca holds {alpaca} {sym}, the hold is {left}. "
@@ -1184,12 +1206,63 @@ class OvernightController:
         leg0["qty"] = leg0["sold"] + max(0, min(left, alpaca))
         if live is not None and live["qty"] != leg0["qty"] - leg0["sold"]:
             live["cancel_wanted"] = True
-        for s, q in (out.get("new_qty") or {}).items():
-            q = max(0, min(left, int(q)))
-            if q and not any(leg["symbol"] == s for leg in n["legs"]):
-                n["legs"].append({"symbol": s, "qty": q, "sold": 0, "notional": 0.0, "attempts": [],
+
+    def _symbol_change(self, n: Dict[str, Any], leg0: Dict[str, Any], live: Optional[Dict[str, Any]],
+                       renames: List[Dict[str, Any]], left: int, alpaca: int, new_qty: Dict[str, int],
+                       now: datetime) -> None:
+        """A merger or symbol change seen at the 09:00 check (section 4.6).
+
+        Confirmed (one action, a new symbol, a ratio, nothing sold yet, Alpaca shows 0 old shares
+        and exactly hold x ratio new shares): ADT's book is converted first (shares x ratio, price /
+        ratio, same strategy), then the new symbol is sold and booked normally and the reservation
+        moves to it. Anything else is unclear: nothing is sold automatically, the old sale is
+        cancelled, the night stays unreleased and needs a look (the unsold banner shows it)."""
+        sym = n["symbol"]
+        a = renames[0]
+        new, ratio = a.get("new_symbol"), a.get("ratio")
+        got = int(new_qty.get(new, 0)) if new else 0
+        want = left * float(ratio) if ratio else None
+        confirmed = (len(renames) == 1 and new not in (None, sym) and ratio and float(ratio) > 0
+                     and leg0["sold"] == 0 and alpaca == 0 and want is not None
+                     and abs(want - round(want)) < 1e-6 and got == round(want) and got > 0)
+        seen = (f"Alpaca holds {alpaca} {sym} and {', '.join(f'{q} {s}' for s, q in sorted(new_qty.items())) or 'no new symbol'}, "
+                f"ADT's book holds {left} {sym}. Actions {[(x.get('kind'), x.get('new_symbol'), x.get('ratio')) for x in renames]}.")
+        if confirmed:
+            ratio = float(ratio)
+            avg = n["buy_cost"] / got
+            try:
+                accepted = self.book({"kind": "symbol_change", "strategy_id": n["strategy_id"], "symbol": sym,
+                                      "new_symbol": new, "buy_date": n["buy_date"], "ratio": ratio, "old_qty": left,
+                                      "new_qty": got, "old_avg": n["buy_avg"], "new_avg": avg})
+            except Exception as exc:      # fail closed: an unconverted book must not sell the new symbol
+                log.warning("OVERNIGHT %s symbol change booking failed: %s", sym, exc)
+                accepted = False
+            if accepted is not False:
+                n["morning_checked"] = True
+                n["symbol_change"] = {"old_symbol": sym, "new_symbol": new, "ratio": ratio, "old_qty": left,
+                                      "new_qty": got, "old_avg": n["buy_avg"], "new_avg": avg,
+                                      "ex_date": a.get("ex_date"), "at": _iso(now)}
+                n["hold_symbol"], n["held_qty"], n["buy_avg"] = new, got, avg
+                leg0["qty"] = leg0["sold"]            # nothing more is ever sold in the old symbol
+                if live is not None:
+                    live["cancel_wanted"] = True
+                n["legs"].append({"symbol": new, "qty": got, "sold": 0, "notional": 0.0, "attempts": [],
                                   "mode": leg0["mode"]})
-                self._log(n, "SALE_LEG_NEW_SYMBOL", now, new_symbol=s, qty=q)
+                self._log(n, "SYMBOL_CHANGE", now, text=(
+                    f"{sym} became {new} overnight, {ratio:g} {new} share for each {sym} share. ADT's book now "
+                    f"holds {got} {new} at ${avg:.2f} each for {n['strategy_id']} instead of {left} {sym}, and "
+                    f"the sale is for {got} {new} shares."))
+                return
+            reason, what = osch.BOOKING_REFUSED, "ADT's book refused to convert the hold."
+        else:
+            reason, what = osch.SYMBOL_CHANGE_UNCLEAR, "The symbol change is not clear enough to handle alone."
+        n["morning_checked"] = True
+        n["frozen"] = reason
+        if live is not None:
+            live["cancel_wanted"] = True
+        self._needs_look(n, reason, now, (
+            f"{what} {seen} Nothing was sold and {sym} stays reserved. Check the corporate action in the "
+            f"Alpaca app, sell the shares there by hand, then clear the {sym} overnight hold in ADT's book."))
 
     def _step_release(self, n: Dict[str, Any], now: datetime) -> None:
         """Release the stock only when Alpaca shows 0 shares and no open overnight order."""
