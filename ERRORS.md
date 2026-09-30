@@ -459,3 +459,11 @@ right. Run the mutation check.
 **What worked instead:** stopped both loops; verified the deploy through the service itself (`/health`, and for the dashboard, the new markup in the served page).
 
 **Note for next time:** poll Railway at most once a minute and from one loop only, or skip the CLI and watch the service's own health/page for the change.
+
+## 2026-09-30: verify_compact_dashboard.py failed 24 height checks against the wrong base
+
+**What did not work**: building `--old-out` from HEAD. Every failure was "height <= 60% (75%) of old", because the old and new pages were the same compact page.
+
+**What worked instead**: `git archive 149f5a3^ frontend` into a scratch folder inside the worktree, symlink node_modules, `npx next build`, then pass that `out`. 288/288.
+
+**Note for next time**: the compact dashboard base is the commit before the compaction (`149f5a3^`), not the branch base.
