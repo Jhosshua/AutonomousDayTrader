@@ -9,7 +9,7 @@ fake. On top of the ORB fake (orders, positions, 40310000 one sell per position)
 - tif opg: refused 09:28 to 19:00 ET; rests until open_auction() fills it.
 - tif day market: fills at once in regular hours; outside them it rests and fills at the open.
 - 403 potential wash trade: a new order while an opposite side order in the same stock is open.
-- GET /v2/calendar and GET /v2/corporate_actions/announcements.
+- GET /v2/calendar, GET /v2/corporate_actions/announcements and GET /v2/assets/{symbol}.
 Prices are whatever the test or the dry run sets (the dry run uses real research bars).
 """
 from __future__ import annotations
@@ -45,6 +45,9 @@ class OvernightAlpaca(FakeAlpaca):
         self.calendar_override: Optional[Callable[[date, date], List[dict]]] = None
         self.network_hosts: List[str] = []
         self.halted: set = set()                   # symbols whose orders do not fill (a halted open)
+        # GET /v2/assets/{symbol}: Alpaca's shape, percents as strings. Default 50% marginable.
+        self.assets: Dict[str, dict] = {}
+        self.asset_down: set = set()               # symbols whose asset read answers 500
 
     # ------------------------------------------------------------------ helpers
     def _et(self) -> datetime:
@@ -92,6 +95,16 @@ class OvernightAlpaca(FakeAlpaca):
             p = request.url.params
             self.requests.append(("GET", path, None, dict(p)))
             return httpx.Response(200, json=[a for a in self.corporate_actions if a.get("initiating_symbol") == p["symbol"]])
+        if path.startswith("/v2/assets/"):
+            sym = path.rsplit("/", 1)[1]
+            self.requests.append(("GET", path, None, {}))
+            if sym in self.asset_down:
+                return httpx.Response(500, json={"message": "internal error"})
+            row = {"symbol": sym, "class": "us_equity", "status": "active", "tradable": True, "marginable": True,
+                   "shortable": True, "easy_to_borrow": True, "margin_requirement_long": "50",
+                   "margin_requirement_short": "50", "maintenance_margin_requirement": 30}
+            row.update(self.assets.get(sym, {}))
+            return httpx.Response(200, json=row)
         return super().handler(request)
 
     def _post(self, body: dict) -> httpx.Response:
