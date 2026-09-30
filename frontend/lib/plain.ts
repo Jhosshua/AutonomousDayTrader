@@ -1,3 +1,4 @@
+// @steered SNARE-2 2026-09-30
 /**
  * Plain-language helpers for the redesigned dashboard.
  *
@@ -123,6 +124,19 @@ export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
     bar: "#8189C4",
     track: "#E2E3F1",
     what: "Bets that a stock that ran too far, too fast will bounce back a little.",
+  },
+  // Overnight holds: labels only, in the neutral colors (no new palette until the mockups are approved).
+  overnight_nvda: {
+    name: "NVDA overnight", band: "#ECE9DE", ink: "#5D5A73", tint: "#F3F1EA", bar: "#A7A2B8", track: "#E7E3D6",
+    what: "Buys NVDA at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
+  },
+  overnight_iren: {
+    name: "IREN overnight", band: "#ECE9DE", ink: "#5D5A73", tint: "#F3F1EA", bar: "#A7A2B8", track: "#E7E3D6",
+    what: "Buys IREN at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
+  },
+  overnight_hut: {
+    name: "HUT overnight", band: "#ECE9DE", ink: "#5D5A73", tint: "#F3F1EA", bar: "#A7A2B8", track: "#E7E3D6",
+    what: "Buys HUT at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
   },
 };
 
@@ -286,15 +300,16 @@ export function rangesToSegments(ranges: [string, string][] | undefined | null):
 }
 
 // ---------------------------------------------------------------------------
-// "Quick trades close in" countdown to 15:55 ET
+// "Quick trades close in" countdown to 15:55 ET. A quick trade in a stock the robot buys
+// overnight tonight closes at 15:46 instead (plan X6), so the caller can pass that minute.
 // ---------------------------------------------------------------------------
 
-export function countdownToClose(now: Date = new Date(), isTradingDay?: boolean): string {
+export function countdownToClose(now: Date = new Date(), isTradingDay?: boolean, closeMinute: number = 15 * 60 + 55): string {
   const { hour, minute, weekday } = etParts(now);
   const tradingDay = isTradingDay ?? (weekday !== 0 && weekday !== 6);
   if (!tradingDay) return "Market closed";
   const nowMin = hour * 60 + minute;
-  const closeMin = 15 * 60 + 55;
+  const closeMin = closeMinute;
   if (nowMin < SESSION_START_MIN || nowMin >= closeMin) return "Market closed";
   const remaining = closeMin - nowMin;
   const h = Math.floor(remaining / 60);
@@ -316,18 +331,25 @@ export interface RightNowInputs {
   strategies: RightNowStrategy[];
   positionsCount: number;
   maxDailyLossDollars?: number | null;
+  /** The overnight holds exist on this robot. A loss limit day still buys at the close (D5), so the
+   * stop is worded as day trading only. Absent on an older backend: the old words stay. */
+  overnightOn?: boolean;
+  /** One sentence about the overnight holds held right now (built by the caller), or null. */
+  overnightLine?: string | null;
 }
 
 export function rightNowSentence(inputs: RightNowInputs): string {
-  const { isCircuitBroken, marketStatus, strategies, positionsCount, maxDailyLossDollars } = inputs;
+  const { isCircuitBroken, marketStatus, strategies, positionsCount, maxDailyLossDollars, overnightOn, overnightLine } = inputs;
   let base: string;
   if (isCircuitBroken) {
+    const lead = overnightOn ? "Day trading stopped for today." : "Stopped for today.";
     base =
       maxDailyLossDollars != null
-        ? `Stopped for today. It hit the $${Math.round(maxDailyLossDollars).toLocaleString()} loss limit.`
-        : "Stopped for today. It hit the daily loss limit.";
+        ? `${lead} It hit the $${Math.round(maxDailyLossDollars).toLocaleString()} loss limit.`
+        : `${lead} It hit the daily loss limit.`;
   } else if ((marketStatus || "").toUpperCase() !== "OPEN") {
-    base = "Market is closed. It starts again at 9:30 AM.";
+    // with holds the overnight line already says when the next open is
+    base = overnightLine ? "Market is closed." : "Market is closed. It starts again at 9:30 AM.";
   } else {
     const active = strategies.filter((s) => s.window?.state === "CAN_TRADE" || s.window?.state === "LIMITED");
     const waiting = strategies.filter((s) => s.window?.state === "WAITING");
@@ -345,6 +367,7 @@ export function rightNowSentence(inputs: RightNowInputs): string {
       base = "Nothing is watching right now.";
     }
   }
+  if (overnightLine) base = `${overnightLine} ${base}`;
   if (positionsCount > 0) {
     const plural = positionsCount === 1 ? "trade" : "trades";
     base = `Holding ${positionsCount} ${plural} right now. ${base}`;
@@ -716,4 +739,178 @@ export function orbBoxText(o: OrbBoxInputs): string {
     parts.push(`Its stop moves to its entry price at +${o.breakeven_r}x its risk, and it can close early if the trade fails fast.`);
   }
   return parts.join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// Overnight holds (NVDA, IREN, HUT overnight), PLAN_2026_09_30_overnight_holds.md section 5.
+// Words only. Every number and state comes from the backend's overnight payload or the positions.
+// ---------------------------------------------------------------------------
+
+export const OVERNIGHT_IDS = ["overnight_nvda", "overnight_iren", "overnight_hut"];
+
+/** A position that is an overnight hold (backend flag, or its strategy id when the flag is missing). */
+export function isOvernightPosition(p: { strategy_id?: string | null; overnight?: boolean | null }): boolean {
+  return p.overnight === true || OVERNIGHT_IDS.includes(String(p.strategy_id || "").toLowerCase());
+}
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-10-01" -> "Thu Oct 1" (a calendar date, no time zone shift). Empty when unreadable. */
+export function dayLabel(ymd: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd || "");
+  if (!m) return "";
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return `${WEEKDAY_SHORT[d.getUTCDay()]} ${MONTH_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+/** The ET calendar date of an ISO timestamp, "YYYY-MM-DD". */
+export function etDateOfIso(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : etDateKey(d);
+}
+
+/** Plain words for the backend's skip and wait reasons (overnight_schedule.py). Each is a full sentence. */
+export function overnightReasonText(code: string | null | undefined): string {
+  const words: Record<string, string> = {
+    EARLY_CLOSE: "The market closes early today, and the rule only buys on full days.",
+    NOT_TRADING_DAY: "The market is closed today.",
+    CALENDAR_NOT_COVERED: "The robot's market calendar does not cover this date.",
+    CALENDAR_DISAGREES: "Alpaca's market calendar did not agree with the robot's.",
+    ALPACA_CALENDAR_UNAVAILABLE: "Alpaca's market calendar could not be read.",
+    NO_0930_BAR: "Today's 9:30 AM price data is missing.",
+    DATA_SHORT: "Too much of today's price data is missing.",
+    RELAY_UNAVAILABLE: "The price data service did not answer.",
+    MODE_OFF: "Overnight holds are switched off.",
+    STOCK_OFF: "This stock is switched off.",
+    NO_BROKER: "The robot is not connected to Alpaca.",
+    OPERATOR_NO_BUY_TONIGHT: "You turned off tonight's buy.",
+    EARLIER_HOLD_UNSOLD: "An earlier hold in this stock is not sold yet.",
+    HELD_BY_OTHER_STRATEGY: "Another strategy holds this stock.",
+    BROKER_MISMATCH: "The robot's positions do not match the Alpaca account.",
+    INTENT_NOT_DURABLE: "The robot could not save its plan first.",
+    DAY_TRADE_NOT_CLOSED: "A day trade in this stock could not be closed in time.",
+    BROKER_NOT_FLAT: "Alpaca still showed shares or an open order in this stock.",
+    ACCOUNT_UNAVAILABLE: "The Alpaca account could not be read.",
+    NO_PRICE: "There was no recent price for this stock.",
+    NO_ROOM: "There was not enough room in the account.",
+    BUY_REFUSED: "Alpaca refused the buy.",
+    WASH_TRADE_REFUSED: "Alpaca refused the buy because of another open order in this stock.",
+    BUYING_POWER_REFUSED: "Alpaca said there was not enough buying power.",
+    BROKER_UNREACHABLE: "Alpaca did not answer.",
+    MISSED_BUY_WINDOW: "No buy could be sent by 3:49:30 PM.",
+    AUCTION_NO_FILL: "The closing buy did not fill.",
+    CANCELED_AT_ALPACA: "The buy was cancelled in the Alpaca app.",
+  };
+  return words[code || ""] || "A required check did not pass.";
+}
+
+const MOVE_TOGETHER = "IREN and HUT are both bitcoin miners and move together.";
+
+export interface HoldLineInputs {
+  symbol: string;
+  shares: number;
+  buyPrice: number | null;
+  saleDate: string | null; // YYYY-MM-DD
+  nights: string | null; // weeknight | weekend | holiday
+  needsLook?: boolean;
+}
+
+/** One line per hold. Always names the sale day. */
+export function holdLine(h: HoldLineInputs): string {
+  const bought = h.buyPrice != null ? ` bought at ${formatMoney(h.buyPrice)} at the close` : " bought at the close";
+  const day = dayLabel(h.saleDate);
+  const over = h.nights === "weekend" ? "Held over the weekend, sells" : h.nights === "holiday" ? "Held over the holiday, sells" : "Sells";
+  const sale = day ? `${over} at the 9:30 AM open on ${day}.` : `${over} at the next 9:30 AM open.`;
+  let line = `${h.shares} shares of ${h.symbol}${bought}. No stop. ${sale}`;
+  if (h.symbol === "IREN" || h.symbol === "HUT") line += ` ${MOVE_TOGETHER}`;
+  if (h.needsLook) line += " The robot flagged it for a look. It still sells at the open.";
+  return line;
+}
+
+export interface TonightRowLike {
+  symbol: string;
+  enabled: boolean;
+  state: string | null;
+  buy_date: string | null;
+  reason: string | null;
+  block: string | null;
+  qty: number | null;
+}
+
+const BUY_WAITING = ["IDLE", "INTENT", "BUY_SENT"];
+const HELD_STATES = ["HELD", "SALE_QUEUED", "SOLD"];
+
+/** From 3:45 PM, what happens to one stock at the close, or why it has no buy tonight.
+ * Null when the stock is bought (its hold line says the rest). `today` is the ET date, `etMin` minutes of day. */
+export function tonightStatusLine(row: TonightRowLike, o: { modeOn: boolean; noBuyTonight: boolean; today: string; etMin: number }): string | null {
+  if (!o.modeOn) return "No buy tonight. Overnight holds are switched off.";
+  if (!row.enabled) return "No buy tonight. This stock is switched off.";
+  const tonight = row.buy_date === o.today ? row : null;
+  if (!tonight || !tonight.state) {
+    // an earlier hold still unsold blocks tonight's buy (EARLIER_HOLD_UNSOLD)
+    if (row.state && ["HELD", "SALE_QUEUED"].includes(row.state)) return `No buy tonight. ${overnightReasonText("EARLIER_HOLD_UNSOLD")}`;
+    if (o.noBuyTonight) return "No buy tonight. You turned it off.";
+    if (o.etMin >= 15 * 60 + 50) return "No buy tonight. No order went in by 3:49:30 PM.";
+    return "Buys at the 4:00 PM close. The order goes in at 3:46 PM.";
+  }
+  const st = tonight.state;
+  if (HELD_STATES.includes(st)) return null;
+  if (st === "SKIPPED") return `No buy tonight. ${overnightReasonText(tonight.reason)}`;
+  const shares = tonight.qty != null ? `${tonight.qty} shares` : "shares";
+  if (st === "BUY_ACCEPTED") {
+    return o.etMin < 16 * 60
+      ? `Buy for ${shares} is waiting at Alpaca. It fills at the 4:00 PM close.`
+      : `Waiting for Alpaca to report the closing buy of ${shares}.`;
+  }
+  if (BUY_WAITING.includes(st) && tonight.block) {
+    return `Not bought yet. ${overnightReasonText(tonight.block)} It keeps trying until 3:49:30 PM.`;
+  }
+  if (st === "INTENT" || st === "BUY_SENT") return `Sending a buy for ${shares} at the 4:00 PM close.`;
+  return "Checking tonight's buy.";
+}
+
+export interface NoBuyButtonInputs {
+  running: boolean;
+  modeOn: boolean;
+  enabledCount: number;
+  tradingDay: boolean;
+  active: boolean; // "No overnight buy tonight" is on for today
+  tooLate: boolean; // at or after 3:49:30 PM ET
+  alreadyStopped: boolean; // a buy tonight was already stopped by the control
+  nothingPlanned: boolean; // every switched on stock tonight is skipped or already bought
+}
+
+/** Why the "No overnight buy tonight" button (or its undo) cannot be used right now. Null when it can. */
+export function noBuyDisabledReason(b: NoBuyButtonInputs): string | null {
+  if (!b.running) return "The overnight holds are not running on this robot.";
+  if (!b.modeOn || b.enabledCount === 0) return "Overnight holds are switched off, so there is no buy to stop.";
+  if (!b.tradingDay) return "The market is closed today, so there is no buy to stop.";
+  if (b.tooLate) return "Too late to change tonight. It can only be changed until 3:49:30 PM.";
+  if (b.active && b.alreadyStopped) return "Tonight's buy was already stopped and cannot be restarted.";
+  if (!b.active && b.nothingPlanned) return "No overnight buy is planned tonight.";
+  return null;
+}
+
+/** Account card note while holds are held (they are not re-marked until they sell). */
+export function overnightBalanceNote(totalAtBuyPrice: number): string {
+  return `Includes ${formatMoney(totalAtBuyPrice)} in overnight holds at their buy price. Their real value is known at 9:30 AM.`;
+}
+
+/** Red banner while any hold is still unsold after 9:31 AM. */
+export function unsoldBannerText(symbols: string[]): string {
+  const names = joinNames(symbols.map((s) => `${s} overnight`));
+  return symbols.length === 1
+    ? `${names} is not sold yet after 9:31 AM. The robot keeps trying to sell it. Check the Alpaca app.`
+    : `${names} are not sold yet after 9:31 AM. The robot keeps trying to sell them. Check the Alpaca app.`;
+}
+
+/** The "Right now" sentence part for holds. `saleDate` is the earliest sale day, `pastSale` true once its 9:30 AM passed. */
+export function overnightHoldingSentence(count: number, saleDate: string | null, pastSale: boolean): string | null {
+  if (count <= 0) return null;
+  const what = `${count} overnight ${count === 1 ? "stock" : "stocks"}`;
+  if (pastSale) return `Selling ${what} bought at the last close.`;
+  const day = dayLabel(saleDate);
+  return `Holding ${what} until the 9:30 AM open${day ? ` on ${day}` : ""}.`;
 }
