@@ -59,6 +59,7 @@ DECISIONS = {
     "core/overnight_integration.py::_close_day_trade": "X6: closes the day trade, never a hold",
     "core/overnight_integration.py::_day_shares": "non overnight shares only",
     "core/overnight_integration.py::_held_by_other": "the stock held by ORB, a fixed plan or a Slow trade is skipped",
+    "core/overnight_integration.py::_overnight_shares": "overnight shares only; a night is released only when ADT's book holds none",
     "core/overnight_integration.py::_swing_value": "Slow trades held tonight count against the room (D3)",
     "core/overnight_integration.py::_x6_step": "X6 booking of the day trade close",
     "core/overnight_integration.py::holds_symbol": "S1: a hold in the book",

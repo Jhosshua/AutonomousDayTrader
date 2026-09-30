@@ -1220,3 +1220,92 @@ def test_corporate_actions_unreadable_until_0927_30_sells_min_of_hold_and_alpaca
     rig.run(T(FRI, 9, 30), T(FRI, 9, 33))
     assert nv["state"] == SOLD and nv["legs"][0]["sold"] == 40
     assert [b["qty"] for _, b in rig.alpaca.sells("NVDA")][-1] == "40"
+
+
+# ============================================== ADT's book holds more than Alpaca (no action)
+def _adt_book(rig):
+    """ADT's book as the booked fills leave it: overnight shares per symbol."""
+    out = {}
+    for e in rig.booked:
+        if e.get("kind") == "fill":
+            out[e["symbol"]] = out.get(e["symbol"], 0) + (e["qty"] if e["role"] == "buy" else -e["qty"])
+    return out
+
+
+@pytest.mark.parametrize("book_source", ["adt_book_hook", "controller_count"])
+def test_alpaca_short_of_the_book_sells_what_alpaca_holds_and_keeps_the_night_unreleased(book_source):
+    """The NVDA hold is 55 shares in ADT's book. At 09:00 Alpaca shows 40 and no corporate action
+    explains it. R2: the sale still runs, for the 40 Alpaca holds (never more), and is booked. The
+    15 left only in ADT's book must keep NVDA unreleased and reserved with a plain needs look, keep
+    the unsold banner, and stop Friday's NVDA buy, while the difference stands. Before the fix the
+    night was released as soon as Alpaca was flat, and Friday bought NVDA on top of 15 shares that
+    only ADT's book held under overnight_nvda."""
+    rig = new()
+    fixed = []
+    if book_source == "adt_book_hook":
+        rig.hooks.overnight_shares = lambda s: 0 if fixed else _adt_book(rig).get(s, 0)
+    _to_morning(rig)
+    rig.alpaca.positions["NVDA"] = 40
+    rig.run(T(FRI, 9, 0), T(FRI, 9, 1))
+    nv = rig.night("NVDA")
+    assert [b["qty"] for _, b in rig.alpaca.sells("NVDA")][-1] == "40"
+    rig.alpaca.clock.now = T(FRI, 9, 30)
+    rig.alpaca.open_auction()
+    rig.run(T(FRI, 9, 30), T(FRI, 9, 40), step=5)
+
+    # sold and booked what Alpaca held, never more
+    assert sum(e["qty"] for e in rig.booked if e.get("role") == "sell" and e["symbol"] == "NVDA") == 40
+    assert "NVDA" not in rig.alpaca.positions and _adt_book(rig)["NVDA"] == 15
+    # but not released while ADT's book holds the other 15
+    assert nv["state"] == SOLD and not nv["released"]
+    assert rig.ctl.reserves("NVDA") and rig.ctl.locks_all("NVDA")
+    assert osch.BOOK_MORE_THAN_ALPACA in nv["needs_look"]
+    text = next(a[1] for a in rig.alerts if a[2].get("reason") == osch.BOOK_MORE_THAN_ALPACA)
+    assert "The robot's book shows 15 more NVDA shares than Alpaca" in text
+    assert "Check the Alpaca app for a sale made by hand or a corporate action" in text
+    assert rig.ctl.unsold_after_0931(T(FRI, 9, 40)) == ["NVDA"]
+    # the other two sold in full and went back to the day strategies
+    assert rig.night("IREN")["released"] and rig.night("HUT")["released"]
+
+    # Friday: no NVDA buy while the difference stands, with the reason logged; IREN and HUT buy
+    buy_day(rig, d=FRI)
+    fri = rig.night("NVDA", FRI)
+    assert fri["state"] == SKIPPED and fri["reason"] == osch.BOOK_MORE_THAN_ALPACA
+    assert any(r["event"] == "SKIP" and r.get("symbol") == "NVDA" and r.get("buy_date") == FRI.isoformat()
+               and r.get("reason") == osch.BOOK_MORE_THAN_ALPACA for r in rig.ctl.state["log"])
+    assert [t.date() for t, _ in rig.alpaca.buys("NVDA")] == [THU]
+    assert rig.night("IREN", FRI)["held_qty"] > 0 and rig.night("HUT", FRI)["held_qty"] > 0
+    assert not nv["released"] and rig.ctl.reserves("NVDA")
+
+    if book_source == "adt_book_hook":
+        # the operator corrects ADT's book: the difference is gone, so the night is released
+        fixed.append(True)
+        rig.run(T(FRI, 16, 11), T(FRI, 16, 12), step=5)
+        assert nv["released"]
+
+
+def test_alpaca_short_at_the_0931_sale_says_so_and_blocks_the_next_buy():
+    """The 09:00 check agreed (55), then the queued sale was cancelled by hand in the Alpaca app and
+    15 shares sold there. The 09:31 market sale sells the 40 Alpaca holds. The night must not be
+    released and must say plainly that the robot's book holds more than Alpaca."""
+    rig = new()
+    _to_morning(rig)
+    rig.run(T(FRI, 9, 0), T(FRI, 9, 1))
+    nv = rig.night("NVDA")
+    assert nv["morning_checked"] and nv["needs_look"] == []
+    queued = rig.alpaca.live("NVDA", "sell")
+    assert len(queued) == 1
+    rig.alpaca.clock.now = T(FRI, 9, 29)
+    queued[0]["status"] = "canceled"
+    rig.alpaca.positions["NVDA"] = 40
+    rig.alpaca.clock.now = T(FRI, 9, 30)
+    rig.alpaca.open_auction()
+    rig.run(T(FRI, 9, 29), T(FRI, 9, 40), step=5)
+    assert [b["qty"] for t, b in rig.alpaca.sells("NVDA") if t.date() == FRI and t.time() >= time(9, 31)] == ["40"]
+    assert "NVDA" not in rig.alpaca.positions
+    assert not nv["released"] and rig.ctl.reserves("NVDA")
+    assert osch.BOOK_MORE_THAN_ALPACA in nv["needs_look"]
+    assert rig.ctl.unsold_after_0931(T(FRI, 9, 40)) == ["NVDA"]
+    buy_day(rig, d=FRI)
+    assert rig.night("NVDA", FRI)["reason"] == osch.BOOK_MORE_THAN_ALPACA
+    assert [t.date() for t, _ in rig.alpaca.buys("NVDA")] == [THU]
