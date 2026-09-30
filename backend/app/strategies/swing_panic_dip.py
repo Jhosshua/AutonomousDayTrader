@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/strategies/swing_panic_dip.py
 Swing Trading Strategy Engine: The "2-Day Panic Dip" (Connors RSI(2)).
 
@@ -32,6 +33,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from backend.app.core.account import PaperTradingAccount, Position, TradingArm
 from backend.app.core.engine import ExecutionEngine, Order, OrderSide, OrderType
+from backend.app.core.overnight_schedule import is_overnight
 from backend.app.core.risk import InstitutionalRiskEngine
 from backend.app.models.events import BarEvent, OrderState
 from zoneinfo import ZoneInfo
@@ -662,7 +664,10 @@ class SwingStrategyEngine:
                 try:
                     # Pre-trade risk validation if risk engine is present
                     if self.risk_engine and order_obj is None:
-                        active_sec = set(self.risk_engine.symbol_sectors.get(s, "Other") for s in self.account.positions)
+                        # Overnight holds still waiting for their 09:30 sale are not Slow trades and
+                        # never count against the swing slots (overnight plan S12, found by T10).
+                        counted = {s: p for s, p in self.account.positions.items() if not is_overnight(p)}
+                        active_sec = set(self.risk_engine.symbol_sectors.get(s, "Other") for s in counted)
                         risk_check = self.risk_engine.evaluate_order_request(
                             symbol=sym,
                             side="BUY",
@@ -671,8 +676,8 @@ class SwingStrategyEngine:
                             stop_price=stop_price,
                             account_equity=self.account.equity,
                             buying_power=self.account.buying_power,
-                            active_positions_count=len(self.account.positions),
-                            active_symbols=set(self.account.positions.keys()),
+                            active_positions_count=len(counted),
+                            active_symbols=set(counted.keys()),
                             active_sectors=active_sec,
                             arm=TradingArm.SWING,
                             strategy_id="swing_panic_dip",
