@@ -82,8 +82,10 @@ LOSS_LINE_NEW = ("If day trades ever lose $1,500.00 in a day, it stops day tradi
                  "The daily loss limit covers day trades only. The overnight buy still goes in at the close.")
 LOSS_LINE_OLD = "If it ever loses $1,500.00 in a day, it stops for the day on its own."
 QUICK_OLD = "Quick trades start closing at 3:55 PM. Slow trades can stay open for days."
-QUICK_NEW = (QUICK_OLD + " Overnight holds buy at the 4:00 PM close and sell at the next 9:30 AM open. "
-             "A quick trade in NVDA, IREN or HUT closes at 3:46 PM on a night the robot buys that stock.")
+# on a buy night the lead itself carries the 3:46 PM exception (X6), it never says all quick trades close at 3:55 PM
+QUICK_NEW = ("Most quick trades close at 3:55 PM, but a quick trade in NVDA, IREN or HUT closes at 3:46 PM on a night "
+             "the robot buys that stock. Slow trades can stay open for days. Overnight holds buy at the 4:00 PM close "
+             "and sell at the next 9:30 AM open.")
 SMALL_OLD = ("Small bets. Keeps each bet small (about 1% of the account at risk). Exception: Opening Range Breakout "
              "follows ORBStraddle's sizing, 2% on its first trade of the day and 2.5% in total.")
 SMALL_NEW = SMALL_OLD + " Overnight holds are not small bets. Each puts 20% of the account in one stock with no stop."
@@ -295,6 +297,9 @@ def run_matrix(s: Session) -> None:
     absent(s, "[data-testid=balance-overnight-note]", "day balance note (no holds)")
     contains(s, "[data-testid=risk-telemetry]", LOSS_LINE_NEW, "day Safety loss line")
     contains(s, "[data-testid=risk-telemetry]", QUICK_NEW, "day Safety closing line")
+    body = s.text("[data-testid=risk-telemetry]")
+    check("Quick trades start closing at 3:55 PM" not in body,
+          f"[{s.label}] day Safety lead never says every quick trade closes at 3:55 PM on a buy night")
     contains(s, "[data-testid=risk-telemetry]", SMALL_NEW, "day Safety small bets line")
     contains(s, "[data-testid=risk-telemetry]", EXIT_NEW, "day Safety exit plan line")
     contains(s, "[data-testid=risk-telemetry]", "Daily loss limit used $0.00 of $1,500.00", "day Safety meter")
