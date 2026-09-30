@@ -47,7 +47,7 @@ Declared differences from the research. Every skipped or changed night is logged
 | X9 | Paper has no trading cost, while research deducted 6 to 12 bps a night. | Paper account. | Live results look better than research by that much even at the same prices. |
 | X10 | Research also dropped a night whose sale day had no 09:30 bar (`families.py:108-111`). | That looks ahead too. | 0 nights for all three. |
 | X11 | A buy can shrink or be skipped for lack of room (D3 or the $25,000 per position cap), or partly fill in the auction. | Account limits. Research always filled in full. | Logged with the size the rule wanted. |
-| X12 | Any corporate action other than a plain split stops the robot from judging the hold alone. It raises needs look and still sells. | Mergers and symbol changes cannot be automated safely. | None for these three in the window. |
+| X12 | A split with a matching ratio and a confirmed symbol change are handled alone (section 4.6). An unclear merger or symbol change does not sell automatically and keeps the night unreleased for the operator, with a needs look and the red unsold banner. Any other unexplained share count raises needs look and sells min(hold, Alpaca). When Alpaca had fewer shares than ADT's book, the night also stays unreleased while the book holds the rest, and no new buy goes out in that stock. | Mergers and symbol changes cannot be automated safely. | None for these three in the window. |
 
 Research record (normal cost, from `holdout.json` and the trade files, recomputed 2026-09-30).
 
@@ -147,15 +147,16 @@ S6 of v1 (EOD_FLAT) is dropped. Holds do not exist yet at 15:58, so no change is
 
 - Size per stock is 20% of Alpaca `equity` at 15:46 (D2), so it grows and shrinks with the account. It is capped at the $25,000 per position cap every arm has, which binds only once the account passes $125,000.
 - Before the build, a read only look at the Alpaca account fields and the NVDA, IREN and HUT margin fields, on a morning after Slow trades were held overnight (R2-9). It settles which field sets the overnight room and whether holding overnight shrinks the next day's day trading power. Any shrink is declared as an effect on the other strategies (R5).
-- Room overnight (D3) is read live from Alpaca at 15:46, from `regt_buying_power` and each stock's margin need, minus Slow trades held tonight. Each order must also fit Alpaca `buying_power`. Slow trade buys for the morning are not counted, because they buy at 09:30 when the holds sell. Buys go in NVDA, IREN, HUT order and the last ones shrink (X11).
-- At 20% each (about $29,800 in all today) with both Slow slots full, the account holds about $80,000 overnight, 1.6 times its $49,700, inside the 2 times limit.
+- Room overnight (D3) is checked at 15:46, Reg T style. Each stock's initial margin ratio comes from Alpaca `GET /v2/assets/{symbol}`. It is 1.0 when Alpaca does not lend on the stock (`marginable` false), else the larger of 0.50 and `margin_requirement_long`. The sum of tonight's overnight notional times each stock's ratio, plus Slow trades held tonight times 0.50, must fit Alpaca `equity` at 15:46. `OVERNIGHT_ROOM_MULTIPLE` scales that limit (equity times the multiple divided by 2, so the default 2.0 is exactly equity). The other overnight money counted is what was sized tonight, earlier holds still held, and 20% kept for an earlier stock in NVDA, IREN, HUT order whose buy is still pending. A failed asset read uses the last good read saved in the checkpoint. A stock never read counts at 0.50 and raises needs look `MARGIN_UNKNOWN`.
+- Each order must also fit Alpaca `buying_power` from the 15:46 snapshot, less tonight's other overnight orders. Slow trade buys for the morning are not counted, because they buy at 09:30 when the holds sell. Buys go in NVDA, IREN, HUT order and the last ones shrink (X11).
+- At 20% each (about $29,800 in all today, each stock at 0.50) with both Slow slots full (about $50,000), the margin needed is about $14,900 plus $25,100, about $40,000, inside the $49,700 equity. The account then holds about $80,000 overnight, 1.6 times its equity.
 
 ### 4.6 Splits and other corporate actions
 
 - At 09:00 compare Alpaca's share count with the ledger for each hold. Equal, keep the queued sale.
 - Different, read Alpaca corporate actions. A split with a matching ratio adjusts the ledger (shares times ratio, price divided by ratio), logs a plain sentence and replaces the sale for the new count.
 - A symbol change or merger with a new symbol and a ratio, where Alpaca shows no old shares and exactly hold times ratio new shares, first converts the hold in ADT's book (shares times ratio, price divided by ratio, same strategy, a plain sentence logged), then sells and books the new symbol, and the reservation moves to it. One that is unclear (no ratio, no new symbol, or Alpaca's shares do not match) sells nothing and is never released, with a needs look telling the operator what to do and the red unsold banner.
-- Anything else (no action found, a split without a ratio), raise needs look and sell min(hold, Alpaca) of the old symbol. Never book more than the hold, so the book never flips short (`account.py:327-347`).
+- Anything else (no action found, a split without a ratio), raise needs look and sell min(hold, Alpaca) of the old symbol. Never book more than the hold, so the book never flips short (`account.py:327-347`). When Alpaca holds fewer shares than the hold, the night stays unreleased while ADT's book still holds the rest, with needs look `BOOK_MORE_THAN_ALPACA` in plain words, the red unsold banner, and no new buy in that stock (skip reason `BOOK_MORE_THAN_ALPACA`).
 
 ### 4.7 Loss limits
 
