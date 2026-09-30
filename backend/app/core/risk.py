@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/core/risk.py
 Institutional Risk Engine, Circuit Breakers ($1,500 hard daily loss limit), and Position Sizing.
 """
@@ -71,6 +72,13 @@ class InstitutionalRiskEngine:
         # distance to their broker stop). It is taken out of the remaining daily-loss budget before
         # any ADT arm sizes (plan 9.6). Not checkpointed: it is read live from the ORB controller.
         self.reserved_risk_fn: Optional[Callable[[], float]] = None
+        # S14 / D6: the overnight holds' result booked today (the opening sale) does not count
+        # against today's loss stop. Both drawdown formulas measure equity net of it. Keyed to its
+        # session date, zeroed at each session boundary, saved in the checkpoint key "overnight"
+        # by the overnight controller and re-applied after a restore. The account baseline is
+        # untouched, so results still show the overnight result on the day it sells.
+        self.overnight_realized_today: float = 0.0
+        self.overnight_realized_date: Optional[str] = None
         self.symbol_sectors: Dict[str, str] = {
             "SPY": "Index",
             "QQQ": "Index",
@@ -110,8 +118,8 @@ class InstitutionalRiskEngine:
         if equity > self.daily_peak_equity:
             self.daily_peak_equity = equity
 
-        # Drawdown measured against starting equity ($50,000.00)
-        dd_dollars = max(0.0, round(self.config.starting_equity - equity, 2))
+        # Drawdown measured against starting equity ($50,000.00), net of today's overnight result (S14)
+        dd_dollars = self.drawdown_dollars(equity)
         self.current_drawdown_dollars = dd_dollars
         self.current_drawdown_pct = round(dd_dollars / self.config.starting_equity, 4)
 
@@ -131,6 +139,16 @@ class InstitutionalRiskEngine:
             self.risk_level = RiskLevel.NORMAL
 
         return self.status
+
+    def set_overnight_realized(self, amount: float, session_date: Optional[str]) -> None:
+        """S14: today's booked overnight result (non finite is treated as 0)."""
+        value = float(amount or 0.0)
+        self.overnight_realized_today = value if math.isfinite(value) else 0.0
+        self.overnight_realized_date = session_date
+
+    def drawdown_dollars(self, equity: float) -> float:
+        """Daily drawdown from the session start, excluding today's overnight hold result (S14)."""
+        return max(0.0, round(self.config.starting_equity - (equity - self.overnight_realized_today), 2))
 
     def reserved_risk(self) -> float:
         """Open + pending risk reserved by other controllers. Unreadable = the whole limit (fail closed)."""
@@ -188,8 +206,8 @@ class InstitutionalRiskEngine:
                 risk_level=self.risk_level,
             )
 
-        # 1. Circuit Breaker Check
-        dd_dollars = max(0.0, round(self.config.starting_equity - account_equity, 2))
+        # 1. Circuit Breaker Check (net of today's overnight result, S14)
+        dd_dollars = self.drawdown_dollars(account_equity)
         if self.status != BreakerStatus.ARMED or dd_dollars >= self.config.hard_max_daily_loss_dollars:
             return RiskCheckResult(
                 approved=False,
@@ -458,3 +476,5 @@ class InstitutionalRiskEngine:
         self.current_drawdown_pct = 0.0
         self.breaker_triggered_at = None
         self.breaker_trigger_equity = None
+        self.overnight_realized_today = 0.0
+        self.overnight_realized_date = None

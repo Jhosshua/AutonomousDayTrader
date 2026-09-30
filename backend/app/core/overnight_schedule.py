@@ -22,6 +22,19 @@ from backend.app.core.trading_windows import ET
 SYMBOLS = ("NVDA", "IREN", "HUT")          # also the order in which buys shrink (X11)
 STRATEGY_IDS = {"NVDA": "overnight_nvda", "IREN": "overnight_iren", "HUT": "overnight_hut"}
 OVERNIGHT_IDS = frozenset(STRATEGY_IDS.values())
+# Local ledger orders that book the controller's Alpaca fills carry this execution policy. The
+# generic engine never sends, settles, cancels or matches them (plan 4.1, R2-11).
+OVERNIGHT_POLICY = "overnight_hold"
+
+
+def is_overnight(obj: object) -> bool:
+    """The one test for an overnight hold (a position, order or bracket): its strategy_id is one of
+    OVERNIGHT_IDS, or it is an order carrying OVERNIGHT_POLICY (plan 4.2)."""
+    if obj is None:
+        return False
+    if getattr(obj, "execution_policy", None) == OVERNIGHT_POLICY:
+        return True
+    return str(getattr(obj, "strategy_id", "") or "").lower() in OVERNIGHT_IDS
 
 # F2a / X2. Research lib.py:89 needs 0.8 x 390 = 312 bars. At 15:46:05 only bars starting
 # before 15:45 are counted, and the 15 bars 15:45 to 15:59 are assumed present.

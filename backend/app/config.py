@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/config.py
 System configuration, network endpoints, credentials, and institutional risk parameters.
 """
@@ -190,6 +191,23 @@ class Settings(BaseSettings):
     ORB_EXCLUDE_SYMBOLS: List[str] = Field(
         default=["TSLA", "CDE"],
         description="Stay on ORB's board but are never picked: ADT's Tesla/Coeur morning plans trade them"
+    )
+
+    # Overnight holds (PLAN_2026_09_30_overnight_holds.md): NVDA, IREN, HUT bought at the closing
+    # auction and sold at the next opening auction. live = real Alpaca paper orders (needs
+    # BROKER_MODE=alpaca_paper); off = no new buys. Nothing ever stops a sale. Read at startup only.
+    OVERNIGHT_MODE: str = Field(default="live", description="live or off")
+    OVERNIGHT_NVDA: bool = Field(default=True, description="NVDA overnight hold switched on")
+    OVERNIGHT_IREN: bool = Field(default=True, description="IREN overnight hold switched on")
+    OVERNIGHT_HUT: bool = Field(default=True, description="HUT overnight hold switched on")
+    OVERNIGHT_PCT: float = Field(default=0.20, description="Share of Alpaca equity per stock, read at 15:46 (D2)")
+    OVERNIGHT_POSITION_CAP: float = Field(default=25000.0, description="Per position dollar cap every arm has (D2)")
+    OVERNIGHT_ROOM_MULTIPLE: float = Field(default=2.0, description="Overnight room as a multiple of equity (D3)")
+    # S16: bars for the overnight stocks from their own list, never WATCHLIST_SYMBOLS, so no day
+    # strategy trades IREN or HUT.
+    OVERNIGHT_BAR_SYMBOLS: List[str] = Field(
+        default=["NVDA", "IREN", "HUT"],
+        description="Stock feed subscriptions for the overnight holds' last price"
     )
 
     # Safe Host Port Allocations (Collision Free)

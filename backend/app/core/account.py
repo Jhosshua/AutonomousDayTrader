@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/core/account.py
 Paper Trading Account State Machine ($50,000 initial balance, FINRA 4:1 Day Trading Buying Power).
 """
@@ -8,6 +9,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from backend.app.models.events import AccountState, PositionState
+from backend.app.core.overnight_schedule import OVERNIGHT_IDS
 
 
 class TradingArm(str, Enum):
@@ -145,8 +147,13 @@ class PaperTradingAccount:
         return self.positions.get(symbol.upper())
 
     def update_market_price(self, symbol: str, price: float) -> None:
-        """Mark-to-market position on new bar or quote."""
+        """Mark-to-market position on new bar or quote.
+
+        An overnight hold is never re-marked between its buy and its sale (S15): it stays at its
+        buy price, so after-hours and pre-market prices move neither equity nor the loss stop."""
         pos = self.positions.get(symbol.upper())
+        if pos is not None and str(getattr(pos, "strategy_id", "") or "").lower() in OVERNIGHT_IDS:
+            return
         if pos is not None:
             pos.update_market_price(price)
             self._recompute_account_state()

@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/core/engine.py
 Deterministic Order Execution Engine, 8-State Lifecycle FSM, and Microstructure Fill Simulator.
 """
@@ -12,6 +13,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import uuid
 
 from backend.app.core.account import PaperTradingAccount, TradingArm
+from backend.app.core.overnight_schedule import OVERNIGHT_POLICY
 from backend.app.models.events import OrderSide, OrderType, OrderState
 from backend.app.strategies.tri_engine import FIXED_IDS, TRI_IDS
 
@@ -156,6 +158,9 @@ class ExecutionEngine:
         # Observation-only hooks called after every booked fill (research
         # recording). A listener failure is logged and never affects the fill.
         self.fill_listeners: List[Callable[["Order", "Fill"], None]] = []
+        # Overnight holds (S2): (order, qty) -> refusal text or None, checked at the broker choke
+        # point with the same rule as the pre-trade validator (S1). Set by the app.
+        self.order_guard: Optional[Callable[["Order", int], Optional[str]]] = None
 
     # Seconds before an order the broker did not fill is tried again.
     BROKER_RETRY_SEC: float = 5.0
@@ -229,6 +234,12 @@ class ExecutionEngine:
             raise BrokerReject("Tri-engine orders require their dedicated lifecycle", hard=True)
         if order.execution_policy == ORB_POLICY:
             raise BrokerReject("ORB orders are placed and managed by the ORB controller", hard=True)
+        if order.execution_policy == OVERNIGHT_POLICY:
+            raise BrokerReject("Overnight hold orders are placed and managed by the overnight controller", hard=True)
+        if self.order_guard is not None:
+            refusal = self.order_guard(order, qty)
+            if refusal:
+                raise BrokerReject(refusal, hard=True)
         if time.monotonic() < self._broker_retry_after.get(f"sym:{order.symbol}", 0.0):
             raise BrokerNoFill(f"{order.symbol} is in broker backoff")
         is_exit = self._reduces_position(order)
@@ -313,8 +324,8 @@ class ExecutionEngine:
         if self.broker is None:
             return fills
         for order in list(self.orders.values()):
-            if order.execution_policy in TRI_IDS or order.execution_policy == ORB_POLICY:
-                continue  # Dedicated controller reconciles cumulative fills (tri tranches / ORB brackets).
+            if order.execution_policy in TRI_IDS or order.execution_policy in (ORB_POLICY, OVERNIGHT_POLICY):
+                continue  # Dedicated controller reconciles cumulative fills (tri tranches / ORB brackets / overnight holds).
             if order.fixed_intent_client_id and order.side == OrderSide.SELL:
                 if order.status.value == "FILLED":
                     continue

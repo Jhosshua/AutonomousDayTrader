@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/core/flattening.py
 Automated 4-Phase Zero-Overnight Flattening State Machine and Market Clock Abstraction.
 """
@@ -10,6 +11,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
 
 from backend.app.core.account import TradingArm
+from backend.app.core.overnight_schedule import is_overnight
 from backend.app.core.trading_windows import session_close
 
 ET_TZ = ZoneInfo("America/New_York")
@@ -261,16 +263,19 @@ class ZeroOvernightFlatteningEngine:
         self.current_phase = FlatteningPhase.ZERO_AUDIT
         now_dt = self.clock.now()
 
-        # Filter out exempt swing positions and orders
+        # Filter out exempt swing positions and orders, and overnight holds (S4: the overnight
+        # controller sells them at the next open; none of its orders is ever a working order)
         intraday_positions = {
             sym: pos for sym, pos in open_positions.items()
             if getattr(pos, "arm", None) not in ("SWING", TradingArm.SWING)
             and getattr(pos, "strategy_id", "") != "swing_panic_dip"
+            and not is_overnight(pos)
         }
         intraday_working_orders = [
             order for order in working_orders
             if getattr(order, "arm", None) not in ("SWING", TradingArm.SWING)
             and getattr(order, "strategy_id", "") != "swing_panic_dip"
+            and not is_overnight(order)
         ]
         unclosed = list(intraday_positions.keys())
 
