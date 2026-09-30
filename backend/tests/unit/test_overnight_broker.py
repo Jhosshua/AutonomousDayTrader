@@ -166,3 +166,33 @@ def test_corporate_actions_range_limit_and_errors():
     b2, _ = make(lambda r: httpx.Response(403, json={"message": "forbidden"}))
     with pytest.raises(BrokerHTTPError):
         b2.get_corporate_actions("NVDA", "2026-10-01", "2026-10-02")
+
+
+def test_asset_margin_reads_the_paper_host_and_turns_the_percent_into_a_fraction():
+    """Alpaca sends margin_requirement_long as a percent and often as a string. 50 must become
+    0.50, or the overnight room would count a 50% stock as needing 50 times its price."""
+    asset = {"symbol": "IREN", "marginable": True, "margin_requirement_long": "100",
+             "margin_requirement_short": "100", "maintenance_margin_requirement": 100}
+    b, rec = make(lambda r: httpx.Response(200, json=asset))
+    assert b.get_asset_margin("iren") == {"symbol": "IREN", "marginable": True, "margin_requirement_long": 1.0}
+    req = rec.requests[0]
+    assert req.method == "GET" and req.url.path == "/v2/assets/IREN"
+    b2, _ = make(lambda r: httpx.Response(200, json={"marginable": "true", "margin_requirement_long": 50}))
+    assert b2.get_asset_margin("NVDA")["margin_requirement_long"] == 0.5
+    b3, _ = make(lambda r: httpx.Response(200, json={"marginable": False, "margin_requirement_long": None}))
+    assert b3.get_asset_margin("HUT") == {"symbol": "HUT", "marginable": False, "margin_requirement_long": None}
+
+
+@pytest.mark.parametrize("reply,error", [
+    (httpx.ReadTimeout("slow"), BrokerTransportError),
+    (httpx.Response(404, json={"message": "asset not found"}), BrokerHTTPError),
+    (httpx.Response(200, json=["not", "an", "object"]), BrokerError),
+    (httpx.Response(200, json={"margin_requirement_long": "50"}), BrokerError),                        # no flag
+    (httpx.Response(200, json={"marginable": True}), BrokerError),                                     # no requirement
+    (httpx.Response(200, json={"marginable": True, "margin_requirement_long": "abc"}), BrokerError),
+    (httpx.Response(200, json={"marginable": True, "margin_requirement_long": "150"}), BrokerError),
+])
+def test_asset_margin_raises_on_anything_it_cannot_trust(reply, error):
+    b, _ = make(lambda r: reply)
+    with pytest.raises(error):
+        b.get_asset_margin("NVDA")

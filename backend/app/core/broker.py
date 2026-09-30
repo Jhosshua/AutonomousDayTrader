@@ -560,6 +560,44 @@ class AlpacaBroker:
                 out[key] = None
         return out
 
+    def get_asset_margin(self, symbol: str) -> Dict[str, Any]:
+        """Read only GET /v2/assets/{symbol}: whether the stock is marginable and its long margin
+        requirement as a fraction (Alpaca sends a percent, often as a string, so "50" is 0.50).
+
+        Raises like the other reads (BrokerTransportError, BrokerHTTPError), and BrokerError when
+        the answer lacks a usable marginable flag or, for a marginable stock, a requirement from 0
+        to 100. The caller then falls back to its last good value."""
+        sym = symbol.upper()
+        try:
+            resp = self._client.get(f"/v2/assets/{sym}")
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"asset read {sym} failed: {exc}") from exc
+        if resp.status_code != 200:
+            raise self._http_error(f"asset read {sym}", resp)
+        row = resp.json()
+        if not isinstance(row, dict):
+            raise BrokerError(f"asset read {sym} answered with something that is not an object")
+        raw_flag = row.get("marginable")
+        if isinstance(raw_flag, bool):
+            marginable = raw_flag
+        elif str(raw_flag).strip().lower() in ("true", "false"):
+            marginable = str(raw_flag).strip().lower() == "true"
+        else:
+            raise BrokerError(f"asset read {sym} has no marginable flag: {raw_flag!r}")
+        requirement: Optional[float] = None
+        raw_req = row.get("margin_requirement_long")
+        if raw_req not in (None, ""):
+            try:
+                pct = float(raw_req)
+            except (TypeError, ValueError):
+                pct = float("nan")
+            if not (0.0 <= pct <= 100.0):
+                raise BrokerError(f"asset read {sym} has a margin requirement outside 0 to 100: {raw_req!r}")
+            requirement = pct / 100.0
+        if marginable and requirement is None:
+            raise BrokerError(f"asset read {sym} is marginable but has no margin_requirement_long")
+        return {"symbol": sym, "marginable": marginable, "margin_requirement_long": requirement}
+
     def get_corporate_actions(self, symbol: str, since: str, until: str) -> List[Dict[str, Any]]:
         """Split, merger and spinoff announcements for one symbol with an ex date in [since, until].
 
