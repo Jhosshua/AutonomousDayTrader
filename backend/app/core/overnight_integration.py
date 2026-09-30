@@ -109,7 +109,8 @@ class OvernightIntegration:
             alert=self._alert, hooks=Hooks(day_shares=self._day_shares, close_day_trade=self._close_day_trade,
                                            cancel_day_entries=self._cancel_day_entries,
                                            broker_mismatch=self._broker_mismatch, held_by_other=self._held_by_other,
-                                           swing_market_value=self._swing_value, on_release=self._on_release),
+                                           swing_market_value=self._swing_value, on_release=self._on_release,
+                                           overnight_shares=self._overnight_shares),
             mode=mode, enabled=tuple(enabled if enabled is not None else cfg["enabled"]),
             pct=cfg["pct"] if pct is None else pct, cap=cfg["cap"], room_multiple=cfg["room_multiple"])
         pending = self._pending
@@ -279,6 +280,11 @@ class OvernightIntegration:
     def _day_shares(self, symbol: str) -> int:
         pos = self.r.account.positions.get(symbol.upper())
         return int(pos.shares) if pos is not None and not is_overnight(pos) else 0
+
+    def _overnight_shares(self, symbol: str) -> int:
+        """Overnight shares in ADT's book for this symbol (the night is released only at 0)."""
+        pos = self.r.account.positions.get(symbol.upper())
+        return int(pos.shares) if pos is not None and is_overnight(pos) else 0
 
     def _broker_mismatch(self) -> bool:
         return bool(self.r.broker_state.get("mismatch"))

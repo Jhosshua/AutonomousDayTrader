@@ -97,6 +97,9 @@ class Hooks:
     held_by_other: Callable[[str], Optional[str]] = _noop         # e.g. "ORB"
     swing_market_value: Callable[[], float] = _zero               # Slow trades held tonight
     on_release: Callable[[str], None] = _noop                     # the stock goes back to the day arms
+    # overnight shares of a symbol in ADT's book; None means not known, so the controller's own
+    # count (bought less booked sales) is used
+    overnight_shares: Callable[[str], Optional[int]] = _noop
 
 
 def _iso(dt: datetime) -> str:
@@ -236,6 +239,23 @@ class OvernightController:
         the new symbol after a confirmed symbol change (the night key and strategy stay)."""
         return n.get("hold_symbol") or n["symbol"]
 
+    def _book_shares(self, n: Dict[str, Any]) -> int:
+        """Overnight shares this night still has in ADT's book: ADT's own book when the hook reads
+        it, else the controller's count (shares bought less sales booked in the current symbol)."""
+        sym = self._cur(n)
+        got = self.hooks.overnight_shares(sym)
+        if got is not None:
+            return int(got)
+        return int(n["held_qty"]) - sum(int(leg["sold"]) for leg in n["legs"] if leg["symbol"] == sym)
+
+    def _book_more_than_alpaca(self, n: Dict[str, Any], book: int, now: datetime) -> None:
+        sym = self._cur(n)
+        self._needs_look(n, osch.BOOK_MORE_THAN_ALPACA, now, (
+            f"The robot's book shows {book} more {sym} shares than Alpaca. Alpaca holds none after the sale, "
+            f"but the book still holds {book} for {n['strategy_id']}. {sym} stays reserved and gets no overnight "
+            f"buy until the two agree. Check the Alpaca app for a sale made by hand or a corporate action on "
+            f"{sym}, then correct the {sym} overnight hold in the robot's book."))
+
     # ---------------------------------------------------------------- queries
     def reserves(self, symbol: str) -> bool:
         """True while any night in this stock is not released (15:45 until the sale is booked and
@@ -327,6 +347,12 @@ class OvernightController:
         for n in self.holds():
             sd = self._sd(n)
             if sd is not None and now >= et(sd, osch.SALE_FALLBACK_AT):
+                out.append(self._cur(n))
+        # sold at Alpaca, but ADT's book still holds shares Alpaca does not: still unsold for the page
+        for n in self._nights():
+            sd = self._sd(n)
+            if (n["state"] == SOLD and not n["released"] and osch.BOOK_MORE_THAN_ALPACA in n["needs_look"]
+                    and sd is not None and now >= et(sd, osch.SALE_FALLBACK_AT) and self._cur(n) not in out):
                 out.append(self._cur(n))
         return out
 
@@ -474,6 +500,8 @@ class OvernightController:
             return reason
         for m in self.state["nights"].values():
             if m["symbol"] == n["symbol"] and m["buy_date"] < n["buy_date"] and not m["released"]:
+                if osch.BOOK_MORE_THAN_ALPACA in m["needs_look"]:
+                    return osch.BOOK_MORE_THAN_ALPACA
                 return osch.EARLIER_HOLD_UNSOLD
         return None
 
@@ -1058,6 +1086,11 @@ class OvernightController:
         if kind == "no_shares":
             leg["attempts"].remove(att)
             self._needs_look(n, osch.SHARES_UNEXPLAINED, now, f"Alpaca shows {qty} {sym} shares free to sell.")
+            # Alpaca holds none but ADT's book still does: say so plainly (the sale keeps trying,
+            # never for more than Alpaca holds, and the night stays unreleased)
+            book = self._book_shares(n) if qty == 0 and sym == self._cur(n) else 0
+            if book > 0:
+                self._book_more_than_alpaca(n, book, now)
             return
         if kind == "post_error":
             refusal = classify_refusal(value)
@@ -1118,7 +1151,8 @@ class OvernightController:
         """09:00: Alpaca's shares equal the ledger and the queued sale is live and for that count.
         Otherwise a matching split adjusts the hold, a merger or symbol change goes to
         _symbol_change (converted when confirmed, else nothing sold), and anything else needs a look
-        and sells min(hold, Alpaca) of the old symbol (never more than the hold)."""
+        and sells min(hold, Alpaca) of the old symbol (never more than the hold). When that is fewer
+        than the hold, the night is not released while ADT's book still holds the rest."""
         leg0 = n["legs"][0]
         sym, bd, sd = n["symbol"], self._bd(n), self._sd(n)
         att = leg0["attempts"][-1] if leg0["attempts"] and not leg0["attempts"][-1]["final"] else None
@@ -1265,7 +1299,10 @@ class OvernightController:
             f"Alpaca app, sell the shares there by hand, then clear the {sym} overnight hold in ADT's book."))
 
     def _step_release(self, n: Dict[str, Any], now: datetime) -> None:
-        """Release the stock only when Alpaca shows 0 shares and no open overnight order."""
+        """Release the stock only when Alpaca shows 0 shares and no open overnight order, and ADT's
+        book holds no overnight shares of the night either. When Alpaca had fewer shares than the
+        book (the sale sold only what Alpaca held), the rest is only in ADT's book: the night stays
+        unreleased with a needs look, and a later buy in the stock is skipped, until the two agree."""
         syms = sorted({leg["symbol"] for leg in n["legs"]} | {n["symbol"]})
         broker = self.broker
         if broker is None:
@@ -1279,11 +1316,16 @@ class OvernightController:
                 out[s] = (broker.position_qty(s), len(opens))
             return out
 
-        every = osch.SALE_RETRY_SEC if osch.SHARES_UNEXPLAINED in n["needs_look"] else osch.POLL_SEC
+        slow = (osch.SHARES_UNEXPLAINED, osch.BOOK_MORE_THAN_ALPACA)
+        every = osch.SALE_RETRY_SEC if any(r in n["needs_look"] for r in slow) else osch.POLL_SEC
         done, out, exc = self._io(f"release:{n['symbol']}:{n['buy_date']}", work, now, every)
         if not done or exc is not None:
             return
         if all(q == 0 and k == 0 for q, k in out.values()):
+            book = self._book_shares(n)
+            if book > 0:
+                self._book_more_than_alpaca(n, book, now)
+                return
             self._release(n, now)
         else:
             self._needs_look(n, osch.SHARES_UNEXPLAINED, now, f"After the sale Alpaca shows {out}.")

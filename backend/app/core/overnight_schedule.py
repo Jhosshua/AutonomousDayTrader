@@ -105,10 +105,14 @@ UNSOLD_AFTER_0931 = "UNSOLD_AFTER_0931"
 BUY_ORDER_CONTRADICTS = "BUY_ORDER_CONTRADICTS"
 MARGIN_UNKNOWN = "MARGIN_UNKNOWN"            # never read Alpaca's margin for the stock, 50% assumed
 SYMBOL_CHANGE_UNCLEAR = "SYMBOL_CHANGE_UNCLEAR"  # a merger or symbol change not safe to handle alone: nothing sold
+# ADT's book still holds overnight shares Alpaca does not (Alpaca had fewer, nothing explains it).
+# The night is not released and it is also the skip reason for a later buy in that stock.
+BOOK_MORE_THAN_ALPACA = "BOOK_MORE_THAN_ALPACA"
 
 # Gates that cannot change before 15:49:30 skip at once; the others are retried every 5 s.
 FINAL_GATES = frozenset({EARLY_CLOSE, NOT_TRADING_DAY, CALENDAR_NOT_COVERED, CALENDAR_DISAGREES,
-                         MODE_OFF, STOCK_OFF, NO_BROKER, OPERATOR_NO_BUY_TONIGHT, EARLIER_HOLD_UNSOLD})
+                         MODE_OFF, STOCK_OFF, NO_BROKER, OPERATOR_NO_BUY_TONIGHT, EARLIER_HOLD_UNSOLD,
+                         BOOK_MORE_THAN_ALPACA})
 
 
 class CalendarNotCovered(Exception):
