@@ -1,3 +1,4 @@
+// @steered SNARE-2 2026-09-30
 "use client";
 
 import { useMemo } from "react";
@@ -14,6 +15,8 @@ interface BalanceCardProps {
   dailyPnl: number;
   todayTrades: TodayTradeLike[];
   loading: boolean;
+  /** Overnight holds: "Includes $X in overnight holds at their buy price..." while any is held. */
+  overnightNote?: string | null;
 }
 
 const SESSION_START_MIN = 9 * 60 + 30;
@@ -21,7 +24,7 @@ const SESSION_START_MIN = 9 * 60 + 30;
 /** F6: the chart is NOT a balance history. It is cumulative realized P&L of today's FINISHED
  * trades, a step line starting at $0. The balance number above it is the live account equity,
  * a separate figure. */
-export default function BalanceCard({ equity, dailyPnl, todayTrades, loading }: BalanceCardProps) {
+export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, overnightNote }: BalanceCardProps) {
   const isDown = dailyPnl < 0;
   const isUp = dailyPnl > 0;
 
@@ -65,6 +68,7 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading }: 
           <div className="font-display text-3xl font-medium tracking-tight tabular-nums text-ink">
             {formatMoney(equity)}
           </div>
+          {overnightNote && <div className="text-xs leading-snug text-muted" data-testid="balance-overnight-note">{overnightNote}</div>}
         </div>
         {!loading && (
           <div

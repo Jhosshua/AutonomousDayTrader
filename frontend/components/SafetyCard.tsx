@@ -1,8 +1,23 @@
+// @steered SNARE-2 2026-09-30
 "use client";
 
 import { ShieldCheck, Moon, Target, TriangleAlert } from "lucide-react";
 import { useActionButton } from "@/hooks/useActionButton";
-import { formatMoney } from "@/lib/plain";
+import { formatMoney, joinNames } from "@/lib/plain";
+
+/** Overnight holds facts the card must say (PLAN_2026_09_30_overnight_holds.md 5.10, D5, D6, D9).
+ * Absent (older backend, no holds) the card reads exactly as before. */
+export interface SafetyOvernight {
+  /** Overnight holds buy tonight (mode live and the controller running). */
+  buysOn: boolean;
+  /** Stocks switched on, e.g. ["NVDA", "IREN", "HUT"]. */
+  symbols: string[];
+  /** Share of the account per stock, 0.20 = 20%. */
+  pct: number | null;
+  /** Today's overnight result (booked on the day it sells), kept out of the loss limit. */
+  resultToday: number | null;
+  holdsCount: number;
+}
 
 interface SafetyCardProps {
   drawdownDollars: number;
@@ -10,6 +25,7 @@ interface SafetyCardProps {
   baseTradeRiskPct: number | null;
   intradayPositionsCount: number;
   onFlattenAll: () => boolean;
+  overnight?: SafetyOvernight | null;
 }
 
 export default function SafetyCard({
@@ -18,6 +34,7 @@ export default function SafetyCard({
   baseTradeRiskPct,
   intradayPositionsCount,
   onFlattenAll,
+  overnight,
 }: SafetyCardProps) {
   const { phase, trigger } = useActionButton({
     send: onFlattenAll,
@@ -25,12 +42,17 @@ export default function SafetyCard({
     requireConfirm: true,
   });
 
+  // drawdownDollars is the loss stop's own drawdown (net of the overnight result) when the backend sends it
   const pctUsed = maxDailyLossDollars ? Math.min(100, (drawdownDollars / maxDailyLossDollars) * 100) : 0;
   const riskPctLabel =
     baseTradeRiskPct != null ? `about ${(baseTradeRiskPct * 100).toFixed(0)}% of the account at risk` : "a small slice of the account at risk";
 
   const buttonLabel =
     phase === "confirm" ? "Tap again to confirm" : phase === "sending" ? "Closing…" : phase === "done" ? "Closed" : phase === "failed" ? "Didn't go through, try again" : "Close all quick trades now";
+
+  const ovn = overnight ?? null;
+  const names = ovn ? joinNames(ovn.symbols).replace(/ and ([^ ]+)$/, " or $1") : "";
+  const pctText = ovn?.pct != null ? `${Math.round(ovn.pct * 100)}%` : null;
 
   return (
     <div
@@ -56,28 +78,44 @@ export default function SafetyCard({
           <div className="grow h-full rounded-full" style={{ width: `${pctUsed}%`, background: "linear-gradient(90deg, #5E9A7A, #E3B77F)" }} />
         </div>
         <div className="text-xs" style={{ color: "#2F5A4B" }}>
-          {maxDailyLossDollars != null
+          {ovn
+            ? `${maxDailyLossDollars != null ? `If day trades ever lose ${formatMoney(maxDailyLossDollars)} in a day` : "If day trades ever hit the daily loss limit"}, it stops day trading for the day on its own. The daily loss limit covers day trades only.${ovn.buysOn ? " The overnight buy still goes in at the close." : ""}`
+            : maxDailyLossDollars != null
             ? `If it ever loses ${formatMoney(maxDailyLossDollars)} in a day, it stops for the day on its own.`
             : "If it ever hits its daily loss limit, it stops for the day on its own."}
         </div>
+        {ovn && (
+          <div className="text-xs" style={{ color: "#2F5A4B" }} data-testid="safety-overnight-result">
+            {ovn.resultToday != null && Math.abs(ovn.resultToday) >= 0.005
+              ? `Overnight holds ${ovn.resultToday > 0 ? "made" : "lost"} ${formatMoney(Math.abs(ovn.resultToday))} today. This is not counted in the limit above.`
+              : "No overnight hold result today."}
+          </div>
+        )}
       </div>
 
       <div className="flex items-start gap-2.5 border-t pt-3" style={{ borderColor: "rgba(14,138,98,0.2)" }}>
         <Moon className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#4A5190" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           <b>Quick trades start closing at 3:55 PM.</b> Slow trades can stay open for days.
+          {ovn && ovn.buysOn && ` Overnight holds buy at the 4:00 PM close and sell at the next 9:30 AM open. A quick trade in ${names} closes at 3:46 PM on a night the robot buys that stock.`}
+          {ovn && !ovn.buysOn && ovn.holdsCount > 0 && " Overnight holds sell at the next 9:30 AM open."}
         </div>
       </div>
       <div className="flex items-start gap-2.5">
         <Target className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#3F7D5C" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           <b>Small bets.</b> Keeps each bet small ({riskPctLabel}). Exception: Opening Range Breakout follows ORBStraddle's sizing, 2% on its first trade of the day and 2.5% in total.
+          {ovn && (ovn.buysOn || ovn.holdsCount > 0) && ` Overnight holds are not small bets. Each puts ${pctText ?? "a set share"} of the account in one stock with no stop.`}
         </div>
       </div>
       <div className="flex items-start gap-2.5">
         <TriangleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#A9553A" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
-          <b>Every trade has an exit plan.</b> A price where it gives up, set before it buys.
+          {ovn ? (
+            <><b>Every day trade has an exit plan.</b> A price where it gives up, set before it buys. Overnight holds have no stop and sell at the next open.</>
+          ) : (
+            <><b>Every trade has an exit plan.</b> A price where it gives up, set before it buys.</>
+          )}
         </div>
       </div>
 
@@ -91,6 +129,11 @@ export default function SafetyCard({
       >
         {buttonLabel}
       </button>
+      {ovn && ovn.holdsCount > 0 && (
+        <div className="text-xs" style={{ color: "#2F5A4B" }} data-testid="safety-holds-not-closed">
+          Overnight holds are not included. They sell at the next 9:30 AM open.
+        </div>
+      )}
     </div>
   );
 }
