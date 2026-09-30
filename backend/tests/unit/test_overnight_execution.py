@@ -381,6 +381,42 @@ def test_duplicate_client_id_answer_is_resolved_by_lookup():
     assert rig.night("NVDA")["buy"][-1]["n"] == 1
 
 
+def test_fidelity_log_stores_caller_fields_and_derives_gross_returns():
+    rig = new()
+    buy_day(rig)
+    rig.ctl.record_fidelity("NVDA", THU, {"feed": "sip", "research_entry": 180.0, "official_close": 180.1,
+                                          "split_ratio": 1.0, "ok_next_day": None})
+    overnight(rig)
+    rig.ctl.record_fidelity("NVDA", THU, {"research_exit": 182.0, "official_open": 182.0, "ok_next_day": True})
+    fid = rig.night("NVDA")["fidelity"]
+    assert fid["feed"] == "sip" and fid["ok_next_day"] is True
+    assert fid["research_gross"] == pytest.approx(182.0 / 180.0 - 1)
+    assert fid["real_gross"] == pytest.approx(0.0)          # the fake fills both auctions at 180
+    rig.ctl.record_fidelity("TSLA", THU, {"x": 1})           # unknown night: ignored
+    assert "TSLA:2026-10-01" not in rig.ctl.state["nights"]
+
+
+def test_cumulative_fills_are_booked_once_across_polls_and_a_restart():
+    rig = new()
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 59))
+    oid = rig.night("NVDA")["buy"][-1]["id"]
+    o = rig.alpaca.orders[oid]
+    rig.alpaca.clock.now = T(THU, 16, 0)
+    rig.alpaca._fill(o, 20, 180.0)                         # partially_filled, still live
+    rig.run(T(THU, 16, 0), T(THU, 16, 0, 20))              # polled several times
+    assert [e["qty"] for e in rig.booked if e["symbol"] == "NVDA"] == [20]
+    rig = rig.restart()
+    rig.ctl.reconcile(T(THU, 16, 0, 30))
+    rig.run(T(THU, 16, 0, 30), T(THU, 16, 0, 40))
+    assert [e["qty"] for e in rig.booked if e["symbol"] == "NVDA"] == []    # nothing booked twice
+    o.update(status="filled", filled_qty="55", filled_avg_price=str((20 * 180.0 + 35 * 181.0) / 55))
+    rig.alpaca.positions["NVDA"] = 55
+    rig.run(T(THU, 16, 0, 41), T(THU, 16, 1))
+    nv = rig.night("NVDA")
+    assert [(e["qty"], round(e["price"], 6)) for e in rig.booked if e["symbol"] == "NVDA"] == [(35, 181.0)]
+    assert nv["state"] == HELD and nv["held_qty"] == 55
+
+
 def test_partial_and_zero_auction_fills():
     rig = new()
     rig.run(T(THU, 15, 44), T(THU, 15, 59, 59))
