@@ -103,6 +103,7 @@ BOOKING_REFUSED = "BOOKING_REFUSED"
 SALE_REFUSED = "SALE_REFUSED"
 UNSOLD_AFTER_0931 = "UNSOLD_AFTER_0931"
 BUY_ORDER_CONTRADICTS = "BUY_ORDER_CONTRADICTS"
+MARGIN_UNKNOWN = "MARGIN_UNKNOWN"            # never read Alpaca's margin for the stock, 50% assumed
 
 # Gates that cannot change before 15:49:30 skip at once; the others are retried every 5 s.
 FINAL_GATES = frozenset({EARLY_CLOSE, NOT_TRADING_DAY, CALENDAR_NOT_COVERED, CALENDAR_DISAGREES,

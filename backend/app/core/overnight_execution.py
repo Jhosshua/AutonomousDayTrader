@@ -141,8 +141,9 @@ class OvernightController:
     # ------------------------------------------------------------ persistence
     @staticmethod
     def empty_state() -> Dict[str, Any]:
+        # margin: the last good Alpaca asset read per stock, used when a later read fails
         return {"version": STATE_VERSION, "nights": {}, "control": {"no_buy_date": None, "set_at": None},
-                "account": {}, "realized_offset": {"date": None, "amount": 0.0}, "log": []}
+                "account": {}, "realized_offset": {"date": None, "amount": 0.0}, "margin": {}, "log": []}
 
     def to_json(self) -> Dict[str, Any]:
         """Plain JSON for the checkpoint key "overnight" (a deep copy, no live references)."""
@@ -160,7 +161,7 @@ class OvernightController:
 
     def _signature(self) -> str:
         s = self.state
-        return json.dumps([s["nights"], s["control"], s["account"], s["realized_offset"]], sort_keys=True)
+        return json.dumps([s["nights"], s["control"], s["account"], s["realized_offset"], s["margin"]], sort_keys=True)
 
     # ---------------------------------------------------------------- helpers
     def _log(self, n: Optional[Dict[str, Any]], event: str, now: datetime, **fields: Any) -> None:
@@ -423,7 +424,7 @@ class OvernightController:
         return {"symbol": sym, "strategy_id": osch.STRATEGY_IDS[sym], "buy_date": d.isoformat(),
                 "sale_date": sale.isoformat() if sale else None, "state": IDLE, "reason": None, "block": None,
                 "needs_look": [], "released": False, "wanted_qty": None, "qty": None, "ref_price": None,
-                "shrunk": None, "bars": None, "entries_cancelled": False, "day_close_requested": False,
+                "margin_ratio": None, "shrunk": None, "bars": None, "entries_cancelled": False, "day_close_requested": False,
                 "fallback_buy": False, "alerted_1547": False, "late_check": False, "buy": [],
                 "held_qty": 0, "buy_cost": 0.0, "buy_avg": None, "legs": [], "booked": {},
                 "morning_checked": False, "splits": [], "realized": 0.0, "fidelity": {}, "last_error": None}
@@ -544,6 +545,10 @@ class OvernightController:
                 out["open_orders"] = len(broker.list_open_orders(sym))
             except Exception as exc:
                 out["flat_err"] = str(exc)[:200]
+            try:
+                out["margin"] = broker.get_asset_margin(sym)
+            except Exception as exc:          # never blocks: the last good read or 50% is used
+                out["margin_err"] = str(exc)[:200]
             return out
 
         done, out, exc = self._io(f"gates:{sym}:{d}", work, now, osch.BUY_RETRY_SEC)
@@ -588,35 +593,85 @@ class OvernightController:
         if price is None or not math.isfinite(float(price)) or float(price) <= 0:
             self._block(n, osch.NO_PRICE)
             return
-        qty = self._size(n, float(price), acct, now)
+        ratio = self._margin_from_read(n, out, now)
+        qty = self._size(n, float(price), acct, now, ratio)
         if qty < 1:
             self._block(n, osch.NO_ROOM)
             return
         n["block"] = None
         self._new_buy_attempt(n, "cls", now)
 
-    def _size(self, n: Dict[str, Any], price: float, acct: Dict[str, Any], now: datetime) -> int:
-        """D2 and D3 with X11. Room = 2 x equity - Slow trades held tonight - other overnight money
-        (sized tonight, still held, or reserved for an earlier stock in NVDA, IREN, HUT order).
-        Each order must also fit Alpaca buying power less the other overnight orders of tonight."""
+    # Reg T style initial margin: a stock Alpaca does not lend on needs its full price, any other
+    # at least 50%. Slow trades held tonight are counted at 50%.
+    REG_T_MIN = 0.50
+    SWING_RATIO = 0.50
+
+    @classmethod
+    def _ratio(cls, margin: Optional[Dict[str, Any]]) -> float:
+        if not margin:
+            return cls.REG_T_MIN
+        if not margin.get("marginable"):
+            return 1.0
+        return max(cls.REG_T_MIN, float(margin.get("margin_requirement_long") or 0.0))
+
+    def _ratio_of(self, m: Dict[str, Any]) -> float:
+        """The margin ratio a night was sized with, else its stock's last good read, else 50%."""
+        if m.get("margin_ratio"):
+            return float(m["margin_ratio"])
+        return self._ratio(self.state["margin"].get(m["symbol"]))
+
+    def _margin_from_read(self, n: Dict[str, Any], out: Dict[str, Any], now: datetime) -> float:
+        """This stock's margin ratio from tonight's asset read. A failed read uses the last good
+        read (saved in the checkpoint); a stock never read counts at 50% and needs a look."""
+        sym = n["symbol"]
+        if out.get("margin") is not None:
+            read = {k: out["margin"].get(k) for k in ("marginable", "margin_requirement_long")}
+            prev = self.state["margin"].get(sym) or {}
+            if any(prev.get(k) != v for k, v in read.items()):
+                self._log(n, "MARGIN_READ", now, **read)
+            self.state["margin"][sym] = {**read, "read_at": _iso(now)}
+            return self._ratio(read)
+        cached = self.state["margin"].get(sym)
+        if cached:
+            self._log(n, "MARGIN_FROM_LAST_READ", now, error=out.get("margin_err"), read_at=cached.get("read_at"),
+                      marginable=cached.get("marginable"), margin_requirement_long=cached.get("margin_requirement_long"))
+            return self._ratio(cached)
+        self._needs_look(n, osch.MARGIN_UNKNOWN, now, f"margin unknown, assumed 50%. {out.get('margin_err') or ''}".strip())
+        return self.REG_T_MIN
+
+    def _size(self, n: Dict[str, Any], price: float, acct: Dict[str, Any], now: datetime, ratio: float) -> int:
+        """D2 and D3 with X11. Overnight room, Reg T style: the initial margin of tonight's holds
+        (notional x each stock's margin ratio) plus Slow trades held tonight x 50% must fit Alpaca
+        equity at 15:46 (times room_multiple / 2, so the default 2.0 is exactly equity). Other
+        overnight money is what was sized tonight, still held, or reserved for an earlier stock in
+        NVDA, IREN, HUT order. Each order must also fit Alpaca buying power less the other
+        overnight orders of tonight."""
         equity, bp = float(acct["equity"]), float(acct["buying_power"])
         wanted = osch.shares_for(equity, price, self.pct, self.cap)
         bound = min(self.pct * equity, self.cap)
         rank = osch.SYMBOLS.index(n["symbol"])
         others = 0.0
+        others_margin = 0.0
         for m in self.state["nights"].values():
             if m is n or m["state"] == SKIPPED:
                 continue
             if m["buy_date"] != n["buy_date"]:
                 if m["state"] in HOLD_STATES:
-                    others += self._left(m) * (m["buy_avg"] or 0.0)
+                    value = self._left(m) * (m["buy_avg"] or 0.0)
+                    others += value
+                    others_margin += value * self._ratio_of(m)
                 continue
             if m.get("qty"):
-                others += m["qty"] * m["ref_price"]
+                value = m["qty"] * m["ref_price"]
             elif m["state"] == IDLE and osch.SYMBOLS.index(m["symbol"]) < rank and m["symbol"] in self.enabled:
-                others += bound
+                value = bound
+            else:
+                continue
+            others += value
+            others_margin += value * self._ratio_of(m)
         swing = float(self.hooks.swing_market_value() or 0.0)
-        room = self.room_multiple * equity - swing - others
+        margin_room = equity * self.room_multiple / 2.0 - swing * self.SWING_RATIO - others_margin
+        room = margin_room / ratio
         bp_left = bp - others
         allowed = min(wanted * price, room, bp_left)
         # full size when nothing binds: allowed // price can land one share short in floating point
@@ -624,10 +679,11 @@ class OvernightController:
         n["wanted_qty"] = wanted
         if qty < wanted:
             n["shrunk"] = {"wanted": wanted, "qty": qty, "price": price, "room": room, "buying_power_left": bp_left,
-                           "swing_value": swing, "other_overnight": others}
+                           "swing_value": swing, "other_overnight": others, "margin_ratio": ratio,
+                           "margin_room": margin_room, "other_overnight_margin": others_margin}
             self._log(n, "X11_SHRUNK", now, **n["shrunk"])
         if qty >= 1:
-            n["qty"], n["ref_price"] = qty, price
+            n["qty"], n["ref_price"], n["margin_ratio"] = qty, price, ratio
         return qty
 
     def _new_buy_attempt(self, n: Dict[str, Any], tif: str, now: datetime) -> None:

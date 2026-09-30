@@ -46,6 +46,8 @@ class FakeAlpaca:
         self.halted = set()
         self.corporate_actions = []
         self.ca_error = False
+        self.assets = {}         # symbol -> {"marginable", "margin_requirement_long" (a fraction)}
+        self.asset_error = set() # symbols whose asset read fails
         self.account = {"account_number": "PA3CSVDZMMPY", "equity": EQUITY, "cash": EQUITY,
                         "buying_power": 2 * EQUITY, "regt_buying_power": 2 * EQUITY,
                         "daytrading_buying_power": 4 * EQUITY, "last_maintenance_margin": 0.0, "multiplier": 2.0}
@@ -144,6 +146,12 @@ class FakeAlpaca:
     def get_account_fields(self):
         self.calls += 1
         return dict(self.account)
+
+    def get_asset_margin(self, symbol):
+        self.calls += 1
+        if symbol in self.asset_error:
+            raise BrokerTransportError("asset read down")
+        return {"symbol": symbol, **self.assets.get(symbol, {"marginable": True, "margin_requirement_long": 0.5})}
 
     def get_corporate_actions(self, symbol, since, until):
         self.calls += 1
@@ -647,6 +655,100 @@ def test_a_pending_earlier_stock_keeps_its_room():
     fail["NVDA"] = False
     rig.run(T(THU, 15, 46, 11), T(THU, 15, 50))
     assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("IREN", "100"), ("NVDA", "100")]
+
+
+# Reg T margin room: equity 50,000, Slow trades 76,000 (38,000 of margin at 50%), so 12,000 of
+# margin is left for tonight. NVDA 100 x 100 uses 5,000 at 50%, leaving 7,000 for IREN.
+MARGIN_SETUP = dict(equity=50_000.0, buying_power=100_000.0, regt_buying_power=100_000.0)
+
+
+def _margin_rig(**kw):
+    rig = new(hooks=Hooks(swing_market_value=lambda: 76_000.0), **kw)
+    rig.alpaca.account.update(MARGIN_SETUP)
+    rig.alpaca.price.update(NVDA=100.0, IREN=50.0, HUT=20.0)
+    return rig
+
+
+def test_margin_room_buys_full_size_when_every_stock_needs_50pct():
+    rig = _margin_rig()
+    rig.run(T(THU, 15, 44), T(THU, 15, 50))
+    # 5,000 + 5,000 of margin, 2,000 left for HUT: 4,000 of notional at 50%, 200 of its 500 shares
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "100"), ("IREN", "200"), ("HUT", "200")]
+    assert rig.night("IREN")["shrunk"] is None and rig.night("IREN")["margin_ratio"] == 0.5
+
+
+def test_a_stock_with_a_100pct_margin_requirement_shrinks():
+    """IREN at margin_requirement_long 100 needs its full price overnight: the 7,000 of margin left
+    after NVDA buys 7,000 of IREN (140 shares), not the 14,000 a 50% stock would get, and HUT, last
+    in NVDA, IREN, HUT order, gets nothing."""
+    rig = _margin_rig()
+    rig.alpaca.assets["IREN"] = {"marginable": True, "margin_requirement_long": 1.0}
+    rig.run(T(THU, 15, 44), T(THU, 15, 50))
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "100"), ("IREN", "140")]
+    ir = rig.night("IREN")
+    assert ir["margin_ratio"] == 1.0 and ir["shrunk"]["wanted"] == 200 and ir["shrunk"]["qty"] == 140
+    assert any(r["event"] == "X11_SHRUNK" and r["symbol"] == "IREN" for r in rig.ctl.state["log"])
+    hut = rig.night("HUT")
+    assert hut["state"] == SKIPPED and hut["reason"] == osch.NO_ROOM
+    assert rig.ctl.state["margin"]["IREN"]["margin_requirement_long"] == 1.0
+    assert rig.night("NVDA")["needs_look"] == [] and ir["needs_look"] == []
+
+
+def test_a_stock_alpaca_does_not_lend_on_counts_at_its_full_price():
+    rig = _margin_rig()
+    rig.alpaca.assets["IREN"] = {"marginable": False, "margin_requirement_long": None}
+    rig.run(T(THU, 15, 44), T(THU, 15, 50))
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "100"), ("IREN", "140")]
+    assert rig.night("IREN")["margin_ratio"] == 1.0
+
+
+def test_a_requirement_below_regt_still_counts_at_50pct():
+    rig = _margin_rig()
+    rig.alpaca.assets["NVDA"] = {"marginable": True, "margin_requirement_long": 0.30}
+    rig.run(T(THU, 15, 44), T(THU, 15, 50))
+    assert rig.night("NVDA")["margin_ratio"] == 0.5
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "100"), ("IREN", "200"), ("HUT", "200")]
+
+
+def test_a_failed_margin_read_uses_the_last_good_read_from_the_checkpoint():
+    first = _margin_rig()
+    first.alpaca.assets["IREN"] = {"marginable": True, "margin_requirement_long": 1.0}
+    first.run(T(THU, 15, 44), T(THU, 15, 46, 6))
+    saved = first.ctl.to_json()["margin"]
+    assert saved["IREN"]["margin_requirement_long"] == 1.0
+    # a new process on a new day with only the margin cache restored, and Alpaca's asset read down
+    rig = _margin_rig(state=json.loads(json.dumps({"version": 1, "margin": saved})))
+    rig.clock.now = T(FRI, 15, 44)
+    rig.alpaca.asset_error = {"NVDA", "IREN", "HUT"}
+    rig.run(T(FRI, 15, 44), T(FRI, 15, 50))
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "100"), ("IREN", "140")]
+    ir = rig.night("IREN", FRI)
+    assert ir["margin_ratio"] == 1.0 and osch.MARGIN_UNKNOWN not in ir["needs_look"]
+    assert any(r["event"] == "MARGIN_FROM_LAST_READ" and r["symbol"] == "IREN" for r in rig.ctl.state["log"])
+
+
+def test_a_stock_never_read_counts_at_50pct_and_needs_a_look():
+    rig = _margin_rig()
+    rig.alpaca.asset_error = {"IREN"}
+    rig.run(T(THU, 15, 44), T(THU, 15, 50))
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "100"), ("IREN", "200"), ("HUT", "200")]
+    ir = rig.night("IREN")
+    assert ir["margin_ratio"] == 0.5 and ir["needs_look"] == [osch.MARGIN_UNKNOWN]
+    assert rig.night("NVDA")["needs_look"] == [] and rig.night("HUT")["needs_look"] == []
+    assert any("margin unknown, assumed 50%" in a[1] for a in rig.alerts if a[2]["symbol"] == "IREN")
+
+
+def test_buying_power_below_the_size_still_shrinks_then_refuses_whatever_the_margin():
+    """Margin room is plenty here; Alpaca buying power (and regt) is 12,000. The existing per order
+    check still binds: NVDA full, IREN shrinks to what is left, HUT gets nothing and is skipped."""
+    rig = new()
+    rig.alpaca.account.update(equity=50_000.0, buying_power=12_000.0, regt_buying_power=12_000.0)
+    rig.alpaca.price.update(NVDA=100.0, IREN=50.0, HUT=20.0)
+    rig.run(T(THU, 15, 44), T(THU, 15, 50))
+    assert [(b["symbol"], b["qty"]) for _, b in rig.alpaca.buys()] == [("NVDA", "100"), ("IREN", "40")]
+    assert rig.night("IREN")["shrunk"]["buying_power_left"] == 2_000.0
+    hut = rig.night("HUT")
+    assert hut["state"] == SKIPPED and hut["reason"] == osch.NO_ROOM
 
 
 def test_relay_outage_alerts_at_1547_30_and_skips_at_1549_30():
