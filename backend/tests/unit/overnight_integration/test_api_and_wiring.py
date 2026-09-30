@@ -181,3 +181,40 @@ def test_watchdog_does_not_flag_overnight_holds_after_1558(monkeypatch):
     health["account"]["open_positions"] = 4                           # one real day position left
     audit = wd.run_watchdog_audit("http://watchdog.test")
     assert [i for i in audit["incidents"] if i["component"] == "zero_overnight_mandate"]
+
+
+def test_fidelity_log_records_research_style_prices_and_the_look_ahead_check(main_runtime, monkeypatch):
+    """Section 4.9 (gates nothing): 16:15 buy day entry, 09:45 sale day exit, 16:15 sale day
+    look ahead check, from SIP minute bars; a skipped night gets the return the rule would have made."""
+    from backend.tests.unit.overnight_integration.fakes import open_sale, queue_sales
+    r = main_runtime
+    h = MainOvernight(r, at(THU, 15, 40))
+    h.bar_counts["HUT"] = (100, True)                      # HUT skipped tonight (data short)
+    buy_night(h, THU, close={"NVDA": 181.0, "IREN": 41.0, "HUT": 51.0})
+    queue_sales(h, THU)
+    monkeypatch.setattr(r.settings, "RELAY_TOKEN", "test-token")
+
+    async def minutes(symbols, session_date, deadline_sec=20.0):
+        sym = symbols[0]
+        base = {"NVDA": 181.0, "IREN": 41.0, "HUT": 51.0}[sym] + (0 if session_date == THU else 2.0)
+        start = datetime(session_date.year, session_date.month, session_date.day, 9, 30, tzinfo=osch.ET)
+        return [BarEvent(sym, base, base, base, base, 100, start + timedelta(minutes=i)) for i in range(390)]
+
+    monkeypatch.setattr(r, "_fetch_session_minutes", minutes)
+    for when in (at(THU, 16, 15), at(THU, 16, 15, 1)):
+        h.set(when)
+        r.overnight.tick(when)
+    open_sale(h, FRI, {"NVDA": 183.0, "IREN": 43.0, "HUT": 53.0}, until=(9, 31))
+    for when in (at(FRI, 9, 45), at(FRI, 9, 45, 1), at(FRI, 16, 15), at(FRI, 16, 15, 1)):
+        h.set(when)
+        r.overnight.tick(when)
+    fid = r.overnight.controller.state["nights"]["NVDA:2026-10-01"]["fidelity"]
+    assert fid["research_entry"] == 181.0 and fid["research_exit"] == 183.0 and fid["last_bar_minute"] == "15:59"
+    assert fid["research_gross"] == pytest.approx(183.0 / 181.0 - 1)
+    assert fid["real_gross"] == pytest.approx(183.0 / 181.0 - 1)
+    assert fid["lookahead_ok"] is True and fid["feed"] == "sip"
+    hut = r.overnight.controller.state["nights"]["HUT:2026-10-01"]
+    assert hut["state"] == "SKIPPED" and hut["reason"] == osch.DATA_SHORT
+    assert hut["fidelity"]["research_gross"] == pytest.approx(53.0 / 51.0 - 1)   # what the rule would have made
+    body = _client(r).get("/api/overnight").json()
+    assert {row["symbol"] for row in body["fidelity"]} == {"NVDA", "IREN", "HUT"}

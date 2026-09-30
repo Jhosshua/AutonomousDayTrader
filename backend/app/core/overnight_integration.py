@@ -599,6 +599,80 @@ class OvernightIntegration:
         ctl.tick(now)
         self._x6_tick()
         self._after_booking(now)
+        try:
+            self._fidelity_tick(now)
+        except Exception:
+            log.exception("Overnight fidelity log step failed (it gates nothing)")
+
+    # ------------------------------------------------------------------ fidelity log (4.9)
+    FIDELITY_RETRY_SEC = 300.0
+    FIDELITY_GIVE_UP = timedelta(hours=3)
+
+    def _fidelity_tick(self, now: datetime) -> None:
+        """Section 4.9, gates nothing. SIP minute bars (relay REST, feed pinned to sip) fetched at
+        16:15 on the buy day (research style entry, the close of the last bar 15:55 to 15:59) and
+        at 09:45 on the sale day (research style exit, the open of the 09:30 bar), and the sale
+        day's full session at 16:15 for the research look ahead check ok[d+1]. Kept for every
+        night with a sale date, bought or skipped, so a skipped night shows the return the rule
+        would have made. Official auction prints are not fetched (not in the relay's minute bars)."""
+        r, ctl = self.r, self.controller
+        if not (r.settings.RELAY_TOKEN and r.settings.RELAY_HTTP_URL):
+            return
+        for n in ctl._nights()[-9:]:
+            if not n.get("sale_date"):
+                continue
+            bd, sd = date.fromisoformat(n["buy_date"]), date.fromisoformat(n["sale_date"])
+            fid = n["fidelity"]
+            for part, day, due in (("entry", bd, et(bd, osch.FIDELITY_CLOSE_AT)),
+                                   ("exit", sd, et(sd, osch.FIDELITY_OPEN_AT)),
+                                   ("lookahead", sd, et(sd, osch.FIDELITY_CLOSE_AT))):
+                if fid.get(f"{part}_status") in ("ok", "unavailable") or now < due:
+                    continue
+                self._fidelity_part(n, part, day, due, now)
+
+    def _fidelity_part(self, n: Dict[str, Any], part: str, day: date, due: datetime, now: datetime) -> None:
+        r, sym = self.r, n["symbol"]
+        key = f"{part}:{sym}:{n['buy_date']}"
+        fut = self.fidelity_jobs.get(key)
+        if fut is None:
+            last = self._x6_last.get(f"fid:{key}")
+            if last is not None and now.timestamp() - last < self.FIDELITY_RETRY_SEC:
+                return
+            self._x6_last[f"fid:{key}"] = now.timestamp()
+
+            def work():
+                return asyncio.run(r._fetch_session_minutes([sym], day, deadline_sec=20.0))
+
+            self.fidelity_jobs[key] = self.executor.submit(work)
+            return
+        if not fut.done():
+            return
+        del self.fidelity_jobs[key]
+        try:
+            bars = [b for b in fut.result() if b.symbol.upper() == sym]
+        except Exception as exc:
+            if now - due > self.FIDELITY_GIVE_UP:
+                self.controller.record_fidelity(sym, date.fromisoformat(n["buy_date"]),
+                                                {f"{part}_status": "unavailable", f"{part}_error": str(exc)[:200]})
+            return
+        fields: Dict[str, Any] = {f"{part}_status": "ok", "feed": "sip"}
+        mins = {b.timestamp.astimezone(ET).strftime("%H:%M"): b for b in bars}
+        if part == "entry":
+            last = next((mins[m] for m in ("15:59", "15:58", "15:57", "15:56", "15:55") if m in mins), None)
+            fields.update(research_entry=last.close if last else None,
+                          last_bar_minute=max(mins) if mins else None, buy_day_bars=len(bars),
+                          real_entry=n.get("buy_avg"))
+        elif part == "exit":
+            b930 = mins.get("09:30")
+            fields.update(research_exit=b930.open if b930 else None, sale_day_has_0930=b930 is not None)
+            legs = [leg for leg in n["legs"] if leg["symbol"] == sym and leg["sold"]]
+            if legs:
+                fields["real_exit"] = legs[0]["notional"] / legs[0]["sold"]
+        else:
+            fields.update(sale_day_bars=len(bars), lookahead_ok=len(bars) >= osch.MIN_SESSION_BARS)
+        if n.get("splits"):
+            fields["split_ratio"] = n["splits"][-1]["ratio"]
+        self.controller.record_fidelity(sym, date.fromisoformat(n["buy_date"]), fields)
 
     def _after_booking(self, now: datetime) -> None:
         r = self.r
