@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/ingestion/stock_ws.py
 AlpacaRelay Stock WebSocket Client with backpressure buffering and auto-reconnect.
 """
@@ -38,7 +39,10 @@ class StockWebSocketClient:
             self.relay_url = self.relay_url.rstrip("/") + "/v2/stocks"
 
         self.relay_token = relay_token or settings.RELAY_TOKEN
-        default_symbols = list(set(settings.WATCHLIST_SYMBOLS) | set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK, "TSLA", "CDE", "QQQ"})
+        # S16: the overnight holds' stocks come from their own list (never WATCHLIST_SYMBOLS), so
+        # their bars only feed the price the controller sizes with; no day strategy trades them.
+        default_symbols = list(set(settings.WATCHLIST_SYMBOLS) | set(settings.SWING_SYMBOLS) | {settings.SWING_BENCHMARK, "TSLA", "CDE", "QQQ"}
+                               | {s.upper() for s in getattr(settings, "OVERNIGHT_BAR_SYMBOLS", [])})
         self.symbols: Set[str] = set(symbols or default_symbols)
         self.bus: EventBus = bus or event_bus
 

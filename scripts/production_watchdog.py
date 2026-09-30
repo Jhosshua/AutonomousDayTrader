@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# @steered SNARE-2 2026-09-30
 """AutonomousDayTrader Production Watchdog & Incident Monitor.
 
 Monitors the live remote deployment on Railway without holding open any local ports:
@@ -147,6 +148,9 @@ def run_watchdog_audit(base_url: str = DEFAULT_URL) -> dict:
     # 6. Check Positions & Account
     account = health_data.get("account", {})
     open_pos = int(account.get("open_positions", 0))
+    # S19: overnight holds are meant to be held after 15:58; they sell at the next open.
+    overnight_holds = (health_data.get("overnight") or {}).get("holds") or []
+    open_pos = max(0, open_pos - len(overnight_holds))
     if is_post_flatten and open_pos > 0:
         audit["incidents"].append({
             "component": "zero_overnight_mandate",

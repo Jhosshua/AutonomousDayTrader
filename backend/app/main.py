@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/main.py
 FastAPI Core Trading Engine API Server & Real-Time WebSocket Streaming (Port 8005).
 """
@@ -47,6 +48,8 @@ from backend.app.models.events import BarEvent, QuoteEvent, TradeEvent, NewsEven
 from backend.app.strategies.base import Strategy, SignalEvent, StrategyStatus
 from backend.app.strategies.orb import OrbStrategy
 from backend.app.core.orb_integration import OrbIntegration, ORB_ID
+from backend.app.core.overnight_integration import OvernightIntegration
+from backend.app.core.overnight_schedule import is_overnight
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy  # v1 class: checkpoint decoding only
 from backend.app.strategies import vwap_pullback_v2
 from backend.app.strategies.vwap_pullback_v2 import VWAPPullbackV2Strategy
@@ -152,6 +155,8 @@ or15_controller = OR15ExecutionController(sys.modules[__name__])
 tri_controller = TriExecutionController(sys.modules[__name__], tri_strategies)
 # ORB controller + scheduler glue; built in lifespan (orb.start()) or by tests (orb.build()).
 orb = OrbIntegration(sys.modules[__name__])
+# Overnight holds (NVDA, IREN, HUT) glue; the controller is built in lifespan when a broker is attached.
+overnight = OvernightIntegration(sys.modules[__name__])
 or15_sip_verified = False
 # OR15 was replaced by the TSLA/CDE asymmetric plan on 2026-09-25. It only
 # finishes a trade restored from a checkpoint; tests may re-enable it.
@@ -242,10 +247,11 @@ def _get_effective_committed_portfolio(
     """
     if arm == TradingArm.INTRADAY:
         # ORB positions have their own slots (ORBStraddle's 4) and never count toward ADT's cap.
+        # Overnight holds are not day trades and never count toward the cap or the sector limit (S12).
         committed_symbols = {
             sym for sym, pos in acct.positions.items()
             if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
-            and getattr(pos, "strategy_id", "") != ORB_ID
+            and getattr(pos, "strategy_id", "") != ORB_ID and not is_overnight(pos)
         }
     elif arm == TradingArm.SWING:
         committed_symbols = {
@@ -253,7 +259,8 @@ def _get_effective_committed_portfolio(
             if getattr(pos, "arm", None) == TradingArm.SWING or getattr(pos, "strategy_id", "") == "swing_panic_dip"
         }
     else:
-        committed_symbols = {sym for sym, pos in acct.positions.items() if getattr(pos, "strategy_id", "") != ORB_ID}
+        committed_symbols = {sym for sym, pos in acct.positions.items()
+                             if getattr(pos, "strategy_id", "") != ORB_ID and not is_overnight(pos)}
 
     existing_notional: dict[str, float] = {}
 
@@ -335,6 +342,10 @@ def _compare_with_broker(broker_positions: Dict[str, int], broker_equity: Option
         for sym in set(local) | set(broker_positions)
         if local.get(sym, 0) != broker_positions.get(sym, 0)
     }
+    # S13: a held overnight stock whose Alpaca count is the hold times a split ratio is a split
+    # (the 9:00 AM check adjusts the hold), not a mismatch.
+    diffs, splits = overnight.explain(diffs)
+    broker_state["splits"] = splits or None
     broker_state["last_check_at"] = datetime.now(timezone.utc).isoformat()
     broker_state["equity_drift"] = None if broker_equity is None else round(account.equity - broker_equity, 2)
     if diffs:
@@ -379,6 +390,11 @@ async def _broker_reconcile_once() -> None:
                 _checkpoint_runtime("ORB_SYNC")
     except Exception:
         log.exception("ORB ledger sync before the broker check failed")
+    # S13: the overnight controller books its own fills first; positions are re-read when it did.
+    try:
+        positions = await overnight.before_compare(positions)
+    except Exception:
+        log.exception("Overnight booking before the broker check failed")
     _compare_with_broker(positions, status.equity)
 
 
@@ -481,6 +497,12 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
             or (isinstance(existing_arm, str) and str(existing_arm).upper() == "SWING")
         )
     )
+
+    # S1: a stock the overnight controller reserves or holds. Checked before the exit
+    # classification below, so a day short can never count as an exit and sell a hold.
+    overnight_refusal = overnight.order_refusal(order)
+    if overnight_refusal:
+        return False, overnight_refusal
 
     is_exit = False
     if existing_strat in TRI_IDS and order_strat != existing_strat:
@@ -595,7 +617,7 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
     active_cnt = (
         sum(1 for p in acct.positions.values() if getattr(p, "arm", None) != TradingArm.SWING
-            and getattr(p, "strategy_id", "") not in ("swing_panic_dip", ORB_ID))
+            and getattr(p, "strategy_id", "") not in ("swing_panic_dip", ORB_ID) and not is_overnight(p))
         if (getattr(order, "strategy_id", None) == "MANUAL" and not is_swing)
         else committed_count
     )
@@ -628,6 +650,8 @@ engine = ExecutionEngine(account=account, risk_validator=pre_trade_risk_validato
 # ORB's open + pending risk comes out of ADT's remaining daily-loss budget before other arms size.
 risk_engine.reserved_risk_fn = orb.open_risk
 engine.broker_gate = _broker_gate
+# S2: the overnight rule again at the broker choke point
+engine.order_guard = overnight.broker_guard
 engine.before_fixed_broker_submit = or15_controller.before_submit
 
 # Swing Trading Infrastructure & Engine
@@ -756,6 +780,7 @@ def _capture_checkpoint() -> Dict[str, Any]:
         decisions=decision_log.to_state(),
         research=research_safe(research_tracker.to_state, recorder=research_recorder),
         orb=orb.ledger_state(),
+        overnight=overnight.checkpoint_state(),
         swing_scan={
             "last_scan": swing_strategy_engine.audit_log[-1] if swing_strategy_engine.audit_log else None,
             "last_close_data_note": getattr(swing_strategy_engine, "last_close_data_note", None),
@@ -897,6 +922,10 @@ def _restore_checkpoint() -> bool:
     decision_log.load_state(restored.get("decisions"))
     research_safe(research_tracker.load_state, restored.get("research"), recorder=research_recorder)
     orb.load_ledger_state(restored.get("orb"))
+    overnight.load_state(restored.get("overnight"))
+    # S14: the restore above rewrote the risk baselines (runtime_state.py and the loss limit line);
+    # re-apply today's overnight offset after them.
+    overnight.apply_risk_offset()
     try:
         # v1 or older v2 symbol state is replayed through the v2 evaluator; no stored index is trusted.
         rebuilt = vwap_strategy.after_restore()
@@ -1051,7 +1080,12 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
         pos_data["take_profit_2"] = None      # a trailing runner has no second target (display only)
     if not bracket:
         pos_data["strategy_id"] = _try_or_none("strategy_id", lambda: str(pos.strategy_id or "manual").lower()) or "manual"
-    if pos_data["exit_due"] is None and pos.arm == TradingArm.INTRADAY:
+    if is_overnight(pos):
+        # S17: a hold sells at the next open, not at 3:55 PM
+        pos_data["exit_due"] = _try_or_none(
+            "exit_due", lambda: overnight.sale_due(symbol).isoformat() if overnight.sale_due(symbol) else None)
+        pos_data["overnight"] = True
+    elif pos_data["exit_due"] is None and pos.arm == TradingArm.INTRADAY:
         pos_data["exit_due"] = _try_or_none("exit_due", _liquidation_due_iso)
     if tri_controller.owns(symbol):
         pos_data.update(tri_controller.position_details(symbol))
@@ -1388,6 +1422,8 @@ def _trip_circuit_breaker(timestamp: datetime) -> None:
     for sym, pos in list(account.positions.items()):
         if tri_controller.owns(sym) or orb.owns(sym):
             continue
+        if is_overnight(pos):
+            continue  # S7: the loss stop never liquidates an overnight hold (it sells at the next open)
         if or15_controller.owns(sym):
             or15_controller.request_exit("CIRCUIT_BREAKER", timestamp)
             continue
@@ -1451,10 +1487,11 @@ def _check_session_boundary(now_dt: datetime) -> None:
     # A position still on the book at a session boundary means the prior day's
     # 15:55 flatten did not complete. Liquidate unclosed INTRADAY positions.
     # Swing positions are strictly exempt and held overnight!
+    # Overnight holds are exempt too (S6): the overnight controller sells them at the open.
     intraday_positions = {
         sym: pos for sym, pos in account.positions.items()
         if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
-        and not orb.owns(sym)
+        and not orb.owns(sym) and not is_overnight(pos)
     }
     if intraday_positions:
         log.error(
@@ -1475,7 +1512,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
         remaining_intraday = {
             sym: pos for sym, pos in account.positions.items()
             if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
-            and not orb.owns(sym)
+            and not orb.owns(sym) and not is_overnight(pos)
         }
         if remaining_intraday:
             log.error(
@@ -1511,6 +1548,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
     daily_bar_aggregator.reset_for_new_session()
     risk_engine.reset_daily_metrics(account.equity)
     risk_engine.config.hard_max_daily_loss_dollars = daily_loss_limit(account.equity)
+    overnight.apply_risk_offset()   # S14: zeroed for the new session (the offset is keyed to its day)
     flattening_engine.reset_for_new_session()
     account.reset_daily_metrics(account.equity)
     # Bracket/linkage state: clear INTRADAY brackets so no stale PENDING_ENTRY
@@ -1651,6 +1689,9 @@ async def broadcast_ui_state(force: bool = False) -> None:
             "risk_level": risk_engine.risk_level.value,
             "status": snapshot.status,
             "daily_starting_equity": account.daily_starting_equity,
+            # S14: the loss stop's own drawdown (net of today's overnight result) for the Safety meter
+            "risk_drawdown": risk_engine.current_drawdown_dollars,
+            "overnight_realized_today": round(overnight.realized_today(), 2),
         },
         "market_context": _market_context(),
         "strategies": _strategy_cards(),
@@ -1688,6 +1729,7 @@ async def broadcast_ui_state(force: bool = False) -> None:
             for r in engine.audit_log[-20:]
         ],
         "swing": swing_strategy_engine.to_ui_dict(),
+        "overnight": _try_or_none("overnight", overnight.payload),
     }
 
     raw = json.dumps(_sanitize_for_json(payload), default=str, allow_nan=False)
@@ -1949,6 +1991,9 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             return
         if existing_pos:
             if or15_controller.owns(sym) or tri_controller.owns(sym):
+                return
+            if is_overnight(existing_pos):
+                log.info("Ignoring %s signal for overnight hold %s (it sells at the next open)", signal.reason, sym)
                 return
             if getattr(existing_pos, "arm", None) == TradingArm.SWING or getattr(existing_pos, "strategy_id", "") == "swing_panic_dip":
                 log.info("Ignoring intraday News exit for Swing position %s", sym)
@@ -2490,8 +2535,8 @@ def _quote_requires_write_ahead(quote: QuoteEvent) -> bool:
         ):
             return True
     position = account.positions.get(symbol)
-    if position is None:
-        return False
+    if position is None or is_overnight(position):
+        return False  # S15: a hold is never re-marked from quotes, so its quote cannot trip the stop
     if risk_engine.status == BreakerStatus.HALTED_DAILY_LOSS:
         return True
     mid = (quote.bid_price + quote.ask_price) / 2.0
@@ -2500,7 +2545,8 @@ def _quote_requires_write_ahead(quote: QuoteEvent) -> bool:
     else:
         projected_unrealized = position.shares * (position.avg_entry_price - mid)
     projected_equity = account.equity + projected_unrealized - position.unrealized_pnl
-    projected_drawdown = max(0.0, risk_engine.config.starting_equity - projected_equity)
+    # net of today's overnight result (S14); identical to before when there is none
+    projected_drawdown = max(0.0, risk_engine.config.starting_equity - (projected_equity - risk_engine.overnight_realized_today))
     return projected_drawdown >= risk_engine.config.hard_max_daily_loss_dollars
 
 
@@ -2677,6 +2723,8 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         for sym, pos in list(account.positions.items()):
             if tri_controller.owns(sym) or orb.owns(sym):
                 continue
+            if is_overnight(pos):
+                continue  # S3: the 15:55 flatten never touches an overnight hold or its orders
             if or15_controller.owns(sym):
                 or15_controller.request_exit("FORCED_FLAT", now_dt)
                 continue
@@ -2712,6 +2760,8 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
             for sym, pos in list(account.positions.items()):
                 if tri_controller.owns(sym) or orb.owns(sym):
                     continue
+                if is_overnight(pos):
+                    continue  # S4: the 15:58 sweep never touches an overnight hold
                 if or15_controller.owns(sym):
                     or15_controller.request_exit("EMERGENCY_SWEEP", now_dt)
                     continue
@@ -2931,6 +2981,11 @@ async def _runtime_clock_step(now_dt: datetime) -> None:
         await handle_flattening_directive(directive)
     or15_controller.tick(now_dt)
     tri_controller.tick(now_dt)
+    # Overnight holds: starts and collects worker jobs only (broker I/O on its own pool).
+    try:
+        overnight.tick(now_dt)
+    except Exception:
+        log.exception("Overnight holds tick failed")
     # ORB scheduler: starts/collects worker jobs only, never waits on the network.
     orb.tick(now_dt)
 
@@ -3069,6 +3124,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     tsla_or15_strategy.__init__()
     tri_controller.shutdown()
     orb.reset()
+    overnight.reset()
     for fixed_strategy in tri_strategies:
         fixed_strategy.__init__(fixed_strategy.symbol)
     daily_bar_aggregator.reset_for_new_session()
@@ -3076,6 +3132,31 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     decision_log.reset_for_session(None)
     research_tracker.state = {"brackets": {}, "swing": {}}
     research_tracker.last_submitted.clear()
+
+
+def _startup_overnight(now_dt: datetime) -> None:
+    """Lifespan, broker attached: session boundary for now, build the controller, reconcile.
+
+    The boundary is skipped here when running it could be unsafe (a SESSION_BOUNDARY input still
+    pending in the durable inbox, which the replay below owns, or ORB positions on the book before
+    ORB's controller exists). The overnight booking then waits on its own until the clock's
+    boundary has run (a fill is never booked into a day whose boundary did not run)."""
+    pending_boundary = state_store is not None and any(
+        t == "SESSION_BOUNDARY" for _k, t, _e in state_store.list_pending_events())
+    orb_positions = any(getattr(p, "strategy_id", "") == ORB_ID for p in account.positions.values())
+    if not pending_boundary and not orb_positions:
+        try:
+            _check_session_boundary(now_dt)
+        except Exception:
+            log.exception("Startup session boundary check failed; overnight bookings wait for the clock's")
+    else:
+        log.warning("Startup session boundary left to the %s; overnight bookings wait for it",
+                    "pending input replay" if pending_boundary else "runtime clock (ORB positions on the book)")
+    overnight.start(engine.broker)
+    try:
+        overnight.reconcile(now_dt)
+    except Exception:
+        log.exception("Overnight startup reconcile failed; the controller retries on its clock")
 
 
 def set_simulation_mode(enabled: bool) -> None:
@@ -3119,6 +3200,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             # Finish any Alpaca order left open by a crash BEFORE pending events replay.
             if engine.broker is not None:
                 _settle_broker_orders()
+                # Overnight holds (R2-2): run the session boundary for now first, so a sale that filled
+                # while the robot was down is booked into its own day and its own loss stop, then ask
+                # Alpaca about every overnight client id, all before the startup compare below.
+                _startup_overnight(datetime.now(timezone.utc))
             status = await asyncio.to_thread(alpaca_broker.sync)
             log.info(
                 "Alpaca paper broker attached: account %s equity %.2f positions %s (bot equity %.2f positions %s)",
@@ -3222,6 +3307,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             pass
         ui_clients.discard(ws)
     tri_controller.shutdown()
+    overnight.shutdown()
     # ORB: stop new entries/jobs, let a running exit finish (bounded), then refuse every broker write,
     # all BEFORE the final checkpoint and the store close (Codex P1 #3). Its last fills are booked.
     try:
@@ -3318,6 +3404,7 @@ async def get_health() -> Dict[str, Any]:
         "ride_the_trend": {"data_layers": vwap_strategy.data_layers(), "tape": tick_tape.health(), "regime": regime_feed.health(), "profiles": profile_store.health(), "addons_enforced": settings.RIDE_THE_TREND_ADDONS_ENFORCED, "enforced_gates": sorted(RIDE_THE_TREND_ENFORCED), "macro_today": macro_calendar.today_text(datetime.now(ET_TZ).date())},
         "broker": _broker_health(),
         "orb": _sanitize_for_json(_orb_health()),
+        "overnight": _sanitize_for_json(_try_or_none("overnight", overnight.health) or {"mode": "error"}),
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
                 "disabled" if state_store is None else "recovery_halt"
@@ -3464,6 +3551,29 @@ async def resolve_orb_unknown_write(req: OrbUnknownWriteRequest) -> Dict[str, An
                         f"operator resolved unknown write {ref}", datetime.now(timezone.utc))
     _checkpoint_runtime("ORB_WRITE_RESOLVED")
     return _sanitize_for_json({"resolved": True, "write": hit})
+
+
+@app.get("/api/overnight")
+async def get_overnight() -> Dict[str, Any]:
+    """Overnight holds: state, per stock rows, intents, holds, queued sales, skips, fidelity log,
+    settings and the research summary (read live, never fixed strings)."""
+    return _sanitize_for_json(overnight.payload())
+
+
+class OvernightNoBuyRequest(BaseModel):
+    on: bool
+
+
+@app.post("/api/overnight/no-buy-tonight")
+async def post_overnight_no_buy(req: OvernightNoBuyRequest) -> Dict[str, Any]:
+    """D4 "No overnight buy tonight". Saved durably with its date before the reply says it worked;
+    refused after 3:49:30 PM. Never touches a sale. No sign in, like flatten (operator's standing
+    choice for ADT's operator actions): its worst misuse is skipping one night's buy."""
+    ok, message = overnight.set_no_buy_tonight(bool(req.on))
+    await broadcast_ui_state(force=True)
+    if not ok:
+        raise HTTPException(status_code=409, detail=message)
+    return {"ok": True, "message": message, "no_buy_tonight": overnight.payload().get("no_buy_tonight")}
 
 
 @app.get("/api/account")
@@ -3794,6 +3904,11 @@ async def _execute_manual_flatten(
 
     for sym in target_symbols:
         pos = account.positions.get(sym)
+        if is_overnight(pos) or overnight.holds_symbol(sym):
+            # S8 / D9: overnight holds are never closed here; they sell at the next open
+            skipped.append({"symbol": sym, "reason": "OVERNIGHT_HOLD: overnight holds are not included. "
+                                                     + overnight.sale_text(sym)})
+            continue
         if orb.owns(sym):
             # ORB's bracket legs are cancelled and confirmed before its exact quantity is closed
             orb.request_exit(sym, "MANUAL_FLATTEN")
@@ -3887,11 +4002,15 @@ async def _execute_manual_flatten(
         else:
             flattened.append("TSLA")
     await broadcast_ui_state(force=True)
+    overnight_skipped = [row["symbol"] for row in skipped if row["reason"].startswith("OVERNIGHT_HOLD")]
     return {
         "flattened": flattened,
         "skipped": skipped,
         "rejected": rejected,
         "remaining_positions": len(account.positions),
+        "overnight_note": (
+            "Overnight holds are not included. " + " ".join(overnight.sale_text(s) for s in overnight_skipped)
+            if overnight_skipped else None),
     }
 
 
@@ -3966,6 +4085,11 @@ async def ui_websocket_endpoint(websocket: WebSocket) -> None:
                     mkt_price = pos.market_price if pos else None
                     if tri_controller.owns(sym):
                         await websocket.send_json({"type": "error", "message": "This plan keeps its safety exit fixed"})
+                        continue
+                    if is_overnight(pos) or overnight.holds_symbol(sym):
+                        # S10: an overnight hold has no stop to move
+                        await websocket.send_json({"type": "error", "message": (
+                            "An overnight hold has no stop, so there is nothing to move. " + overnight.sale_text(sym))})
                         continue
                     orb_refusal = _orb_tighten_refusal(sym)
                     if orb_refusal:

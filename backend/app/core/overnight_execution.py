@@ -238,6 +238,77 @@ class OvernightController:
     def holds(self) -> List[Dict[str, Any]]:
         return [n for n in self._nights() if n["state"] in HOLD_STATES and self._left(n) > 0]
 
+    def locks_all(self, symbol: str) -> bool:
+        """S1: once a buy intent exists (sent, accepted, held, queued for sale, or sold but Alpaca
+        not yet shown flat) every other order in this stock is refused."""
+        sym = symbol.upper()
+        return any(n["symbol"] == sym and not n["released"]
+                   and (n["state"] not in (IDLE, SKIPPED) or n["held_qty"] > 0)
+                   for n in self.state["nights"].values())
+
+    def sale_due(self, symbol: str) -> Optional[datetime]:
+        """S17: when the hold in this stock sells (the sale date at 09:30 ET), or None."""
+        sym = symbol.upper()
+        for n in self.holds():
+            if n["symbol"] == sym and self._sd(n) is not None:
+                return et(self._sd(n), osch.SALE_POLL_FROM)
+        return None
+
+    # ------------------------------------------------ broker loop refresh (S13)
+    def pending_reads(self) -> List[Tuple[str, int, int, Optional[str], str]]:
+        """Non final attempts to read before a position compare: (night key, leg index or -1 for
+        the buy, attempt index, Alpaca id, client id). Nights with a job already in flight are left
+        to that job, so a slower read can never land after a fresher one."""
+        out: List[Tuple[str, int, int, Optional[str], str]] = []
+        for key, n in self.state["nights"].items():
+            syms = {n["symbol"]} | {leg["symbol"] for leg in n["legs"]}
+            if any(k.endswith(f":{n['buy_date']}") and k.split(":")[1] in syms for k in self._jobs):
+                continue
+            for j, att in enumerate(n["buy"]):
+                if not att["final"] and att["sent"]:
+                    out.append((key, -1, j, att["id"], att["cid"]))
+            for i, leg in enumerate(n["legs"]):
+                for j, att in enumerate(leg["attempts"]):
+                    if not att["final"] and att["sent"]:
+                        out.append((key, i, j, att["id"], att["cid"]))
+        return out
+
+    def fetch_reads(self, reads: List[Tuple[str, int, int, Optional[str], str]]) -> Dict[Tuple[str, int, int], Any]:
+        """Worker thread: read each attempt at Alpaca. Read only, touches no state."""
+        out: Dict[Tuple[str, int, int], Any] = {}
+        for key, i, j, oid, cid in reads:
+            try:
+                out[(key, i, j)] = self.broker.get_order(oid) if oid else self.broker.get_order_by_client_id(cid)
+            except Exception as exc:  # proves nothing; the regular poll tries again
+                log.warning("OVERNIGHT refresh read of %s failed: %s", cid, exc)
+        return out
+
+    def apply_reads(self, rows: Dict[Tuple[str, int, int], Any], now: Optional[datetime] = None) -> bool:
+        """Event loop: book what the reads show. Returns True when anything new was booked."""
+        now = now or self.clock()
+        before = json.dumps([n["booked"] for n in self.state["nights"].values()], sort_keys=True)
+        for (key, i, j), row in rows.items():
+            n = self.state["nights"].get(key)
+            if n is None or row is None:
+                continue
+            syms = {n["symbol"]} | {leg["symbol"] for leg in n["legs"]}
+            if any(k.endswith(f":{n['buy_date']}") and k.split(":")[1] in syms for k in self._jobs):
+                continue                    # a job started meanwhile: it owns this read
+            try:
+                if i < 0:
+                    att = n["buy"][j]
+                    if not att["final"]:
+                        self._apply_buy_row(n, att, row, now)
+                else:
+                    leg = n["legs"][i]
+                    att = leg["attempts"][j]
+                    if not att["final"]:
+                        self._apply_sale_row(n, leg, att, row, now)
+            except Exception as exc:
+                n["last_error"] = f"refresh: {type(exc).__name__}: {exc}"[:300]
+                log.warning("OVERNIGHT refresh apply %s failed: %s", key, exc)
+        return json.dumps([n["booked"] for n in self.state["nights"].values()], sort_keys=True) != before
+
     def overnight_realized_today(self, session_date: date) -> float:
         """D6 / S14: overnight result booked on session_date (0.0 for any other day)."""
         off = self.state["realized_offset"]
@@ -273,6 +344,24 @@ class OvernightController:
             return False, "Not saved, so not applied. Try again."
         self._log(None, "CONTROL_NO_BUY_TONIGHT", now, date=d.isoformat())
         return True, "No overnight buy tonight. Holds already bought still sell at the next open."
+
+    def clear_no_buy_tonight(self, now: datetime) -> Tuple[bool, str]:
+        """D4 switched back off before 15:49:30. A buy the control already stopped stays stopped."""
+        d = et_date(now)
+        if not self._control_active(d):
+            return True, "The overnight buy is on for tonight."
+        if now >= et(d, osch.BUY_GIVE_UP):
+            return False, "Too late for tonight. The control can only be changed until 3:49:30 PM."
+        if any(n["buy_date"] == d.isoformat() and n["reason"] == osch.OPERATOR_NO_BUY_TONIGHT
+               for n in self.state["nights"].values()):
+            return False, "Tonight's buy was already stopped and cannot be restarted."
+        prev = dict(self.state["control"])
+        self.state["control"] = {"no_buy_date": None, "set_at": _iso(now)}
+        if not self.checkpoint("OVERNIGHT_CONTROL"):
+            self.state["control"] = prev
+            return False, "Not saved, so not changed. Try again."
+        self._log(None, "CONTROL_BUY_TONIGHT_ON", now, date=d.isoformat())
+        return True, "The overnight buy is on for tonight."
 
     def record_fidelity(self, symbol: str, buy_date: date, fields: Dict[str, Any]) -> None:
         """Section 4.9 fidelity log. The caller fetches the SIP bars; this only stores and derives."""

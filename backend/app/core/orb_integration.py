@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """ADT <-> ORB glue (phase 3 of PLAN_2026_09_28_orb_rules_match_orbstraddle.md, sections 2-5, 8, 9).
 
 ORB (strategy id "orb") trades ORBStraddle's rules through its own controller
@@ -493,6 +494,11 @@ class OrbIntegration:
             return f"{sym} belongs to the Tesla/Coeur morning plan today"
         if r.or15_controller.reserves(sym):
             return f"{sym} belongs to the OR15 plan"
+        ovn = getattr(r, "overnight", None)
+        if ovn is not None:
+            reason = ovn.occupied_reason(sym)     # S11: reserved from 15:45 or held overnight
+            if reason:
+                return reason
         return None
 
     def is_occupied(self, symbol: str) -> bool:

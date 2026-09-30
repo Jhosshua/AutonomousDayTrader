@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """Capture and restore the mutable trading runtime without pickling code."""
 from __future__ import annotations
 
@@ -50,6 +51,7 @@ def capture_runtime_state(
     swing_scan: Optional[Dict[str, Any]] = None,
     research: Optional[Dict[str, Any]] = None,
     orb: Optional[Dict[str, Any]] = None,
+    overnight: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 
     """Return a complete JSON-safe recovery checkpoint."""
@@ -158,6 +160,11 @@ def capture_runtime_state(
         # trades are recorded). The controller and scheduler state are their own durable
         # rows (orb_state table), written by ORB's worker threads.
         state["orb"] = orb
+    if overnight is not None:
+        # Optional key: the overnight holds (intents, attempt ids, states, the loss offset with its
+        # date, the no buy tonight control, skip and fidelity logs). Plain JSON only (no __type__
+        # classes), so an older build still decodes the payload; older code ignores the key.
+        state["overnight"] = overnight
     encoded = encode_runtime_value(state)
     if not isinstance(encoded, dict):
         raise PersistenceError("Encoded runtime checkpoint is not an object")
@@ -305,6 +312,7 @@ def restore_runtime_state(
         "swing_scan": decoded.get("swing_scan"),
         "research": decoded.get("research"),
         "orb": decoded.get("orb"),
+        "overnight": decoded.get("overnight"),
     }
 
 
