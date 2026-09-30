@@ -154,7 +154,8 @@ S6 of v1 (EOD_FLAT) is dropped. Holds do not exist yet at 15:58, so no change is
 
 - At 09:00 compare Alpaca's share count with the ledger for each hold. Equal, keep the queued sale.
 - Different, read Alpaca corporate actions. A split with a matching ratio adjusts the ledger (shares times ratio, price divided by ratio), logs a plain sentence and replaces the sale for the new count.
-- Anything else (no action found, a merger, a new symbol), raise needs look and sell min(hold, Alpaca) of the old and any new symbol. Never book more than the hold, so the book never flips short (`account.py:327-347`).
+- A symbol change or merger with a new symbol and a ratio, where Alpaca shows no old shares and exactly hold times ratio new shares, first converts the hold in ADT's book (shares times ratio, price divided by ratio, same strategy, a plain sentence logged), then sells and books the new symbol, and the reservation moves to it. One that is unclear (no ratio, no new symbol, or Alpaca's shares do not match) sells nothing and is never released, with a needs look telling the operator what to do and the red unsold banner.
+- Anything else (no action found, a split without a ratio), raise needs look and sell min(hold, Alpaca) of the old symbol. Never book more than the hold, so the book never flips short (`account.py:327-347`).
 
 ### 4.7 Loss limits
 
