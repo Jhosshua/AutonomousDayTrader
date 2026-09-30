@@ -1,3 +1,4 @@
+# @steered SNARE-2 2026-09-30
 """backend/app/core/broker.py
 Real order execution on an Alpaca PAPER account.
 
@@ -502,5 +503,140 @@ class AlpacaBroker:
             raise self._http_error("account read", resp)
         return resp.json()
 
+    # --------------------------------------------- overnight holds (paper host)
+    # Used by core/overnight_execution.py. Same rule as the ORB methods: one HTTP round trip,
+    # no write retried here, the caller owns ambiguity (lookup by client id).
+    AUCTION_TIFS = ("cls", "opg")
+    ACCOUNT_FIELDS = ("equity", "cash", "buying_power", "regt_buying_power", "daytrading_buying_power",
+                      "last_maintenance_margin", "multiplier")
+    CORPORATE_ACTION_MAX_DAYS = 90   # Alpaca's date range limit for the announcements endpoint
+
+    def submit_on_auction(self, symbol: str, side: str, qty: int, client_order_id: str, tif: str) -> Dict[str, Any]:
+        """POST one market order for the closing (tif cls) or opening (tif opg) auction.
+
+        Alpaca takes cls until 15:50 ET and opg from 19:00 until 09:28 ET. A lost reply raises
+        BrokerTransportError and a refusal BrokerHTTPError (see classify_refusal).
+        """
+        side = side.lower()
+        if tif not in self.AUCTION_TIFS:
+            raise ValueError("auction orders take time in force cls or opg only")
+        if side not in ("buy", "sell") or int(qty) < 1:
+            raise ValueError("auction order needs side buy/sell and qty >= 1")
+        body = {"symbol": symbol.upper(), "qty": str(int(qty)), "side": side, "type": "market",
+                "time_in_force": tif, "client_order_id": client_order_id[:128]}
+        self.status.orders_sent += 1
+        self.status.last_order_at = datetime.now(timezone.utc).isoformat()
+        try:
+            resp = self._client.post("/v2/orders", json=body)
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"{tif} {side} {symbol} outcome unknown: {exc}") from exc
+        if resp.status_code in (200, 201):
+            return resp.json()
+        err = self._http_error(f"{tif} {side} {qty} {symbol} refused", resp)
+        self.status.last_error = str(err)[:300]
+        raise err
+
+    def get_calendar(self, start: str, end: str) -> List[Dict[str, Any]]:
+        """Read only GET /v2/calendar: [{"date": "YYYY-MM-DD", "open": "09:30", "close": "16:00", ...}]."""
+        try:
+            resp = self._client.get("/v2/calendar", params={"start": start, "end": end})
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"calendar read failed: {exc}") from exc
+        if resp.status_code != 200:
+            raise self._http_error("calendar read", resp)
+        rows = resp.json()
+        if not isinstance(rows, list):
+            raise BrokerError("calendar answered with something that is not a list")
+        return rows
+
+    def get_account_fields(self) -> Dict[str, Any]:
+        """Account number plus the sizing and room fields as floats (None when Alpaca omits one)."""
+        acct = self.get_account_checked()
+        out: Dict[str, Any] = {"account_number": acct.get("account_number")}
+        for key in self.ACCOUNT_FIELDS:
+            try:
+                out[key] = float(acct[key]) if acct.get(key) not in (None, "") else None
+            except (TypeError, ValueError):
+                out[key] = None
+        return out
+
+    def get_corporate_actions(self, symbol: str, since: str, until: str) -> List[Dict[str, Any]]:
+        """Split, merger and spinoff announcements for one symbol with an ex date in [since, until].
+
+        TO VERIFY against the paper host before relying on it live: the endpoint is taken to be
+        GET /v2/corporate_actions/announcements (Trading API, same host as orders) with params
+        ca_types, since, until (at most 90 days apart), symbol and date_type=ex_date, answering
+        rows with ca_type, ca_sub_type, initiating_symbol, target_symbol, old_rate, new_rate and
+        ex_date. Alpaca also serves GET https://data.alpaca.markets/v1/corporate-actions, which
+        is on the market data host and is not used (R6, paper host only).
+        Rows are returned normalized: kind (split, reverse_split, merger, spinoff, other),
+        old_symbol, new_symbol, ratio (new shares per old share, None when a rate is missing)
+        and ex_date; the raw row is kept under "raw".
+        """
+        a, b = datetime.fromisoformat(since).date(), datetime.fromisoformat(until).date()
+        if b < a or (b - a).days > self.CORPORATE_ACTION_MAX_DAYS:
+            raise ValueError("corporate action range must be 0 to 90 days")
+        params = {"ca_types": "split,merger,spinoff", "since": a.isoformat(), "until": b.isoformat(),
+                  "symbol": symbol.upper(), "date_type": "ex_date"}
+        try:
+            resp = self._client.get("/v2/corporate_actions/announcements", params=params)
+        except httpx.HTTPError as exc:
+            raise BrokerTransportError(f"corporate actions read failed: {exc}") from exc
+        if resp.status_code != 200:
+            raise self._http_error("corporate actions read", resp)
+        rows = resp.json()
+        if not isinstance(rows, list):
+            raise BrokerError("corporate actions answered with something that is not a list")
+        return [normalize_corporate_action(row) for row in rows]
+
     def close(self) -> None:
         self._client.close()
+
+
+REFUSAL_AMBIGUOUS = "AMBIGUOUS"          # no answer, 429 or 5xx: proves nothing, look up by client id
+REFUSAL_WASH_TRADE = "WASH_TRADE"        # 403 potential wash trade (an opposite order is open)
+REFUSAL_BUYING_POWER = "BUYING_POWER"    # 403 insufficient buying power
+REFUSAL_DEFINITE = "REFUSED"             # any other explicit 4xx, including other 40310000 answers
+
+
+def _refusal_text(body: Any) -> str:
+    if isinstance(body, dict):
+        return f"{body.get('code', '')} {body.get('message', '')}".lower()
+    return str(body or "").lower()
+
+
+def classify_refusal(exc: Exception) -> str:
+    """Sort a broker failure: AMBIGUOUS, WASH_TRADE, BUYING_POWER or REFUSED (definite)."""
+    if not isinstance(exc, BrokerHTTPError) or not exc.definitive:
+        return REFUSAL_AMBIGUOUS
+    text = _refusal_text(exc.body) or str(exc).lower()
+    if "wash trade" in text:
+        return REFUSAL_WASH_TRADE
+    if "buying power" in text:
+        return REFUSAL_BUYING_POWER
+    return REFUSAL_DEFINITE
+
+
+def _rate(value: Any) -> Optional[float]:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return v if v > 0 else None
+
+
+def normalize_corporate_action(row: Dict[str, Any]) -> Dict[str, Any]:
+    ca_type = str(row.get("ca_type") or "").lower()
+    sub = str(row.get("ca_sub_type") or "").lower()
+    old_sym = str(row.get("initiating_symbol") or row.get("target_symbol") or "").upper() or None
+    new_sym = str(row.get("target_symbol") or row.get("initiating_symbol") or "").upper() or None
+    old_rate, new_rate = _rate(row.get("old_rate")), _rate(row.get("new_rate"))
+    ratio = new_rate / old_rate if old_rate and new_rate else None
+    if ca_type == "split":
+        kind = "reverse_split" if sub == "reverse_split" or (ratio is not None and ratio < 1) else "split"
+    elif ca_type in ("merger", "spinoff"):
+        kind = ca_type
+    else:
+        kind = "other"
+    return {"kind": kind, "old_symbol": old_sym, "new_symbol": new_sym, "ratio": ratio,
+            "ex_date": row.get("ex_date"), "raw": row}
