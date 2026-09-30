@@ -12,7 +12,7 @@ Two fixed-rule arms from `/Users/mo/multi_stock_edge_lab_3yr/EXECUTION_PLAN.md` 
 
 - **Tesla Morning Plan** (`tsla_asymmetric_dual`): 15-minute opening range 09:30-09:44. Long after a breakout and a later green retest bar that holds the midpoint (QQQ at/above its VWAP), signals through 11:30. Short when a bar closes under the range low with QQQ under VWAP, before 11:00. Market order at T+2. Half the shares target 1.5R and close after 180 min, half target 2R and close after 240 min. Stop: range low (long) or midpoint (short). Each half has its own native Alpaca OCO.
 - **Coeur Morning Plan** (`cde_asymmetric_dual`): same rules on CDE, longs until noon, shorts before 11:30, full size at 2R / 180 min.
-- Risk 0.75% of session-start equity per symbol, sized by stop distance (only buying power limits size). Account daily loss stop = min($1,500, 2.5% of session-start equity). Everything flat at 15:55 (12:55 on half days).
+- Risk 0.75% of session-start equity per symbol, sized by stop distance (only buying power limits size). Account daily loss stop = min($1,500, 2.5% of session-start equity). Day trades flat at 15:55 (12:55 on half days). The overnight holds (NVDA, IREN, HUT overnight) are the exception, they buy at the 4:00 PM close and sell at the next 9:30 AM open (`PLAN_2026_09_30_overnight_holds.md`).
 - Code: `backend/app/strategies/tri_engine.py` (signals), `backend/app/core/tri_execution.py` (orders, tranches, recovery). State: `GET /api/tri-engine`.
 - Evidence and decisions: `docs/tri_engine/EVIDENCE.md`. **The plan's win-rate table came from a pre-market opening range; the live 09:30 version backtests weaker (TSLA 2R and CDE not significant).**
 - Tools: `scripts/tri_research_parity.py`, `scripts/tri_real_day_replay.py`, `scripts/tri_variant_backtest.py`, `scripts/run_tri_engine_dry_run.py [--serve]`.
@@ -36,7 +36,7 @@ The old TSLA OR15 one-share arm (`tsla_or15_retest`) takes no new entries (`OR15
                   │  - Market Data & Order Book Event Bus                  │
                   │  - Paper Portfolio State Machine ($50k, 4:1 BP, PnL)   │
                   │  - Institutional Risk Engine ($1,500 Circuit Breaker)  │
-                  │  - 4-Phase EOD Auto-Flattening Engine (Zero Overnight) │
+                  │  - 4-Phase EOD Auto-Flattening Engine (Day Trades)     │
                   └───────────────────────────┬────────────────────────────┘
                                               │
                                               ▼
@@ -78,7 +78,7 @@ The old TSLA OR15 one-share arm (`tsla_or15_retest`) takes no new entries (`OR15
   - Per-Position Risk Cap: 1–2% maximum risk budget per trade.
   - Single-Position Concentration Cap: $25,000 notional (50% of equity, 12.5% of 4:1 DTBP). With the 3-position concurrency limit the whole book tops out at $75,000 (1.5x equity), and a 5% adverse gap on the largest allowed position costs $1,250, inside the $1,500 daily breaker.
   - Dynamic Brackets: Multi-target profit scaling (Target 1 at 0.8R with 50% scale-out, Target 2 at 1.8R or trailing ATR stop).
-  - 4-Phase Zero-Overnight Flattening: 15:45 entry lockout $\to$ 15:50 working order purge $\to$ 15:55 market liquidation $\to$ 15:58 flat audit before 16:00 ET.
+  - 4-Phase Day Trade Flattening: 15:45 entry lockout $\to$ 15:50 working order purge $\to$ 15:55 market liquidation $\to$ 15:58 flat audit before 16:00 ET. Overnight holds are left out and sell at the next 9:30 AM open.
 
 ### 2. 4 Dynamically Adapted Intraday Strategies
 1. **Opening Range Breakout (ORB)**: Uses the first 5 minutes in production (15 minutes is configurable), a relative volume threshold of 1.8x, midpoint invalidation stops, and tiered profit targets.
@@ -283,7 +283,7 @@ AutonomousDayTrader/
 │   │   │   ├── broker.py         # Alpaca PAPER order client (real fills since 2026-09-25)
 │   │   │   ├── risk.py           # Institutional Risk Engine & circuit breakers
 │   │   │   ├── bracket.py        # Stop-loss & dynamic take-profit brackets
-│   │   │   ├── flattening.py     # 4-phase zero-overnight auto-liquidation state machine
+│   │   │   ├── flattening.py     # 4-phase day trade auto-liquidation state machine (skips overnight holds)
 │   │   │   └── engine.py         # Main execution engine coordinator
 │   │   ├── ingestion/
 │   │   │   ├── stock_ws.py       # Stock WebSocket client (bars, quotes, trades)
