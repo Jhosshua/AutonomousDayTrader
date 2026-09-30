@@ -1,3 +1,4 @@
+// @steered SNARE-2 2026-09-30
 "use client";
 
 import { useMemo, useState } from "react";
@@ -18,8 +19,24 @@ import SwingCandidateWatchlist from "@/components/SwingCandidateWatchlist";
 import ActiveSwingPositionsTable from "@/components/ActiveSwingPositionsTable";
 import TradeHistory from "@/components/TradeHistory";
 import ExecutionLog from "@/components/ExecutionLog";
+import OvernightHolds, { HoldView } from "@/components/OvernightHolds";
 import { AlertTriangle, WifiOff } from "lucide-react";
-import { countdownToClose, groupLedgerByStrategy, rightNowSentence } from "@/lib/plain";
+import {
+  countdownToClose,
+  etDateKey,
+  etDateOfIso,
+  etMinutesOfDay,
+  etParts,
+  groupLedgerByStrategy,
+  isOvernightPosition,
+  joinNames,
+  noBuyDisabledReason,
+  overnightBalanceNote,
+  overnightHoldingSentence,
+  rightNowSentence,
+  tonightStatusLine,
+  unsoldBannerText,
+} from "@/lib/plain";
 
 export default function Home() {
   const {
@@ -33,6 +50,7 @@ export default function Home() {
     swingExitNextOpen,
     swingExitImmediate,
     swingTightenStop,
+    setNoBuyTonight,
   } = useTradingStream();
 
   const [showPro, setShowPro] = useProWordsToggle();
@@ -60,13 +78,13 @@ export default function Home() {
   }, [todayLedger.items, todayLedger.recoveredSessions]);
 
   // F1: split holdings by arm. Quick-trade holdings = all_positions whose symbol is NOT
-  // currently a swing holding.
+  // currently a swing holding, and not an overnight hold (those have their own list).
   const swingSymbols = useMemo(
     () => new Set((state.swing?.positions ?? []).map((p) => p.symbol)),
     [state.swing?.positions]
   );
   const intradayPositions = useMemo(
-    () => state.all_positions.filter((p) => !swingSymbols.has(p.symbol)),
+    () => state.all_positions.filter((p) => !swingSymbols.has(p.symbol) && !isOvernightPosition(p)),
     [state.all_positions, swingSymbols]
   );
 
@@ -75,7 +93,79 @@ export default function Home() {
   const losses = todayLedger.summary?.losses ?? 0;
 
   const firstTradingDayFlag = state.strategies.find((s) => s.window)?.window?.trading_day;
-  const countdownValue = countdownToClose(new Date(), firstTradingDayFlag);
+
+  // Overnight holds (PLAN_2026_09_30_overnight_holds.md section 5). Everything below reads the
+  // websocket "overnight" payload and the positions. With neither (older backend) nothing changes.
+  const now = new Date();
+  const nowMs = now.getTime();
+  const etMin = etMinutesOfDay(now);
+  const todayEt = etDateKey(now);
+  const ovn = state.overnight ?? null;
+  const holdViews: HoldView[] = state.all_positions.filter(isOvernightPosition).map((p) => {
+    const h = ovn?.holds?.find((x) => x.symbol === p.symbol);
+    return {
+      symbol: p.symbol,
+      strategyId: p.strategy_id || h?.strategy_id || "",
+      shares: p.shares,
+      buyPrice: p.entry_price ?? h?.buy_avg ?? null,
+      saleDate: h?.sale_date ?? etDateOfIso(p.exit_due),
+      nights: h?.nights ?? null,
+      needsLook: (h?.needs_look?.length ?? 0) > 0,
+    };
+  });
+  const overnightOn = ovn != null || holdViews.length > 0;
+  const ovnRunning = ovn?.state?.running === true;
+  const ovnBuysOn = ovnRunning && ovn?.state?.mode === "live";
+  const tradingDayToday = firstTradingDayFlag ?? (etParts(now).weekday !== 0 && etParts(now).weekday !== 6);
+  const noBuyActive = ovn?.no_buy_tonight === true;
+  const ovnRows = (ovn?.rows ?? []).filter((r) => (ovn?.settings?.enabled ?? []).includes(r.symbol) || r.enabled);
+  // a stock still counts as planned tonight until its night is skipped or bought
+  const plannedTonight = ovnRows.filter((r) => {
+    if (!r.enabled) return false;
+    if (r.buy_date === todayEt) return r.state !== "SKIPPED" && !["HELD", "SALE_QUEUED", "SOLD"].includes(r.state || "");
+    return !["HELD", "SALE_QUEUED"].includes(r.state || "") && !noBuyActive;
+  });
+  const noBuyUntilMs = ovn?.no_buy_until ? Date.parse(ovn.no_buy_until) : NaN;
+  const tooLate = Number.isFinite(noBuyUntilMs) && etDateOfIso(ovn?.no_buy_until) === todayEt ? nowMs >= noBuyUntilMs : etMin >= 15 * 60 + 49;
+  const disabledReason = noBuyDisabledReason({
+    running: ovnRunning,
+    modeOn: ovnBuysOn,
+    enabledCount: ovn?.settings?.enabled?.length ?? 0,
+    tradingDay: tradingDayToday,
+    active: noBuyActive,
+    tooLate,
+    alreadyStopped: ovnRows.some((r) => r.buy_date === todayEt && r.reason === "OPERATOR_NO_BUY_TONIGHT"),
+    nothingPlanned: plannedTonight.length === 0,
+  });
+  const tonightLines =
+    ovn && ovnRunning && tradingDayToday && etMin >= 15 * 60 + 45
+      ? (ovn.rows ?? []).flatMap((r) => {
+          const text = tonightStatusLine(r, { modeOn: ovnBuysOn, noBuyTonight: noBuyActive, today: todayEt, etMin });
+          return text ? [{ symbol: r.symbol, name: r.name || `${r.symbol} overnight`, text }] : [];
+        })
+      : [];
+  const overnightSummary =
+    ovnBuysOn && tradingDayToday && !tooLate && etMin < 15 * 60 + 45 && plannedTonight.length > 0
+      ? `Tonight it buys ${joinNames(plannedTonight.map((r) => r.symbol))} at the 4:00 PM close and sells at the next 9:30 AM open.`
+      : null;
+  // unsold after 9:31 AM: the backend list, plus any hold whose sale time is more than a minute past
+  const unsold = Array.from(new Set([
+    ...(ovn?.unsold_after_0931 ?? ovn?.state?.unsold_after_0931 ?? []),
+    ...state.all_positions
+      .filter((p) => isOvernightPosition(p) && p.exit_due && nowMs >= Date.parse(p.exit_due) + 60_000)
+      .map((p) => p.symbol),
+  ]));
+  const firstSale = holdViews.map((h) => h.saleDate).filter((d): d is string => !!d).sort()[0] ?? null;
+  const pastSale = state.all_positions.some((p) => isOvernightPosition(p) && p.exit_due && nowMs >= Date.parse(p.exit_due));
+  const holdsValue = holdViews.reduce((sum, h) => sum + h.shares * (h.buyPrice ?? 0), 0);
+
+  // X6: a quick trade in a stock bought overnight tonight closes at 3:46 PM, not 3:55 PM
+  const x6Symbol =
+    ovnBuysOn && etMin < 15 * 60 + 46
+      ? intradayPositions.find((p) => plannedTonight.some((r) => r.symbol === p.symbol))?.symbol ?? null
+      : null;
+  const countdownValue = countdownToClose(now, firstTradingDayFlag, x6Symbol ? 15 * 60 + 46 : undefined);
+  const countdownLabel = x6Symbol ? `${x6Symbol} quick trade closes in` : "Quick trades close in";
 
   const heroSentence = rightNowSentence({
     isCircuitBroken: state.account.is_circuit_broken,
@@ -83,6 +173,8 @@ export default function Home() {
     strategies: state.strategies,
     positionsCount: intradayPositions.length,
     maxDailyLossDollars: healthLimits.maxDailyLossDollars,
+    overnightOn,
+    overnightLine: overnightHoldingSentence(holdViews.length, firstSale, pastSale),
   });
 
   // F8: always-visible plain-language problem banners (not behind "Show pro words").
@@ -161,9 +253,15 @@ export default function Home() {
             Saving problems: new trades are paused until this is fixed.
           </div>
         )}
+        {unsold.length > 0 && (
+          <div role="alert" className="rounded-2xl border px-4 py-3 text-sm font-semibold" style={{ borderColor: "#E8B09E", background: "#F6E3DA", color: "#8F4424" }} data-testid="overnight-unsold-banner">
+            <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
+            {unsoldBannerText(unsold)}
+          </div>
+        )}
         {state.account.is_circuit_broken && (
           <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
-            Stopped for today. It hit the daily loss limit.
+            {overnightOn ? "Day trading stopped for today. It hit the daily loss limit." : "Stopped for today. It hit the daily loss limit."}
           </div>
         )}
         {state.swing?.last_close_entries_withheld && (
@@ -178,16 +276,28 @@ export default function Home() {
             dailyPnl={state.account.daily_pnl}
             todayTrades={todayLedger.items}
             loading={todayLedger.loading && todayLedger.items.length === 0}
+            overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
           />
           <RightNowCard
             sentence={heroSentence}
             tradesToday={tradesToday}
             wins={wins}
             losses={losses}
-            countdownLabel="Quick trades close in"
+            countdownLabel={countdownLabel}
             countdownValue={countdownValue}
           />
         </section>
+
+        {overnightOn && (
+          <OvernightHolds
+            holds={holdViews}
+            tonight={tonightLines}
+            summary={overnightSummary}
+            noBuyActive={noBuyActive}
+            disabledReason={disabledReason}
+            onSetNoBuy={setNoBuyTonight}
+          />
+        )}
 
         {mode === "intraday" ? (
           <div className="fadein grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -212,11 +322,22 @@ export default function Home() {
                 onSeeAll={() => setHistoryOpen(true)}
               />
               <SafetyCard
-                drawdownDollars={state.account.daily_drawdown}
+                drawdownDollars={state.account.risk_drawdown ?? state.account.daily_drawdown}
                 maxDailyLossDollars={healthLimits.maxDailyLossDollars}
                 baseTradeRiskPct={healthLimits.baseTradeRiskPct}
                 intradayPositionsCount={intradayPositions.length}
                 onFlattenAll={flattenAll}
+                overnight={
+                  overnightOn
+                    ? {
+                        buysOn: ovnBuysOn,
+                        symbols: ovn?.settings?.enabled?.length ? ovn.settings.enabled : ["NVDA", "IREN", "HUT"],
+                        pct: ovn?.settings?.pct ?? null,
+                        resultToday: state.account.overnight_realized_today ?? null,
+                        holdsCount: holdViews.length,
+                      }
+                    : null
+                }
               />
             </div>
           </div>
