@@ -1,3 +1,4 @@
+// @steered SNARE-2 2026-09-30
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -237,6 +238,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                 ledger_revision: payload.ledger_revision ?? prev.ledger_revision,
                 persistence: payload.persistence || prev.persistence,
                 swing: payload.swing !== undefined ? payload.swing : prev.swing,
+                overnight: payload.overnight !== undefined ? payload.overnight : prev.overnight,
                 isConnected: true,
                 lastUpdated: new Date(),
               };
@@ -395,6 +397,20 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
           } catch {
             // Ignore swing poll error
           }
+
+          // Poll overnight holds state
+          try {
+            const ovnRes = await fetch(`${httpBase}/api/overnight`);
+            if (ovnRes.ok) {
+              const ovnData = await ovnRes.json();
+              setState((prev) => ({
+                ...prev,
+                overnight: ovnData,
+              }));
+            }
+          } catch {
+            // Ignore overnight poll error
+          }
         } catch {
           // Backend might be starting or offline, gracefully ignore
         }
@@ -487,6 +503,24 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     return sendAction({ action: "SWING_TIGHTEN_STOP", symbol, new_stop: newStop });
   }, [sendAction]);
 
+  /** D4 "No overnight buy tonight" (on) and its undo (off). REST only: POST /api/overnight/no-buy-tonight.
+   * Resolves with the backend's plain sentence; a refusal (409) carries its reason in `detail`. */
+  const setNoBuyTonight = useCallback(async (on: boolean): Promise<{ ok: boolean; message: string }> => {
+    const { httpBase } = getResolvedEndpoints();
+    try {
+      const res = await fetch(`${httpBase}/api/overnight/no-buy-tonight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ on }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) return { ok: true, message: String(body?.message || "") };
+      return { ok: false, message: String(body?.detail || "Didn't go through, try again.") };
+    } catch {
+      return { ok: false, message: "Could not reach the robot. Try again." };
+    }
+  }, [getResolvedEndpoints]);
+
   return {
     state,
     isConnected,
@@ -499,6 +533,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
     swingExitNextOpen,
     swingExitImmediate,
     swingTightenStop,
+    setNoBuyTonight,
     sendAction,
   };
 }

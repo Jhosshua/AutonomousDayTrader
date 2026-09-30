@@ -1,3 +1,4 @@
+// @steered SNARE-2 2026-09-30
 export interface AccountState {
   equity: number;
   cash: number;
@@ -9,6 +10,10 @@ export interface AccountState {
   is_circuit_broken: boolean;
   risk_level: string;
   status: string;
+  /** S14: the loss stop's own drawdown, net of today's overnight result (new backend only). */
+  risk_drawdown?: number | null;
+  /** D6: today's overnight holds result, kept out of the daily loss limit (new backend only). */
+  overnight_realized_today?: number | null;
 }
 
 export interface VixTier {
@@ -234,6 +239,56 @@ export interface Position {
   /** Fixed plans: percent of the account the plan risks (0.75 = 0.75%). */
   plan_risk_pct?: number | null;
   r_multiple?: number | null;
+  /** True for an overnight hold (NVDA, IREN, HUT overnight). It sells at exit_due, the next 9:30 AM open. */
+  overnight?: boolean;
+}
+
+/** One stock of the overnight holds (backend overnight payload "rows"). The latest night of that stock. */
+export interface OvernightRow {
+  symbol: string;
+  name: string;
+  strategy_id: string;
+  enabled: boolean;
+  state: string | null;
+  buy_date: string | null;
+  sale_date: string | null;
+  reason: string | null;
+  block: string | null;
+  needs_look: string[];
+  qty: number | null;
+  held_qty: number;
+  buy_avg: number | null;
+  realized: number | null;
+  reserved: boolean;
+  tonight: boolean;
+  sale_text: string | null;
+  size_note: string;
+}
+
+export interface OvernightHold {
+  symbol: string;
+  strategy_id: string;
+  shares: number;
+  buy_avg: number | null;
+  buy_date: string;
+  sale_date: string | null;
+  nights: "weeknight" | "weekend" | "holiday" | string | null;
+  state: string;
+  needs_look: string[];
+}
+
+/** GET /api/overnight and the websocket frame's "overnight" key. Null when the backend could not build it. */
+export interface OvernightPayload {
+  state: { mode: string; running: boolean; init_error?: string | null; realized_today?: number; unsold_after_0931?: string[] };
+  settings: { mode: string; enabled: string[]; pct: number; cap: number; room_multiple: number };
+  rows: OvernightRow[];
+  holds: OvernightHold[];
+  skips: { symbol: string; buy_date: string; reason: string; wanted_qty: number | null }[];
+  intents: unknown[];
+  queued_sales: unknown[];
+  no_buy_tonight?: boolean;
+  no_buy_until?: string;
+  unsold_after_0931?: string[];
 }
 
 export interface AuditRecord {
@@ -420,6 +475,7 @@ export interface TradingState {
   ledger_revision: number;
   persistence: PersistenceStatus;
   swing?: SwingEngineState;
+  overnight?: OvernightPayload | null;
   isConnected: boolean;
   lastUpdated: Date;
 }
