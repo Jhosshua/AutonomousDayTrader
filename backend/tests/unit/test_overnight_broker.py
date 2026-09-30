@@ -75,6 +75,7 @@ def test_lost_reply_is_a_transport_error_and_is_never_resent():
     (422, {"code": 42210000, "message": "time_in_force cls is not allowed at this time"}, REFUSAL_DEFINITE),
     (403, {"code": 40310000, "message": "opg orders are not supported for this account"}, REFUSAL_DEFINITE),
     (429, {"message": "rate limit exceeded"}, REFUSAL_AMBIGUOUS),
+    (422, {"code": 40010001, "message": "client_order_id must be unique"}, REFUSAL_AMBIGUOUS),
     (500, {"message": "internal"}, REFUSAL_AMBIGUOUS),
     (503, "upstream", REFUSAL_AMBIGUOUS),
 ])
@@ -85,7 +86,7 @@ def test_refusals_are_classified(status, body, kind):
         b.submit_on_auction("HUT", "buy", 3, "c1", "cls")
     assert err.value.status_code == status
     assert classify_refusal(err.value) == kind
-    assert err.value.definitive == (kind != REFUSAL_AMBIGUOUS)
+    assert err.value.definitive == (status < 500 and status != 429)
 
 
 def test_plain_broker_errors_prove_nothing():

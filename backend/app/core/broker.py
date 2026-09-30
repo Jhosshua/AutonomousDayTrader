@@ -610,6 +610,8 @@ def classify_refusal(exc: Exception) -> str:
     if not isinstance(exc, BrokerHTTPError) or not exc.definitive:
         return REFUSAL_AMBIGUOUS
     text = _refusal_text(exc.body) or str(exc).lower()
+    if "client_order_id" in text:
+        return REFUSAL_AMBIGUOUS     # a duplicate id means an order with it may exist: look it up
     if "wash trade" in text:
         return REFUSAL_WASH_TRADE
     if "buying power" in text:
