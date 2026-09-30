@@ -155,3 +155,18 @@ def test_stock_held_by_orb_is_skipped(main_runtime, monkeypatch):
     assert h.night("HUT", THU)["reason"] == osch.HELD_BY_OTHER_STRATEGY
     assert [b for b in h.alpaca.posts("HUT")] == []
     assert h.night("NVDA", THU)["state"] == "BUY_ACCEPTED"
+
+
+def test_an_unsold_hold_does_not_use_a_day_slot_or_the_sector_limit(main_runtime):
+    """S12: NVDA held (its opening sale halted) must not count toward the 3 day trade slots or the
+    2 per sector limit (NVDA, AMD and MU are all Semiconductors)."""
+    h = MainOvernight(main_runtime, at(THU, 15, 40))
+    buy_night(h, THU)
+    queue_sales(h, THU)
+    h.alpaca.halted.update({"NVDA", "IREN", "HUT"})
+    open_sale(h, FRI, until=(9, 40))
+    assert set(h.r.account.positions) == {"NVDA", "IREN", "HUT"}
+    h.day_trade("AMD", 50, 100.0, 98.0)
+    h.day_trade("MU", 50, 101.0, 99.0)
+    assert h.r.account.positions["AMD"].shares == 50
+    assert h.r.account.positions["MU"].shares == 50

@@ -177,3 +177,39 @@ def test_holds_survive_a_full_main_loop_pass(main_runtime):
     assert r.last_session_date == fri
     writes = [(m, p, b) for m, p, b, _q in h.alpaca.requests if m in ("POST", "DELETE", "PATCH")]
     assert all(m == "POST" and b["client_order_id"].startswith("adt-ovn-") for m, p, b in writes), writes
+
+
+def test_a_partial_opening_sale_leaves_the_rest_at_its_buy_price(main_runtime):
+    """S15 during the sale: the unsold shares of a partly filled opening sale stay at their buy
+    price, so equity moves only by the realized part (the offset covers exactly that)."""
+    r = main_runtime
+    thu, fri = date(2026, 10, 1), date(2026, 10, 2)
+    h = MainOvernight(r, at(thu, 15, 40))
+    buy_night(h, thu)
+    queue_sales(h, thu)
+    h.run(at(fri, 9, 29, 50), every=120)
+    h.set(at(fri, 9, 30))
+    sale = next(o for o in h.alpaca.live("NVDA", "sell"))
+    h.alpaca.fill(sale["id"], 20, 190.0)                     # 20 of 55 at the open
+    h.run(at(fri, 9, 30, 20))
+    pos = r.account.positions["NVDA"]
+    assert pos.shares == 35 and pos.market_price == pos.avg_entry_price == 180.0
+    assert r.account.realized_pnl == 200.0
+    assert r.account.equity == 49_700.0 + 200.0
+    assert r.overnight.realized_today() == 200.0
+
+
+def test_a_buy_fill_never_merges_into_a_day_position(main_runtime):
+    """R2-13: if a non overnight position is in ADT's book when the buy fills, the fill is not
+    merged into it (the controller raises needs look and still sells its own shares)."""
+    r = main_runtime
+    thu = date(2026, 10, 1)
+    h = MainOvernight(r, at(thu, 16, 0, 5))
+    r.account.apply_fill("x", "NVDA", "BUY", 10, 180.0, 0.0, h.clock.now, strategy_id="vwap_pullback")
+    ok = r.overnight._book({"kind": "fill", "role": "buy", "strategy_id": "overnight_nvda", "symbol": "NVDA",
+                            "hold_symbol": "NVDA", "buy_date": thu.isoformat(), "qty": 55, "price": 181.0,
+                            "at": h.clock.now.isoformat(), "alpaca_order_id": "o1",
+                            "client_order_id": "adt-ovn-NVDA-20261001-buy-1", "realized": None})
+    assert ok is False
+    pos = r.account.positions["NVDA"]
+    assert (pos.shares, pos.strategy_id, pos.avg_entry_price) == (10, "vwap_pullback", 180.0)
