@@ -154,7 +154,8 @@ def test_relay_failure_is_a_logged_skip_at_154930(main_runtime, monkeypatch):
     assert InlineExecutor is not None
 
 
-def test_overnight_bars_come_from_their_own_list_not_the_day_watchlist(main_runtime):
+@pytest.mark.asyncio
+async def test_overnight_bars_come_from_their_own_list_not_the_day_watchlist(main_runtime):
     r = main_runtime
     from backend.app.ingestion.stock_ws import StockWebSocketClient
     subs = StockWebSocketClient(relay_url="ws://127.0.0.1:1", relay_token="x").symbols

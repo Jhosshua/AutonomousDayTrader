@@ -40,6 +40,7 @@ def test_alpaca_fewer_shares_sells_what_it_holds_and_keeps_nvda_unreleased(main_
     assert [b["qty"] for b in h.alpaca.posts("NVDA") if b["side"] == "sell"][-1] == "40"
     pos = r.account.positions["NVDA"]
     assert (pos.shares, pos.strategy_id) == (15, "overnight_nvda")
+    assert r.pending_trade_records["ovn_NVDA_2026-10-01"]["quantity"] == 40
     # not released while ADT's book holds the 15 Alpaca does not
     assert n["state"] == SOLD and not n["released"]
     assert r.overnight.claimed("NVDA") and r.overnight.holds_symbol("NVDA")

@@ -711,7 +711,9 @@ def test_regime_gate_in_admission_records_and_enforces():
         r.set_simulation_mode(False)
 
 
-def test_tape_rejects_implausible_and_out_of_retention_events_before_mutating():
+def test_tape_rejects_implausible_and_out_of_retention_events_before_mutating(monkeypatch):
+    # The fake event clock must stay fixed as calendar time advances.
+    monkeypatch.setattr("backend.app.core.tick_tape._time.time_ns", lambda: T0_NS + 100 * NS)
     tape = TickTape(keep_seconds=10)
     tape.on_quote("AAPL", 100.0, 100.1, 10, 10, T0_NS + 100 * NS)
     tape.on_trade("AAPL", 100.1, 5, T0_NS + 100 * NS)

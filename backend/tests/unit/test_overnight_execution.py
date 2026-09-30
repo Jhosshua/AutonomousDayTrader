@@ -1309,3 +1309,66 @@ def test_alpaca_short_at_the_0931_sale_says_so_and_blocks_the_next_buy():
     buy_day(rig, d=FRI)
     assert rig.night("NVDA", FRI)["reason"] == osch.BOOK_MORE_THAN_ALPACA
     assert [t.date() for t, _ in rig.alpaca.buys("NVDA")] == [THU]
+
+
+@pytest.mark.parametrize('settings,reason', [({'mode': 'off'}, osch.MODE_OFF),
+                                             ({'enabled': ('IREN', 'HUT')}, osch.STOCK_OFF)])
+def test_restored_unsent_buy_respects_disabled_settings(settings, reason):
+    rig = new()
+    rig.alpaca.fail_posts = [('transport', False)] * 3
+    rig.at(T(THU, 15, 46, 5))
+    saved = [s for why, s in rig.saves if why == 'OVERNIGHT_BUY_INTENT'][0]
+    rig.alpaca.posts.clear()  # the failed transport attempts preceded the restart
+    restored = rig.restart(state=saved, **settings)
+    restored.at(T(THU, 15, 47))
+    assert restored.alpaca.buys('NVDA') == []
+    assert restored.night('NVDA')['reason'] == reason
+
+
+@pytest.mark.parametrize('stop', ['cutoff', 'control', 'mode'])
+def test_buy_rechecks_permission_after_slow_lookup(stop):
+    rig = new()
+    original = rig.alpaca.get_order_by_client_id
+
+    def slow_lookup(cid, nested=True):
+        row = original(cid, nested)
+        if cid.startswith('adt-ovn-NVDA') and row is None:
+            if stop == 'cutoff':
+                rig.clock.now = T(THU, 15, 49, 30)
+            elif stop == 'control':
+                assert rig.ctl.set_no_buy_tonight(rig.clock.now)[0]
+            else:
+                rig.ctl.mode = 'off'
+        return row
+
+    rig.alpaca.get_order_by_client_id = slow_lookup
+    rig.at(T(THU, 15, 46, 5))
+    assert rig.alpaca.buys('NVDA') == []
+
+
+@pytest.mark.parametrize('failure', ['raise', 'refuse'])
+def test_split_booking_failure_never_changes_controller_or_replaces_sale(failure):
+    rig = new()
+    _to_morning(rig)
+    rig.alpaca.positions['NVDA'] = 550
+    rig.alpaca.corporate_actions = [{'kind': 'split', 'old_symbol': 'NVDA', 'new_symbol': 'NVDA',
+                                     'ratio': 10.0, 'ex_date': FRI.isoformat()}]
+    original = rig.ctl.book
+
+    def fail_split(ev):
+        if ev['kind'] == 'split':
+            if failure == 'raise':
+                raise RuntimeError('ledger unavailable')
+            return False
+        return original(ev)
+
+    rig.ctl.book = fail_split
+    rig.run(T(FRI, 9, 0), T(FRI, 9, 1))
+    n = rig.night('NVDA')
+    assert (n['held_qty'], n['buy_avg'], n['legs'][0]['qty']) == (55, 180.0, 55)
+    assert n['splits'] == []
+    assert n['frozen'] == osch.BOOKING_REFUSED
+    assert osch.BOOKING_REFUSED in n['needs_look']
+    assert rig.alpaca.live('NVDA', 'sell') == []
+    assert len(rig.alpaca.sells('NVDA')) == 1
+    assert rig.ctl.reserves('NVDA')

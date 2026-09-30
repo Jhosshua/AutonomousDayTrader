@@ -75,6 +75,7 @@ def test_confirmed_symbol_change_converts_the_book_then_sells_and_books_the_new_
     assert h.local() == h.alpaca.signed_positions() == {} and r.broker_state["mismatch"] is False
     assert n["state"] == SOLD and n["released"] and not r.overnight.claimed("IRNX")
     trade = r.pending_trade_records["ovn_IREN_2026-10-01"]
+    assert trade["quantity"] == 124 and trade["avg_entry_price"] == 80.0
     assert trade["realized_pnl"] == 124 * (82.0 - 80.0) == 248 * (41.0 - 40.0)
     assert [l["side"] for l in trade["fill_legs"]] == ["BUY", "SELL"]
     assert trade["overnight"]["symbol_change"]["old_qty"] == 248

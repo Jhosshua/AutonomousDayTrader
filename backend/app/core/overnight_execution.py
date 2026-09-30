@@ -528,10 +528,7 @@ class OvernightController:
         give_up = et(d, osch.BUY_GIVE_UP)
         att = n["buy"][-1] if n["buy"] else None
         if att is not None and not att["final"]:
-            if att["tif"] == "cls":
-                allow = now < give_up and not self._control_active(d)
-            else:
-                allow = et(d, osch.BUY_FALLBACK_AT) <= now < et(d, FALLBACK_BUY_END) and not self._control_active(d)
+            allow = self._buy_send_allowed(n, att, now)
             self._buy_attempt_io(n, att, now, allow and self.broker is not None)
             return
         if now < et(d, osch.BUY_WINDOW_START):
@@ -755,6 +752,16 @@ class OvernightController:
             return self.broker.get_order(att["id"])
         return self.broker.get_order_by_client_id(att["cid"])
 
+    def _buy_send_allowed(self, n: Dict[str, Any], att: Dict[str, Any], now: datetime) -> bool:
+        """New buys obey the current settings and clock, including restored intents and slow I/O.
+        Existing broker orders are always looked up even when new buys are disabled."""
+        d = self._bd(n)
+        if self.mode != "live" or n["symbol"] not in self.enabled or self._control_active(d):
+            return False
+        if att["tif"] == "cls":
+            return et(d, osch.BUY_WINDOW_START) <= now < et(d, osch.BUY_GIVE_UP)
+        return et(d, osch.BUY_FALLBACK_AT) <= now < et(d, FALLBACK_BUY_END)
+
     def _buy_attempt_io(self, n: Dict[str, Any], att: Dict[str, Any], now: datetime, allow: bool) -> None:
         broker, sym = self.broker, n["symbol"]
         if broker is None:
@@ -765,7 +772,7 @@ class OvernightController:
 
         def work():
             row = self._lookup(att)
-            if row is not None or not allow:
+            if row is not None or not allow or not self._buy_send_allowed(n, att, self.clock()):
                 return "found", row
             try:
                 if att["tif"] == "day":
@@ -789,7 +796,7 @@ class OvernightController:
         if value is None:                   # Alpaca has no order with this id and none may be sent now
             att.update(final=True, status="not_found")
             n["late_check"] = True          # the POST may still surface; looked up once after the close
-            reason = osch.OPERATOR_NO_BUY_TONIGHT if self._control_active(self._bd(n)) else (
+            reason = self._final_gate(n) or (
                 n.get("block") or (osch.BUY_REFUSED if att["tif"] == "day" else osch.MISSED_BUY_WINDOW))
             self._skip(n, reason, now)
             return
@@ -1213,19 +1220,31 @@ class OvernightController:
                 split = a
                 break
         if split is not None:
-            n["morning_checked"] = True
             ratio = float(split["ratio"])
             old_qty, old_avg = n["held_qty"], n["buy_avg"]
+            new_avg = n["buy_cost"] / alpaca
+            try:
+                accepted = self.book({"kind": "split", "strategy_id": n["strategy_id"], "symbol": sym,
+                                      "buy_date": n["buy_date"], "ratio": ratio, "old_qty": old_qty,
+                                      "new_qty": alpaca, "new_avg": new_avg})
+            except Exception as exc:
+                log.warning("OVERNIGHT %s split booking failed: %s", sym, exc)
+                accepted = False
+            n["morning_checked"] = True
+            if live is not None:
+                live["cancel_wanted"] = True
+            if accepted is False:
+                n["frozen"] = osch.BOOKING_REFUSED
+                self._needs_look(n, osch.BOOKING_REFUSED, now,
+                                 "The ledger did not accept the split. The queued sale is cancelled; "
+                                 "check the book before selling the adjusted shares.")
+                return
             n["held_qty"] = leg0["qty"] = alpaca
-            n["buy_avg"] = n["buy_cost"] / n["held_qty"]
+            n["buy_avg"] = new_avg
             n["splits"].append({"ratio": ratio, "old_qty": old_qty, "new_qty": alpaca, "old_avg": old_avg,
                                 "new_avg": n["buy_avg"], "ex_date": split.get("ex_date"), "at": _iso(now)})
             self._log(n, "SPLIT", now, text=(f"{sym} split {ratio:g} for 1 overnight. The hold is now {alpaca} shares "
                                              f"at ${n['buy_avg']:.2f} each. The sale was replaced for {alpaca} shares."))
-            self.book({"kind": "split", "strategy_id": n["strategy_id"], "symbol": sym, "buy_date": n["buy_date"],
-                       "ratio": ratio, "old_qty": old_qty, "new_qty": alpaca, "new_avg": n["buy_avg"]})
-            if live is not None:
-                live["cancel_wanted"] = True
             return
         renames = [a for a in actions if a.get("old_symbol") == sym
                    and (a.get("kind") == "merger" or a.get("new_symbol") not in (None, sym))]

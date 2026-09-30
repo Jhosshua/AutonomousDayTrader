@@ -536,7 +536,8 @@ class OvernightIntegration:
         r = self.r
         sym = str(ev["symbol"]).upper()
         pos = r.account.positions.get(sym)
-        if pos is None or not is_overnight(pos) or pos.shares != int(ev["old_qty"]):
+        if (pos is None or not is_overnight(pos) or pos.strategy_id != ev["strategy_id"]
+                or pos.side.value != "LONG" or pos.shares != int(ev["old_qty"])):
             log.error("Overnight %s split not applied to ADT's book (%s)", sym,
                       None if pos is None else (pos.strategy_id, pos.shares))
             return False
@@ -593,7 +594,6 @@ class OvernightIntegration:
             changed = True
             if not buys or not sells:
                 continue
-            qty = sum(l["qty"] for l in buys)
             out_qty = sum(l["qty"] for l in sells)
             pnl = round(sum(float(l["realized_pnl"]) for l in sells), 2)
             closed = max(_parse(l["timestamp"], self._now()) for l in sells)
@@ -601,7 +601,7 @@ class OvernightIntegration:
                 "trade_id": f"ovn_{key.replace(':', '_')}", "session_date": (r.last_session_date or et_date(closed)).isoformat(),
                 "symbol": n["symbol"], "side": "LONG", "status": "CLOSED", "strategy_id": n["strategy_id"],
                 "opened_at": min(l["timestamp"] for l in buys), "closed_at": closed.isoformat(),
-                "quantity": qty, "avg_entry_price": round(sum(l["qty"] * l["price"] for l in buys) / qty, 4),
+                "quantity": out_qty, "avg_entry_price": round(n["buy_avg"], 4),
                 "avg_exit_price": round(sum(l["qty"] * l["price"] for l in sells) / out_qty, 4),
                 "realized_pnl": pnl, "fees": 0.0, "exit_reason": "OVERNIGHT_OPEN_SALE", "aggregate_only": False,
                 "execution_mode": "alpaca_paper", "buy_date": n["buy_date"], "sale_date": n["sale_date"],
