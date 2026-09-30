@@ -802,6 +802,9 @@ export function overnightReasonText(code: string | null | undefined): string {
     MISSED_BUY_WINDOW: "No buy could be sent by 3:49:30 PM.",
     AUCTION_NO_FILL: "The closing buy did not fill.",
     CANCELED_AT_ALPACA: "The buy was cancelled in the Alpaca app.",
+    BOOK_MORE_THAN_ALPACA: "The robot's book shows more shares of this stock than Alpaca holds. Check the Alpaca app.",
+    SYMBOL_CHANGE_UNCLEAR: "This stock had a company change the robot cannot handle alone. Check the Alpaca app.",
+    MARGIN_UNKNOWN: "Alpaca's margin rule for this stock could not be read, so the robot assumed the usual 50%.",
   };
   return words[code || ""] || "A required check did not pass.";
 }
@@ -902,8 +905,8 @@ export function overnightBalanceNote(totalAtBuyPrice: number): string {
 export function unsoldBannerText(symbols: string[]): string {
   const names = joinNames(symbols.map((s) => `${s} overnight`));
   return symbols.length === 1
-    ? `${names} is not sold yet after 9:31 AM. The robot keeps trying to sell it. Check the Alpaca app.`
-    : `${names} are not sold yet after 9:31 AM. The robot keeps trying to sell them. Check the Alpaca app.`;
+    ? `${names} is not sold yet after 9:31 AM, or the robot's book and Alpaca disagree on it. Check the Alpaca app.`
+    : `${names} are not sold yet after 9:31 AM, or the robot's book and Alpaca disagree on them. Check the Alpaca app.`;
 }
 
 /** The "Right now" sentence part for holds. `saleDate` is the earliest sale day, `pastSale` true once its 9:30 AM passed. */
