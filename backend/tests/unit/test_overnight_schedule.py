@@ -124,3 +124,96 @@ def test_sizing_and_client_ids():
 def test_2026_holidays_and_early_closes_are_covered_and_distinct():
     assert all(d.year in PROD.COVERED_YEARS for d in NYSE_HOLIDAYS | NYSE_EARLY_CLOSES)
     assert not NYSE_HOLIDAYS & NYSE_EARLY_CLOSES
+
+
+# ---------------------------------------------------------------- T1 decision parity
+FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "overnight_parity.json"
+X1_IREN = {date(2023, 10, 6), date(2023, 10, 17), date(2023, 11, 7)}
+LIVE_NIGHTS = {"NVDA": 742, "IREN": 739, "HUT": 742}
+
+
+@pytest.fixture(scope="module")
+def parity():
+    raw = json.loads(FIXTURE.read_text())
+    cols = raw["columns"]
+    stocks = {sym: [dict(zip(cols, row)) for row in v["rows"]] for sym, v in raw["stocks"].items()}
+    cal = osch.SessionListCalendar([_ymd(d) for d in raw["calendar"]], [_ymd(d) for d in raw["early_closes"]])
+    return raw, stocks, cal
+
+
+def _decisions(rows, sym, cal):
+    """Only the 15:46:05 inputs reach the schedule: no research_ok, no next-day data."""
+    out = set()
+    for r in rows:
+        buy = _ymd(r["date"])
+        ok, _ = osch.buy_gates(buy, r["count_before_1545"], r["has_0930_bar"], cal)
+        if ok:
+            out.add((sym, buy, osch.sale_date(buy, cal)))
+    return out
+
+
+def _research(rows, sym):
+    return {(sym, _ymd(r["date"]), _ymd(r["next"])) for r in rows if r["outcome"] == "TRADE"}
+
+
+def test_fixture_is_the_committed_research_run(parity):
+    raw, stocks, _ = parity
+    assert raw["config"] == {"cond": "none", "exit": "open"}
+    assert raw["window"]["first"] == 20231002 and raw["window"]["last"] == 20260925
+    assert {s: v["trades"] for s, v in raw["stocks"].items()} == {"NVDA": 742, "IREN": 736, "HUT": 742}
+    assert set(raw["sha256"]) == {f"data/trades_{s}_overnight_0.npy" for s in osch.SYMBOLS} | {
+        "data/holdout.json"} | {f"data/bars/{s}.npz" for s in ("NVDA", "IREN", "HUT", "SPY")}
+    assert all(len(h) == 64 for h in raw["sha256"].values()) and len(raw["generator_commit"]) == 40
+    for sym, rows in stocks.items():
+        assert len(rows) == 749
+        trades = [r for r in rows if r["outcome"] == "TRADE"]
+        assert len(trades) == raw["stocks"][sym]["trades"]
+        # full precision kept: every trade carries floats, never rounded strings
+        assert all(isinstance(r[k], float) for r in trades for k in ("entry", "exit", "ret"))
+
+
+@pytest.mark.parametrize("sym", osch.SYMBOLS)
+def test_t1_live_decisions_equal_research_apart_from_x1(parity, sym):
+    _, stocks, cal = parity
+    live = _decisions(stocks[sym], sym, cal)
+    research = _research(stocks[sym], sym)
+    assert research <= live
+    extra = {buy for _, buy, _ in live - research}
+    assert extra == (X1_IREN if sym == "IREN" else set())
+    assert len(live) == LIVE_NIGHTS[sym]
+    # the X1 nights are exactly the research's look-ahead skips (sale day short of data)
+    x1 = {_ymd(r["date"]) for r in stocks[sym] if r["outcome"] == "NEXT_NOT_OK"}
+    assert x1 == extra
+    assert not any(r["outcome"] in ("NO_CLOSE_BAR", "NEXT_NO_0930_BAR") for r in stocks[sym])  # F2c, X10: 0
+
+
+@pytest.mark.parametrize("sym", osch.SYMBOLS)
+def test_x2_rule_agrees_with_research_ok_on_every_full_session(parity, sym):
+    _, stocks, cal = parity
+    full = [r for r in stocks[sym] if not r["early_close"]]
+    early = [r for r in stocks[sym] if r["early_close"]]
+    assert len(full) == 742 and len(early) == 7
+    assert [osch.data_rule_ok(r["count_before_1545"]) for r in full] == [r["research_ok"] for r in full]
+    # early closes: research judges 80% of 210 minutes and never trades them; live refuses first
+    for r in early:
+        assert osch.buy_gates(_ymd(r["date"]), r["count_before_1545"], r["has_0930_bar"], cal) == (False, osch.EARLY_CLOSE)
+        assert r["outcome"] == "EARLY_CLOSE"
+
+
+@pytest.mark.parametrize("sym", osch.SYMBOLS)
+def test_t1_production_calendar_gives_identical_2026_decisions(parity, sym):
+    _, stocks, cal = parity
+    rows = [r for r in stocks[sym] if r["date"] // 10000 == 2026]
+    assert len(rows) > 180
+    assert _decisions(rows, sym, PROD) == _decisions(rows, sym, cal)
+
+
+def test_2026_nyse_holidays_equal_the_fixture_calendar_gaps(parity):
+    raw, _, _ = parity
+    sessions = {_ymd(d) for d in raw["calendar"]}
+    last = max(sessions)
+    weekdays = {date(2026, 1, 1) + timedelta(days=i) for i in range((last - date(2026, 1, 1)).days + 1)}
+    gaps = {d for d in weekdays if d.weekday() < 5 and d not in sessions}
+    assert gaps == {d for d in NYSE_HOLIDAYS if d.year == 2026 and d <= last}
+    assert not {d for d in NYSE_EARLY_CLOSES if d <= last} and not {
+        d for d in map(_ymd, raw["early_closes"]) if d.year == 2026}
