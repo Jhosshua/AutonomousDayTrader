@@ -54,6 +54,7 @@ DECISIONS = {
     "core/overnight_integration.py::<module>": "module docstring",
     "core/overnight_integration.py::_book": "books holds; never merges into a non overnight position (R2-13)",
     "core/overnight_integration.py::_book_split": "adjusts a hold after a split",
+    "core/overnight_integration.py::_book_symbol_change": "moves a hold to its new symbol after a confirmed symbol change; never merges",
     "core/overnight_integration.py::_cancel_day_entries": "15:46:05 cancels other working entries in the stock",
     "core/overnight_integration.py::_close_day_trade": "X6: closes the day trade, never a hold",
     "core/overnight_integration.py::_day_shares": "non overnight shares only",

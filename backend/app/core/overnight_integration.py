@@ -471,6 +471,8 @@ class OvernightIntegration:
         r = self.r
         if ev.get("kind") == "split":
             return self._book_split(ev)
+        if ev.get("kind") == "symbol_change":
+            return self._book_symbol_change(ev)
         now = self._now()
         at = _parse(ev.get("at"), now)
         fill_day = et_date(at)
@@ -496,7 +498,8 @@ class OvernightIntegration:
                           None if pos is None else (pos.strategy_id, pos.shares))
                 return False
             side = r.OrderSide.SELL
-        key = f"{sym}:{ev['buy_date']}"
+        # the night's key is its stock (IREN), also after a symbol change sold it as the new symbol
+        key = f"{str(ev.get('stock') or sym).upper()}:{ev['buy_date']}"
         order = r.engine.create_order(symbol=sym, side=side, order_type=r.OrderType.MARKET, qty=qty, strategy_id=sid,
                                       client_order_id=str(ev.get("client_order_id") or ""),
                                       parent_order_id=f"overnight:{key}", arm=r.TradingArm.INTRADAY)
@@ -540,6 +543,31 @@ class OvernightIntegration:
                                   f"at ${pos.avg_entry_price:.2f}.")
         return True
 
+    def _book_symbol_change(self, ev: Dict[str, Any]) -> bool:
+        """A confirmed symbol change (section 4.6): the hold moves in ADT's book from the old symbol
+        to the new one, shares x ratio at price / ratio, same strategy, before any sale is sent.
+        Refused (False, nothing changed) unless the book holds exactly this overnight hold in the
+        old symbol and nothing in the new one, so it can never merge into or flip a position."""
+        r = self.r
+        old, new = str(ev["symbol"]).upper(), str(ev["new_symbol"]).upper()
+        pos = r.account.positions.get(old)
+        if (pos is None or not is_overnight(pos) or pos.strategy_id != ev["strategy_id"]
+                or pos.side.value != "LONG" or pos.shares != int(ev["old_qty"]) or new in r.account.positions):
+            log.error("Overnight %s to %s symbol change NOT applied to ADT's book (old %s, new %s)", old, new,
+                      None if pos is None else (pos.strategy_id, pos.shares), r.account.positions.get(new) is not None)
+            return False
+        old_qty, old_avg = pos.shares, pos.avg_entry_price
+        del r.account.positions[old]
+        pos.symbol = new
+        pos.shares = int(ev["new_qty"])
+        pos.avg_entry_price = round(float(ev["new_avg"]), 6)
+        pos.update_market_price(pos.avg_entry_price)       # S15: held at its (converted) buy price
+        r.account.positions[new] = pos
+        r.account._recompute_account_state()
+        log.warning("Overnight %s became %s. ADT's book now holds %d %s at $%.2f for %s instead of %d %s at $%.2f.",
+                    old, new, pos.shares, new, pos.avg_entry_price, pos.strategy_id, old_qty, old, old_avg)
+        return True
+
     def _record_trades(self) -> bool:
         """One closed trade row per sold night, on the day it sells (ADT's session at booking)."""
         r, ctl = self.r, self.controller
@@ -572,6 +600,7 @@ class OvernightIntegration:
                 "realized_pnl": pnl, "fees": 0.0, "exit_reason": "OVERNIGHT_OPEN_SALE", "aggregate_only": False,
                 "execution_mode": "alpaca_paper", "buy_date": n["buy_date"], "sale_date": n["sale_date"],
                 "overnight": {"needs_look": list(n["needs_look"]), "splits": list(n["splits"]),
+                              "symbol_change": n.get("symbol_change"),
                               "legs": [(leg["symbol"], leg["sold"], leg["mode"]) for leg in n["legs"]]},
                 "fill_legs": [{"fill_id": l["fill_id"], "order_id": l["order_id"], "side": l["side"].upper(),
                                "qty": l["qty"], "price": l["price"], "fee": 0.0, "realized_pnl": l["realized_pnl"],
@@ -840,7 +869,7 @@ class OvernightIntegration:
                               + (f" (about ${cfg['pct'] * float(acct['equity']):,.0f})" if acct.get("equity") else "")
                               + ", no stop"),
             })
-        out["holds"] = [{"symbol": n["symbol"], "strategy_id": n["strategy_id"], "shares": ctl._left(n),
+        out["holds"] = [{"symbol": ctl._cur(n), "strategy_id": n["strategy_id"], "shares": ctl._left(n),
                          "buy_avg": n["buy_avg"], "buy_date": n["buy_date"], "sale_date": n["sale_date"],
                          "nights": osch.holding_nights(date.fromisoformat(n["buy_date"]), date.fromisoformat(n["sale_date"]))
                          if n.get("sale_date") else None, "state": n["state"], "needs_look": list(n["needs_look"])}
