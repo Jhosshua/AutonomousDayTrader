@@ -1,0 +1,274 @@
+{
+ "day": {
+  "now": "2026-09-30T14:00:00-04:00",
+  "holds": [],
+  "rows": [
+   [
+    "NVDA",
+    null,
+    null,
+    null
+   ],
+   [
+    "IREN",
+    null,
+    null,
+    null
+   ],
+   [
+    "HUT",
+    null,
+    null,
+    null
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": []
+ },
+ "no_buy": {
+  "now": "2026-09-30T14:05:00-04:00",
+  "holds": [],
+  "rows": [
+   [
+    "NVDA",
+    null,
+    null,
+    null
+   ],
+   [
+    "IREN",
+    null,
+    null,
+    null
+   ],
+   [
+    "HUT",
+    null,
+    null,
+    null
+   ]
+  ],
+  "no_buy_tonight": true,
+  "unsold": []
+ },
+ "no_buy_closing": {
+  "now": "2026-09-30T15:47:10-04:00",
+  "holds": [],
+  "rows": [
+   [
+    "NVDA",
+    "SKIPPED",
+    "OPERATOR_NO_BUY_TONIGHT",
+    null
+   ],
+   [
+    "IREN",
+    "SKIPPED",
+    "OPERATOR_NO_BUY_TONIGHT",
+    null
+   ],
+   [
+    "HUT",
+    "SKIPPED",
+    "OPERATOR_NO_BUY_TONIGHT",
+    null
+   ]
+  ],
+  "no_buy_tonight": true,
+  "unsold": []
+ },
+ "closing": {
+  "now": "2026-09-30T15:47:10-04:00",
+  "holds": [],
+  "rows": [
+   [
+    "NVDA",
+    "BUY_ACCEPTED",
+    null,
+    null
+   ],
+   [
+    "IREN",
+    "BUY_ACCEPTED",
+    null,
+    null
+   ],
+   [
+    "HUT",
+    "IDLE",
+    null,
+    "DATA_SHORT"
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": []
+ },
+ "closing_late": {
+  "now": "2026-09-30T15:52:00-04:00",
+  "holds": [],
+  "rows": [
+   [
+    "NVDA",
+    "BUY_ACCEPTED",
+    null,
+    null
+   ],
+   [
+    "IREN",
+    "BUY_ACCEPTED",
+    null,
+    null
+   ],
+   [
+    "HUT",
+    "SKIPPED",
+    "DATA_SHORT",
+    "DATA_SHORT"
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": []
+ },
+ "evening": {
+  "now": "2026-09-30T20:00:00-04:00",
+  "holds": [
+   "NVDA",
+   "IREN",
+   "HUT"
+  ],
+  "rows": [
+   [
+    "NVDA",
+    "SALE_QUEUED",
+    null,
+    null
+   ],
+   [
+    "IREN",
+    "SALE_QUEUED",
+    null,
+    null
+   ],
+   [
+    "HUT",
+    "SALE_QUEUED",
+    null,
+    null
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": []
+ },
+ "morning_unsold": {
+  "now": "2026-10-01T09:32:00-04:00",
+  "holds": [
+   "IREN"
+  ],
+  "rows": [
+   [
+    "NVDA",
+    "SOLD",
+    null,
+    null
+   ],
+   [
+    "IREN",
+    "SALE_QUEUED",
+    null,
+    null
+   ],
+   [
+    "HUT",
+    "SOLD",
+    null,
+    null
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": [
+   "IREN"
+  ]
+ },
+ "morning_loss": {
+  "now": "2026-10-01T09:35:00-04:00",
+  "holds": [],
+  "rows": [
+   [
+    "NVDA",
+    "SOLD",
+    null,
+    null
+   ],
+   [
+    "IREN",
+    "SOLD",
+    null,
+    null
+   ],
+   [
+    "HUT",
+    "SOLD",
+    null,
+    null
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": []
+ },
+ "weekend": {
+  "now": "2026-10-02T20:00:00-04:00",
+  "holds": [
+   "NVDA",
+   "IREN",
+   "HUT"
+  ],
+  "rows": [
+   [
+    "NVDA",
+    "SALE_QUEUED",
+    null,
+    null
+   ],
+   [
+    "IREN",
+    "SALE_QUEUED",
+    null,
+    null
+   ],
+   [
+    "HUT",
+    "SALE_QUEUED",
+    null,
+    null
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": []
+ },
+ "loss_day": {
+  "now": "2026-09-30T14:00:00-04:00",
+  "holds": [],
+  "rows": [
+   [
+    "NVDA",
+    null,
+    null,
+    null
+   ],
+   [
+    "IREN",
+    null,
+    null,
+    null
+   ],
+   [
+    "HUT",
+    null,
+    null,
+    null
+   ]
+  ],
+  "no_buy_tonight": false,
+  "unsold": []
+ }
+}
