@@ -37,3 +37,22 @@ def test_split_books_before_replacing_sale_and_history_uses_adjusted_shares(main
     assert trade['quantity'] == 550
     assert trade['avg_entry_price'] == 18.0
     assert trade['realized_pnl'] == 550 * (trade['avg_exit_price'] - trade['avg_entry_price'])
+
+
+@pytest.mark.parametrize('pending, runs', [([], True), ([('k1', 'FLATTENING', {})], False),
+                                           ([('k2', 'SESSION_BOUNDARY', {})], False)])
+def test_startup_boundary_waits_for_any_pending_input(main_runtime, monkeypatch, pending, runs):
+    """A stale FLATTENING replayed after the startup boundary would set EOD_FLAT on the new day."""
+    r = main_runtime
+
+    class Store:
+        def list_pending_events(self):
+            return list(pending)
+
+    calls = []
+    monkeypatch.setattr(r, 'state_store', Store())
+    monkeypatch.setattr(r, '_check_session_boundary', lambda now: calls.append(now))
+    monkeypatch.setattr(r.overnight, 'start', lambda broker: None)
+    monkeypatch.setattr(r.overnight, 'reconcile', lambda now: None)
+    r._startup_overnight(at(FRI, 9, 0))
+    assert bool(calls) is runs

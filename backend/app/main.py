@@ -3307,12 +3307,13 @@ def _startup_day_one(now_dt: datetime) -> None:
 def _startup_overnight(now_dt: datetime) -> None:
     """Lifespan, broker attached: session boundary for now, build the controller, reconcile.
 
-    The boundary is skipped here when running it could be unsafe (a SESSION_BOUNDARY input still
+    The boundary is skipped here when running it could be unsafe (any input still
     pending in the durable inbox, which the replay below owns, or ORB positions on the book before
     ORB's controller exists). The overnight booking then waits on its own until the clock's
     boundary has run (a fill is never booked into a day whose boundary did not run)."""
-    pending_boundary = state_store is not None and any(
-        t == "SESSION_BOUNDARY" for _k, t, _e in state_store.list_pending_events())
+    # any pending input, not only SESSION_BOUNDARY: a stale FLATTENING replayed after this boundary
+    # would set EOD_FLAT on the new day and block every day entry
+    pending_boundary = state_store is not None and bool(state_store.list_pending_events())
     orb_positions = any(getattr(p, "strategy_id", "") == ORB_ID for p in account.positions.values())
     if not pending_boundary and not orb_positions:
         try:
