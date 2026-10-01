@@ -703,5 +703,6 @@ The completed 2026-09-24 operator-window plan was removed from the active notes 
 
 ### 2026-10-01 (01:15 ET): Audit of the SPY/COIN day one code, 5 fixes
 - **What**: two reviewers on adef05d/f2866c3. Fixed: gate retries paced and noted once, refused exits paced (10 s, then 5 min) so the opening auction exit still has attempts, unknown outcomes polled every 5 s, a missed COIN day releases COIN, startup boundary skipped while day one shares are on the book. `122bdc0`, `802b96d`. Details in `docs/audits/2026-10-01_last_24h.md`.
-- **Rejected**: making `/health` always 200 (it is the deploy healthcheck and the watchdog reads it; operator call); auto-terminating an ambiguous entry after the cutoff (a real order could still exist).
+- **Then (operator: "do this then push")**: `/health` always 200, day one not ready shows as status "degraded"; the 503 moved to new `GET /ready`. Why: `/health` is the Railway deploy healthcheck, so a mismatch or halt also blocked the fixing deploy. The watchdog flags any status other than healthy, so it still sees it (now with the reason, not "unreachable").
+- **Rejected**: auto-terminating an ambiguous entry after the cutoff (a real order could still exist).
 - **Deploy rule learned**: `DAY_ONE_BUILD_REVISION` must be set to the new source hash (`_day_one_source_revision()`) with `--skip-deploys` BEFORE pushing any change to the 11 `DAY_ONE_SOURCE_PATHS`, else `/health` is 503 and the Railway healthcheck fails.
