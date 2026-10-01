@@ -16,7 +16,7 @@ import uuid
 import sys
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -50,6 +50,9 @@ from backend.app.strategies.orb import OrbStrategy
 from backend.app.core.orb_integration import OrbIntegration, ORB_ID
 from backend.app.core.overnight_integration import OvernightIntegration
 from backend.app.core.overnight_schedule import is_overnight
+from backend.app.core.day_one_integration import DayOneIntegration
+from backend.app.core.day_one_data import DayOneData
+from backend.app.core.day_one_schedule import DAY_ONE_IDS, is_day_one
 from backend.app.strategies.vwap_pullback import VWAPPullbackStrategy  # v1 class: checkpoint decoding only
 from backend.app.strategies import vwap_pullback_v2
 from backend.app.strategies.vwap_pullback_v2 import VWAPPullbackV2Strategy
@@ -157,6 +160,22 @@ tri_controller = TriExecutionController(sys.modules[__name__], tri_strategies)
 orb = OrbIntegration(sys.modules[__name__])
 # Overnight holds (NVDA, IREN, HUT) glue; the controller is built in lifespan when a broker is attached.
 overnight = OvernightIntegration(sys.modules[__name__])
+# Live SPY turn-of-month and COIN bitcoin-follow controller, always live when the paper broker is attached.
+day_one = DayOneIntegration(sys.modules[__name__])
+day_one_data: Optional[DayOneData] = None
+DAY_ONE_SOURCE_PATHS = (
+    "backend/app/core/day_one_schedule.py",
+    "backend/app/core/day_one_data.py",
+    "backend/app/core/day_one_execution.py",
+    "backend/app/core/day_one_integration.py",
+    "backend/app/core/engine.py",
+    "backend/app/core/flattening.py",
+    "backend/app/core/orb_integration.py",
+    "backend/app/core/overnight_integration.py",
+    "backend/app/core/runtime_state.py",
+    "backend/app/main.py",
+    "backend/tests/fixtures/day_one_research_parity.json",
+)
 or15_sip_verified = False
 # OR15 was replaced by the TSLA/CDE asymmetric plan on 2026-09-25. It only
 # finishes a trade restored from a checkpoint; tests may re-enable it.
@@ -240,6 +259,7 @@ def _get_effective_committed_portfolio(
     risk_eng: Optional[Any] = None,
     bracket_mgr: Optional[Any] = None,
     arm: Optional[TradingArm] = None,
+    exclude_day_one_symbol: Optional[str] = None,
 ) -> tuple[set[str], list[str], int, dict[str, float]]:
     """Compute active symbols, active sectors, committed position count, and exposure notional map.
     Includes filled positions and in-flight entry commitments (working orders / pending brackets).
@@ -302,6 +322,15 @@ def _get_effective_committed_portfolio(
                 committed_symbols.add(sym)
                 if sym not in existing_notional:
                     existing_notional[sym] = b.total_qty * b.entry_price
+
+    if arm != TradingArm.SWING:
+        day_one_integration = globals().get("day_one")
+        commitment_reader = getattr(day_one_integration, "commitments", None)
+        if callable(commitment_reader):
+            for symbol, notional in commitment_reader(exclude_day_one_symbol).items():
+                sym = str(symbol).upper()
+                committed_symbols.add(sym)
+                existing_notional[sym] = max(existing_notional.get(sym, 0.0), float(notional))
 
     re = risk_eng or globals().get("risk_engine")
     committed_sectors = [
@@ -390,11 +419,15 @@ async def _broker_reconcile_once() -> None:
                 _checkpoint_runtime("ORB_SYNC")
     except Exception:
         log.exception("ORB ledger sync before the broker check failed")
-    # S13: the overnight controller books its own fills first; positions are re-read when it did.
+    # Dedicated controllers book their own fills before aggregate position comparison.
     try:
         positions = await overnight.before_compare(positions)
     except Exception:
         log.exception("Overnight booking before the broker check failed")
+    try:
+        positions = await day_one.before_compare(positions)
+    except Exception:
+        log.exception("Day one booking before the broker check failed")
     _compare_with_broker(positions, status.equity)
 
 
@@ -498,8 +531,11 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
         )
     )
 
-    # S1: a stock the overnight controller reserves or holds. Checked before the exit
-    # classification below, so a day short can never count as an exit and sell a hold.
+    # Dedicated symbol owners are checked before exit classification, so another strategy cannot
+    # disguise an order as a reducing trade and touch controller-owned shares.
+    day_one_refusal = day_one.order_refusal(order)
+    if day_one_refusal:
+        return False, day_one_refusal
     overnight_refusal = overnight.order_refusal(order)
     if overnight_refusal:
         return False, overnight_refusal
@@ -647,11 +683,24 @@ def pre_trade_risk_validator(order: Any, acct: PaperTradingAccount) -> tuple[boo
 
 
 engine = ExecutionEngine(account=account, risk_validator=pre_trade_risk_validator)
-# ORB's open + pending risk comes out of ADT's remaining daily-loss budget before other arms size.
-risk_engine.reserved_risk_fn = orb.open_risk
+
+
+def _dedicated_reserved_risk() -> float:
+    orb_risk = float(orb.open_risk())
+    remaining = max(0.0, risk_engine.config.hard_max_daily_loss_dollars
+                    - risk_engine.current_drawdown_dollars - orb_risk)
+    return orb_risk + day_one.reserved_risk(remaining)
+
+
+def _dedicated_order_guard(order: Any, qty: int) -> Optional[str]:
+    return day_one.broker_guard(order, qty) or overnight.broker_guard(order, qty)
+
+
+# Dedicated controller risk comes out of the remaining daily loss budget before other arms size.
+risk_engine.reserved_risk_fn = _dedicated_reserved_risk
 engine.broker_gate = _broker_gate
-# S2: the overnight rule again at the broker choke point
-engine.order_guard = overnight.broker_guard
+# Preserve every dedicated controller at the single broker choke point.
+engine.order_guard = _dedicated_order_guard
 engine.before_fixed_broker_submit = or15_controller.before_submit
 
 # Swing Trading Infrastructure & Engine
@@ -756,6 +805,67 @@ pending_processed_events: Dict[str, str] = {}
 inflight_event_keys: Set[str] = set()
 
 
+def _day_one_source_revision() -> str:
+    root = Path(__file__).resolve().parents[2]
+    digest = hashlib.sha256()
+    for relative in DAY_ONE_SOURCE_PATHS:
+        path = root / relative
+        digest.update(relative.encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _day_one_revision_match() -> bool:
+    expected = os.getenv("DAY_ONE_BUILD_REVISION")
+    return bool(expected and expected.strip() == _day_one_source_revision())
+
+
+def day_one_spy_reference(session: date) -> float:
+    if day_one_data is None:
+        raise RuntimeError("day one relay data is not ready")
+    return day_one_data.spy_reference(session)
+
+
+def day_one_coin_model(session: date) -> Dict[str, Any]:
+    if day_one_data is None:
+        raise RuntimeError("day one relay data is not ready")
+    return day_one_data.coin_model(session)
+
+
+def day_one_usable_buying_power(fields: Dict[str, Any], _symbol: str) -> float:
+    value = fields.get("buying_power")
+    return float(value) if isinstance(value, (int, float)) and math.isfinite(value) and value > 0 else 0.0
+
+
+def day_one_admission(symbol: str, _side: str, qty: int, notional: float) -> Optional[str]:
+    """Central no-stop admission for the two direct broker controllers."""
+    if simulation_mode or engine.broker is None:
+        return "DAY_ONE_REAL_BROKER_UNAVAILABLE"
+    if settings.ENV.lower() == "production" and not _day_one_revision_match():
+        return "DAY_ONE_BUILD_REVISION_MISMATCH"
+    if state_store is None or not persistence_healthy or inflight_event_keys:
+        return "DAY_ONE_PERSISTENCE_UNAVAILABLE"
+    if broker_state.get("mismatch"):
+        return "DAY_ONE_BROKER_MISMATCH"
+    if risk_engine.status != BreakerStatus.ARMED or account.status.value == "CIRCUIT_HALTED":
+        return "DAY_ONE_ACCOUNT_HALTED"
+    active_symbols, _sectors, committed_count, _notional = _get_effective_committed_portfolio(
+        account,
+        engine,
+        risk_engine,
+        bracket_manager,
+        arm=TradingArm.INTRADAY,
+        exclude_day_one_symbol=symbol,
+    )
+    if symbol.upper() not in active_symbols and committed_count >= risk_engine.config.max_concurrent_positions:
+        return "DAY_ONE_POSITION_SLOTS_FULL"
+    if not isinstance(qty, int) or qty < 1 or not math.isfinite(notional) or notional <= 0:
+        return "DAY_ONE_SIZE_INVALID"
+    if notional > min(25_000.0, account.equity * risk_engine.config.max_position_equity_pct) + 0.01:
+        return "DAY_ONE_REFERENCE_NOTIONAL_TOO_LARGE"
+    return None
+
+
 def _capture_checkpoint() -> Dict[str, Any]:
     return capture_runtime_state(
         account=account,
@@ -781,6 +891,8 @@ def _capture_checkpoint() -> Dict[str, Any]:
         research=research_safe(research_tracker.to_state, recorder=research_recorder),
         orb=orb.ledger_state(),
         overnight=overnight.checkpoint_state(),
+        day_one=day_one.checkpoint_state(),
+        day_one_ownership=day_one.ownership_envelope(),
         swing_scan={
             "last_scan": swing_strategy_engine.audit_log[-1] if swing_strategy_engine.audit_log else None,
             "last_close_data_note": getattr(swing_strategy_engine, "last_close_data_note", None),
@@ -894,6 +1006,8 @@ def _restore_checkpoint() -> bool:
         _checkpoint_runtime("INITIALIZE_FRESH_ACCOUNT")
         return False
     payload, revision, _saved_at = loaded
+    # Restore the version-independent owner claims before decoding any controller payload.
+    day_one.restore_ownership_envelope(payload.get("day_one_ownership") if isinstance(payload, dict) else None)
     restored = restore_runtime_state(
         payload,
         account=account,
@@ -923,6 +1037,7 @@ def _restore_checkpoint() -> bool:
     research_safe(research_tracker.load_state, restored.get("research"), recorder=research_recorder)
     orb.load_ledger_state(restored.get("orb"))
     overnight.load_state(restored.get("overnight"))
+    day_one.load_state(restored.get("day_one"))
     # S14: the restore above rewrote the risk baselines (runtime_state.py and the loss limit line);
     # re-apply today's overnight offset after them.
     overnight.apply_risk_offset()
@@ -1086,6 +1201,8 @@ def _serialize_position(symbol: str, include_chart: bool = True) -> Dict[str, An
         pos_data["exit_due"] = _try_or_none(
             "exit_due", lambda: overnight.sale_due(symbol).isoformat() if overnight.sale_due(symbol) else None)
         pos_data["overnight"] = True
+    elif is_day_one(pos):
+        pos_data.update(_try_or_none("day_one_position", lambda: day_one.position_details(symbol)) or {})
     elif pos_data["exit_due"] is None and pos.arm == TradingArm.INTRADAY:
         pos_data["exit_due"] = _try_or_none("exit_due", _liquidation_due_iso)
     if tri_controller.owns(symbol):
@@ -1412,6 +1529,9 @@ def _trip_circuit_breaker(timestamp: datetime) -> None:
     """Halt trading and liquidate all open intraday positions after a daily-loss breach. Swing positions are strictly exempt."""
     account.status = account.status.__class__.CIRCUIT_HALTED
     tri_controller.request_all_exits("CIRCUIT_BREAKER", timestamp)
+    for symbol in ("SPY", "COIN"):
+        if day_one.owns(symbol):
+            day_one.request_exit(symbol, "CIRCUIT_BREAKER", timestamp)
     # ORB: no new entries today and every ORB position exits (legs cancelled first)
     orb.request_all_exits("CIRCUIT_BREAKER", block_entries=True)
     if tsla_or15_strategy.phase == "WAITING_ENTRY":
@@ -1425,6 +1545,8 @@ def _trip_circuit_breaker(timestamp: datetime) -> None:
             continue
         if is_overnight(pos):
             continue  # S7: the loss stop never liquidates an overnight hold (it sells at the next open)
+        if is_day_one(pos) and day_one.safe_to_exempt(sym):
+            continue  # the day one controller cancels its resting close and exits the exact remainder
         if or15_controller.owns(sym):
             or15_controller.request_exit("CIRCUIT_BREAKER", timestamp)
             continue
@@ -1493,6 +1615,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
         sym: pos for sym, pos in account.positions.items()
         if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
         and not orb.owns(sym) and not is_overnight(pos)
+        and not (is_day_one(pos) and day_one.safe_to_exempt(sym))
     }
     if intraday_positions:
         log.error(
@@ -1514,6 +1637,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
             sym: pos for sym, pos in account.positions.items()
             if getattr(pos, "arm", None) != TradingArm.SWING and getattr(pos, "strategy_id", "") != "swing_panic_dip"
             and not orb.owns(sym) and not is_overnight(pos)
+            and not (is_day_one(pos) and day_one.safe_to_exempt(sym))
         }
         if remaining_intraday:
             log.error(
@@ -1996,6 +2120,9 @@ async def execute_strategy_signal(signal: SignalEvent, bar: Optional[BarEvent] =
             if is_overnight(existing_pos):
                 log.info("Ignoring %s signal for overnight hold %s (it sells at the next open)", signal.reason, sym)
                 return
+            if is_day_one(existing_pos) or day_one.claimed(sym):
+                log.info("Ignoring %s signal for day one owned %s", signal.reason, sym)
+                return
             if getattr(existing_pos, "arm", None) == TradingArm.SWING or getattr(existing_pos, "strategy_id", "") == "swing_panic_dip":
                 log.info("Ignoring intraday News exit for Swing position %s", sym)
                 return
@@ -2361,6 +2488,9 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     """Ingest bar, update clocks, match orders, process strategies, check risk, update trailing stops."""
     now = bar.timestamp + timedelta(minutes=1) if simulation_mode else or15_now()
     prior = tsla_or15_strategy.bars.get(bar.symbol.upper(), [])
+    bar_local = bar.timestamp.astimezone(ET_TZ) if bar.timestamp.tzinfo else bar.timestamp.replace(tzinfo=ET_TZ)
+    if bar_local.time() <= time(9, 36, 5):
+        day_one.reserve_coin_before_events(bar_local.date())
     if not durable_replay and prior and bar.timestamp <= prior[-1].timestamp:
         tsla_or15_strategy.skip("DUPLICATE_OR_OUT_OF_ORDER_BAR", now)
         _checkpoint_runtime("OR15_DUPLICATE_BAR")
@@ -2372,6 +2502,7 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
     else:
         flattening_engine.clock.clear_simulated_time()
     _check_session_boundary(bar.timestamp)
+    day_one.on_bar(bar)
     if not durable_replay:
         if OR15_NEW_ENTRIES or tsla_or15_strategy.phase in ("ENTERING", "HOLDING", "EXITING"):
             or15_controller.on_bar(bar, now)
@@ -2553,6 +2684,7 @@ def _quote_requires_write_ahead(quote: QuoteEvent) -> bool:
 
 async def handle_quote_event(quote: QuoteEvent) -> None:
     """Ingest quote and match working orders."""
+    day_one.on_quote(quote)
     can_fill = _quote_requires_write_ahead(quote)
     event_key: Optional[str] = None
     if can_fill:
@@ -2726,6 +2858,8 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
                 continue
             if is_overnight(pos):
                 continue  # S3: the 15:55 flatten never touches an overnight hold or its orders
+            if is_day_one(pos) and day_one.safe_to_exempt(sym):
+                continue  # its broker-held closing auction order belongs to the day one controller
             if or15_controller.owns(sym):
                 or15_controller.request_exit("FORCED_FLAT", now_dt)
                 continue
@@ -2752,6 +2886,7 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
         audit_res = flattening_engine.execute_phase_4_audit(
             open_positions=account.positions,
             working_orders=list(engine.working_orders.values()),
+            day_one_protected=day_one.safe_to_exempt,
         )
         if audit_res.cancel_all_orders and engine.working_orders:
             engine.cancel_all_orders("AUDIT_EMERGENCY_SWEEP", arm=TradingArm.INTRADAY)
@@ -2763,6 +2898,8 @@ async def handle_flattening_directive(directive: FlatteningDirective) -> None:
                     continue
                 if is_overnight(pos):
                     continue  # S4: the 15:58 sweep never touches an overnight hold
+                if is_day_one(pos) and day_one.safe_to_exempt(sym):
+                    continue  # controller health covers its native close order and recovery
                 if or15_controller.owns(sym):
                     or15_controller.request_exit("EMERGENCY_SWEEP", now_dt)
                     continue
@@ -2968,6 +3105,9 @@ async def _swing_close_with_backfill(eval_date: date, max_wait_sec: float = 120.
 async def _runtime_clock_step(now_dt: datetime) -> None:
     """One 1-second pass of the runtime clock (EOD controls, fixed plans, ORB's scheduler)."""
     _check_session_boundary(now_dt)
+    local = now_dt.astimezone(ET_TZ)
+    if is_trading_day(local.date()) and local.time() <= time(9, 36, 5):
+        day_one.reserve_coin_before_events(local.date())
     adaptation_engine.update_clock(now_dt)
     _expire_stale_staged_swing_orders(now_dt)
     for strat in strategies:
@@ -2982,7 +3122,11 @@ async def _runtime_clock_step(now_dt: datetime) -> None:
         await handle_flattening_directive(directive)
     or15_controller.tick(now_dt)
     tri_controller.tick(now_dt)
-    # Overnight holds: starts and collects worker jobs only (broker I/O on its own pool).
+    # Day one and overnight controllers start and collect worker jobs only.
+    try:
+        day_one.tick(now_dt)
+    except Exception:
+        log.exception("Day one controller tick failed")
     try:
         overnight.tick(now_dt)
     except Exception:
@@ -3126,6 +3270,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     tri_controller.shutdown()
     orb.reset()
     overnight.reset()
+    day_one.reset()
     for fixed_strategy in tri_strategies:
         fixed_strategy.__init__(fixed_strategy.symbol)
     daily_bar_aggregator.reset_for_new_session()
@@ -3133,6 +3278,30 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     decision_log.reset_for_session(None)
     research_tracker.state = {"brackets": {}, "swing": {}}
     research_tracker.last_submitted.clear()
+
+
+def _day_one_build_revision() -> str:
+    """Exact SHA256 identity of the day one source set uploaded to Railway."""
+    return _day_one_source_revision()
+
+
+async def _day_one_deployment_attestation(broker: AlpacaBroker) -> Dict[str, Any]:
+    day_one.tick(datetime.now(timezone.utc))
+    status = await asyncio.to_thread(broker.sync)
+    _compare_with_broker(dict(status.positions), status.equity)
+    return day_one.attestation(_day_one_build_revision())
+
+
+def _startup_day_one(now_dt: datetime) -> None:
+    """Build, reserve before market events, and reconcile the two live day strategies."""
+    day_one.start(engine.broker)
+    local = now_dt.astimezone(ET_TZ)
+    if is_trading_day(local.date()) and local.time() <= time(9, 36, 5):
+        day_one.reserve_coin_before_events(local.date())
+    try:
+        day_one.reconcile(now_dt)
+    except Exception:
+        log.exception("Day one startup reconcile failed; new entries remain blocked until it succeeds")
 
 
 def _startup_overnight(now_dt: datetime) -> None:
@@ -3166,6 +3335,11 @@ def set_simulation_mode(enabled: bool) -> None:
     simulation_mode = enabled
     # Replays must never reach the real account.
     engine.broker = None if enabled else alpaca_broker
+    if day_one.controller is not None:
+        if enabled:
+            day_one.controller.close_entry_writes()
+        else:
+            day_one.controller.open_entry_writes()
     if not enabled:
         flattening_engine.clock.clear_simulated_time()
 
@@ -3187,13 +3361,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
     _restore_checkpoint()
     _schedule_profile_rebuild()
-    global alpaca_broker
+    global alpaca_broker, day_one_data
     if settings.BROKER_MODE.lower() == "alpaca_paper":
         alpaca_broker = AlpacaBroker(
             api_key=settings.ALPACA_API_KEY,
             secret_key=settings.ALPACA_SECRET_KEY,
             base_url=settings.ALPACA_BASE_URL,
         )
+        day_one_data = DayOneData(settings.RELAY_HTTP_URL, settings.RELAY_TOKEN, alpaca_broker)
         broker_state["mode"] = "alpaca_paper"
         if not simulation_mode:
             engine.broker = alpaca_broker
@@ -3205,17 +3380,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 # while the robot was down is booked into its own day and its own loss stop, then ask
                 # Alpaca about every overnight client id, all before the startup compare below.
                 _startup_overnight(datetime.now(timezone.utc))
+                _startup_day_one(datetime.now(timezone.utc))
             status = await asyncio.to_thread(alpaca_broker.sync)
             log.info(
                 "Alpaca paper broker attached: account %s equity %.2f positions %s (bot equity %.2f positions %s)",
                 status.account_number, status.equity or 0.0, status.positions,
                 account.equity, _local_signed_positions(account),
             )
-            # Startup is the moment a crash gap would show: mismatch blocks entries at once.
+            # Startup is the moment a crash gap would show. Compare, tick the controller once,
+            # then reread the broker before producing deployment attestation.
             _compare_with_broker(dict(status.positions), status.equity)
             if broker_state["mismatch_detail"]:
                 broker_state["mismatch"] = True
                 log.error("BROKER MISMATCH at startup %s; new entries blocked", broker_state["mismatch_detail"])
+            attestation = await _day_one_deployment_attestation(alpaca_broker)
+            log.info("DAY_ONE_DEPLOYMENT_ATTESTATION %s", json.dumps(attestation, sort_keys=True, separators=(",", ":")))
         except Exception as exc:
             broker_state["last_error"] = f"startup sync failed: {exc}"
             broker_state["mismatch"] = True
@@ -3308,6 +3487,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             pass
         ui_clients.discard(ws)
     tri_controller.shutdown()
+    day_one_safe = day_one.shutdown()
+    if not day_one_safe:
+        log.error("Day one shutdown left an unresolved worker or unprotected position")
     overnight.shutdown()
     # ORB: stop new entries/jobs, let a running exit finish (bounded), then refuse every broker write,
     # all BEFORE the final checkpoint and the store close (Codex P1 #3). Its last fills are booked.
@@ -3333,6 +3515,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     stock_ws_client = None
     news_ws_client = None
     vix_client = None
+    if day_one_data is not None:
+        day_one_data.close()
     if state_store is not None:
         state_store.close()
     event_bus.clear()
@@ -3357,7 +3541,7 @@ app.add_middleware(
 
 # REST Endpoints
 @app.get("/health")
-async def get_health() -> Dict[str, Any]:
+async def get_health(response: Response = None) -> Dict[str, Any]:
     """System health telemetry and component statuses."""
     configured = bool(settings.RELAY_TOKEN)
     bound_api_port = int(os.getenv("PORT", str(settings.API_PORT)))
@@ -3368,12 +3552,19 @@ async def get_health() -> Dict[str, Any]:
         ts = feed_last_event.get(feed)
         return None if ts is None else round((now_utc - ts).total_seconds(), 1)
 
+    day_one_readiness = _sanitize_for_json(day_one.readiness())
+    revision_match = _day_one_revision_match() if settings.ENV.lower() == "production" else True
+    day_one_readiness["source_revision_match"] = revision_match
+    if not revision_match:
+        day_one_readiness["readiness"] = "not_ready"
     operational_status = "healthy" if configured and all(
         relay_statuses.get(feed) == "connected" for feed in ("stock", "news", "vix")
     ) else "degraded" if configured else "unconfigured"
+    if day_one_readiness["readiness"] != "ready" and operational_status == "healthy":
+        operational_status = "degraded"
     if settings.PERSISTENCE_REQUIRED and not persistence_healthy:
         operational_status = "recovery_halt"
-    return {
+    payload = {
         "status": operational_status,
         "mode": settings.ENV,
         "upstream_configured": configured,
@@ -3406,6 +3597,7 @@ async def get_health() -> Dict[str, Any]:
         "broker": _broker_health(),
         "orb": _sanitize_for_json(_orb_health()),
         "overnight": _sanitize_for_json(_try_or_none("overnight", overnight.health) or {"mode": "error"}),
+        "day_one": day_one_readiness,
         "persistence": {
             "status": "durable" if persistence_healthy and state_store else (
                 "disabled" if state_store is None else "recovery_halt"
@@ -3468,6 +3660,13 @@ async def get_health() -> Dict[str, Any]:
             },
         },
     }
+    if (
+        response is not None
+        and settings.ENV.lower() == "production"
+        and day_one_readiness["readiness"] != "ready"
+    ):
+        response.status_code = 503
+    return payload
 
 
 def _orb_health() -> Dict[str, Any]:

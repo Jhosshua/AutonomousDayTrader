@@ -14,6 +14,7 @@ import uuid
 
 from backend.app.core.account import PaperTradingAccount, TradingArm
 from backend.app.core.overnight_schedule import OVERNIGHT_POLICY
+from backend.app.core.day_one_schedule import DAY_ONE_POLICY
 from backend.app.models.events import OrderSide, OrderType, OrderState
 from backend.app.strategies.tri_engine import FIXED_IDS, TRI_IDS
 
@@ -236,6 +237,8 @@ class ExecutionEngine:
             raise BrokerReject("ORB orders are placed and managed by the ORB controller", hard=True)
         if order.execution_policy == OVERNIGHT_POLICY:
             raise BrokerReject("Overnight hold orders are placed and managed by the overnight controller", hard=True)
+        if order.execution_policy == DAY_ONE_POLICY:
+            raise BrokerReject("Day one orders are placed and managed by the day one controller", hard=True)
         if self.order_guard is not None:
             refusal = self.order_guard(order, qty)
             if refusal:
@@ -324,8 +327,8 @@ class ExecutionEngine:
         if self.broker is None:
             return fills
         for order in list(self.orders.values()):
-            if order.execution_policy in TRI_IDS or order.execution_policy in (ORB_POLICY, OVERNIGHT_POLICY):
-                continue  # Dedicated controller reconciles cumulative fills (tri tranches / ORB brackets / overnight holds).
+            if order.execution_policy in TRI_IDS or order.execution_policy in (ORB_POLICY, OVERNIGHT_POLICY, DAY_ONE_POLICY):
+                continue  # Dedicated controllers reconcile cumulative fills.
             if order.fixed_intent_client_id and order.side == OrderSide.SELL:
                 if order.status.value == "FILLED":
                     continue
@@ -580,7 +583,8 @@ class ExecutionEngine:
         fills: List[Fill] = []
         matching_orders = [
             o for o in list(self.working_orders.values())
-            if o.symbol == symbol and o.execution_policy not in FIXED_IDS and not (
+            if o.symbol == symbol and o.execution_policy not in FIXED_IDS
+            and o.execution_policy != DAY_ONE_POLICY and not (
                 o.arm == TradingArm.SWING and o.side == OrderSide.BUY
                 and o.strategy_id == "swing_panic_dip"
             )
@@ -639,7 +643,8 @@ class ExecutionEngine:
         fills: List[Fill] = []
         matching_orders = [
             o for o in list(self.working_orders.values())
-            if o.symbol == symbol and o.execution_policy not in FIXED_IDS and not (
+            if o.symbol == symbol and o.execution_policy not in FIXED_IDS
+            and o.execution_policy != DAY_ONE_POLICY and not (
                 o.arm == TradingArm.SWING and o.side == OrderSide.BUY
                 and o.strategy_id == "swing_panic_dip"
             )

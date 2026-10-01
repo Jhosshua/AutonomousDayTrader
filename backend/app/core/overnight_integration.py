@@ -32,6 +32,7 @@ from backend.app.core.overnight_execution import (
     HOLD_STATES, HELD, IDLE, SKIPPED, SOLD, Hooks, InlineExecutor, OvernightController,
 )
 from backend.app.core.overnight_schedule import ET, OVERNIGHT_POLICY, et, et_date, is_overnight
+from backend.app.core.day_one_schedule import is_day_one
 
 log = logging.getLogger("overnight_integration")
 
@@ -306,7 +307,10 @@ class OvernightIntegration:
 
     def _swing_value(self) -> float:
         r = self.r
-        return float(sum(abs(p.market_value) for p in r.account.positions.values() if r._is_swing_arm(p)))
+        # The overnight room formula applies the same 50% Reg T ratio to this hook. Include
+        # day one SPY or COIN shares until their actual exit fill, not when CLS is accepted.
+        return float(sum(abs(p.market_value) for p in r.account.positions.values()
+                         if r._is_swing_arm(p) or is_day_one(p)))
 
     def _on_release(self, symbol: str) -> None:
         log.info("Overnight hold released %s back to the day strategies", symbol)

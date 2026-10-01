@@ -499,6 +499,11 @@ class OrbIntegration:
             reason = ovn.occupied_reason(sym)     # S11: reserved from 15:45 or held overnight
             if reason:
                 return reason
+        day_one = getattr(r, "day_one", None)
+        if day_one is not None:
+            reason = day_one.occupied_reason(sym)
+            if reason:
+                return reason
         return None
 
     def is_occupied(self, symbol: str) -> bool:

@@ -64,6 +64,8 @@ DECISIONS = {
     "core/overnight_integration.py::_x6_step": "X6 booking of the day trade close",
     "core/overnight_integration.py::holds_symbol": "S1: a hold in the book",
     "core/overnight_integration.py::order_refusal": "S1/S2",
+    # the day one glue only reads other owners to refuse a conflicting SPY or COIN entry
+    "core/day_one_integration.py::_held_by_other": "never adopts an overnight hold; a conflicting owner causes a day one skip",
     # research (observation only)
     "core/research_tracker.py::_swing_fill": SWING, "core/research_tracker.py::context": "observation only (a count)",
     "core/research_tracker.py::on_bar": "observation only, bracketed trades",

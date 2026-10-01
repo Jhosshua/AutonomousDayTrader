@@ -52,6 +52,8 @@ def capture_runtime_state(
     research: Optional[Dict[str, Any]] = None,
     orb: Optional[Dict[str, Any]] = None,
     overnight: Optional[Dict[str, Any]] = None,
+    day_one: Optional[Dict[str, Any]] = None,
+    day_one_ownership: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 
     """Return a complete JSON-safe recovery checkpoint."""
@@ -165,6 +167,13 @@ def capture_runtime_state(
         # date, the no buy tonight control, skip and fidelity logs). Plain JSON only (no __type__
         # classes), so an older build still decodes the payload; older code ignores the key.
         state["overnight"] = overnight
+    if day_one_ownership is not None:
+        # Minimal top-level ownership survives controller schema changes and is restored first.
+        state["day_one_ownership"] = day_one_ownership
+    if day_one is not None:
+        # Optional plain JSON owner state for SPY turn-of-month and COIN bitcoin-follow lifecycles.
+        # Older code ignores it, while this build restores ownership before any generic liquidation.
+        state["day_one"] = day_one
     encoded = encode_runtime_value(state)
     if not isinstance(encoded, dict):
         raise PersistenceError("Encoded runtime checkpoint is not an object")
@@ -313,6 +322,8 @@ def restore_runtime_state(
         "research": decoded.get("research"),
         "orb": decoded.get("orb"),
         "overnight": decoded.get("overnight"),
+        "day_one_ownership": decoded.get("day_one_ownership"),
+        "day_one": decoded.get("day_one"),
     }
 
 
