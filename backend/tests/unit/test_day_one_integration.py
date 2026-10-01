@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime, time as dtime
+from datetime import date, datetime, time as dtime, timedelta
 from enum import Enum
 from types import SimpleNamespace
 
@@ -33,6 +33,25 @@ class Broker:
         self.orders = {}
         self.positions = {}
         self.posts = []
+        self.reads = []
+
+    def get_account_fields(self):
+        return {"account_number": d1.EXPECTED_ACCOUNT, "equity": 50_000.0, "buying_power": 100_000.0}
+
+    def get_calendar(self, start, end):
+        current, final = date.fromisoformat(start), date.fromisoformat(end)
+        rows = []
+        while current <= final:
+            if CALENDAR.is_trading_day(current):
+                rows.append({"date": current.isoformat(), "close": CALENDAR.session_close(current).strftime("%H:%M")})
+            current += timedelta(days=1)
+        return rows
+
+    def get_asset(self, symbol):
+        return {"symbol": symbol, "tradable": True, "shortable": True, "easy_to_borrow": True}
+
+    def get_positions_raw(self):
+        return [{"symbol": symbol, "qty": str(qty)} for symbol, qty in self.positions.items()]
 
     def position_qty(self, symbol):
         return self.positions.get(symbol, 0)
@@ -56,9 +75,11 @@ class Broker:
                 and (symbol is None or row["symbol"] == symbol)]
 
     def get_order(self, order_id, nested=True):
+        self.reads.append(order_id)
         return dict(self.orders[order_id])
 
     def get_order_by_client_id(self, client_id, nested=True):
+        self.reads.append(client_id)
         row = next((row for row in self.orders.values() if row["client_order_id"] == client_id), None)
         return dict(row) if row else None
 
@@ -319,6 +340,7 @@ def test_before_compare_books_discovered_fill_then_places_broker_held_cls():
     broker_row.update(status="filled", filled_qty="3", filled_avg_price="250", filled_at=moment(9, 36).isoformat())
     rig.broker.positions["COIN"] = 3
 
+    rig.clock.value = moment(9, 36, 1)
     positions = asyncio.run(rig.integration.before_compare({"COIN": 3}))
     assert positions["COIN"] == 3
     assert rig.runtime.account.positions["COIN"].shares == 3
@@ -479,3 +501,22 @@ def test_coin_reservation_checks_brackets_and_staged_swing_entries():
         assert integration.reserve_coin_before_events(SESSION) is False
         assert controller.state["lifecycles"]["COIN"]["phase"] == "SKIPPED"
         assert not integration.owns("COIN")
+
+
+def test_routine_broker_compare_obeys_resting_auction_poll_throttle():
+    prior = date(2026, 9, 30)
+    rig = Rig(now=datetime.combine(prior, dtime(19, 5), d1.ET))
+    lifecycle = rig.controller._new_lifecycle("SPY", SESSION, dtime(16), "IDLE")
+    lifecycle.update(side="LONG", target_qty=20, reference_price=500.0, admitted=True)
+    rig.controller.state["lifecycles"]["SPY"] = lifecycle
+    rig.controller._create_attempt(lifecycle, "entry", "buy", 20, "opg", rig.clock.value)
+    assert rig.broker.posts and rig.broker.posts[-1]["time_in_force"] == "opg"
+    rig.broker.reads.clear()
+
+    rig.clock.value = datetime.combine(prior, dtime(19, 5, 30), d1.ET)
+    asyncio.run(rig.integration.before_compare({}))
+    assert rig.broker.reads == []
+
+    rig.clock.value = datetime.combine(prior, dtime(19, 6), d1.ET)
+    asyncio.run(rig.integration.before_compare({}))
+    assert len(rig.broker.reads) == 1

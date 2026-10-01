@@ -1042,8 +1042,27 @@ class DayOneController:
         day_close = self.calendar.session_close(local.date())
         return d1.MARKET_OPEN <= local.time() < day_close
 
+    def _poll_interval(self, lifecycle: Dict[str, Any], attempt: Dict[str, Any], now: datetime) -> float:
+        if attempt["time_in_force"] == "day":
+            return 1.0
+        local = now.astimezone(d1.ET)
+        if attempt["time_in_force"] == "opg":
+            near = local.date() == self._session(lifecycle) and local.time() >= dtime(9, 28)
+        else:
+            close_at = datetime.combine(self._session(lifecycle), self._close(lifecycle), d1.ET)
+            near = now >= close_at - timedelta(minutes=2)
+        return 2.0 if near else 60.0
+
+    def _poll_due(self, lifecycle: Dict[str, Any], attempt: Dict[str, Any], now: datetime) -> bool:
+        if attempt["status"] not in ("accepted", "partially_filled", "done_for_day"):
+            return True
+        last = attempt.get("last_read_at")
+        if not last:
+            return True
+        return (now - _parse_datetime(last, now)).total_seconds() >= self._poll_interval(lifecycle, attempt, now)
+
     def _drive_attempt(self, lifecycle: Dict[str, Any], attempt: Dict[str, Any], now: datetime) -> None:
-        if attempt["status"] in TERMINAL:
+        if attempt["status"] in TERMINAL or not self._poll_due(lifecycle, attempt, now):
             return
         if attempt["role"] == "entry" and not self._has_durable_protection(lifecycle):
             self._precommit_protection(lifecycle)
@@ -1184,6 +1203,7 @@ class DayOneController:
             attempt["order_id"] = str(row.get("id") or attempt["order_id"] or "") or None
             attempt["filled_qty"] = total
             attempt["status"] = status
+            attempt["last_read_at"] = _iso(now)
         except Exception as exc:
             self._halt(lifecycle, "BROKER_ORDER_CONTRADICTION", now, exc)
             return
@@ -1586,13 +1606,14 @@ class DayOneController:
             self._verify_release(lifecycle, now)
         return True
 
-    def pending_reads(self) -> List[Tuple[str, int, Optional[str], str]]:
+    def pending_reads(self, now: Optional[datetime] = None, *, force: bool = False) -> List[Tuple[str, int, Optional[str], str]]:
+        now = now or self.clock()
         out: List[Tuple[str, int, Optional[str], str]] = []
         for symbol, lifecycle in self.state["lifecycles"].items():
             if symbol in self._jobs:
                 continue
             for index, attempt in enumerate(lifecycle["attempts"]):
-                if attempt["status"] in LIVE:
+                if attempt["status"] in LIVE and (force or self._poll_due(lifecycle, attempt, now)):
                     out.append((symbol, index, attempt.get("order_id"), attempt["client_id"]))
         return out
 
@@ -1626,7 +1647,7 @@ class DayOneController:
         now = now or self.clock()
         self._reconciling = True
         try:
-            rows = self.fetch_reads(self.pending_reads())
+            rows = self.fetch_reads(self.pending_reads(now, force=True))
             self.apply_reads(rows, now)
             for lifecycle in self.state["lifecycles"].values():
                 if lifecycle["symbol"] in self._jobs:

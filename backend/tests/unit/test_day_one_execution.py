@@ -664,7 +664,7 @@ def test_fractional_broker_order_quantities_enter_recovery_halt(field, value):
     lifecycle = rig.lifecycle("SPY")
     attempt = lifecycle["attempts"][0]
     rig.broker.orders[attempt["order_id"]][field] = value
-    rig.tick(moment(SEP30, 19, 5, 1))
+    rig.tick(moment(SEP30, 19, 6))
     assert lifecycle["phase"] == "RECOVERY_HALT"
 
 
@@ -707,3 +707,22 @@ def test_rejected_or_unsent_close_is_not_protection_and_shutdown_is_unsafe():
     assert rig.controller.health()["ready"] is False
     assert rig.controller.shutdown(0.0) is False
     assert rig.controller.health()["exit_writes_open"] is True
+
+
+def test_resting_auction_order_polls_once_a_minute_until_auction_window():
+    rig = Rig()
+    rig.tick()
+    lifecycle = rig.lifecycle("SPY")
+    attempt = lifecycle["attempts"][0]
+    initial_lookups = len(rig.broker.lookups)
+    for second in (1, 10, 30, 59):
+        rig.tick(moment(SEP30, 19, 5, second))
+    assert len(rig.broker.lookups) == initial_lookups
+    rig.tick(moment(SEP30, 19, 6))
+    assert len(rig.broker.lookups) == initial_lookups + 1
+
+    attempt["last_read_at"] = moment(OCT1, 9, 29, 58).isoformat()
+    rig.tick(moment(OCT1, 9, 29, 59))
+    assert len(rig.broker.lookups) == initial_lookups + 1
+    rig.tick(moment(OCT1, 9, 30))
+    assert len(rig.broker.lookups) == initial_lookups + 2
