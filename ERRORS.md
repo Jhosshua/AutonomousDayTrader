@@ -467,3 +467,11 @@ right. Run the mutation check.
 **What worked instead**: `git archive 149f5a3^ frontend` into a scratch folder inside the worktree, symlink node_modules, `npx next build`, then pass that `out`. 288/288.
 
 **Note for next time**: the compact dashboard base is the commit before the compaction (`149f5a3^`), not the branch base.
+
+## 2026-10-01: production was running code that is not on GitHub
+
+**What happened**: the 24 h audit found two Railway CLI deploys after the last GitHub commit (28b0536): 2026-09-30 23:43 ET from Kiro ("adef05d live SPY COIN source 73d319aaec53") and 2026-10-01 00:14 ET from Codex ("f2866c3 throttle day one broker reads"). Neither commit exists in this repo, any worktree, or any git folder under /Users/mo or /private/tmp. The live service has a `day_one` block in `/health` (strategies `turn_month_spy` ENTRY_PENDING and `bitcoin_follow_coin` RESERVED) and had already sent a real SPY buy (order 53014908..., accepted) for the 10-01 open.
+
+**Why it matters**: a push to main redeploys GitHub's code and drops that code. The resting SPY order would then fill as a position the robot does not know, raising a broker mismatch that pauses entries.
+
+**Note for next time**: before any push here, compare `railway deployment list --json` (meta.commitHash vs meta.cliMessage/cliCaller) with `git log -1`. A deploy with no commitHash is CLI code; find its source before replacing it.
