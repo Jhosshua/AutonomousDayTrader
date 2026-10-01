@@ -14,6 +14,7 @@ export interface HoldView {
   saleDate: string | null;
   nights: string | null;
   needsLook: boolean;
+  bookOnly?: boolean;
 }
 
 interface OvernightHoldsProps {
@@ -81,7 +82,7 @@ export default function OvernightHolds({ holds, tonight, summary, noBuyActive, d
                 <span className="font-display text-[15px] font-semibold leading-tight">{theme.name}</span>
               </div>
               <div className="min-w-0 flex-1 basis-[260px] text-[13px] leading-snug text-ink" data-testid="overnight-hold-line">
-                {holdLine({ symbol: h.symbol, shares: h.shares, buyPrice: h.buyPrice, saleDate: h.saleDate, nights: h.nights, needsLook: h.needsLook })}
+                {holdLine({ symbol: h.symbol, shares: h.shares, buyPrice: h.buyPrice, saleDate: h.saleDate, nights: h.nights, needsLook: h.needsLook, bookOnly: h.bookOnly })}
               </div>
             </div>
           </div>

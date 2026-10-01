@@ -818,10 +818,12 @@ export interface HoldLineInputs {
   saleDate: string | null; // YYYY-MM-DD
   nights: string | null; // weeknight | weekend | holiday
   needsLook?: boolean;
+  bookOnly?: boolean;
 }
 
 /** One line per hold. Always names the sale day. */
 export function holdLine(h: HoldLineInputs): string {
+  if (h.bookOnly) return `Alpaca already sold ${h.symbol}, but the robot's book still shows ${h.shares} shares. Check the Alpaca app.`;
   const bought = h.buyPrice != null ? ` bought at ${formatMoney(h.buyPrice)} at the close` : " bought at the close";
   const day = dayLabel(h.saleDate);
   const over = h.nights === "weekend" ? "Held over the weekend, sells" : h.nights === "holiday" ? "Held over the holiday, sells" : "Sells";

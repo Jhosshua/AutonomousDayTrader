@@ -103,6 +103,7 @@ export default function Home() {
   const ovn = state.overnight ?? null;
   const holdViews: HoldView[] = state.all_positions.filter(isOvernightPosition).map((p) => {
     const h = ovn?.holds?.find((x) => x.symbol === p.symbol);
+    const row = ovn?.rows?.find((x) => x.symbol === p.symbol && (x.needs_look ?? []).includes("BOOK_MORE_THAN_ALPACA"));
     return {
       symbol: p.symbol,
       strategyId: p.strategy_id || h?.strategy_id || "",
@@ -110,7 +111,9 @@ export default function Home() {
       buyPrice: p.entry_price ?? h?.buy_avg ?? null,
       saleDate: h?.sale_date ?? etDateOfIso(p.exit_due),
       nights: h?.nights ?? null,
-      needsLook: (h?.needs_look?.length ?? 0) > 0,
+      needsLook: (h?.needs_look?.length ?? 0) > 0 || row != null,
+      // Alpaca sold it but the robot's book still shows shares: not a normal hold
+      bookOnly: !h && row != null,
     };
   });
   const overnightOn = ovn != null || holdViews.length > 0;
@@ -122,6 +125,7 @@ export default function Home() {
   // a stock still counts as planned tonight until its night is skipped or bought
   const plannedTonight = ovnRows.filter((r) => {
     if (!r.enabled) return false;
+    if ((r.needs_look ?? []).includes("BOOK_MORE_THAN_ALPACA")) return false; // the backend skips it
     if (r.buy_date === todayEt) return r.state !== "SKIPPED" && !["HELD", "SALE_QUEUED", "SOLD"].includes(r.state || "");
     return !["HELD", "SALE_QUEUED"].includes(r.state || "") && !noBuyActive;
   });
@@ -155,7 +159,7 @@ export default function Home() {
       .filter((p) => isOvernightPosition(p) && p.exit_due && nowMs >= Date.parse(p.exit_due) + 60_000)
       .map((p) => p.symbol),
   ]));
-  const firstSale = holdViews.map((h) => h.saleDate).filter((d): d is string => !!d).sort()[0] ?? null;
+  const firstSale = holdViews.filter((h) => !h.bookOnly).map((h) => h.saleDate).filter((d): d is string => !!d).sort()[0] ?? null;
   const pastSale = state.all_positions.some((p) => isOvernightPosition(p) && p.exit_due && nowMs >= Date.parse(p.exit_due));
   const holdsValue = holdViews.reduce((sum, h) => sum + h.shares * (h.buyPrice ?? 0), 0);
 
@@ -174,7 +178,7 @@ export default function Home() {
     positionsCount: intradayPositions.length,
     maxDailyLossDollars: healthLimits.maxDailyLossDollars,
     overnightOn,
-    overnightLine: overnightHoldingSentence(holdViews.length, firstSale, pastSale),
+    overnightLine: overnightHoldingSentence(holdViews.filter((h) => !h.bookOnly).length, firstSale, pastSale),
   });
 
   // F8: always-visible plain-language problem banners (not behind "Show pro words").
