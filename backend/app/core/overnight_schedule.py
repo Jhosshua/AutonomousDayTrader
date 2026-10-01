@@ -64,6 +64,7 @@ FIDELITY_OPEN_AT = dtime(9, 45)
 BUY_RETRY_SEC = 5
 POLL_SEC = 5
 SALE_RETRY_SEC = 30
+SALE_REFUSED_RETRY_SEC = 300
 
 # Skip and needs look reasons. Plain, stable strings: they are saved and shown on the page.
 EARLY_CLOSE = "EARLY_CLOSE"

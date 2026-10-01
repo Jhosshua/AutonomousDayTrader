@@ -547,6 +547,10 @@ class OvernightController:
         if reason is not None:
             self._block(n, reason)
             return
+        # a buying power refusal will not clear in 5 s (the account is read once a day): wait 30 s
+        if (att is not None and att.get("refusal") == REFUSAL_BUYING_POWER
+                and (now - _parse_time(att.get("created_at"), now)).total_seconds() < osch.SALE_RETRY_SEC):
+            return
         self._gates_io(n, now)
 
     def _gates_io(self, n: Dict[str, Any], now: datetime) -> None:
@@ -1013,7 +1017,10 @@ class OvernightController:
                "cancel_requested": False, "fallback": window == "fallback", "created_at": _iso(now)}
         # throttle: a new attempt at most every 30 s after the last one started
         last = self._last.get(f"sellsend:{leg['symbol']}:{n['buy_date']}")
-        if last is not None and (now - last).total_seconds() < osch.SALE_RETRY_SEC:
+        # after two refusals in a row, slow to every 5 min so a night of refusals cannot pile up attempts
+        refused = len(leg["attempts"]) >= 2 and all(a["status"] == "refused" for a in leg["attempts"][-2:])
+        every = osch.SALE_REFUSED_RETRY_SEC if refused else osch.SALE_RETRY_SEC
+        if last is not None and (now - last).total_seconds() < every:
             return
         leg["attempts"].append(new)
         self.checkpoint("OVERNIGHT_SALE_INTENT")   # best effort only (R2)

@@ -466,6 +466,29 @@ def test_buying_power_refusal_is_a_skip_not_a_fallback():
     assert all(b["time_in_force"] == "cls" for _, b in rig.alpaca.buys("HUT"))
 
 
+def test_buying_power_refusal_retries_every_30s_not_every_5s():
+    rig = new()
+    rig.alpaca.refuse = {"cls": (403, "insufficient buying power")}
+    rig.alpaca.refuse_symbols = {"NVDA"}
+    rig.run(T(THU, 15, 44), T(THU, 15, 50))
+    posts = rig.alpaca.buys("NVDA")
+    assert 2 <= len(posts) <= 8        # was about 41 at one try per 5 s
+    gaps = [(b - a).total_seconds() for (a, _), (b, _) in zip(posts, posts[1:])]
+    assert all(g >= osch.SALE_RETRY_SEC for g in gaps)
+
+
+def test_sale_refused_twice_in_a_row_slows_to_every_5_minutes():
+    rig = new()
+    buy_day(rig)
+    rig.alpaca.refuse = {"opg": (403, "potential wash trade detected"), "day": (403, "potential wash trade detected")}
+    rig.alpaca.refuse_symbols = {"HUT"}
+    rig.run(T(THU, 19, 0), T(THU, 23, 0), step=5)
+    n = rig.night("HUT")
+    assert osch.SALE_REFUSED in n["needs_look"]
+    assert 2 < len(rig.alpaca.sells("HUT")) <= 52   # was 480 at one try per 30 s
+    assert len(n["legs"][0]["attempts"]) == len(rig.alpaca.sells("HUT"))
+
+
 def test_buy_cancelled_by_hand_at_alpaca_is_a_logged_skip():
     rig = new()
     rig.run(T(THU, 15, 44), T(THU, 15, 50))
