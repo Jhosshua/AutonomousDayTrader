@@ -787,3 +787,14 @@ def test_an_unknown_outcome_is_looked_up_every_5_seconds_not_every_tick():
     assert rig.lifecycle("SPY")["attempts"][0]["status"] == "ambiguous"
     assert len(rig.broker.writes) <= 15          # was 60 a minute
     assert len({a["client_id"] for a in rig.lifecycle("SPY")["attempts"]}) == 1
+
+
+def test_a_coin_session_missed_entirely_is_released_the_next_day():
+    rig = Rig(now=moment(OCT1, 0, 30))
+    rig.controller.reserve_coin_before_events(OCT1)
+    assert rig.lifecycle("COIN")["phase"] == "RESERVED"
+    rig.tick(moment(date(2026, 10, 2), 0, 30))       # down from before 09:35 until after the close
+    lc = rig.lifecycle("COIN")
+    assert lc["phase"] == "SKIPPED" and lc["released"]
+    assert rig.controller.reserve_coin_before_events(date(2026, 10, 2))
+    assert not [w for w in rig.broker.writes if "coin" in str(w.get("client_id", "")).lower()]

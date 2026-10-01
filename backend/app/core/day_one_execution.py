@@ -625,6 +625,10 @@ class DayOneController:
 
     def _step_coin_decision(self, lifecycle: Dict[str, Any], now: datetime) -> None:
         local = now.astimezone(d1.ET)
+        if local.date() > self._session(lifecycle) and not lifecycle["attempts"] and lifecycle["entry_qty"] == 0:
+            # the robot was down through the whole session: release COIN instead of owning it forever
+            self._skip(lifecycle, "SESSION_PASSED", now)
+            return
         if local.date() != self._session(lifecycle) or local.time() < dtime(9, 35):
             return
         done, result, error = self._io(lifecycle, "coin_model", lambda: self.coin_model(self._session(lifecycle)))

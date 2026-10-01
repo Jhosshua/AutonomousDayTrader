@@ -3315,14 +3315,17 @@ def _startup_overnight(now_dt: datetime) -> None:
     # would set EOD_FLAT on the new day and block every day entry
     pending_boundary = state_store is not None and bool(state_store.list_pending_events())
     orb_positions = any(getattr(p, "strategy_id", "") == ORB_ID for p in account.positions.values())
-    if not pending_boundary and not orb_positions:
+    # same for day one: its controller is built after this, so its positions are not yet protected and
+    # the boundary's liquidation would sell next to day one's own queued recovery exit (a short)
+    day_one_positions = any(getattr(p, "strategy_id", "") in DAY_ONE_IDS for p in account.positions.values())
+    if not pending_boundary and not orb_positions and not day_one_positions:
         try:
             _check_session_boundary(now_dt)
         except Exception:
             log.exception("Startup session boundary check failed; overnight bookings wait for the clock's")
     else:
         log.warning("Startup session boundary left to the %s; overnight bookings wait for it",
-                    "pending input replay" if pending_boundary else "runtime clock (ORB positions on the book)")
+                    "pending input replay" if pending_boundary else "runtime clock (ORB or day one positions on the book)")
     overnight.start(engine.broker)
     try:
         overnight.reconcile(now_dt)

@@ -56,3 +56,25 @@ def test_startup_boundary_waits_for_any_pending_input(main_runtime, monkeypatch,
     monkeypatch.setattr(r.overnight, 'reconcile', lambda now: None)
     r._startup_overnight(at(FRI, 9, 0))
     assert bool(calls) is runs
+
+
+@pytest.mark.parametrize('strategy_id, runs', [('turn_month_spy', False), ('bitcoin_follow_coin', False),
+                                               ('vwap_reclaim', True)])
+def test_startup_boundary_waits_while_a_day_one_position_is_on_the_book(main_runtime, monkeypatch, strategy_id, runs):
+    """Day one's controller is built after the startup boundary; its liquidation would sell next to
+    day one's own queued recovery exit and leave the account short."""
+    from types import SimpleNamespace
+    r = main_runtime
+
+    class Store:
+        def list_pending_events(self):
+            return []
+
+    calls = []
+    monkeypatch.setattr(r, 'state_store', Store())
+    monkeypatch.setattr(r.account, 'positions', {'SPY': SimpleNamespace(symbol='SPY', strategy_id=strategy_id)})
+    monkeypatch.setattr(r, '_check_session_boundary', lambda now: calls.append(now))
+    monkeypatch.setattr(r.overnight, 'start', lambda broker: None)
+    monkeypatch.setattr(r.overnight, 'reconcile', lambda now: None)
+    r._startup_overnight(at(FRI, 9, 0))
+    assert bool(calls) is runs
