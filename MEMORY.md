@@ -699,4 +699,9 @@ The completed 2026-09-24 operator-window plan was removed from the active notes 
 - **Why**: each was confirmed by a simulation or a test that fails on the old code.
 - **Rejected**: capping wash trade retries (the plan wants 5 s retries, a day trade exit can clear it within seconds); re-reading the account after a buying power refusal (more broker calls for a case that cannot change in 3.5 minutes).
 - **Corrects an older note**: the 09-30 "Open" about `BOOK_MORE_THAN_ALPACA` having no page words and the banner saying "keeps trying to sell it" is out of date; both were already fixed before this audit.
-- **Not deployed, why**: production is running code from two CLI deploys (Kiro 23:43, Codex 00:14) that is not on GitHub, with live SPY turn of month and COIN bitcoin follow strategies and a real SPY buy resting at Alpaca. Pushing main would drop it. See ERRORS.md 2026-10-01. Waiting on the operator.
+- **Deploy hold, resolved**: production was running two CLI deploys (Kiro 23:43, Codex 00:14) not on GitHub. Operator pushed them (adef05d, f2866c3) at 00:49; fixes rebased on top.
+
+### 2026-10-01 (01:15 ET): Audit of the SPY/COIN day one code, 5 fixes
+- **What**: two reviewers on adef05d/f2866c3. Fixed: gate retries paced and noted once, refused exits paced (10 s, then 5 min) so the opening auction exit still has attempts, unknown outcomes polled every 5 s, a missed COIN day releases COIN, startup boundary skipped while day one shares are on the book. `122bdc0`, `802b96d`. Details in `docs/audits/2026-10-01_last_24h.md`.
+- **Rejected**: making `/health` always 200 (it is the deploy healthcheck and the watchdog reads it; operator call); auto-terminating an ambiguous entry after the cutoff (a real order could still exist).
+- **Deploy rule learned**: `DAY_ONE_BUILD_REVISION` must be set to the new source hash (`_day_one_source_revision()`) with `--skip-deploys` BEFORE pushing any change to the 11 `DAY_ONE_SOURCE_PATHS`, else `/health` is 503 and the Railway healthcheck fails.
