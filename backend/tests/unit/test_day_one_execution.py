@@ -726,3 +726,64 @@ def test_resting_auction_order_polls_once_a_minute_until_auction_window():
     assert len(rig.broker.lookups) == initial_lookups + 1
     rig.tick(moment(OCT1, 9, 30))
     assert len(rig.broker.lookups) == initial_lookups + 2
+
+
+def test_a_failing_gate_is_noted_once_and_retried_slowly_then_skipped_at_cutoff():
+    from types import SimpleNamespace
+    from backend.app.core.day_one_execution import DayOneHooks
+    rig = Rig(now=moment(OCT1, 9, 0), hooks=DayOneHooks(admission=lambda *a: None, broker_mismatch=lambda: True))
+    rig.controller.reserve_coin_before_events(OCT1)
+    start = moment(OCT1, 9, 35)
+    before = len(rig.checkpoints)
+    for i in range(3600):
+        rig.tick(start + timedelta(seconds=i))
+    lc = rig.lifecycle("COIN")
+    assert lc["operational_gates"].count("BROKER_MISMATCH") == 1      # was 3,600 entries
+    assert len(rig.checkpoints) - before < 20                          # was 3,601 saves an hour
+    assert lc["phase"] == "SKIPPED" and lc["released"]
+    assert rig.broker.writes == []
+
+
+def test_refused_exits_are_paced_and_the_next_open_still_gets_an_exit():
+    class Refused(Exception):
+        status_code = 403
+        body = '{"message":"insufficient qty"}'
+
+    rig = Rig(now=moment(SEP30, 19, 5))
+    rig.tick()
+    lc = rig.lifecycle("SPY")
+    rig.broker.fill(lc["attempts"][0]["client_id"], 20, 500.0)
+    rig.tick(moment(OCT1, 9, 30, 1))
+    cls = lc["attempts"][-1]
+    next(r for r in rig.broker.orders.values() if r["client_order_id"] == cls["client_id"])["status"] = "rejected"
+    posts = []
+
+    def refuse(symbol, side, qty, cid):
+        posts.append(cid)
+        raise Refused("refused")
+
+    rig.broker.submit_market_order = refuse
+    for i in range(4 * 60):
+        rig.tick(moment(OCT1, 15, 58) + timedelta(seconds=i))
+    assert 1 <= len(posts) <= 3                    # was 10, then a halt at the 13th
+    assert lc["phase"] != "RECOVERY_HALT"
+    writes = len(rig.broker.writes)
+    for i in range(120):
+        rig.tick(moment(date(2026, 10, 2), 9, 0) + timedelta(seconds=i))
+    assert len(rig.broker.writes) - writes == 1    # the opening auction exit is queued
+    assert lc["phase"] == "EXIT_PENDING"
+
+
+def test_an_unknown_outcome_is_looked_up_every_5_seconds_not_every_tick():
+    rig = Rig(now=moment(SEP30, 19, 5))
+
+    def failing(*a, **k):
+        rig.broker.writes.append("x")
+        raise ConnectionError("timeout")
+
+    rig.broker.submit_on_auction = failing
+    for i in range(60):
+        rig.tick(moment(SEP30, 19, 5) + timedelta(seconds=i))
+    assert rig.lifecycle("SPY")["attempts"][0]["status"] == "ambiguous"
+    assert len(rig.broker.writes) <= 15          # was 60 a minute
+    assert len({a["client_id"] for a in rig.lifecycle("SPY")["attempts"]}) == 1

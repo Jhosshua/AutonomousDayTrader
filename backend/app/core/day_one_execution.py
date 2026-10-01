@@ -201,6 +201,7 @@ class DayOneController:
         self._durable_revision = int(checkpoint_revision)
         self.state = _strict_copy(state) if state is not None else self.empty_state()
         self._jobs: Dict[str, Tuple[str, Future]] = {}
+        self._gate_retry_at: Dict[str, datetime] = {}
         self._entry_writes_open = True
         self._exit_writes_open = True
         self._reconciling = False
@@ -650,14 +651,29 @@ class DayOneController:
             return
         self._start_gates(lifecycle, now)
 
+    def _gate_wait(self, lifecycle: Dict[str, Any], reason: str, now: datetime) -> None:
+        """A gate that cannot pass yet: note the reason once (not every tick) and wait before retrying."""
+        gates = lifecycle["operational_gates"]
+        if not gates or gates[-1] != reason:
+            gates.append(reason)
+        self._gate_retry_at[lifecycle["symbol"]] = now + timedelta(
+            seconds=d1.GATE_RETRY_SEC.get(lifecycle["symbol"], 30))
+
     def _start_gates(self, lifecycle: Dict[str, Any], now: datetime) -> None:
         if not self._entry_writes_open:
             return
+        _open, terminal, _tif = self._entry_window(lifecycle, now)
+        if terminal:
+            self._skip(lifecycle, "ENTRY_CUTOFF_MISSED", now)
+            return
+        retry_at = self._gate_retry_at.get(lifecycle["symbol"])
+        if retry_at is not None and now < retry_at:
+            return
         if not self.hooks.persistence_healthy():
-            lifecycle["operational_gates"].append("PERSISTENCE_UNHEALTHY")
+            self._gate_wait(lifecycle, "PERSISTENCE_UNHEALTHY", now)
             return
         if self.hooks.broker_mismatch():
-            lifecycle["operational_gates"].append("BROKER_MISMATCH")
+            self._gate_wait(lifecycle, "BROKER_MISMATCH", now)
             return
         other = self.hooks.held_by_other(lifecycle["symbol"])
         if other:
@@ -670,7 +686,7 @@ class DayOneController:
         side = lifecycle["side"]
         coin_price = self._fresh_coin_price(now) if symbol == "COIN" else None
         if symbol == "COIN" and coin_price is None:
-            lifecycle["operational_gates"].append("FRESH_PRICE_UNAVAILABLE")
+            self._gate_wait(lifecycle, "FRESH_PRICE_UNAVAILABLE", now)
             return
         broker = self.broker
 
@@ -692,7 +708,7 @@ class DayOneController:
             if isinstance(error, QuantityError):
                 self._halt(lifecycle, "FRACTIONAL_BROKER_QUANTITY", now, error)
             else:
-                lifecycle["operational_gates"].append("BROKER_OR_RELAY_UNAVAILABLE")
+                self._gate_wait(lifecycle, "BROKER_OR_RELAY_UNAVAILABLE", now)
             return
         try:
             self._apply_gates(lifecycle, result, now)
@@ -1054,6 +1070,13 @@ class DayOneController:
         return 2.0 if near else 60.0
 
     def _poll_due(self, lifecycle: Dict[str, Any], attempt: Dict[str, Any], now: datetime) -> bool:
+        if attempt["status"] == "ambiguous":
+            # an unknown outcome is looked up every 5 s, not every 1 s tick (same client id, never a double)
+            last = attempt.get("ambiguous_checked_at")
+            if last and (now - _parse_datetime(last, now)).total_seconds() < d1.AMBIGUOUS_POLL_SEC:
+                return False
+            attempt["ambiguous_checked_at"] = _iso(now)
+            return True
         if attempt["status"] not in ("accepted", "partially_filled", "done_for_day"):
             return True
         last = attempt.get("last_read_at")
@@ -1368,6 +1391,17 @@ class DayOneController:
             return
         tif = self._recovery_mode(lifecycle, now)
         if tif is None:
+            return
+        # pace exits Alpaca refused: 10 s after one refusal, 5 min after two in a row, so the
+        # attempt cap is not burned in seconds and the 19:05 opening auction exit still has room
+        attempts = lifecycle["attempts"]
+        if attempts and attempts[-1]["status"] == "rejected" and attempts[-1]["role"] != "entry":
+            again = len(attempts) >= 2 and attempts[-2]["status"] == "rejected" and attempts[-2]["role"] != "entry"
+            wait = d1.EXIT_REFUSED_AGAIN_RETRY_SEC if again else d1.EXIT_REFUSED_RETRY_SEC
+            if (now - _parse_datetime(attempts[-1].get("created_at"), now)).total_seconds() < wait:
+                return
+        if len(attempts) >= d1.MAX_ATTEMPTS:
+            self._halt(lifecycle, "EXIT_ATTEMPTS_EXHAUSTED", now)
             return
         broker = self.broker
         symbol = lifecycle["symbol"]

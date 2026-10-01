@@ -36,6 +36,12 @@ FULL_CLOSE = dtime(16, 0)
 EARLY_CLOSE = dtime(13, 0)
 CLS_SUBMIT_BEFORE = timedelta(minutes=10)
 CLOSE_FALLBACK_BEFORE = timedelta(seconds=30)
+# retry pacing (a refusal or a gate that cannot pass is not retried every 1 s tick)
+GATE_RETRY_SEC = {"SPY": 30, "COIN": 2}
+EXIT_REFUSED_RETRY_SEC = 10
+EXIT_REFUSED_AGAIN_RETRY_SEC = 300
+AMBIGUOUS_POLL_SEC = 5
+MAX_ATTEMPTS = 12
 EVIDENCE = {
     SPY_ID: "post hoc atlas pattern, not preregistered",
     COIN_ID: "post holdout selection, design gate failed",
@@ -240,7 +246,7 @@ def validate_lifecycle(raw: dict[str, Any]) -> None:
         if protection.get("durable") is not True:
             raise ValueError("day one protection identity is not durable")
     attempts = raw.get("attempts", [])
-    if not isinstance(attempts, list) or len(attempts) > 12:
+    if not isinstance(attempts, list) or len(attempts) > MAX_ATTEMPTS:
         raise ValueError("day one attempts must be a bounded list")
     live_by_role: dict[str, int] = {}
     for a in attempts:
