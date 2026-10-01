@@ -174,7 +174,11 @@ def test_health_exposes_only_day_one_mode_readiness_and_strategy_phases(main_run
     assert set(health["day_one"]) == {"mode", "readiness", "strategy_phases", "source_revision_match"}
     assert health["day_one"]["readiness"] == "not_ready"
     monkeypatch.setattr(r.settings, "ENV", "production")
-    assert TestClient(r.app).get("/health").status_code == 503
+    client = TestClient(r.app)
+    assert client.get("/health").status_code == 200        # the deploy healthcheck is never blocked
+    assert client.get("/health").json()["status"] != "healthy"
+    ready = client.get("/ready")
+    assert ready.status_code == 503 and ready.json()["ready"] is False
 
 
 def test_deployment_attestation_ticks_then_rereads_broker_and_uses_source_revision(main_runtime, monkeypatch):

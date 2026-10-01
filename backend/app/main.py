@@ -3664,13 +3664,20 @@ async def get_health(response: Response = None) -> Dict[str, Any]:
             },
         },
     }
-    if (
-        response is not None
-        and settings.ENV.lower() == "production"
-        and day_one_readiness["readiness"] != "ready"
-    ):
-        response.status_code = 503
+    # /health stays 200 (it is Railway's deploy healthcheck: a 503 here would also block the deploy
+    # meant to fix a mismatch or a halt). Not ready shows as status "degraded"; /ready carries the 503.
     return payload
+
+
+@app.get("/ready")
+async def get_ready(response: Response) -> Dict[str, Any]:
+    """Day one readiness: 200 when ready, 503 otherwise (production only), same rule /health once used."""
+    health = await get_health()
+    day_one_state = health.get("day_one") or {}
+    ready = day_one_state.get("readiness") == "ready" or settings.ENV.lower() != "production"
+    if not ready:
+        response.status_code = 503
+    return {"ready": ready, "status": health.get("status"), "day_one": day_one_state}
 
 
 def _orb_health() -> Dict[str, Any]:
