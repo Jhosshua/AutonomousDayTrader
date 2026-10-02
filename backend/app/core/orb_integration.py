@@ -58,6 +58,20 @@ MARK_BREAKER_EVERY_S = 5.0       # ORB price marks re-evaluate ADT's daily loss 
 DRAIN_TIMEOUT_S = 20.0
 
 
+def rules_label() -> Dict[str, Any]:
+    """The rules ADT's ORB copy runs, read from the live orbs config (PARITY_MANIFEST.json), never a literal.
+    `flags` has the same keys ORBStraddle's /api/state `rules` dict carries (candle, delta, velocity, macro,
+    deal); `text` is the one-line label the dashboard and closed-trade rows show, with the deal rule spelled
+    out the way ORBStraddle's page prints it ("deal on")."""
+    from backend.app.strategies.orbs import config as orbs_config
+    flags = {"candle": bool(orbs_config.CANDLE_RULE), "delta": bool(orbs_config.DELTA_RULE),
+             "velocity": bool(orbs_config.VELOCITY_RULE), "macro": bool(orbs_config.MACRO_RULE),
+             "deal": bool(orbs_config.DEAL_RULE)}
+    commit = (orbs_config.MANIFEST.get("source") or {}).get("commit") or "?"
+    text = (f"ORBStraddle {orbs_config.RULES_VERSION} (@{commit}), deal {'on' if flags['deal'] else 'off'}")
+    return {"text": text, "flags": flags, "rules_version": orbs_config.RULES_VERSION, "source_commit": commit}
+
+
 def _f(v: Any) -> Optional[float]:
     try:
         x = float(v)
@@ -841,7 +855,7 @@ class OrbIntegration:
                 "quantity": qty, "avg_entry_price": round(avg_in, 4),
                 "avg_exit_price": round(avg_out, 4) if avg_out else None, "realized_pnl": pnl, "fees": 0.0,
                 "broker_fees": None, "exit_reason": pos.get("closed_reason") or pos.get("exit_reason"),
-                "aggregate_only": False, "execution_mode": "alpaca_paper", "rules": "ORBStraddle adaptive-v1.7.1-deal-rule",
+                "aggregate_only": False, "execution_mode": "alpaca_paper", "rules": rules_label()["text"],
                 "orb": {k: pos.get(k) for k in ("coid", "tier", "wave", "entry_ref", "card_entry", "stop", "initial_stop",
                                                  "target", "rd", "risk_usd", "planned_shares", "peak", "be_locked",
                                                  "exit_reason", "closed_reason", "carried")},
@@ -1328,8 +1342,10 @@ class OrbIntegration:
 
     def status(self) -> Dict[str, Any]:
         ctl, sched = self.controller, self.scheduler
+        rules = rules_label()
         out: Dict[str, Any] = {"mode": ctl.mode if ctl else self.mode, "configured_mode": self.configured_mode,
-                               "rules": "ORBStraddle adaptive-v1.7.1-deal-rule (@05d370d)",
+                               "rules": rules["text"], "rule_flags": rules["flags"],
+                               "rules_version": rules["rules_version"],
                                "exclude_symbols": list(self.r.settings.ORB_EXCLUDE_SYMBOLS),
                                "expected_account": self.r.settings.ORB_EXPECTED_ACCOUNT,
                                "init_error": self.init_error, "errors": self.current_errors(),

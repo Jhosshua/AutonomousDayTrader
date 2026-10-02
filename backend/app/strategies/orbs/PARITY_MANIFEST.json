@@ -5,11 +5,12 @@
     "commit_full": "05d370db09538ea447eb740b3cd52396759b98fc",
     "rules_version": "adaptive-v1.7.1-deal-rule",
     "pinned_at": "2026-10-02",
-    "evidence": "ORBStraddle Railway variables (railway variables --kv, read 2026-09-28) applied to ORBStraddle config.py @71b001f; live /api/state 13:28 ET 09-28 confirms risk_pct 2.0, max_slots 4, day_risk_budget.max_risk_pct 2.5, cutoff 10:15, flatten 11:00. Code defaults are used ONLY where the Railway variable is unset, and each such value is pinned below. Re-pinned 2026-10-02 to 06ca29f (deal rule v1.7.1, news/index-bars retries, 8 scanner threads), then the same day to 05d370d (attack-review fixes to the retry helper only; no config change). DEAL_RULE: operator ruling pending; code default off (ORBStraddle config.py DEAL_RULE default, _on_off -> 'off' when ORBS_DEAL_RULE is unset), so ORBS_DEAL_RULE is deliberately ABSENT from orbstraddle_railway_env here even though ORBStraddle's own Railway service runs it on (its MEMORY.md, 2026-10-01). This is the one place ADT's copy knowingly differs from ORBStraddle live. Every other variable is unchanged since 09-28."
+    "evidence": "ORBStraddle Railway variables (railway variables --kv, read 2026-09-28) applied to ORBStraddle config.py @71b001f; live /api/state 13:28 ET 09-28 confirms risk_pct 2.0, max_slots 4, day_risk_budget.max_risk_pct 2.5, cutoff 10:15, flatten 11:00. Code defaults are used ONLY where the Railway variable is unset, and each such value is pinned below. Re-pinned 2026-10-02 to 06ca29f (deal rule v1.7.1, news/index-bars retries, 8 scanner threads), then the same day to 05d370d (attack-review fixes to the retry helper only; no config change). DEAL_RULE: operator ruling 2026-10-02 14:45 ET: on, same as the other four ORB bots (ORBStraddle, JSL, ADMS, MT2 since 10-01); ORBS_DEAL_RULE=on matches ORBStraddle's Railway service (its MEMORY.md, 2026-10-01: 'Code default OFF; Railway ORBS_DEAL_RULE=on here'). It was pinned off for a few hours on 10-02 while the ruling was pending. Every other variable is unchanged since 09-28."
   },
   "orbstraddle_railway_env": {
     "ORBS_ABSORPTION_EXIT": "on",
     "ORBS_CARD_SOURCE": "file",
+    "ORBS_DEAL_RULE": "on",
     "ORBS_DECIDER": "adaptive",
     "ORBS_DELTA_RULE": "on",
     "ORBS_FREEZE": "09:38",
@@ -39,7 +40,7 @@
     "VELOCITY_RULE": true,
     "MACRO_RULE": true,
     "ABSORPTION_EXIT": true,
-    "DEAL_RULE": false,
+    "DEAL_RULE": true,
     "DELTA_MIN": 0.05,
     "VELOCITY_BURST_S": 2,
     "VELOCITY_BASE_S": 60,
