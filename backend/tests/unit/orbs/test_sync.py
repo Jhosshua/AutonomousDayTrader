@@ -1,4 +1,4 @@
-"""Sync check: the copied modules are ORBStraddle@06ca29f plus ONLY the edits listed in SYNC_EDITS.json.
+"""Sync check: the copied modules are ORBStraddle@05d370d plus ONLY the edits listed in SYNC_EDITS.json.
 
 With the ORBStraddle checkout present (the operator's Mac) this fails when ORBStraddle's files drift from
 the pinned commit (re-sync needed) or when a copy differs from original + documented edits. Without it

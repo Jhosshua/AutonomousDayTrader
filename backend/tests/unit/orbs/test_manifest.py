@@ -15,7 +15,7 @@ MANIFEST = config.load_manifest()
 
 def test_manifest_pins_orbstraddle_live_values():
     eff = MANIFEST["effective"]
-    assert MANIFEST["source"]["commit"] == "06ca29f"
+    assert MANIFEST["source"]["commit"] == "05d370d"
     assert MANIFEST["source"]["rules_version"] == "adaptive-v1.7.1-deal-rule"
     # live Railway: all four flow rules ON (the code default is OFF), candle rule ON
     for key in ("DELTA_RULE", "VELOCITY_RULE", "MACRO_RULE", "ABSORPTION_EXIT", "CANDLE_RULE"):

@@ -1329,7 +1329,7 @@ class OrbIntegration:
     def status(self) -> Dict[str, Any]:
         ctl, sched = self.controller, self.scheduler
         out: Dict[str, Any] = {"mode": ctl.mode if ctl else self.mode, "configured_mode": self.configured_mode,
-                               "rules": "ORBStraddle adaptive-v1.7.1-deal-rule (@06ca29f)",
+                               "rules": "ORBStraddle adaptive-v1.7.1-deal-rule (@05d370d)",
                                "exclude_symbols": list(self.r.settings.ORB_EXCLUDE_SYMBOLS),
                                "expected_account": self.r.settings.ORB_EXPECTED_ACCOUNT,
                                "init_error": self.init_error, "errors": self.current_errors(),

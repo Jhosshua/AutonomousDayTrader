@@ -1,4 +1,4 @@
-# Copied from ORBStraddle adaptive.py @06ca29f; logic unchanged; edits:
+# Copied from ORBStraddle adaptive.py @05d370d; logic unchanged; edits:
 #   1. package-relative imports; `core` -> ADT shim (today, now_et, _valid_card, long_only, urlopen)
 #   2. package-relative lazy import of flow
 #   3. package-relative dynamic import of flow
@@ -194,12 +194,12 @@ _news_sleep = _t.sleep
 def _news_retry_after(exc, fallback):
     try:
         value = float((exc.headers or {}).get("Retry-After", ""))
-        return value if 0.0 <= value <= 10.0 else fallback
+        return min(value, 10.0) if value >= 0.0 else fallback
     except (TypeError, ValueError, AttributeError):
         return fallback
 
 
-def _relay_page(req, deadline, per_try=10.0):
+def _relay_page(req, deadline, per_try=10.0, what="news"):
     """One relay page (news, index bars), with bounded retries for transport and relay-busy
     failures. Each try waits at most ``per_try`` seconds and never past ``deadline``.
 
@@ -207,12 +207,14 @@ def _relay_page(req, deadline, per_try=10.0):
     caller can record why a wave was sat out; health telemetry never carries raw text.
     """
     last = None
+    attempts = 0
     for attempt in range(1, NEWS_PAGE_ATTEMPTS + 1):
         remaining = deadline - _t.monotonic()
         if remaining <= 0:
             break
         try:
             timeout = max(0.1, min(per_try, remaining))
+            attempts += 1
             with core.urlopen(req, timeout=timeout) as resp:
                 return json.load(resp)
         except urllib.error.HTTPError as exc:
@@ -226,8 +228,12 @@ def _relay_page(req, deadline, per_try=10.0):
         if attempt >= NEWS_PAGE_ATTEMPTS or pause > max(0.0, deadline - _t.monotonic()):
             break
         _news_sleep(pause)
-    err = NewsDataError("news provider request failed")
-    err.detail = {"attempts": attempt, "cause": f"{type(last).__name__}: {str(last)[:160]}"}
+    if last is None:
+        err = NewsDataError(f"{what} budget exhausted")
+        err.detail = {"attempts": attempts, "cause": "no time left for a request"}
+        raise err
+    err = NewsDataError(f"{what} provider request failed")
+    err.detail = {"attempts": attempts, "cause": f"{type(last).__name__}: {str(last)[:160]}"}
     raise err from last
 
 
@@ -516,7 +522,7 @@ def evaluate_market_regime(day, freeze_time="09:38", cards=None,
                 "end": freeze_dt.astimezone(timezone.utc).isoformat(), "feed": "sip", "limit": 1000})
             req = urllib.request.Request(config.INDEX_BARS_URL + "?" + query,
                                          headers=dict(config.RELAY_HEADERS))
-            payload = _relay_page(req, _t.monotonic() + 9.0, per_try=3.0)
+            payload = _relay_page(req, _t.monotonic() + 9.0, per_try=3.0, what="index bars")
             if not isinstance(payload, dict) or not isinstance(payload.get("bars"), dict):
                 raise ValueError("malformed index response")
             bars = payload["bars"]

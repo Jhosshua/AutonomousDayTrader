@@ -1,4 +1,4 @@
-# Copied from ORBStraddle flow.py @06ca29f; logic unchanged; edits:
+# Copied from ORBStraddle flow.py @05d370d; logic unchanged; edits:
 #   1. package-relative import of config
 #   2. package-relative lazy import of scanner
 #   3. `import core` -> ADT shim (orbs/shim.py: now_et)

@@ -1,4 +1,4 @@
-# Copied from ORBStraddle scanner.py @06ca29f; logic unchanged; edits:
+# Copied from ORBStraddle scanner.py @05d370d; logic unchanged; edits:
 #   1. package-relative imports (config, flow, market, orbproc, signals, ticks)
 #   2. ORBS_* tunables come from PARITY_MANIFEST.json (config.getenv), never the process environment
 #   3. `import core` -> ADT shim (status_heartbeat, _ledger, today, _superv_open, _todays)

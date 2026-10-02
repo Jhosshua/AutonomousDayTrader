@@ -1,4 +1,4 @@
-# Copied from ORBStraddle market.py @06ca29f; logic unchanged; edits:
+# Copied from ORBStraddle market.py @05d370d; logic unchanged; edits:
 #   1. package-relative import of config, plus the shim that owns the HTTP transport
 #   2. HTTP goes through shim.urlopen (default urllib.request.urlopen; injectable for replay)
 #   3. package-relative import of ticks

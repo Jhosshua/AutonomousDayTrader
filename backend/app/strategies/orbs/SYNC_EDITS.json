@@ -1,14 +1,14 @@
 {
   "source_repo": "ORBStraddle",
-  "source_commit": "06ca29f",
-  "source_commit_full": "06ca29f8eeed1bbdf3cf9bfe8d35d94086fe3ad6",
-  "note": "Every copied file is ORBStraddle's file at 06ca29f with ONLY these exact text replacements applied (each must match exactly `count` times) and a generated header prepended. scripts/orbs_parity/sync_copy.py regenerates the copies; backend/tests/unit/orbs/test_sync.py fails on any other difference. Pin history: 71b001f (2026-09-28, adaptive-v1.6.0-flow-rules) -> 06ca29f (2026-10-02, adaptive-v1.7.1-deal-rule: deal rule, news/index-bars page retries, SCAN_CONCURRENCY 8).",
+  "source_commit": "05d370d",
+  "source_commit_full": "05d370db09538ea447eb740b3cd52396759b98fc",
+  "note": "Every copied file is ORBStraddle's file at 05d370d with ONLY these exact text replacements applied (each must match exactly `count` times) and a generated header prepended. scripts/orbs_parity/sync_copy.py regenerates the copies; backend/tests/unit/orbs/test_sync.py fails on any other difference. Pin history: 71b001f (2026-09-28, adaptive-v1.6.0-flow-rules) -> 06ca29f (2026-10-02, adaptive-v1.7.1-deal-rule: deal rule, news/index-bars page retries, SCAN_CONCURRENCY 8) -> 05d370d (2026-10-02, attack-review fixes to _relay_page: Retry-After capped at 10 s, `what=` names the failing fetch, attempts count real requests, budget-exhausted branch).",
   "source_sha256": {
     "scanner.py": "c06e91a26e29ad204761a20d8a4184c3adb1a7757c249c73d02404f7f7ec6476",
     "orbproc.py": "0ddde179e033d7bc2903f491054a0d1ba3c0c349c5091e871f9c86da2df06a32",
     "signals.py": "55084a16652d16dd176650d4627b4a168052d844597c574f7f9bfba266f8c627",
     "flow.py": "bcc3c251e235ce1980659e0e139caebdf765618431ea37c3bc6cf1ed00deb9a5",
-    "adaptive.py": "92b2ce22b540434c96855c0407ac86564cd8af66e03105469d8048f59e1a0b26",
+    "adaptive.py": "ad11fe22aa5db8591d3ad8b16c05d20dde8a770c4e471af9e89fcfc14ff88784",
     "market.py": "c2743151645eaf9a711d0c53b673150ef6490cd19878afc76640496cf1c7ab79",
     "ticks.py": "fd8f017eb858d1f2606e334346e5eb12f7c89b5860ecd982c8f0e5692e95dead",
     "session_calendar.py": "009703a11eda22c0d4528376073df853825c16d0158d9a9c5a192dcc93a4c601",

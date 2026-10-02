@@ -1,4 +1,4 @@
-"""ORBStraddle tests/test_news_retry_2026_10_02.py ported to ADT's copy (ORBStraddle @06ca29f).
+"""ORBStraddle tests/test_news_retry_2026_10_02.py ported to ADT's copy (ORBStraddle @05d370d, 11 tests).
 
 2026-10-02: nine ORB robots scan one shared relay at the same minutes, so a single news page can fail for
 a moment. A transient page failure must retry inside the fetch budget, a real failure must still fail
@@ -145,6 +145,7 @@ def test_retries_never_sleep_past_the_budget():
             raise AssertionError("must fail closed")
     assert opened.call_count == 2
     assert clock.slept == [0.5]
+    assert abs(opened.call_args_list[1].kwargs["timeout"] - 0.1) < 1e-9   # the last try is cut to what is left
 
 
 def test_news_failure_is_written_to_the_ledger_with_its_cause():
@@ -244,8 +245,32 @@ def test_persistent_index_bars_failure_sits_the_wave_out_and_is_in_the_ledger():
     assert regime["action"] == "SIT_OUT_CASH"
     assert any("VWAP" in r for r in regime["reasons"])
     assert rows == [{"kind": "indices_unavailable", "day": "2026-10-02",
-                     "why": "news provider request failed",
+                     "why": "index bars provider request failed",
                      "detail": {"attempts": 3, "cause": "OSError: down"}}]
+
+
+def test_retry_after_above_ten_seconds_is_capped_not_discarded():
+    clock = _Clock()
+    with patch.object(core, "urlopen", side_effect=[_busy(429, retry_after=15), _Response({"news": []})]) as opened, \
+         patch.object(adaptive._t, "monotonic", clock.monotonic), \
+         patch.object(adaptive, "_news_sleep", clock.sleep), \
+         patch.object(adaptive, "_record_health"):
+        assert adaptive.fetch_earnings_headlines(["ABC"], FREEZE, budget_s=30) == {}
+    assert opened.call_count == 2 and clock.slept == [10.0]
+
+
+def test_no_time_left_is_reported_as_budget_exhausted_with_zero_requests():
+    clock = _Clock()
+    req = adaptive.urllib.request.Request("https://relay.test/x")
+    with patch.object(core, "urlopen") as opened, \
+         patch.object(adaptive._t, "monotonic", clock.monotonic):
+        try:
+            adaptive._relay_page(req, deadline=clock.now - 1.0)
+        except adaptive.NewsDataError as exc:
+            assert str(exc) == "news budget exhausted" and exc.detail["attempts"] == 0
+        else:
+            raise AssertionError("must fail closed")
+    assert opened.call_count == 0
 
 
 def test_a_replay_miss_is_a_transport_error_the_helper_retries_and_reports():
