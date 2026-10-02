@@ -732,3 +732,6 @@ The completed 2026-09-24 operator-window plan was removed from the active notes 
 ## 2026-10-02 ~14:20 ET: 9aac2f6 DEPLOYED (push main; DAY_ONE_BUILD_REVISION=fd807e23... set with --skip-deploys first)
 - Live: /health 200, /api/orb rules "ORBStraddle adaptive-v1.7.1-deal-rule (@05d370d)", decision process running.
 - Deal rule stays OFF here (operator ruling pending); relay retry helper + 8 scanner threads in. 456 ORB tests.
+
+## 2026-10-02 14:47 ET: b21798c DEPLOYED, deal rule ON (operator ruling 14:45 "why would it not be on? turn it on")
+DAY_ONE_BUILD_REVISION=7c51e646... set with --skip-deploys, then push main. Verify /api/orb rules "..., deal on".
