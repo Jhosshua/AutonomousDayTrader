@@ -1,15 +1,16 @@
 {
   "source": {
     "repo": "ORBStraddle",
-    "commit": "71b001f",
-    "commit_full": "71b001fb2cb4f359eb85efb182795d11c54b9047",
-    "rules_version": "adaptive-v1.6.0-flow-rules",
-    "pinned_at": "2026-09-28",
-    "evidence": "ORBStraddle Railway variables (railway variables --kv, read 2026-09-28) applied to ORBStraddle config.py @71b001f; live /api/state 13:28 ET 09-28 confirms risk_pct 2.0, max_slots 4, day_risk_budget.max_risk_pct 2.5, cutoff 10:15, flatten 11:00. Code defaults are used ONLY where the Railway variable is unset, and each such value is pinned below."
+    "commit": "06ca29f",
+    "commit_full": "06ca29f8eeed1bbdf3cf9bfe8d35d94086fe3ad6",
+    "rules_version": "adaptive-v1.7.1-deal-rule",
+    "pinned_at": "2026-10-02",
+    "evidence": "ORBStraddle Railway variables (railway variables --kv, read 2026-09-28) applied to ORBStraddle config.py @71b001f; live /api/state 13:28 ET 09-28 confirms risk_pct 2.0, max_slots 4, day_risk_budget.max_risk_pct 2.5, cutoff 10:15, flatten 11:00. Code defaults are used ONLY where the Railway variable is unset, and each such value is pinned below. Re-pinned 2026-10-02 to 06ca29f (deal rule v1.7.1, news/index-bars retries, 8 scanner threads): ORBS_DEAL_RULE=on is taken from ORBStraddle MEMORY.md ('Code default OFF; Railway ORBS_DEAL_RULE=on here', 2026-10-01) and docs/DEAL_RULE_AUDIT_2026-10-01.md, NOT from a fresh Railway read; every other variable is unchanged since 09-28."
   },
   "orbstraddle_railway_env": {
     "ORBS_ABSORPTION_EXIT": "on",
     "ORBS_CARD_SOURCE": "file",
+    "ORBS_DEAL_RULE": "on",
     "ORBS_DECIDER": "adaptive",
     "ORBS_DELTA_RULE": "on",
     "ORBS_FREEZE": "09:38",
@@ -21,7 +22,7 @@
     "ORBS_VELOCITY_RULE": "on"
   },
   "effective": {
-    "RULES_VERSION": "adaptive-v1.6.0-flow-rules",
+    "RULES_VERSION": "adaptive-v1.7.1-deal-rule",
     "DECIDER": "adaptive",
     "CARD_SOURCE": "file",
     "FREEZE_ET": "09:38",
@@ -39,6 +40,7 @@
     "VELOCITY_RULE": true,
     "MACRO_RULE": true,
     "ABSORPTION_EXIT": true,
+    "DEAL_RULE": true,
     "DELTA_MIN": 0.05,
     "VELOCITY_BURST_S": 2,
     "VELOCITY_BASE_S": 60,
@@ -119,8 +121,10 @@
       "LAMBDA_TAIL": 0.5,
       "MAX_DAILY_PICKS": 2
     },
-    "scanner": {"DEPTH": 25000.0, "WIN": 100, "Z": 2.0, "REST_MAX_STALE_S": 120, "REST_MIN_TRADES": 5, "REST_MIN_QUOTES": 20},
-    "adaptive.ADAPTIVE_VERSION": "adaptive-v1.6.0-flow-rules"
+    "scanner": {"DEPTH": 25000.0, "WIN": 100, "Z": 2.0, "REST_MAX_STALE_S": 120, "REST_MIN_TRADES": 5, "REST_MIN_QUOTES": 20, "SCAN_CONCURRENCY": 8},
+    "adaptive.ADAPTIVE_VERSION": "adaptive-v1.7.1-deal-rule",
+    "adaptive.NEWS_PAGE_ATTEMPTS": 3,
+    "adaptive.NEWS_RETRIABLE_HTTP": [429, 500, 502, 503, 504]
   },
   "adt": {
     "_note": "ADT-only settings (not ORBStraddle's). exclude_symbols stays empty here for parity; ADT sets TSLA,CDE when it wires the facade.",

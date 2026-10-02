@@ -2,7 +2,7 @@
 session through the record/replay transport. Always a subprocess of record.py / compare.py.
 
 Safety: the source .py files are copied into a fresh temp directory (so state/ files land there, never in
-ORBStraddle), their sha256 must equal the pinned 71b001f hashes, ORBStraddle's .env is NOT copied, no
+ORBStraddle), their sha256 must equal the pinned hashes in SYNC_EDITS.json, ORBStraddle's .env is NOT copied, no
 broker keys are set (config.DRY_RUN=True, core.TRADING_ARMED=False) and no order code is ever called: only
 scanner.prep/run/run_secondary, adaptive.reply_text, core.validate and the candle/flow/macro re-check.
 
@@ -45,7 +45,7 @@ def main():
         with open(os.path.join(code_dir, name), "rb") as f:
             got = hashlib.sha256(f.read()).hexdigest()
         if got != want:
-            raise SystemExit(f"ORBStraddle {name} is not the pinned 71b001f content ({got[:12]} != {want[:12]})")
+            raise SystemExit(f"ORBStraddle {name} is not the pinned content ({got[:12]} != {want[:12]})")
 
     manifest = common.load_manifest()
     for key in list(os.environ):

@@ -15,10 +15,10 @@ MANIFEST = config.load_manifest()
 
 def test_manifest_pins_orbstraddle_live_values():
     eff = MANIFEST["effective"]
-    assert MANIFEST["source"]["commit"] == "71b001f"
-    assert MANIFEST["source"]["rules_version"] == "adaptive-v1.6.0-flow-rules"
-    # live Railway: all four flow rules ON (the code default is OFF), candle rule ON
-    for key in ("DELTA_RULE", "VELOCITY_RULE", "MACRO_RULE", "ABSORPTION_EXIT", "CANDLE_RULE"):
+    assert MANIFEST["source"]["commit"] == "06ca29f"
+    assert MANIFEST["source"]["rules_version"] == "adaptive-v1.7.1-deal-rule"
+    # live Railway: all four flow rules ON (the code default is OFF), candle rule ON, deal rule ON (10-01)
+    for key in ("DELTA_RULE", "VELOCITY_RULE", "MACRO_RULE", "ABSORPTION_EXIT", "CANDLE_RULE", "DEAL_RULE"):
         assert eff[key] is True, key
     assert eff["RISK_PCT"] == 2.0
     assert eff["MAX_DAY_RISK_PCT"] == 2.5
@@ -74,6 +74,9 @@ def test_code_constants_match_manifest():
     assert adaptive.ADAPTIVE_VERSION == consts["adaptive.ADAPTIVE_VERSION"] == MANIFEST["effective"]["RULES_VERSION"]
     for key, value in consts["scanner"].items():
         assert getattr(scanner, key) == value, key
+    assert consts["scanner"]["SCAN_CONCURRENCY"] == 8          # 2026-10-02: nine robots x 8 threads fit the relay
+    assert adaptive.NEWS_PAGE_ATTEMPTS == consts["adaptive.NEWS_PAGE_ATTEMPTS"] == 3
+    assert list(adaptive.NEWS_RETRIABLE_HTTP) == consts["adaptive.NEWS_RETRIABLE_HTTP"]
 
 
 def test_unsupported_long_only_mode_is_refused():

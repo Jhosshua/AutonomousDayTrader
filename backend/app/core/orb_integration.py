@@ -841,7 +841,7 @@ class OrbIntegration:
                 "quantity": qty, "avg_entry_price": round(avg_in, 4),
                 "avg_exit_price": round(avg_out, 4) if avg_out else None, "realized_pnl": pnl, "fees": 0.0,
                 "broker_fees": None, "exit_reason": pos.get("closed_reason") or pos.get("exit_reason"),
-                "aggregate_only": False, "execution_mode": "alpaca_paper", "rules": "ORBStraddle adaptive-v1.6.0-flow-rules",
+                "aggregate_only": False, "execution_mode": "alpaca_paper", "rules": "ORBStraddle adaptive-v1.7.1-deal-rule",
                 "orb": {k: pos.get(k) for k in ("coid", "tier", "wave", "entry_ref", "card_entry", "stop", "initial_stop",
                                                  "target", "rd", "risk_usd", "planned_shares", "peak", "be_locked",
                                                  "exit_reason", "closed_reason", "carried")},
@@ -1329,7 +1329,7 @@ class OrbIntegration:
     def status(self) -> Dict[str, Any]:
         ctl, sched = self.controller, self.scheduler
         out: Dict[str, Any] = {"mode": ctl.mode if ctl else self.mode, "configured_mode": self.configured_mode,
-                               "rules": "ORBStraddle adaptive-v1.6.0-flow-rules (@71b001f)",
+                               "rules": "ORBStraddle adaptive-v1.7.1-deal-rule (@06ca29f)",
                                "exclude_symbols": list(self.r.settings.ORB_EXCLUDE_SYMBOLS),
                                "expected_account": self.r.settings.ORB_EXPECTED_ACCOUNT,
                                "init_error": self.init_error, "errors": self.current_errors(),

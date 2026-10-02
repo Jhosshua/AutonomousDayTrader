@@ -14,7 +14,8 @@ from typing import Dict, List, Optional, Tuple
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 EDITS_PATH = os.path.join(PKG_DIR, "SYNC_EDITS.json")
 HEADER_END = "# --- end of ADT copy header ---\n"
-COPIED_FILES = ("ticks.py", "signals.py", "orbproc.py", "flow.py", "market.py", "scanner.py", "adaptive.py")
+COPIED_FILES = ("ticks.py", "signals.py", "orbproc.py", "flow.py", "market.py", "scanner.py", "adaptive.py",
+                "session_calendar.py")
 DEFAULT_SOURCE_DIR = "/Users/mo/ORBStraddle"
 
 

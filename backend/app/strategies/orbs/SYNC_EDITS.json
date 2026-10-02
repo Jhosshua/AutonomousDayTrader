@@ -1,18 +1,19 @@
 {
   "source_repo": "ORBStraddle",
-  "source_commit": "71b001f",
-  "source_commit_full": "71b001fb2cb4f359eb85efb182795d11c54b9047",
-  "note": "Every copied file is ORBStraddle's file at 71b001f with ONLY these exact text replacements applied (each must match exactly `count` times) and a generated header prepended. scripts/orbs_parity/sync_copy.py regenerates the copies; backend/tests/unit/orbs/test_sync.py fails on any other difference.",
+  "source_commit": "06ca29f",
+  "source_commit_full": "06ca29f8eeed1bbdf3cf9bfe8d35d94086fe3ad6",
+  "note": "Every copied file is ORBStraddle's file at 06ca29f with ONLY these exact text replacements applied (each must match exactly `count` times) and a generated header prepended. scripts/orbs_parity/sync_copy.py regenerates the copies; backend/tests/unit/orbs/test_sync.py fails on any other difference. Pin history: 71b001f (2026-09-28, adaptive-v1.6.0-flow-rules) -> 06ca29f (2026-10-02, adaptive-v1.7.1-deal-rule: deal rule, news/index-bars page retries, SCAN_CONCURRENCY 8).",
   "source_sha256": {
-    "scanner.py": "777c0102d54f6b14c634b4f05dcd99961b3b33d99d8b2a102256a948acbb4905",
+    "scanner.py": "c06e91a26e29ad204761a20d8a4184c3adb1a7757c249c73d02404f7f7ec6476",
     "orbproc.py": "0ddde179e033d7bc2903f491054a0d1ba3c0c349c5091e871f9c86da2df06a32",
     "signals.py": "55084a16652d16dd176650d4627b4a168052d844597c574f7f9bfba266f8c627",
     "flow.py": "bcc3c251e235ce1980659e0e139caebdf765618431ea37c3bc6cf1ed00deb9a5",
-    "adaptive.py": "008489d593a899e7e79157c1f25f27b60fbab96397b82c9c99927a11b9abded7",
+    "adaptive.py": "92b2ce22b540434c96855c0407ac86564cd8af66e03105469d8048f59e1a0b26",
     "market.py": "c2743151645eaf9a711d0c53b673150ef6490cd19878afc76640496cf1c7ab79",
     "ticks.py": "fd8f017eb858d1f2606e334346e5eb12f7c89b5860ecd982c8f0e5692e95dead",
+    "session_calendar.py": "009703a11eda22c0d4528376073df853825c16d0158d9a9c5a192dcc93a4c601",
     "core.py": "56abe7d1cd55f278d5e8715ce8a61fbff4b9c39f7dd68e2e15ec333581d47432",
-    "config.py": "8f928d9746916c5a1e43de45887075b58b2208329bfc3043d2e4d254940f2ed8"
+    "config.py": "846f1d4f3b77b67b277789de033652c152e488825b0a466134eea221c611b7dc"
   },
   "files": {
     "ticks.py": [],
@@ -55,7 +56,17 @@
       {"why": "ORBS_* tunables come from PARITY_MANIFEST.json (config.getenv), never the process environment", "count": 8,
        "old": "os.environ.get(\"ORBS_", "new": "config.getenv(\"ORBS_"},
       {"why": "`import core` -> ADT shim (status_heartbeat, _ledger, today, _superv_open, _todays)", "count": 3,
-       "old": "import core\n", "new": "from . import shim as core\n"}
+       "old": "import core\n", "new": "from . import shim as core\n"},
+      {"why": "package-relative lazy import of session_calendar (deal rule prior-close evidence)", "count": 1,
+       "old": "    import session_calendar\n", "new": "    from . import session_calendar\n"}
+    ],
+    "session_calendar.py": [
+      {"why": "package-relative import of config, plus the shim that owns the HTTP transport", "count": 1,
+       "old": "\nimport config\n", "new": "\nfrom . import config\nfrom . import shim\n"},
+      {"why": "HTTP goes through shim.urlopen (default urllib.request.urlopen; injectable for replay)", "count": 1,
+       "old": "urllib.request.urlopen(", "new": "shim.urlopen("},
+      {"why": "calendar and prior-close files live in config.STATE (ADT's facade sets the state dir; ORBStraddle derives ROOT/state)", "count": 2,
+       "old": "Path(config.ROOT) / \"state\" /", "new": "Path(config.STATE) /"}
     ],
     "adaptive.py": [
       {"why": "package-relative imports; `core` -> ADT shim (today, now_et, _valid_card, long_only, urlopen)", "count": 1,
@@ -64,8 +75,10 @@
        "old": "import flow\n", "new": "from . import flow\n"},
       {"why": "package-relative dynamic import of flow", "count": 1,
        "old": "__import__(\"flow\")", "new": "__import__(__package__ + \".flow\", fromlist=[\"flow_refusal\"])"},
-      {"why": "HTTP goes through shim.urlopen (default urllib.request.urlopen; injectable for replay)", "count": 2,
+      {"why": "HTTP goes through shim.urlopen (default urllib.request.urlopen; injectable for replay): _relay_page (news + index bars, retried) and fetch_deal_headlines", "count": 2,
        "old": "urllib.request.urlopen(", "new": "core.urlopen("},
+      {"why": "package-relative lazy import of session_calendar (deal rule prior-close evidence)", "count": 1,
+       "old": "    import session_calendar\n", "new": "    from . import session_calendar\n"},
       {"why": "ADT exclude_symbols: excluded names stay on the board (regime unchanged) but leave the eligible pool before pick 1 / pick 2; empty set = original behaviour", "count": 1,
        "old": "                and c[\"utility\"][\"p_win\"] >= ADAPTIVE_CONFIG[\"MIN_WIN_PROB\"] and c[\"utility\"][\"utility\"] > 0]\n",
        "new": "                and c[\"utility\"][\"p_win\"] >= ADAPTIVE_CONFIG[\"MIN_WIN_PROB\"] and c[\"utility\"][\"utility\"] > 0]\n    # ADT edit: exclude_symbols leave the pick pool here, after the board and the regime were judged, so the\n    # next eligible candidate is promoted to pick 1 / pick 2. An empty set is the exact ORBStraddle behaviour.\n    excluded_syms = {str(s).upper() for s in (getattr(config, \"EXCLUDE_SYMBOLS\", ()) or ())}\n    if excluded_syms:\n        eligible = [c for c in eligible if c[\"symbol\"] not in excluded_syms]\n"},

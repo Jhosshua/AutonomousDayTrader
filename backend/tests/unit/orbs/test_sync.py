@@ -1,4 +1,4 @@
-"""Sync check: the copied modules are ORBStraddle@71b001f plus ONLY the edits listed in SYNC_EDITS.json.
+"""Sync check: the copied modules are ORBStraddle@06ca29f plus ONLY the edits listed in SYNC_EDITS.json.
 
 With the ORBStraddle checkout present (the operator's Mac) this fails when ORBStraddle's files drift from
 the pinned commit (re-sync needed) or when a copy differs from original + documented edits. Without it
@@ -41,9 +41,9 @@ def test_copies_never_import_orbstraddle_top_level_modules():
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     assert alias.name not in ("config", "core", "scanner", "flow", "adaptive", "signals", "market",
-                                              "orbproc", "ticks", "orders", "auditor"), (name, alias.name)
+                                              "orbproc", "ticks", "orders", "auditor", "session_calendar"), (name, alias.name)
             if isinstance(node, ast.ImportFrom) and node.level == 0:
-                assert node.module not in ("ticks", "config", "core"), (name, node.module)
+                assert node.module not in ("ticks", "config", "core", "session_calendar"), (name, node.module)
 
 
 @pytest.mark.skipif(not HAVE_SOURCE, reason="ORBStraddle checkout not available")

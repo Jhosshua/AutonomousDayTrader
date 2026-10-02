@@ -1,4 +1,4 @@
-"""Run ORBStraddle's ORIGINAL decision code (/Users/mo/ORBStraddle @71b001f, hash-checked, copied to a temp
+"""Run ORBStraddle's ORIGINAL decision code (/Users/mo/ORBStraddle at the SYNC_EDITS.json pin, hash-checked, copied to a temp
 dir, no keys, no order code) on the EXACT boards ADT decided in a dry run, at ADT's decision times.
 
     python scripts/orb_dry_run/orig_decide.py --date 2026-09-28 --result DIR/result.json --out DIR/orig_decisions.json
@@ -50,7 +50,7 @@ def main():
     for name, want in pins.items():
         with open(os.path.join(code_dir, name), "rb") as f:
             if hashlib.sha256(f.read()).hexdigest() != want:
-                raise SystemExit(f"ORBStraddle {name} is not the pinned 71b001f content")
+                raise SystemExit(f"ORBStraddle {name} is not the pinned content")
     manifest = pc.load_manifest()
     for key in list(os.environ):
         if key.startswith(("ORBS_", "ALPACA_", "APCA_")) or key in ("JSL_KILL", "THESIS_STATE_URL", "RELAY_TOKEN"):
