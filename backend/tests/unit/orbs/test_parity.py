@@ -16,8 +16,20 @@ import sys
 
 import pytest
 
+from backend.app.strategies.orbs import shim
 from backend.tests.unit.orbs._helpers import (ORBSTRADDLE_DIR, PARITY_DIR, SYNTH_DAY, load_golden, parity_modules,
                                                unpack_fixture)
+
+# 2026-10-02: adaptive._relay_page retries a failed page 3 times and then records news_unavailable /
+# indices_unavailable in the ledger. In a replay, a ReplayMiss inside that helper would be swallowed the
+# same way (a sat-out decision that still "matches" if the golden sat out too), so a parity run must end
+# with none of these rows: every news and index-bars page the copy asked for was served.
+FETCH_FAILURE_KINDS = ("news_unavailable", "indices_unavailable")
+
+
+def _assert_no_fetch_failures_in_ledger():
+    rows = [dict(r) for r in shim.LEDGER_ROWS if r.get("kind") in FETCH_FAILURE_KINDS]
+    assert rows == [], f"the copy recorded fetch failures during the replay: {rows[:5]}"
 
 
 @pytest.fixture(scope="module")
@@ -36,11 +48,13 @@ def _with_root(common, root):
 def test_copy_matches_original_golden_on_synthetic_session(synthetic_root):
     common, copy_runner, compare = parity_modules()
     old = _with_root(common, synthetic_root)
+    shim.LEDGER_ROWS.clear()
     try:
         golden = load_golden(os.path.join(synthetic_root, SYNTH_DAY))
         result = copy_runner.run_copy(SYNTH_DAY, log=lambda m: None)
     finally:
         common.CACHE_ROOT = old
+    _assert_no_fetch_failures_in_ledger()
     report = compare.parity(golden, result)
     bad = [s for s in report["steps"] if not s["equal"]]
     assert report["equal"], json.dumps({"sections": report["sections"], "steps": bad[:3],
@@ -59,7 +73,7 @@ def test_original_still_reproduces_the_golden_output(synthetic_root, tmp_path):
     env = {k: v for k, v in os.environ.items() if not k.startswith(("ORBS_", "ALPACA_"))}
     env["ADT_PARITY_CACHE_ROOT"] = synthetic_root
     subprocess.run([sys.executable, os.path.join(PARITY_DIR, "orig_runner.py"), "--date", SYNTH_DAY, "--mode",
-                    "replay", "--out", str(out)], env=env, check=True, capture_output=True)
+                    "replay", "--out", str(out), "--src", ORBSTRADDLE_DIR], env=env, check=True, capture_output=True)
     with open(out) as f:
         rerun = json.load(f)
     golden = load_golden(os.path.join(synthetic_root, SYNTH_DAY))
@@ -86,7 +100,9 @@ def test_copy_matches_original_on_recorded_session_primary(day):
     ddir = common.day_dir(day)
     with open(os.path.join(ddir, "replay_original.json")) as f:
         orig = json.load(f)
+    shim.LEDGER_ROWS.clear()
     result = copy_runner.run_copy(day, log=lambda m: None, max_steps=2)       # preview + primary + decision
+    _assert_no_fetch_failures_in_ledger()
     orig["steps"] = orig["steps"][:2]
     report = compare.parity(orig, result)
     assert report["equal"], json.dumps({"sections": report["sections"], "steps": report["steps"]},

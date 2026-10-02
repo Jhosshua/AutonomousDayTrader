@@ -10,7 +10,10 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..",
 PARITY_DIR = os.path.join(REPO, "scripts", "orbs_parity")
 FIXTURE_TGZ = os.path.join(os.path.dirname(__file__), "fixtures", "parity_synthetic_2031-03-04.tar.gz")
 SYNTH_DAY = "2031-03-04"
-ORBSTRADDLE_DIR = "/Users/mo/ORBStraddle"
+# The ORBStraddle source the pinned-commit checks read. ADT_ORBSTRADDLE_DIR may point at a clean export of the
+# pinned commit (`git -C /Users/mo/ORBStraddle archive <pin> | tar -x -C <dir>`) when the live checkout has
+# moved past the pin; the default is the operator's checkout, so drift past the pin is visible by default.
+ORBSTRADDLE_DIR = os.environ.get("ADT_ORBSTRADDLE_DIR") or "/Users/mo/ORBStraddle"
 
 
 def parity_modules():

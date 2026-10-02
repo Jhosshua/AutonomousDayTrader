@@ -17,9 +17,13 @@ def test_manifest_pins_orbstraddle_live_values():
     eff = MANIFEST["effective"]
     assert MANIFEST["source"]["commit"] == "06ca29f"
     assert MANIFEST["source"]["rules_version"] == "adaptive-v1.7.1-deal-rule"
-    # live Railway: all four flow rules ON (the code default is OFF), candle rule ON, deal rule ON (10-01)
-    for key in ("DELTA_RULE", "VELOCITY_RULE", "MACRO_RULE", "ABSORPTION_EXIT", "CANDLE_RULE", "DEAL_RULE"):
+    # live Railway: all four flow rules ON (the code default is OFF), candle rule ON
+    for key in ("DELTA_RULE", "VELOCITY_RULE", "MACRO_RULE", "ABSORPTION_EXIT", "CANDLE_RULE"):
         assert eff[key] is True, key
+    # Deal rule (ORBStraddle v1.7.1): operator ruling pending, so ADT pins the CODE DEFAULT (off), not
+    # ORBStraddle's live 'on'. The env key must be absent (unset -> _on_off default), never "on".
+    assert eff["DEAL_RULE"] is False
+    assert "ORBS_DEAL_RULE" not in MANIFEST["orbstraddle_railway_env"]
     assert eff["RISK_PCT"] == 2.0
     assert eff["MAX_DAY_RISK_PCT"] == 2.5
     assert eff["MAX_OPEN_SLOTS"] == 4 and eff["MAX_PICKS"] == 4
@@ -45,6 +49,20 @@ def test_copy_effective_config_equals_manifest():
     config.apply_manifest(MANIFEST)
     assert config.effective() == MANIFEST["effective"]
     assert config.EXCLUDE_SYMBOLS == frozenset()
+    assert config.DEAL_RULE is False
+
+
+def test_deal_rule_is_off_at_runtime_in_a_fresh_process():
+    """What the copied adaptive.select_adaptive reads as config.DEAL_RULE when ADT imports the package
+    cold (no test-time apply_manifest, no ORBS_* environment): the manifest's pinned value, False."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("ORBS_")}
+    env["ORBS_DEAL_RULE"] = "on"                # the process environment must not be able to switch it on
+    code = ("from backend.app.strategies.orbs import config, adaptive; "
+            "print(repr(config.DEAL_RULE), repr(adaptive.config.DEAL_RULE), config.RULES_VERSION)")
+    repo = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+    out = subprocess.run([sys.executable, "-c", code], cwd=repo, env=env, capture_output=True, text=True,
+                         check=True).stdout.split()
+    assert out == ["False", "False", "adaptive-v1.7.1-deal-rule"]
 
 
 def test_scanner_tunables_come_from_manifest():

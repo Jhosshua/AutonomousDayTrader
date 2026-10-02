@@ -5,12 +5,11 @@
     "commit_full": "06ca29f8eeed1bbdf3cf9bfe8d35d94086fe3ad6",
     "rules_version": "adaptive-v1.7.1-deal-rule",
     "pinned_at": "2026-10-02",
-    "evidence": "ORBStraddle Railway variables (railway variables --kv, read 2026-09-28) applied to ORBStraddle config.py @71b001f; live /api/state 13:28 ET 09-28 confirms risk_pct 2.0, max_slots 4, day_risk_budget.max_risk_pct 2.5, cutoff 10:15, flatten 11:00. Code defaults are used ONLY where the Railway variable is unset, and each such value is pinned below. Re-pinned 2026-10-02 to 06ca29f (deal rule v1.7.1, news/index-bars retries, 8 scanner threads): ORBS_DEAL_RULE=on is taken from ORBStraddle MEMORY.md ('Code default OFF; Railway ORBS_DEAL_RULE=on here', 2026-10-01) and docs/DEAL_RULE_AUDIT_2026-10-01.md, NOT from a fresh Railway read; every other variable is unchanged since 09-28."
+    "evidence": "ORBStraddle Railway variables (railway variables --kv, read 2026-09-28) applied to ORBStraddle config.py @71b001f; live /api/state 13:28 ET 09-28 confirms risk_pct 2.0, max_slots 4, day_risk_budget.max_risk_pct 2.5, cutoff 10:15, flatten 11:00. Code defaults are used ONLY where the Railway variable is unset, and each such value is pinned below. Re-pinned 2026-10-02 to 06ca29f (deal rule v1.7.1, news/index-bars retries, 8 scanner threads). DEAL_RULE: operator ruling pending; code default off (ORBStraddle config.py DEAL_RULE default, _on_off -> 'off' when ORBS_DEAL_RULE is unset), so ORBS_DEAL_RULE is deliberately ABSENT from orbstraddle_railway_env here even though ORBStraddle's own Railway service runs it on (its MEMORY.md, 2026-10-01). This is the one place ADT's copy knowingly differs from ORBStraddle live. Every other variable is unchanged since 09-28."
   },
   "orbstraddle_railway_env": {
     "ORBS_ABSORPTION_EXIT": "on",
     "ORBS_CARD_SOURCE": "file",
-    "ORBS_DEAL_RULE": "on",
     "ORBS_DECIDER": "adaptive",
     "ORBS_DELTA_RULE": "on",
     "ORBS_FREEZE": "09:38",
@@ -40,7 +39,7 @@
     "VELOCITY_RULE": true,
     "MACRO_RULE": true,
     "ABSORPTION_EXIT": true,
-    "DEAL_RULE": true,
+    "DEAL_RULE": false,
     "DELTA_MIN": 0.05,
     "VELOCITY_BURST_S": 2,
     "VELOCITY_BASE_S": 60,

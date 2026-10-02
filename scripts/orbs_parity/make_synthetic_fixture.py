@@ -35,6 +35,8 @@ def main():
         out = os.path.join(ddir, "golden_original.json")
         cmd = [sys.executable, os.path.join(HERE, "orig_runner.py"), "--date", synthetic.DAY, "--mode", "record",
                "--out", out]
+        if os.environ.get("ADT_ORBSTRADDLE_DIR"):      # a clean export of the pinned commit (see tests/_helpers.py)
+            cmd += ["--src", os.environ["ADT_ORBSTRADDLE_DIR"]]
         if subprocess.run(cmd, env=dict(os.environ)).returncode:
             raise SystemExit("original run failed")
         os.makedirs(os.path.dirname(FIXTURE), exist_ok=True)
