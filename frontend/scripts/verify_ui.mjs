@@ -30,10 +30,9 @@ const requiredFiles = [
   "components/StrategyTable.tsx",
   "components/HoldingNow.tsx",
   "components/MarketMoodCard.tsx",
-  "components/RecentTrades.tsx",
+  "components/ResultsPanel.tsx",
   "components/SafetyCard.tsx",
   "components/ExecutionLog.tsx",
-  "components/TradeHistory.tsx",
   "components/SwingTelemetryBar.tsx",
   "components/SwingCandidateWatchlist.tsx",
   "components/ActiveSwingPositionsTable.tsx",
@@ -54,6 +53,8 @@ const deletedFiles = [
   "components/LiveChart.tsx",
   "components/ManualControls.tsx",
   "components/StrategyCarousel.tsx", // replaced by StrategyTable (2026-09-29 compact dashboard)
+  "components/RecentTrades.tsx", // replaced by ResultsPanel (2026-10-04 bright dashboard)
+  "components/TradeHistory.tsx", // the history drawer is now the always-visible Results panel
 ];
 for (const file of deletedFiles) {
   assert(!fs.existsSync(path.join(FRONTEND_DIR, file)), `Old dark-theme component should be deleted: ${file}`);
@@ -130,6 +131,13 @@ const testidLocations = {
   "swing-schedule": "components/SwingTelemetryBar.tsx",
   "active-swing-positions": "components/ActiveSwingPositionsTable.tsx",
   "market-mood": "components/MarketMoodCard.tsx",
+  // 2026-10-04 bright dashboard: Results replaces the "What it did today" list and the history drawer
+  "results-panel": "components/ResultsPanel.tsx",
+  "results-tab-day": "components/ResultsPanel.tsx",
+  "results-tab-playbook": "components/ResultsPanel.tsx",
+  "results-group": "components/ResultsPanel.tsx",
+  "results-trade": "components/ResultsPanel.tsx",
+  "trade-detail": "components/ResultsPanel.tsx",
   // 2026-09-29 compact dashboard: playbooks are rows in one table
   "strategy-table": "components/StrategyTable.tsx",
   "strategy-row-toggle": "components/StrategyCard.tsx",
@@ -140,7 +148,8 @@ const testidLocations = {
 };
 for (const [testid, file] of Object.entries(testidLocations)) {
   const content = fs.readFileSync(path.join(FRONTEND_DIR, file), "utf8");
-  assert(content.includes(`data-testid="${testid}"`), `Missing data-testid="${testid}" in ${file}`);
+  // a testid is either a literal attribute or a `testid: "..."` entry that a component maps into the attribute
+  assert(content.includes(`data-testid="${testid}"`) || content.includes(`testid: "${testid}"`), `Missing data-testid="${testid}" in ${file}`);
 }
 console.log("  ✅ Verified all required data-testids are present on their new elements");
 

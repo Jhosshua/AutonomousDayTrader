@@ -145,6 +145,17 @@ a:hover {
   transform-origin: left center;
   animation: grow 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.4s both;
 }
+.grow-l {
+  transform-origin: left center;
+  animation: grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.4s both;
+}
+.grow-r {
+  transform-origin: right center;
+  animation: grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.4s both;
+}
+.open-in {
+  animation: fadein 0.2s ease both;
+}
 .breathe {
   animation: breathe 2.4s ease-in-out infinite;
 }
@@ -168,6 +179,9 @@ a:hover {
   .draw,
   .ping2,
   .grow,
+  .grow-l,
+  .grow-r,
+  .open-in,
   .breathe,
   .fadein,
   .bob {

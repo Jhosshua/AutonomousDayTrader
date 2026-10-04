@@ -66,20 +66,35 @@ LIVE_TRADES = [
     base.make_trade(2, "MSFT", "SHORT", "mean_reversion", -50.04, 14, 33, session_date="2026-09-29"),
 ]
 
+def redate(items: List[Dict[str, Any]], day: str = "2026-09-29") -> List[Dict[str, Any]]:
+    """The busy fixtures' trades are dated 2026-09-24; this harness's clock says 09-29, so they are 'today' only once
+    their dates say so (Results groups by session_date). Times of day are unchanged."""
+    out = []
+    for t in items:
+        t = dict(t)
+        t["session_date"] = day
+        for k in ("opened_at", "closed_at"):
+            t[k] = day + t[k][10:]
+        out.append(t)
+    return out
+
+
+BUSY_TRADES = redate(base.BUSY_TODAY_TRADES)
+
 # frame name -> (fixture path, finished trades the /api/trades mock returns)
 FRAMES: Dict[str, Tuple[Path, List[Dict[str, Any]]]] = {
     "idle": (MOOD_FIX / "idle.json", []),
     "live": (COMPACT_FIX / "live.json", LIVE_TRADES),
     "live_one": (COMPACT_FIX / "live_one.json", LIVE_TRADES),
-    "busy": (MOOD_FIX / "busy.json", base.BUSY_TODAY_TRADES),
+    "busy": (MOOD_FIX / "busy.json", BUSY_TRADES),
     "alarms": (COMPACT_FIX / "alarms.json", LIVE_TRADES),
     "branches": (COMPACT_FIX / "branches.json", LIVE_TRADES),
     "branches_confirmed": (COMPACT_FIX / "branches_confirmed.json", LIVE_TRADES),
     "waiting": (MOOD_FIX / "waiting.json", []),
     "weekend": (MOOD_FIX / "weekend.json", []),
     "stale_vix": (MOOD_FIX / "stale_vix.json", []),
-    "sized_down": (MOOD_FIX / "sized_down.json", base.BUSY_TODAY_TRADES),
-    "pre_release_and_unlinked": (MOOD_FIX / "pre_release_and_unlinked.json", base.BUSY_TODAY_TRADES),
+    "sized_down": (MOOD_FIX / "sized_down.json", BUSY_TRADES),
+    "pre_release_and_unlinked": (MOOD_FIX / "pre_release_and_unlinked.json", BUSY_TRADES),
 }
 PRO_FRAMES = ("live", "branches")
 
@@ -102,7 +117,16 @@ SHARED_ONCE: Dict[str, str] = {
     "4 PM": "one shared hours axis above the playbook rows replaces one axis per card",
 }
 # Old-page text allowed to be missing entirely, each with its reason (empty on purpose).
-ALLOWED_MISSING: Dict[str, str] = {}
+ALLOWED_MISSING: Dict[str, str] = {
+    "What it did today": "the section is now 'Results'; today is its first group (PLAN_2026_10_04 section 6)",
+    "Trade history": "the history drawer button is gone: history is the always-visible Results panel",
+    "No finished trades today. Your previous days are saved in Trade history.": "now 'No finished trades today.' inside Results, nothing is saved 'in' a drawer any more",
+    "Loading today's trades…": "now 'Loading results…'",
+    "Couldn't load today's trades": "now the muted line 'Couldn't refresh results. Showing the last ones loaded.' (never red)",
+    # The drawer-only texts of PLAN section 6 / 11.4 (range buttons, Balance/Result/Trades/Fees tiles, "Load older trades",
+    # "No finished trades on this day.", "More trades from this day ...") are NOT listed: the old drawer was closed in every
+    # parity frame, so none of them is in the old node list, and listing common words like "Result" would only blind the check.
+}
 
 MIN_OLD_NODES = 40
 

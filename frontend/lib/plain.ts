@@ -919,3 +919,24 @@ export function overnightHoldingSentence(count: number, saleDate: string | null,
   const day = dayLabel(saleDate);
   return `Holding ${what} until the 9:30 AM open${day ? ` on ${day}` : ""}.`;
 }
+
+/** The Balance card's all-time line, from the full ledger. Null until it has loaded, and when it failed: a line the
+ * page cannot back up is left out, never guessed. "Since start" is the account's growth (current minus opening
+ * equity); "last trading day" is the newest earlier day that has trades. */
+export function ledgerHistoryLine(
+  ledger: {
+    summary: { current_equity: number; opening_equity: number } | null;
+    sessions: { session_date: string; realized_pnl: number; trades_count: number }[];
+    error: string | null;
+  },
+  today: string
+): { sinceStart: number; lastDay: { pnl: number; label: string } | null } | null {
+  if (ledger.error || !ledger.summary) return null;
+  const last = [...ledger.sessions]
+    .filter((x) => x.session_date < today && x.trades_count > 0)
+    .sort((a, b) => (a.session_date < b.session_date ? 1 : -1))[0];
+  return {
+    sinceStart: Math.round((ledger.summary.current_equity - ledger.summary.opening_equity) * 100) / 100,
+    lastDay: last ? { pnl: last.realized_pnl, label: dayLabel(last.session_date) } : null,
+  };
+}

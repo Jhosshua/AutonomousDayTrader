@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { useTradingStream } from "@/hooks/useTradingStream";
-import { useTodayLedger } from "@/hooks/useTodayLedger";
+import { useLedger, useTodayLedger } from "@/hooks/useTodayLedger";
 import { useHealthLimits } from "@/hooks/useHealthLimits";
 import Header, { useProWordsToggle } from "@/components/Header";
 import SegmentedModeToggle, { TradingMode } from "@/components/SegmentedModeToggle";
@@ -12,12 +12,11 @@ import RightNowCard from "@/components/RightNowCard";
 import StrategyTable from "@/components/StrategyTable";
 import HoldingNow from "@/components/HoldingNow";
 import MarketMoodCard from "@/components/MarketMoodCard";
-import RecentTrades from "@/components/RecentTrades";
+import ResultsPanel from "@/components/ResultsPanel";
 import SafetyCard from "@/components/SafetyCard";
 import SwingTelemetryBar from "@/components/SwingTelemetryBar";
 import SwingCandidateWatchlist from "@/components/SwingCandidateWatchlist";
 import ActiveSwingPositionsTable from "@/components/ActiveSwingPositionsTable";
-import TradeHistory from "@/components/TradeHistory";
 import ExecutionLog from "@/components/ExecutionLog";
 import OvernightHolds, { HoldView } from "@/components/OvernightHolds";
 import { AlertTriangle, WifiOff } from "lucide-react";
@@ -28,6 +27,7 @@ import {
   etMinutesOfDay,
   etParts,
   groupLedgerByStrategy,
+  ledgerHistoryLine,
   isOvernightPosition,
   joinNames,
   noBuyDisabledReason,
@@ -55,9 +55,10 @@ export default function Home() {
 
   const [showPro, setShowPro] = useProWordsToggle();
   const [mode, setMode] = useState<TradingMode>("intraday");
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const todayLedger = useTodayLedger(state.ledger_revision, isConnected);
+  // every day and every trade since the start: the Results panel and the Balance card's "Since start" line
+  const allLedger = useLedger("all", state.ledger_revision, isConnected);
   const healthLimits = useHealthLimits();
 
   // F4: recovered aggregate sessions add their strategy aggregates to the per-strategy totals
@@ -278,6 +279,7 @@ export default function Home() {
             todayTrades={todayLedger.items}
             loading={todayLedger.loading && todayLedger.items.length === 0}
             overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
+            history={ledgerHistoryLine(allLedger, todayEt)}
           />
           <RightNowCard
             sentence={heroSentence}
@@ -316,12 +318,6 @@ export default function Home() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-3">
-              <RecentTrades
-                items={todayLedger.items}
-                loading={todayLedger.loading}
-                error={todayLedger.error}
-                onSeeAll={() => setHistoryOpen(true)}
-              />
               <SafetyCard
                 drawdownDollars={state.account.risk_drawdown ?? state.account.daily_drawdown}
                 maxDailyLossDollars={healthLimits.maxDailyLossDollars}
@@ -340,6 +336,7 @@ export default function Home() {
                     : null
                 }
               />
+              <ResultsPanel ledger={allLedger} today={todayEt} streamPersistence={state.persistence} />
             </div>
           </div>
         ) : (
@@ -357,13 +354,6 @@ export default function Home() {
 
         {showPro && <ExecutionLog records={state.recent_activity} maxItems={20} />}
       </div>
-
-      <TradeHistory
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        ledgerRevision={state.ledger_revision}
-        streamPersistence={state.persistence}
-      />
     </main>
   );
 }

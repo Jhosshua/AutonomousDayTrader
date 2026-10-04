@@ -358,8 +358,26 @@ def trades_summary(items: List[Dict[str, Any]], opening_equity: float = 50000.0,
     }
 
 
+def derive_sessions(items: List[Dict[str, Any]], recovered: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    """What the real /api/trades sends as "sessions": one summary per day (the recovered aggregate days as they are,
+    every other day built from its trades), newest first. The Results panel reads its day totals from here."""
+    sessions = list(recovered or [])
+    known = {x["session_date"] for x in sessions}
+    by_day: Dict[str, List[Dict[str, Any]]] = {}
+    for t in items:
+        by_day.setdefault(t["session_date"], []).append(t)
+    for day, ts in by_day.items():
+        if day in known:
+            continue
+        pnl = round(sum(t["realized_pnl"] for t in ts), 2)
+        sessions.append({"session_date": day, "opening_equity": 50000.0, "closing_equity": round(50000.0 + pnl, 2),
+                         "realized_pnl": pnl, "trades_count": len(ts), "fees": round(sum(t["fees"] for t in ts), 2),
+                         "source": "ledger", "aggregate_only": False})
+    return sorted(sessions, key=lambda x: x["session_date"], reverse=True)
+
+
 def trades_response(items: List[Dict[str, Any]], recovered: Optional[List[Dict[str, Any]]] = None,
-                     next_cursor: Optional[str] = None) -> Dict[str, Any]:
+                     next_cursor: Optional[str] = None, sessions_from: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     return {
         "as_of": "2026-09-24T17:10:58Z",
         "timezone": "America/New_York",
@@ -367,9 +385,10 @@ def trades_response(items: List[Dict[str, Any]], recovered: Optional[List[Dict[s
         "summary": trades_summary(items),
         "items": items,
         "recovered_sessions": recovered or [],
-        # The real /api/trades also sends every session summary as "sessions" (backend/app/main.py), and the
-        # history drawer reads "sessions" first; mirror it so the drawer is tested on the production shape.
-        "sessions": recovered or [],
+        # The real /api/trades also sends every session summary as "sessions" (backend/app/main.py), complete on every
+        # page. The Results panel reads its day totals from it; mirror it so the panel is tested on the production
+        # shape (2026-10-04: this used to be just the recovered days, "sessions": []).
+        "sessions": derive_sessions(sessions_from if sessions_from is not None else items, recovered),
         "next_cursor": next_cursor,
     }
 
@@ -418,7 +437,8 @@ def install_mocks(page: Page, ws_payload: Dict[str, Any], trades_items: List[Dic
             page_idx = int(cursor) if cursor else 0
             page_items = trades_pages[page_idx] if page_idx < len(trades_pages) else []
             next_cursor = str(page_idx + 1) if page_idx + 1 < len(trades_pages) else None
-            body = trades_response(page_items, recovered=recovered if page_idx == 0 else None, next_cursor=next_cursor)
+            body = trades_response(page_items, recovered=recovered if page_idx == 0 else None, next_cursor=next_cursor,
+                                   sessions_from=[t for pg in trades_pages for t in pg])
         else:
             items = trades_items if rng in ("today", "7d", "all") else []
             body = trades_response(items, recovered=recovered)
@@ -662,7 +682,8 @@ def run_reduced_motion_check(browser) -> None:
 
 
 def run_pagination_check(browser) -> None:
-    """>100 trades: /api/trades drains next_cursor and 'Load older trades' grows the list."""
+    """>100 trades: the all-time ledger drains next_cursor (both pages are loaded), Results shows the newest day's
+    first six trades and 'Show all N' reveals the rest."""
     payload = idle_payload()
     dispatched: List[Dict[str, Any]] = []
     page1 = [make_trade(i, "AAPL", "LONG", "vwap_pullback", 1.0, 9, i % 60, session_date="2026-09-18") for i in range(100)]
@@ -672,18 +693,19 @@ def run_pagination_check(browser) -> None:
     install_mocks(page, payload, [], dispatched, trades_pages=[page1, page2])
     page.goto(BASE_URL, wait_until="networkidle", timeout=15000)
     page.get_by_text("Day Trader", exact=False).first.wait_for(state="visible", timeout=10000)
-    page.get_by_role("button", name="Trade history").click()  # was "See all trades", renamed in e033306
-    page.wait_for_timeout(400)
-    initial_count = page.locator('button:has(time)').count()
-    check(initial_count > 0, f"[pagination] first page of trades rendered ({initial_count} rows)")
-    load_more = page.get_by_text("Load older trades", exact=False)
-    if load_more.count() > 0:
-        load_more.click()
-        page.wait_for_timeout(500)
-        grown_count = page.locator('button:has(time)').count()
-        check(grown_count > initial_count, f"[pagination] 'Load older trades' grew the list ({initial_count} -> {grown_count})")
-    else:
-        check(False, "[pagination] expected a 'Load older trades' button for a >100-trade history")
+    page.locator("[data-testid=results-panel]").wait_for(state="visible", timeout=10000)
+    page.wait_for_timeout(600)
+    summary = " ".join(page.locator("[data-testid=results-summary]").inner_text().split())
+    check("130 finished trades" in summary, f"[pagination] both pages of the ledger were drained ({summary!r})")
+    initial_count = page.locator("[data-testid=results-trade]").count()
+    check(initial_count == 6, f"[pagination] the open day shows its newest 6 trades first ({initial_count} rows)")
+    show_all = page.get_by_role("button", name="Show all 100")
+    check(show_all.count() == 1, "[pagination] a 'Show all 100' button offers the rest of the day")
+    if show_all.count():
+        show_all.click()
+        page.wait_for_timeout(300)
+        grown = page.locator("[data-testid=results-trade]").count()
+        check(grown == 100, f"[pagination] 'Show all 100' grew the list ({initial_count} -> {grown})")
     context.close()
 
 
@@ -700,18 +722,19 @@ def run_recovered_session_check(browser) -> None:
     install_mocks(page, payload, [], dispatched, recovered=recovered)
     page.goto(BASE_URL, wait_until="networkidle", timeout=15000)
     page.get_by_text("Day Trader", exact=False).first.wait_for(state="visible", timeout=10000)
-    page.get_by_role("button", name="Trade history").click()  # was "See all trades", renamed in e033306
-    page.wait_for_timeout(400)
-    # Wording since e033306 ("Fix tri-engine recovery and restore clear daily trade history"): the day row says
-    # "daily total only" and, opened, explains that individual trades are unavailable.
-    day = page.locator("[data-testid=history-days] details").filter(has_text="daily total only")
+    page.locator("[data-testid=results-panel]").wait_for(state="visible", timeout=10000)
+    page.wait_for_timeout(600)
+    # The recovered day is a group: its sub line says "daily total only", it carries the recovered count and total,
+    # and opened, it explains that individual trades are unavailable (wording from e033306, now inside Results).
+    day = page.locator("[data-testid=results-group]").filter(has_text="daily total only")
     check(day.count() == 1, "[recovered] the recovered day is listed as 'daily total only'")
-    summary_text = " ".join(day.first.locator("summary").inner_text().split()) if day.count() else ""
-    check("5 finished trades" in summary_text and "-$21.34" in summary_text,
-          f"[recovered] its row shows the recovered trade count and total ({summary_text!r})")
-    if day.count():
-        day.first.locator("summary").click()
-        page.wait_for_timeout(200)
+    row_text = " ".join(day.first.locator("button").first.inner_text().split()) if day.count() else ""
+    check("5 finished trades" in row_text and "-$21.34" in row_text,
+          f"[recovered] its row shows the recovered trade count and total ({row_text!r})")
+    if day.count() and day.first.locator("button").first.get_attribute("aria-expanded") != "true":
+        # the newest day with trades opens by itself (it is the only one here); open it only if it is not open
+        day.first.locator("button").first.click()
+        page.wait_for_timeout(300)
     note = page.get_by_text("The daily total was recovered. Individual trade details are unavailable.", exact=False)
     check(note.count() == 1 and note.first.is_visible(), "[recovered] opened, it explains individual trade details are unavailable")
     context.close()

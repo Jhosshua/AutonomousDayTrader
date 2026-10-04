@@ -5,13 +5,21 @@ import { RecoveredSessionSummary, TradeHistoryResponse, TradeRecord } from "@/ty
 import { apiBase } from "@/lib/apiBase";
 import { dedupeTrades, etDateKey } from "@/lib/plain";
 
-export interface TodayLedgerState {
+export type LedgerRange = "today" | "all";
+
+export interface LedgerState {
   items: TradeRecord[];
   recoveredSessions: RecoveredSessionSummary[];
+  /** Every session summary the server sent (not paginated). Empty for a backend that does not send them. */
+  sessions: RecoveredSessionSummary[];
   summary: TradeHistoryResponse["summary"] | null;
+  /** True when the page cap stopped the drain: the trade rows are the most recent ones, day totals are complete. */
+  truncated: boolean;
   loading: boolean;
   error: string | null;
 }
+
+export type TodayLedgerState = LedgerState;
 
 const PAGE_LIMIT = 100;
 // Hard safety cap: even at 100/page this covers 2,000 trades in one session before giving up,
@@ -21,15 +29,17 @@ const RETRY_BACKOFF_MS = 5000;
 const DATE_POLL_MS = 30000;
 
 /**
- * F4: fetches /api/trades?range=today, draining next_cursor until null, deduping by trade_id.
+ * F4: fetches /api/trades?range=<range>, draining next_cursor until null, deduping by trade_id.
  * Refetches on ledger_revision change, ET calendar-date change, reconnect, and (with backoff)
  * after a failure. A generation counter discards any response superseded by a newer request.
  */
-export function useTodayLedger(ledgerRevision: number, isConnected: boolean): TodayLedgerState {
-  const [state, setState] = useState<TodayLedgerState>({
+export function useLedger(range: LedgerRange, ledgerRevision: number, isConnected: boolean): LedgerState {
+  const [state, setState] = useState<LedgerState>({
     items: [],
     recoveredSessions: [],
+    sessions: [],
     summary: null,
+    truncated: false,
     loading: true,
     error: null,
   });
@@ -48,10 +58,11 @@ export function useTodayLedger(ledgerRevision: number, isConnected: boolean): To
       let cursor: string | null | undefined;
       let allItems: TradeRecord[] = [];
       let recovered: RecoveredSessionSummary[] = [];
+      let sessions: RecoveredSessionSummary[] = [];
       let summary: TradeHistoryResponse["summary"] | null = null;
       let pages = 0;
       do {
-        const params = new URLSearchParams({ range: "today", limit: String(PAGE_LIMIT) });
+        const params = new URLSearchParams({ range, limit: String(PAGE_LIMIT) });
         if (cursor) params.set("cursor", cursor);
         const res = await fetch(`${apiBase()}/api/trades?${params.toString()}`, { cache: "no-store" });
         if (!res.ok) throw new Error(`Trades request failed (${res.status})`);
@@ -59,6 +70,7 @@ export function useTodayLedger(ledgerRevision: number, isConnected: boolean): To
         if (myGeneration !== generationRef.current) return; // superseded by a newer request
         allItems = allItems.concat(data.items);
         recovered = data.recovered_sessions;
+        sessions = data.sessions ?? data.recovered_sessions ?? [];
         summary = data.summary;
         cursor = data.next_cursor;
         pages += 1;
@@ -68,7 +80,9 @@ export function useTodayLedger(ledgerRevision: number, isConnected: boolean): To
       setState({
         items: dedupeTrades(allItems),
         recoveredSessions: recovered,
+        sessions,
         summary,
+        truncated: !!cursor,
         loading: false,
         error: null,
       });
@@ -77,13 +91,13 @@ export function useTodayLedger(ledgerRevision: number, isConnected: boolean): To
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: err instanceof Error ? err.message : "Couldn't load today's trades",
+        error: err instanceof Error ? err.message : range === "today" ? "Couldn't load today's trades" : "Couldn't load results",
       }));
       retryTimeoutRef.current = setTimeout(() => {
         void load();
       }, RETRY_BACKOFF_MS);
     }
-  }, []);
+  }, [range]);
 
   // Initial load + refetch whenever the durable ledger advances.
   useEffect(() => {
@@ -119,4 +133,9 @@ export function useTodayLedger(ledgerRevision: number, isConnected: boolean): To
   }, [load]);
 
   return state;
+}
+
+/** Today's finished trades (the balance chart, the strip's counters, the per-playbook totals). */
+export function useTodayLedger(ledgerRevision: number, isConnected: boolean): TodayLedgerState {
+  return useLedger("today", ledgerRevision, isConnected);
 }
