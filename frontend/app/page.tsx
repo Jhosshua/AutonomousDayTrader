@@ -206,6 +206,7 @@ export default function Home() {
       ])),
     },
     ledgerError: !!todayLedger.error,
+    resultsError: !!allLedger.error,
     positions: intradayPositions,
   });
 
@@ -304,6 +305,18 @@ export default function Home() {
           </div>
         )}
 
+        {/* Rendered once, above both views (as on main), so a tap-to-confirm in flight survives Quick/Slow switches. */}
+        {overnightOn && (
+          <OvernightHolds
+            holds={holdViews}
+            tonight={tonightLines}
+            summary={overnightSummary}
+            noBuyActive={noBuyActive}
+            disabledReason={disabledReason}
+            onSetNoBuy={setNoBuyTonight}
+          />
+        )}
+
         {mode === "intraday" ? (
           // Quick trades: two columns from lg up. Balance sits top right, the left stack runs the whole height, Safety and
           // Results stack under Balance. DOM order is the phone order: Balance, left stack, right stack (no CSS order).
@@ -320,16 +333,6 @@ export default function Home() {
             />
 
             <div className="flex min-w-0 flex-col gap-3 lg:col-span-1 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-              {overnightOn && (
-                <OvernightHolds
-                  holds={holdViews}
-                  tonight={tonightLines}
-                  summary={overnightSummary}
-                  noBuyActive={noBuyActive}
-                  disabledReason={disabledReason}
-                  onSetNoBuy={setNoBuyTonight}
-                />
-              )}
 
               <HoldingNow
                 positions={intradayPositions}
@@ -377,16 +380,6 @@ export default function Home() {
               overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
               history={ledgerHistoryLine(allLedger, todayEt)}
             />
-            {overnightOn && (
-              <OvernightHolds
-                holds={holdViews}
-                tonight={tonightLines}
-                summary={overnightSummary}
-                noBuyActive={noBuyActive}
-                disabledReason={disabledReason}
-                onSetNoBuy={setNoBuyTonight}
-              />
-            )}
             <div className="fadein flex flex-col gap-4">
               <SwingTelemetryBar swingState={state.swing} showPro={showPro} />
               <ActiveSwingPositionsTable

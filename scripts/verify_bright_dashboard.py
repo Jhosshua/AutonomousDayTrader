@@ -340,6 +340,20 @@ def run_attention(browser, port: int) -> None:
     check(expect_one(got, "today's trades did not load"), f"[one/ledger] today's ledger 500: count 1 and the list says so ({got['text']!r}, {got['list']!r})")
     s.close()
 
+    # the all-time ledger (Results) fails: the pill says so too
+    led = Ledger(vc.LIVE_TRADES)
+    led.fail_all = True
+    s = BS(browser, port, "one/results", "desktop", LIVE, led)
+    got = pill(s)
+    check(expect_one(got, "results did not refresh"), f"[one/results] range=all 500: count 1 and the list says so ({got['text']!r}, {got['list']!r})")
+    s.close()
+
+    # an unsold hold that also needs a look counts once
+    s = BS(browser, port, "dedup/unsold", "desktop", with_overnight(LIVE, needs_look=["BOOK_MORE_THAN_ALPACA"], unsold=["IREN"]), Ledger(vc.LIVE_TRADES))
+    got = pill(s)
+    check(expect_one(got, "IREN not sold yet"), f"[dedup] unsold plus needs-look on the same stock counts once ({got['text']!r}, {got['list']!r})")
+    s.close()
+
     # de-dup: an orphan that also raises an ORB alert and an ORB error counts once
     s = BS(browser, port, "dedup", "desktop", mutate(LIVE, orb_orphan_with_error), Ledger(vc.LIVE_TRADES))
     got = pill(s)
@@ -414,8 +428,8 @@ def run_results(browser, port: int) -> None:
     items = body["items"]
     wins, losses = sum(1 for t in items if t["realized_pnl"] > 0), sum(1 for t in items if t["realized_pnl"] < 0)
     check(summary.startswith(f"{len(items)} finished trades · {wins} won, {losses} lost"), f"[summary] counts come from the loaded trades ({summary!r})")
-    more = body["summary"]["trades_count"] - len(items)
-    check(f"{more} more on daily-total-only days" in summary, f"[summary] trades on daily-total-only days are said, not added ({summary!r})")
+    more = sum(x["trades_count"] for x in sessions if x["aggregate_only"])
+    check(f"{more} more on daily-total-only days" in summary, f"[summary] only recovered daily-total-only days are counted as 'more' ({more}: {summary!r})")
 
     # a day whose total differs from the sum of its trades by a few cents shows the SESSION total
     day1 = sessions[1]["session_date"]  # newest earlier day (index 0 is today)
@@ -541,6 +555,27 @@ def run_results(browser, port: int) -> None:
     led.fail_all = False
     p.wait_for_timeout(5600)
     check(p.get_by_test_id("results-error").count() == 0, "[error] it recovers on the next retry (5 s) and the line goes away")
+    s.close()
+
+    # default open group is fixed: yesterday open by default, a dialog open, a refetch adds a trade today
+    led = Ledger([])
+    s = BS(browser, port, "results-lock", "desktop", LIVE, led, settle_ms=2000)
+    yday = led.sessions[0]["session_date"]
+    check(group_btn(s, yday).get_attribute("aria-expanded") == "true", "[lock] with no trades today the newest day is open by default")
+    row = s.page.locator(f"[data-testid=results-group][data-key='{yday}'] [data-testid=results-trade]").first
+    tid = row.get_attribute("data-trade-id")
+    row.click(); s.page.wait_for_timeout(300)
+    led.today_trades = list(vc.LIVE_TRADES)
+    fr = copy.deepcopy(LIVE); fr["ledger_revision"] = LIVE.get("ledger_revision", 0) + 1
+    before = led.requests["all"]
+    s.push(fr, 1200)
+    check(led.requests["all"] > before, "[lock] the ledger refetched with a trade added today")
+    check(s.page.locator("dialog[data-testid=trade-detail]").first.evaluate("d => d.open"), "[lock] the open dialog survived the refetch")
+    s.page.keyboard.press("Escape"); s.page.wait_for_timeout(300)
+    check(group_btn(s, yday).get_attribute("aria-expanded") == "true", "[lock] yesterday is still open after the refetch")
+    check(group_btn(s, TODAY).get_attribute("aria-expanded") == "false", "[lock] today did not take over as the open group")
+    focused = s.page.evaluate("() => document.activeElement.getAttribute('data-trade-id')")
+    check(focused == tid, f"[lock] focus returns to the row ({focused!r} == {tid!r})")
     s.close()
 
     # empty today: its group opens with 'No finished trades today.'; first load shows 'Loading results…'
@@ -694,6 +729,24 @@ def run_layout(browser, port: int, old_port: Optional[int]) -> None:
     check(sw == {"safety": 0, "results": 0, "swing": 1, "ovn": 1, "bal": 1}, f"[slow-mode] Balance, overnight holds and the slow-trades view; no Safety, no Results {sw}")
     s.page.screenshot(path=str(SHOTS / "slow_desktop.png"), full_page=True)
     check(not s.page.evaluate(vc.JS_OVERFLOW), "[slow-mode] no horizontal overflow")
+    s.close()
+
+    # the no-overnight-buy confirm state survives a Quick/Slow switch (OvernightHolds is one instance above both views)
+    f = with_overnight(LIVE)
+    f["overnight"]["rows"] = [{"symbol": "IREN", "name": "IREN overnight", "strategy_id": "overnight_iren", "enabled": True, "state": None,
+                               "buy_date": TODAY, "sale_date": None, "reason": None, "block": None, "needs_look": [], "qty": None,
+                               "held_qty": 0, "buy_avg": None, "realized": None, "reserved": False, "tonight": True, "sale_text": None, "size_note": ""}]
+    f["overnight"]["holds"] = []
+    f["all_positions"] = [p for p in f["all_positions"] if p["symbol"] != "IREN"]
+    s = BS(browser, port, "ovn-mode", "desktop", f, Ledger(vc.LIVE_TRADES), settle_ms=1200)
+    btn = s.page.locator("[data-testid=btn-no-buy-tonight]")
+    check(btn.count() == 1 and btn.is_enabled(), "[ovn-mode] the no overnight buy button is there and enabled")
+    btn.click(); s.page.wait_for_timeout(200)
+    check("Tap again to confirm" in btn.inner_text(), "[ovn-mode] the first tap asks to confirm")
+    s.page.locator("[data-testid=mode-tab-swing]").click(); s.page.wait_for_timeout(300)
+    s.page.locator("[data-testid=mode-tab-intraday]").click(); s.page.wait_for_timeout(300)
+    check("Tap again to confirm" in s.page.locator("[data-testid=btn-no-buy-tonight]").inner_text() and s.page.locator("[data-testid=overnight-holds]").count() == 1,
+          "[ovn-mode] after Slow trades and back the confirm state is still there (one OvernightHolds, same position)")
     s.close()
 
     # the Close-all button is ink, not red, until it asks for confirmation

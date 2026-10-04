@@ -1031,6 +1031,8 @@ export interface AttentionInputs {
   };
   /** Today's finished-trades list failed to load (the strip's "Trades today" would read a silent 0). */
   ledgerError: boolean;
+  /** The all-time ledger (the Results panel) failed to refresh. */
+  resultsError: boolean;
   /** Quick-trade positions (overnight holds excluded). */
   positions: { symbol: string; stop_loss?: number | null; strategy_id?: string | null }[];
 }
@@ -1070,8 +1072,9 @@ export function collectAttention(i: AttentionInputs): AttentionItem[] {
     });
   }
   guard(() => { if (i.overnight.initError) add("overnight-init", "overnight holds could not start"); });
-  guard(() => { for (const sym of i.overnight.needsLook) add(`overnight-look:${sym}`, `${sym} overnight hold needs a look`); });
+  guard(() => { for (const sym of i.overnight.needsLook) if (!i.unsold.includes(sym)) add(`overnight-look:${sym}`, `${sym} overnight hold needs a look`); });
   guard(() => { if (i.ledgerError) add("ledger", "today's trades did not load"); });
+  guard(() => { if (i.resultsError) add("results", "results did not refresh"); });
   for (const p of i.positions) {
     guard(() => {
       const w = positionWarning(p);

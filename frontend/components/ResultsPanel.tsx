@@ -235,8 +235,10 @@ export default function ResultsPanel({ ledger, today, streamPersistence }: Resul
   const [showOlder, setShowOlder] = useState(false);
   const [selected, setSelected] = useState<TradeRecord | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
+  const lockedDefault = useRef<Partial<Record<Grouping, string>>>({});
 
-  const { items, sessions, recoveredSessions, summary, loading, error, truncated } = ledger;
+  const { items, sessions, recoveredSessions, loading, error, truncated } = ledger;
+  const firstLoad = loading && items.length === 0 && sessions.length === 0;
 
   const groups = useMemo(
     () => (grouping === "day" ? groupByDay(items, sessions.length ? sessions : recoveredSessions, today) : groupByPlaybook(items, recoveredSessions)),
@@ -249,15 +251,20 @@ export default function ResultsPanel({ ledger, today, streamPersistence }: Resul
     return todayGroup?.key ?? groups.find((g) => g.count > 0)?.key ?? null;
   }, [grouping, groups]);
 
-  const isOpen = (key: string) => (openKeys ? openKeys.has(key) : key === defaultKey);
+  // The default open group is fixed once per grouping, the first time there is one. A refetch (a trade finishing
+  // today) must never close the group the operator is reading or unmount the row a dialog returns focus to.
+  if (!firstLoad && defaultKey && lockedDefault.current[grouping] === undefined) lockedDefault.current[grouping] = defaultKey;
+  const openDefault = lockedDefault.current[grouping] ?? defaultKey;
+  const isOpen = (key: string) => (openKeys ? openKeys.has(key) : key === openDefault);
   const toggle = (key: string) => {
-    const next = new Set(openKeys ?? (defaultKey ? [defaultKey] : []));
+    const next = new Set(openKeys ?? (openDefault ? [openDefault] : []));
     if (next.has(key)) next.delete(key);
     else next.add(key);
     setOpenKeys(next);
   };
   const switchTo = (g: Grouping) => {
     if (g === grouping) return;
+    delete lockedDefault.current[g];
     setGrouping(g);
     setOpenKeys(null);
     setShowAllKeys(new Set());
@@ -281,11 +288,11 @@ export default function ResultsPanel({ ledger, today, streamPersistence }: Resul
 
   const wins = items.filter((t) => t.realized_pnl > 0).length;
   const losses = items.filter((t) => t.realized_pnl < 0).length;
-  const dailyOnly = summary && summary.trades_count > items.length ? summary.trades_count - items.length : 0;
+  // trades that exist only as a daily total (recovered days); trades merely not loaded (page cap) are not counted here
+  const dailyOnly = (sessions.length ? sessions : recoveredSessions).filter((x) => x.aggregate_only).reduce((n, x) => n + x.trades_count, 0);
 
   const durable = streamPersistence.status === "durable";
   const disabled = streamPersistence.status === "disabled";
-  const firstLoad = loading && items.length === 0 && sessions.length === 0;
   const empty = !loading && items.length === 0 && sessions.length === 0 && recoveredSessions.length === 0;
 
   return (

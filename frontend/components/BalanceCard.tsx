@@ -66,7 +66,8 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
   }, [todayTrades]);
 
   return (
-    <div className={`rise hover-card flex flex-col rounded-[22px] border border-line bg-white ${narrow ? "gap-1.5 p-3 sm:flex-row sm:items-stretch sm:gap-4 sm:p-4" : "gap-3 p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5"} ${className}`} data-testid="balance-card">
+    <div className={`rise hover-card flex flex-col rounded-[22px] border border-line bg-white ${narrow ? "gap-1.5 p-3 sm:p-4" : "gap-2 p-4 sm:p-5"} ${className}`} data-testid="balance-card">
+      <div className={`flex flex-col ${narrow ? "gap-1.5 sm:flex-row sm:items-stretch sm:gap-4" : "gap-3 sm:flex-row sm:items-stretch sm:gap-5"}`}>
       <div className={`flex flex-col gap-2 ${narrow ? "sm:w-[44%] sm:justify-center" : "sm:w-[46%] sm:justify-center"}`}>
       <div className="flex flex-row items-start justify-between gap-3 sm:flex-col sm:gap-2">
         <div className="flex flex-col gap-0.5">
@@ -95,12 +96,6 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
           </div>
         )}
       </div>
-        {history && (
-          <div className="text-xs leading-snug text-muted" data-testid="balance-history">
-            <span className="whitespace-nowrap">Since start <MoneyText value={history.sinceStart} />{history.lastDay && " ·"}</span>
-            {history.lastDay && <> Last trading day <MoneyText value={history.lastDay.pnl} /> ({history.lastDay.label})</>}
-          </div>
-        )}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
@@ -136,6 +131,13 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
           <span>4:00 PM</span>
         </div>
       </div>
+      </div>
+      {history && (
+        <div className="text-xs leading-snug text-muted" data-testid="balance-history">
+          <span className="whitespace-nowrap">Since start <MoneyText value={history.sinceStart} />{history.lastDay && " ·"}</span>
+          {history.lastDay && <> Last trading day <MoneyText value={history.lastDay.pnl} /> ({history.lastDay.label})</>}
+        </div>
+      )}
     </div>
   );
 }

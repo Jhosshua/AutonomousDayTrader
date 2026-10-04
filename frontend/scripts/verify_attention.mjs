@@ -19,6 +19,7 @@ const calmInputs = () => ({
   ],
   overnight: { initError: null, needsLook: [] },
   ledgerError: false,
+  resultsError: false,
   positions: [{ symbol: "MSFT", stop_loss: 399.5, strategy_id: "mean_reversion" }],
 });
 const keys = (i) => collectAttention(i).map((a) => a.key);
@@ -45,6 +46,7 @@ const one = {
   "overnight-init": (i) => { i.overnight.initError = "no key"; },
   "overnight-look:IREN": (i) => { i.overnight.needsLook = ["IREN"]; },
   ledger: (i) => { i.ledgerError = true; },
+  results: (i) => { i.resultsError = true; },
   "unprotected:AMD (no stop)": (i) => { i.positions = [{ symbol: "AMD", stop_loss: null, strategy_id: "mean_reversion" }]; },
   "unprotected:AMD (not linked)": (i) => { i.positions = [{ symbol: "AMD", stop_loss: 10, strategy_id: undefined }]; },
 };
@@ -67,6 +69,16 @@ for (const [name, mutate] of Object.entries(one)) {
   check(keys(i).length === 2, "two different orphans count twice");
   i.positions = [{ symbol: "AMD", stop_loss: null, strategy_id: undefined }, { symbol: "AMD", stop_loss: null, strategy_id: undefined }];
   check(keys(i).filter((k) => k === "unprotected:AMD").length === 1, "the same position twice counts once");
+}
+
+// an unsold hold that also needs a look counts once; a different stock's needs-look still counts
+{
+  const i = calmInputs();
+  i.unsold = ["IREN"];
+  i.overnight.needsLook = ["IREN"];
+  check(keys(i).length === 1 && keys(i)[0] === "unsold", "an unsold hold that also needs a look counts once");
+  i.overnight.needsLook = ["IREN", "HUT"];
+  check(keys(i).length === 2, "another stock's needs-a-look still counts");
 }
 
 // optional fields the backend may not send are NOT alarms
