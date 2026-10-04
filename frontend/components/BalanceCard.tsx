@@ -66,7 +66,7 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
   }, [todayTrades]);
 
   return (
-    <div className={`rise hover-card flex flex-col rounded-[22px] border border-line bg-white ${narrow ? "gap-2 p-3.5 sm:flex-row sm:items-stretch sm:gap-4 sm:p-4" : "gap-3 p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5"} ${className}`} data-testid="balance-card">
+    <div className={`rise hover-card flex flex-col rounded-[22px] border border-line bg-white ${narrow ? "gap-1.5 p-3 sm:flex-row sm:items-stretch sm:gap-4 sm:p-4" : "gap-3 p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5"} ${className}`} data-testid="balance-card">
       <div className={`flex flex-col gap-2 ${narrow ? "sm:w-[44%] sm:justify-center" : "sm:w-[46%] sm:justify-center"}`}>
       <div className="flex flex-row items-start justify-between gap-3 sm:flex-col sm:gap-2">
         <div className="flex flex-col gap-0.5">
@@ -112,7 +112,7 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
             </span>
           )}
         </div>
-        <div className="relative h-[44px]">
+        <div className="relative h-[36px] sm:h-[44px]">
           {hasTrades ? (
             <svg width="100%" height="100%" viewBox="0 0 560 150" preserveAspectRatio="none" role="img"
               aria-label={`Chart of today's finished trades: cumulative result ${finalValue >= 0 ? "up" : "down"} ${formatMoney(Math.abs(finalValue))}`}>

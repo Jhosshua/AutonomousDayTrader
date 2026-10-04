@@ -1057,15 +1057,15 @@ export function collectAttention(i: AttentionInputs): AttentionItem[] {
   for (const s of i.strategies) {
     guard(() => {
       const label = s.name || strategyTheme(s.id, s.id).name;
-      if (s.orb?.init_error) add("orb-init", "Opening Range Breakout could not start");
-      else if (orbProblemOf(s)) add("orb-problem", "Opening Range Breakout reported a problem");
+      if (s.orb?.init_error) add("orb-init", "ORB could not start");
+      else if (orbProblemOf(s)) add("orb-problem", "ORB reported a problem");
       const orphans = s.orb?.orphans ?? [];
       for (const a of orbAlertsOf(s)) {
         const orphan = orphans.find((o) => o.text === a);
-        if (orphan) add(`orb-orphan:${orphan.symbol}`, `${orphan.symbol} left open by Opening Range Breakout`);
-        else add("orb-alert", "Opening Range Breakout alert");
+        if (orphan) add(`orb-orphan:${orphan.symbol}`, `${orphan.symbol} left open by ORB`);
+        else add("orb-alert", "ORB alert");
       }
-      for (const o of orphans) add(`orb-orphan:${o.symbol}`, `${o.symbol} left open by Opening Range Breakout`);
+      for (const o of orphans) add(`orb-orphan:${o.symbol}`, `${o.symbol} left open by ORB`);
       if (triErrorOf(s)) add(`tri:${s.id}`, `broker issue on ${strategyTheme(s.id, label).name}`);
     });
   }

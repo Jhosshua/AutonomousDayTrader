@@ -475,3 +475,11 @@ right. Run the mutation check.
 **Why it matters**: a push to main redeploys GitHub's code and drops that code. The resting SPY order would then fill as a position the robot does not know, raising a broker mismatch that pauses entries.
 
 **Note for next time**: before any push here, compare `railway deployment list --json` (meta.commitHash vs meta.cliMessage/cliCaller) with `git log -1`. A deploy with no commitHash is CLI code; find its source before replacing it.
+
+## 2026-10-04: bright dashboard harness hung at 99% CPU, and the phone strip took four tries to fit the "Holding now no lower than old" check
+
+**What did not work:** (1) Calling `ws.close()` (Playwright sync API) inside a `route_web_socket` handler to refuse reconnects deadlocked the event loop (Python at 99% CPU, no output because stdout was buffered). (2) The status strip on the phone alarms frame (7 things need a look): pill on its own row, stats wrapped to two rows, long labels. Holding/playbook top was 60 px lower than the old page; trimming one thing at a time moved it 3 px, 35 px, 8 px, 8 px.
+
+**What worked instead:** (1) Stub `window.WebSocket` in the page so later connects fail at once, and close the open route from the main thread; run harnesses with `python3 -u` so a stall shows where it is. (2) Pill and text as one run-on paragraph on phone, shorter labels ("ORB" not "Opening Range Breakout"), three-column stats, tighter paddings.
+
+**Note for next time:** never call a blocking sync Playwright method from inside a route handler. When a height check fails by a small margin, measure each block first (a measure script printing every card's height) instead of nudging paddings.
