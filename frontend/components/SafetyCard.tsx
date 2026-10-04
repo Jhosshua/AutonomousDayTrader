@@ -57,11 +57,11 @@ export default function SafetyCard({
   return (
     <div
       className="rise hover-card flex flex-col gap-3 rounded-[22px] border p-4 sm:p-5"
-      style={{ background: "#E9EFE8", borderColor: "#D5E2D6", animationDelay: "380ms" }}
+      style={{ background: "#E9F8F0", borderColor: "#BFE6D3", animationDelay: "380ms" }}
       data-testid="risk-telemetry"
     >
       <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: "#3F7D5C" }}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: "#0A7D53" }}>
           <ShieldCheck className="h-4 w-4 text-white" strokeWidth={2} aria-hidden="true" />
         </div>
         <h2 className="font-display text-lg font-semibold text-ink">Safety rules</h2>
@@ -75,9 +75,9 @@ export default function SafetyCard({
           </span>
         </div>
         <div className="h-2 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.8)" }}>
-          <div className="grow h-full rounded-full" style={{ width: `${pctUsed}%`, background: "linear-gradient(90deg, #5E9A7A, #E3B77F)" }} />
+          <div className="grow h-full rounded-full" style={{ width: `${pctUsed}%`, background: "#0A7D53" }} />
         </div>
-        <div className="text-xs" style={{ color: "#2F5A4B" }}>
+        <div className="text-xs" style={{ color: "#0B5A3C" }}>
           {ovn
             ? `${maxDailyLossDollars != null ? `If day trades ever lose ${formatMoney(maxDailyLossDollars)} in a day` : "If day trades ever hit the daily loss limit"}, it stops day trading for the day on its own. The daily loss limit covers day trades only.${ovn.buysOn ? " The overnight buy still goes in at the close." : ""}`
             : maxDailyLossDollars != null
@@ -85,7 +85,7 @@ export default function SafetyCard({
             : "If it ever hits its daily loss limit, it stops for the day on its own."}
         </div>
         {ovn && (
-          <div className="text-xs" style={{ color: "#2F5A4B" }} data-testid="safety-overnight-result">
+          <div className="text-xs" style={{ color: "#0B5A3C" }} data-testid="safety-overnight-result">
             {ovn.resultToday != null && Math.abs(ovn.resultToday) >= 0.005
               ? `Overnight holds ${ovn.resultToday > 0 ? "made" : "lost"} ${formatMoney(Math.abs(ovn.resultToday))} today. This is not counted in the limit above.`
               : "No overnight hold result today."}
@@ -93,8 +93,8 @@ export default function SafetyCard({
         )}
       </div>
 
-      <div className="flex items-start gap-2.5 border-t pt-3" style={{ borderColor: "rgba(14,138,98,0.2)" }}>
-        <Moon className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#4A5190" }} aria-hidden="true" />
+      <div className="flex items-start gap-2.5 border-t pt-3" style={{ borderColor: "#BFE6D3" }}>
+        <Moon className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#2B4BFF" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           {ovn && ovn.buysOn ? (
             <><b>{`Most quick trades close at 3:55 PM, but a quick trade in ${names} closes at 3:46 PM on a night the robot buys that stock.`}</b> Slow trades can stay open for days. Overnight holds buy at the 4:00 PM close and sell at the next 9:30 AM open.</>
@@ -105,14 +105,14 @@ export default function SafetyCard({
         </div>
       </div>
       <div className="flex items-start gap-2.5">
-        <Target className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#3F7D5C" }} aria-hidden="true" />
+        <Target className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#0A7D53" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           <b>Small bets.</b> Keeps each bet small ({riskPctLabel}). Exception: Opening Range Breakout follows ORBStraddle's sizing, 2% on its first trade of the day and 2.5% in total.
           {ovn && (ovn.buysOn || ovn.holdsCount > 0) && ` Overnight holds are not small bets. Each puts ${pctText ?? "a set share"} of the account in one stock with no stop.`}
         </div>
       </div>
       <div className="flex items-start gap-2.5">
-        <TriangleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#A9553A" }} aria-hidden="true" />
+        <TriangleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#C2300F" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           {ovn ? (
             <><b>Every day trade has an exit plan.</b> A price where it gives up, set before it buys. Overnight holds have no stop and sell at the next open.</>
@@ -128,12 +128,12 @@ export default function SafetyCard({
         disabled={phase === "sending" || intradayPositionsCount === 0}
         data-testid="btn-flatten-all"
         className="mt-auto min-h-[44px] rounded-xl border-0 text-sm font-semibold text-white shadow transition-opacity disabled:opacity-50"
-        style={{ background: "#A9553A" }}
+        style={{ background: phase === "confirm" ? "#C2300F" : "#0E1330" }}
       >
         {buttonLabel}
       </button>
       {ovn && ovn.holdsCount > 0 && (
-        <div className="text-xs" style={{ color: "#2F5A4B" }} data-testid="safety-holds-not-closed">
+        <div className="text-xs" style={{ color: "#0B5A3C" }} data-testid="safety-holds-not-closed">
           Overnight holds are not included. They sell at the next 9:30 AM open.
         </div>
       )}

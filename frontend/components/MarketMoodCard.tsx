@@ -19,7 +19,7 @@ interface MarketMoodCardProps {
   tradingDay?: boolean;
 }
 
-const GREY = { bg: "#ECE9DE", ink: "#4A4760" };
+const GREY = { bg: "#E6EAF5", ink: "#3F4663" };
 
 function stopPhrase(mult: number | null | undefined): string | null {
   if (mult == null) return null;
@@ -30,7 +30,7 @@ function stopPhrase(mult: number | null | undefined): string | null {
 
 function Tile({ label, children, testid }: { label: string; children: React.ReactNode; testid: string }) {
   return (
-    <div className="rounded-lg bg-[#F3F1EA] px-3 py-1.5 text-[13px] leading-snug text-ink" data-testid={testid}>
+    <div className="rounded-lg bg-[#F1F3FB] px-3 py-1.5 text-[13px] leading-snug text-ink" data-testid={testid}>
       <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-0.5 flex flex-col gap-0.5">{children}</div>
     </div>

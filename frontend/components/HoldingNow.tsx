@@ -43,7 +43,7 @@ const BADGE_TEXT: Record<Kind, string> = {
 
 function Tile({ label, children, testid }: { label: string; children: React.ReactNode; testid?: string }) {
   return (
-    <div className="rounded-lg bg-[#F3F1EA] px-2 py-1 text-xs leading-snug text-ink sm:px-2.5 sm:text-[13px]" data-testid={testid}>
+    <div className="rounded-lg bg-[#F1F3FB] px-2 py-1 text-xs leading-snug text-ink sm:px-2.5 sm:text-[13px]" data-testid={testid}>
       <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</div>
       <div>{children}</div>
     </div>
@@ -137,7 +137,7 @@ function HoldingRow({
           </div>
           <div
             className="rounded-full px-3 py-1 text-sm font-bold tabular-nums"
-            style={won ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
+            style={won ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#FFEFEA", color: "#C2300F" }}
           >
             {formatSignedMoney(position.unrealized_pnl)}
           </div>
@@ -150,7 +150,7 @@ function HoldingRow({
               disabled={sellButton.phase === "sending"}
               data-testid={`btn-sell-now-${position.symbol}`}
               className="min-h-[44px] flex-1 min-w-[120px] rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-60 lg:w-full lg:flex-none"
-              style={{ background: "#A9553A" }}
+              style={{ background: sellButton.phase === "confirm" ? "#C2300F" : "#0E1330" }}
             >
               {sellLabel}
             </button>
@@ -161,7 +161,7 @@ function HoldingRow({
               title={position.strategy_id === "orb" ? "ORB moves its own stop at Alpaca" : position.fixed_protection ? "This plan keeps its safety exit fixed" : "Before fees"}
               data-testid={`btn-break-even-${position.symbol}`}
               className="min-h-[44px] flex-1 min-w-[150px] rounded-xl border px-3 text-[13px] font-semibold leading-tight disabled:opacity-40 lg:w-full lg:flex-none"
-              style={{ borderColor: "#D5E2D6", color: "#2F5A45", background: "#EDF3EE" }}
+              style={{ borderColor: "#BFE6D3", color: "#0B5A3C", background: "#E9F8F0" }}
             >
               {position.strategy_id === "orb" ? "ORB moves its own stop" : position.fixed_protection ? "Safety exit stays fixed" : beLabel}
             </button>
@@ -197,7 +197,7 @@ function HoldingRow({
             {position.tranches && (
               <div className="col-span-2 grid gap-1.5 sm:grid-cols-2 sm:gap-2" data-testid="fixed-tranches">
                 {position.tranches.map((t, i, all) => (
-                  <div key={t.id} className="rounded-lg bg-[#EDF4F7] px-2 py-1 text-xs leading-snug text-[#2F5368] sm:px-2.5 sm:text-[13px]">
+                  <div key={t.id} className="rounded-lg bg-[#EEF1FF] px-2 py-1 text-xs leading-snug text-[#1E36B8] sm:px-2.5 sm:text-[13px]">
                     <div className="font-semibold">{trancheName(i, all.length)} · {t.qty - t.closed_qty} shares open</div>
                     <div>Sells at {formatMoney(t.target)} or at {etTimeLabel(t.exit_due)} ET</div>
                     <div>{t.closed_qty === t.qty ? "Finished" : t.protection_confirmed && !t.protection_terminal ? "Protection held at the broker" : "Checking protection and exit orders"}</div>

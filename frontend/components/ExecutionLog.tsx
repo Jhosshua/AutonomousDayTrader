@@ -22,7 +22,7 @@ export default function ExecutionLog({ records, maxItems = 20 }: ExecutionLogPro
       ) : (
         <div className="mt-3 max-h-64 space-y-1.5 overflow-y-auto pr-1">
           {displayRecords.map((item, idx) => (
-            <div key={`${item.id}-${idx}`} className="rounded-xl border border-line/60 bg-[#FAF8F2] px-3 py-2 text-xs">
+            <div key={`${item.id}-${idx}`} className="rounded-xl border border-line/60 bg-[#F6F8FE] px-3 py-2 text-xs">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   {item.symbol && <span className="font-bold text-ink">{item.symbol}</span>}
@@ -32,7 +32,7 @@ export default function ExecutionLog({ records, maxItems = 20 }: ExecutionLogPro
                 </div>
                 <span className="tabular-nums text-[10px] text-muted">{item.timestamp}</span>
               </div>
-              <p className="mt-0.5 break-words leading-snug text-[#3E3A57]">{item.message}</p>
+              <p className="mt-0.5 break-words leading-snug text-[#2A3150]">{item.message}</p>
             </div>
           ))}
         </div>

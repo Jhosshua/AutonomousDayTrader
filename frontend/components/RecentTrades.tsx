@@ -36,7 +36,7 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
           type="button"
           onClick={onSeeAll}
           className="min-h-[44px] px-1 text-sm font-semibold underline-offset-2 hover:underline"
-          style={{ color: "#4A5190" }}
+          style={{ color: "#2B4BFF" }}
         >
           Trade history
         </button>
@@ -45,7 +45,7 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
       {loading && items.length === 0 ? (
         <div className="py-4 text-center text-sm text-muted">Loading today's trades…</div>
       ) : error ? (
-        <div className="py-4 text-center text-sm" style={{ color: "#8F4424" }}>
+        <div className="py-4 text-center text-sm" style={{ color: "#C2300F" }}>
           Couldn't load today's trades
         </div>
       ) : top6.length === 0 ? (
@@ -53,10 +53,10 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
           <p className="mb-2">No finished trades today. Your previous days are saved in Trade history.</p>
           {recentDays.map((day) => (
             <button key={day.session_date} type="button" onClick={onSeeAll}
-              className="mt-2 flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border border-line p-3 text-left hover:bg-[#FAF8F2]">
+              className="mt-2 flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border border-line p-3 text-left hover:bg-[#F6F8FE]">
               <span><span className="block font-semibold text-ink">{historyDateLabel(day.session_date)}</span>
                 <span className="text-xs">{day.trades_count} finished {day.trades_count === 1 ? "trade" : "trades"}</span></span>
-              <span className="font-bold tabular-nums" style={{ color: day.realized_pnl < 0 ? "#8F4424" : "#2F6B4C" }}>{formatSignedMoney(day.realized_pnl)}</span>
+              <span className="font-bold tabular-nums" style={{ color: day.realized_pnl < 0 ? "#C2300F" : "#0A7D53" }}>{formatSignedMoney(day.realized_pnl)}</span>
             </button>
           ))}
         </div>
@@ -69,7 +69,7 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
             <div
               key={t.trade_id}
               className="grid grid-cols-[32px_minmax(0,1fr)_auto] sm:grid-cols-[64px_32px_minmax(0,1fr)_auto] items-center gap-2.5 border-t py-2"
-              style={{ borderColor: "#F5EEE2" }}
+              style={{ borderColor: "#DDE2F2" }}
             >
               <div className="hidden tabular-nums text-sm text-muted sm:block">{etTimeLabel(t.closed_at)}</div>
               <div
@@ -91,7 +91,7 @@ export default function RecentTrades({ items, loading, error, onSeeAll }: Recent
               </div>
               <div
                 className="whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-bold tabular-nums"
-                style={won ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
+                style={won ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#FFEFEA", color: "#C2300F" }}
               >
                 {won ? "+" : "-"}
                 {formatMoney(Math.abs(t.realized_pnl))}

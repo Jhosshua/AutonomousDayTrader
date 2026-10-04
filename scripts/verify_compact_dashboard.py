@@ -41,7 +41,7 @@ import subprocess
 import sys
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -83,13 +83,14 @@ FRAMES: Dict[str, Tuple[Path, List[Dict[str, Any]]]] = {
 }
 PRO_FRAMES = ("live", "branches")
 
-# Plan section 8: hard cap (px) and max fraction of the old page's height on the same frame.
+# Plan section 8: hard cap (px) and max fraction of the old page's height on the same frame (--no-ratio skips the
+# fraction: on 2026-09-30 old and new are both compact pages, see ERRORS.md 2026-09-30).
+# 2026-10-04 bright dashboard (PLAN_2026_10_04 section 11.6), pre-registered, not to be raised without a MEMORY.md
+# entry. The compact page of 2026-09-29 had 1100/1250/1300/2050 and 2600/3200/3400/5000; Results with one open day
+# and a "Show older days" button is taller than the six-row "today" list it replaces.
 CAP = {
-    ("idle", "desktop"): 1100, ("live", "desktop"): 1250, ("live_one", "desktop"): 1300,
-    # Pre-registered at 2000; the finished build measures 2038 (42% of the old 4863). The rest is each of the five
-    # trades' own explanation, which the plan forbids hiding. Raised to 2050 on 2026-09-29, recorded in MEMORY.md.
-    ("busy", "desktop"): 2050,
-    ("idle", "phone"): 2600, ("live", "phone"): 3200, ("live_one", "phone"): 3400, ("busy", "phone"): 5000,
+    ("idle", "desktop"): 1150, ("live", "desktop"): 1300, ("live_one", "desktop"): 1350, ("busy", "desktop"): 2100,
+    ("idle", "phone"): 2950, ("live", "phone"): 3550, ("live_one", "phone"): 3750, ("busy", "phone"): 5350,
 }
 RATIO = {"desktop": 0.60, "phone": 0.75}
 
@@ -105,8 +106,78 @@ ALLOWED_MISSING: Dict[str, str] = {}
 
 MIN_OLD_NODES = 40
 
+NO_RATIO = [False]
 FAILURES: List[str] = []
 PASSED = [0]
+
+
+TODAY = "2026-09-29"  # the fixed clock's ET date
+
+
+def history_sessions(n: int = 30, before: str = TODAY) -> List[Dict[str, Any]]:
+    """n earlier trading days, newest first, deterministic: a mix of wins and losses, the oldest four recovered
+    daily totals with no trade rows (aggregate_only). The newest day's total differs from the sum of its trades
+    by 3 cents (a day total is the ledger's number, not a sum the page computes)."""
+    d = date.fromisoformat(before)
+    out: List[Dict[str, Any]] = []
+    while len(out) < n:
+        d -= timedelta(days=1)
+        if d.weekday() >= 5:
+            continue
+        i = len(out)
+        pnl = round(((i * 37) % 200) - 90 + (i % 3) * 1.37, 2)
+        out.append({
+            "session_date": d.isoformat(), "opening_equity": 50000.0, "closing_equity": round(50000.0 + pnl, 2),
+            "realized_pnl": pnl, "trades_count": 3 + i % 5, "fees": 0.0, "source": "ledger",
+            "aggregate_only": i >= n - 4,
+            "strategies": {"vwap_pullback": {"trades_count": 2, "realized_pnl": round(pnl / 2, 2)},
+                           "mean_reversion": {"trades_count": 1 + i % 5, "realized_pnl": round(pnl - round(pnl / 2, 2), 2)}},
+        })
+    return out
+
+
+def history_trades(sessions: List[Dict[str, Any]], days: int = 2) -> List[Dict[str, Any]]:
+    """Trade rows for the newest `days` earlier days; the first day's total is the trade sum plus 0.03."""
+    items: List[Dict[str, Any]] = []
+    for di, sess in enumerate(sessions[:days]):
+        n = sess["trades_count"]
+        total = sess["realized_pnl"] - (0.03 if di == 0 else 0)
+        each = round(total / n, 2)
+        pnls = [each] * (n - 1) + [round(total - each * (n - 1), 2)]
+        for k, pnl in enumerate(pnls):
+            sym = ["MSFT", "AMD", "NVDA", "META", "GOOGL", "AMZN", "PLTR", "AAPL"][(k + di) % 8]
+            items.append(base.make_trade(100 * (di + 1) + k, sym, "LONG" if k % 2 == 0 else "SHORT",
+                                         ["vwap_pullback", "mean_reversion", "news_momentum", "orb"][k % 4], pnl,
+                                         15 + k % 3, 5 * k, session_date=sess["session_date"]))
+    return items
+
+
+def ledger_all(today_trades: List[Dict[str, Any]], sessions: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """The /api/trades?range=all answer: today's trades and the newest earlier days' trades as rows, every day as a
+    session summary (sessions is not paginated)."""
+    hist = sessions if sessions is not None else history_sessions()
+    items = list(today_trades) + history_trades(hist)
+    resp = base.trades_response(items)
+    today_sum = round(sum(t["realized_pnl"] for t in today_trades), 2)
+    today_sess = []
+    if today_trades:
+        today_sess = [{"session_date": TODAY, "opening_equity": 50000.0, "closing_equity": 50000.0 + today_sum,
+                       "realized_pnl": today_sum, "trades_count": len(today_trades), "fees": 0.0, "source": "ledger",
+                       "aggregate_only": False}]
+    resp["sessions"] = today_sess + hist
+    resp["recovered_sessions"] = [s for s in hist if s["aggregate_only"]]
+    total = sum(s["trades_count"] for s in resp["sessions"])
+    resp["summary"] = dict(resp["summary"], trades_count=total,
+                           realized_pnl=round(sum(s["realized_pnl"] for s in resp["sessions"]), 2))
+    return resp
+
+
+def trades_mock(url: str, today_trades: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """range=all answers sessions and items; every other range answers as before (today's rows, no sessions), so
+    the OLD page, which never asks for range=all, sees exactly what it always saw."""
+    if "range=all" in url:
+        return ledger_all(today_trades)
+    return base.trades_response(today_trades)
 
 
 def check(ok: bool, msg: str) -> None:
@@ -266,7 +337,7 @@ class Session:
 
         p.route_web_socket(re.compile(r".*/ws/ui$"), on_ws)
         p.route(re.compile(r".*/api/trades.*"), lambda route: route.fulfill(
-            status=200, content_type="application/json", body=json.dumps(base.trades_response(trades))))
+            status=200, content_type="application/json", body=json.dumps(trades_mock(route.request.url, trades))))
         p.route(re.compile(r".*/health$"), lambda route: route.fulfill(
             status=200, content_type="application/json", body=json.dumps(base.HEALTH_RESPONSE)))
         p.route(re.compile(r".*/api/account$"), lambda route: route.fulfill(
@@ -321,7 +392,8 @@ def frame_checks(browser, name: str, vp: str, report: List[str]) -> None:
     report.append(f"| {name} | {vp} | {old_h} | {new_h} | {round(100 * new_h / old_h)}% |")
     if (name, vp) in CAP:
         check(new_h <= CAP[(name, vp)], f"[{lab}] height {new_h} <= cap {CAP[(name, vp)]}")
-    check(new_h <= RATIO[vp] * old_h, f"[{lab}] height {new_h} <= {int(RATIO[vp] * 100)}% of old {old_h}")
+    if not NO_RATIO[0]:
+        check(new_h <= RATIO[vp] * old_h, f"[{lab}] height {new_h} <= {int(RATIO[vp] * 100)}% of old {old_h}")
     if name in ("idle", "live", "live_one", "busy", "alarms", "branches"):
         new.page.screenshot(path=str(SHOTS / f"{name}_{vp}.png"), full_page=True)
 
@@ -449,7 +521,10 @@ def run(old_out: Path) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--old-out", type=Path, required=True, help="static export of the commit before the change")
+    ap.add_argument("--no-ratio", action="store_true",
+                    help="skip only the '<= 60% / 75% of old' ratio checks (old and new are both compact pages)")
     args = ap.parse_args()
+    NO_RATIO[0] = args.no_ratio
     for d in (NEW_OUT, args.old_out):
         if not (d / "index.html").exists():
             print(f"{d} has no index.html: build the export first")

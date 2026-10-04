@@ -10,7 +10,7 @@ interface SegmentedModeToggleProps {
 export default function SegmentedModeToggle({ mode, onModeChange }: SegmentedModeToggleProps) {
   const tabClass = (on: boolean) =>
     `min-h-[44px] flex-1 lg:flex-none rounded-full px-4 sm:px-5 text-sm font-semibold transition-colors ${
-      on ? "bg-darkcard text-white shadow" : "bg-transparent text-[#3E3A57] hover:bg-white/60"
+      on ? "bg-darkcard text-white shadow" : "bg-transparent text-[#2A3150] hover:bg-white/60"
     }`;
 
   return (

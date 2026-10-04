@@ -204,9 +204,6 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-ground px-3 py-4 sm:px-6 sm:py-5">
-      <div className="drift pointer-events-none absolute -left-40 -top-52 h-[420px] w-[420px] rounded-full opacity-70 blur-3xl" style={{ background: "#F3E1CF" }} />
-      <div className="drift2 pointer-events-none absolute -right-40 -top-40 h-[420px] w-[420px] rounded-full opacity-80 blur-3xl" style={{ background: "#E2E1F1" }} />
-
       <div className="relative mx-auto flex max-w-[1400px] flex-col gap-3">
         <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro}>
           <SegmentedModeToggle mode={mode} onModeChange={setMode} />
@@ -219,7 +216,7 @@ export default function Home() {
               <span key={feed} className="flex items-center gap-1.5">
                 <span
                   className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: status === "connected" ? "#5E9A7A" : "#A9553A" }}
+                  style={{ background: status === "connected" ? "#0A7D53" : "#C2300F" }}
                 />
                 {feed}
               </span>
@@ -231,7 +228,7 @@ export default function Home() {
           <div
             role="status"
             className="rounded-2xl border px-4 py-3 text-sm flex items-center gap-2"
-            style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}
+            style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}
           >
             <WifiOff className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
             {connectionState === "reconnecting"
@@ -240,36 +237,36 @@ export default function Home() {
           </div>
         )}
         {feedDown && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
+          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
             <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
             Price feed is down, it can't trade right now.
           </div>
         )}
         {state.broker?.mismatch && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
+          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
             <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
             The robot's positions don't match the Alpaca account. New trades are paused until they match.
           </div>
         )}
         {savingProblem && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
+          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
             <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
             Saving problems: new trades are paused until this is fixed.
           </div>
         )}
         {unsold.length > 0 && (
-          <div role="alert" className="rounded-2xl border px-4 py-3 text-sm font-semibold" style={{ borderColor: "#E8B09E", background: "#F6E3DA", color: "#8F4424" }} data-testid="overnight-unsold-banner">
+          <div role="alert" className="rounded-2xl border px-4 py-3 text-sm font-semibold" style={{ borderColor: "#F5B7A8", background: "#FFEFEA", color: "#C2300F" }} data-testid="overnight-unsold-banner">
             <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
             {unsoldBannerText(unsold)}
           </div>
         )}
         {state.account.is_circuit_broken && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
+          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
             {overnightOn ? "Day trading stopped for today. It hit the daily loss limit." : "Stopped for today. It hit the daily loss limit."}
           </div>
         )}
         {state.swing?.last_close_entries_withheld && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#D9DCEB", background: "#EEEFF7", color: "#3E4478" }}>
+          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#DDD2FF", background: "#F0EBFF", color: "#4A2AB5" }}>
             Slow trades: last close data was incomplete, so no new slow trades were bought overnight.
           </div>
         )}

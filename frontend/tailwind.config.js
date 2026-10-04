@@ -24,24 +24,28 @@ module.exports = {
           orange: "#ff9f0a",
           teal: "#64d2ff",
         },
-        // Plain-language redesign (2026-09-24), light theme "muted palette" only.
-        ground: "#F7F3EC",
-        ink: "#1D1A33",
-        muted: "#5D5A73",
-        line: "#EFE4D2",
-        darkcard: "#2E3244",
-        gain: "#2F6B4C",
-        gainbg: "#E4EFE7",
-        loss: "#8F4424",
-        lossbg: "#F6E3DA",
-        lavender: "#8189C4",
-        sage: "#5E9A7A",
-        terracotta: "#A9553A",
+        // Bright operator dashboard (2026-10-04). Replaces the 2026-09-24 "muted palette".
+        // Every colour in app|components|lib|hooks is listed in docs/bright_dashboard/palette_map.md.
+        ground: "#EEF1FA",
+        ink: "#0E1330",
+        muted: "#5B6283",
+        line: "#DDE2F2",
+        darkcard: "#2B4BFF", // the accent: status strip, selected tab
+        gain: "#0A7D53",
+        gainbg: "#E9F8F0",
+        loss: "#C2300F",
+        lossbg: "#FFEFEA",
+        lime: "#C6F432",
+        warn: "#8A4B00",
+        warnbg: "#FFF4DB",
+        lavender: "#6D3BFF",
+        sage: "#0A7D53",
+        terracotta: "#C2300F", // alarms only
       },
       fontFamily: {
-        // F15: @fontsource/fraunces and @fontsource/instrument-sans (npm, offline-safe),
-        // registered by name in layout.tsx — not next/font/google.
-        display: ["Fraunces", "Georgia", "serif"],
+        // F15: @fontsource/bricolage-grotesque and @fontsource/instrument-sans (npm, offline-safe),
+        // registered by name in layout.tsx, not next/font/google.
+        display: ["Bricolage Grotesque", "Instrument Sans", "system-ui", "sans-serif"],
         body: ["Instrument Sans", "system-ui", "sans-serif"],
       },
       animation: {
@@ -52,8 +56,6 @@ module.exports = {
         grow: "grow 1.1s cubic-bezier(.2,.7,.2,1) .4s both",
         breathe: "breathe 2.4s ease-in-out infinite",
         fadein: "fadein .5s ease both",
-        drift: "drift 14s ease-in-out infinite",
-        drift2: "drift2 17s ease-in-out infinite",
         bob: "bob 3.2s ease-in-out infinite",
       },
       keyframes: {
@@ -63,14 +65,6 @@ module.exports = {
         grow: { from: { transform: "scaleX(0)" }, to: { transform: "scaleX(1)" } },
         breathe: { "0%,100%": { opacity: 1 }, "50%": { opacity: 0.45 } },
         fadein: { from: { opacity: 0 }, to: { opacity: 1 } },
-        drift: {
-          "0%,100%": { transform: "translate(0,0) scale(1)" },
-          "50%": { transform: "translate(40px,-30px) scale(1.15)" },
-        },
-        drift2: {
-          "0%,100%": { transform: "translate(0,0) scale(1.1)" },
-          "50%": { transform: "translate(-50px,25px) scale(.92)" },
-        },
         bob: { "0%,100%": { transform: "translateY(0)" }, "50%": { transform: "translateY(-4px)" } },
       },
     },

@@ -75,7 +75,7 @@ export default function Header({ isConnected, broker, showPro, onTogglePro, chil
       <div className="flex items-center gap-3">
         <div
           className="bob flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg"
-          style={{ background: "linear-gradient(135deg, #D98B5F, #C47A88 55%, #8189C4)" }}
+          style={{ background: "#2B4BFF" }}
         >
           <LineChart className="h-5 w-5 text-white" strokeWidth={1.8} aria-hidden="true" />
         </div>
@@ -91,14 +91,14 @@ export default function Header({ isConnected, broker, showPro, onTogglePro, chil
         <div className="flex items-center gap-2 rounded-full border border-line bg-white/80 px-3 sm:px-4 py-2 text-xs sm:text-sm">
           <span className="relative inline-block h-2.5 w-2.5" aria-hidden="true">
             {isConnected && (
-              <span className="ping2 absolute inset-0 rounded-full" style={{ background: "#5E9A7A" }} />
+              <span className="ping2 absolute inset-0 rounded-full" style={{ background: "#0A7D53" }} />
             )}
             <span
               className="absolute inset-0 rounded-full"
-              style={{ background: isConnected ? "#5E9A7A" : "#A7A2B8" }}
+              style={{ background: isConnected ? "#0A7D53" : "#8A91B0" }}
             />
           </span>
-          <span className="font-semibold" style={{ color: isConnected ? "#3F7D5C" : "#5D5A73" }}>
+          <span className="font-semibold" style={{ color: isConnected ? "#0A7D53" : "#5B6283" }}>
             {isConnected ? "Running" : "Reconnecting"}
           </span>
           {clock && <span className="hidden sm:inline text-muted">{clock}</span>}
@@ -111,8 +111,8 @@ export default function Header({ isConnected, broker, showPro, onTogglePro, chil
           className="min-h-[44px] rounded-full border px-4 text-xs sm:text-sm font-semibold transition-colors"
           style={
             showPro
-              ? { borderColor: "#4A5190", background: "#EEEFF7", color: "#3E4478" }
-              : { borderColor: "#E2D6C2", background: "rgba(255,255,255,0.8)", color: "#3E3A57" }
+              ? { borderColor: "#2B4BFF", background: "#F0EBFF", color: "#4A2AB5" }
+              : { borderColor: "#C9D0E8", background: "rgba(255,255,255,0.8)", color: "#2A3150" }
           }
         >
           {showPro ? "Hide pro words" : "Show pro words"}

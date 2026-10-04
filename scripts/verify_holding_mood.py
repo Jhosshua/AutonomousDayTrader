@@ -95,9 +95,9 @@ HOLDERS = {
 
 OLD_WORDING = [r"5-minute", r"five.minute", r"RVOL", r"20 bars", r"breakout_fired", r"opening_range", r"range_high"]
 # money losses and alarms only (loss chip, Sell button, loss text)
-TERRACOTTA = ["rgb(169, 85, 58)", "rgb(143, 68, 36)", "rgb(246, 227, 218)"]
+TERRACOTTA = ["rgb(194, 48, 15)", "rgb(255, 239, 234)", "rgb(245, 183, 168)"]  # loss / terracotta, loss background, loss border (2026-10-04 bright palette)
 # the alarm-banner family: also forbidden inside the mood card (ORB's strategy band legitimately sits in it)
-ALARM_FAMILY = ["rgb(122, 62, 29)", "rgb(250, 240, 230)", "rgb(239, 216, 197)", "rgb(244, 224, 207)"]
+ALARM_FAMILY = ["rgb(138, 75, 0)", "rgb(255, 244, 219)", "rgb(240, 215, 154)", "rgb(255, 223, 207)"]  # warn text, warn background, warn border, ORB band
 
 # ---------------------------------------------------------------------------------------------------
 # Page probes
@@ -426,10 +426,10 @@ def negative_controls(browser, width: int, height: int) -> None:
     try:
         s.push(frame("busy"), 1500)
         clean_overflow = overflow(p)
-        p.add_style_tag(content="[data-testid=mood-tile-fear]{background:#A9553A !important;color:#F6E3DA !important}")
+        p.add_style_tag(content="[data-testid=mood-tile-fear]{background:#C2300F !important;color:#FFEFEA !important}")
         bad = p.evaluate(JS_COLORS, ["[data-testid=market-mood]", TERRACOTTA + ALARM_FAMILY])
         check(len(bad) >= 1, f"[negative] terracotta inside the mood card is detected ({len(bad)} hits)")
-        p.add_style_tag(content="[data-testid=holding-row-AAPL] [data-testid=holding-badge]{background:#F6E3DA !important}")
+        p.add_style_tag(content="[data-testid=holding-row-AAPL] [data-testid=holding-badge]{background:#FFEFEA !important}")
         bad = p.evaluate(JS_COLORS, ["[data-testid=holding-banner]", TERRACOTTA])
         check(len(bad) >= 1, f"[negative] terracotta inside a holding badge is detected ({len(bad)} hits)")
         p.evaluate("() => { const d = document.createElement('div'); d.style.cssText = 'width:2400px;height:10px;background:#ccc'; "

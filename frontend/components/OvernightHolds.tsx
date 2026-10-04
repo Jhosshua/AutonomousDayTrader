@@ -105,7 +105,7 @@ export default function OvernightHolds({ holds, tonight, summary, noBuyActive, d
           {!noBuyActive && summary && <div data-testid="overnight-summary">{summary}</div>}
           {disabledReason && <div className="text-xs text-muted" data-testid="overnight-no-buy-reason">{disabledReason}</div>}
           {reply && (
-            <div role="status" className="text-xs font-semibold" style={{ color: reply.ok ? "#2F6B4C" : "#8F4424" }} data-testid="overnight-no-buy-reply">
+            <div role="status" className="text-xs font-semibold" style={{ color: reply.ok ? "#0A7D53" : "#C2300F" }} data-testid="overnight-no-buy-reply">
               {reply.text}
             </div>
           )}
@@ -116,7 +116,7 @@ export default function OvernightHolds({ holds, tonight, summary, noBuyActive, d
           disabled={disabled}
           data-testid="btn-no-buy-tonight"
           className="min-h-[44px] flex-1 min-w-[180px] rounded-xl border px-4 text-sm font-semibold disabled:opacity-40 sm:flex-none"
-          style={{ borderColor: "#D5E2D6", color: "#2F5A45", background: "#EDF3EE" }}
+          style={{ borderColor: "#BFE6D3", color: "#0B5A3C", background: "#E9F8F0" }}
         >
           {label}
         </button>

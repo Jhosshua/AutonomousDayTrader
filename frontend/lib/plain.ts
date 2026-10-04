@@ -71,81 +71,81 @@ export interface StrategyTheme {
 
 export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
   tsla_asymmetric_dual: {
-    name: "Tesla Morning Plan", band: "#DCE9EF", ink: "#2F5368", tint: "#EDF4F7",
-    bar: "#7299AF", track: "#DFEAF0",
+    name: "Tesla Morning Plan", band: "#DDE4FF", ink: "#1E36B8", tint: "#EEF1FF",
+    bar: "#2B4BFF", track: "#E1E7FF",
     what: "Trades a confirmed morning bounce or breakdown. Splits the position into two equal parts, each with a fixed target and closing time.",
   },
   cde_asymmetric_dual: {
-    name: "Coeur Morning Plan", band: "#EAE3CF", ink: "#65542E", tint: "#F5F1E5",
-    bar: "#AD985E", track: "#EBE4D2",
+    name: "Coeur Morning Plan", band: "#FBEBB8", ink: "#7A5900", tint: "#FFF6DD",
+    bar: "#B88600", track: "#F7EDC8",
     what: "Trades Coeur Mining after a morning bounce or breakdown, with QQQ confirmation. Uses one fixed target and a three-hour limit.",
   },
   tsla_or15_retest: {
     name: "Tesla Morning Retest",
-    band: "#DCE9EF",
-    ink: "#2F5368",
-    tint: "#EDF4F7",
-    bar: "#7299AF",
-    track: "#DFEAF0",
+    band: "#DDE4FF",
+    ink: "#1E36B8",
+    tint: "#EEF1FF",
+    bar: "#2B4BFF",
+    track: "#E1E7FF",
     what: "Buys one Tesla share after a morning breakout pulls back and holds. Checks QQQ for support, then uses fixed exits and a two-hour limit.",
   },
   orb: {
     name: "Opening Range Breakout (ORBStraddle rules)",
-    band: "#F4E0CF",
-    ink: "#7A3E1D",
-    tint: "#FAF0E6",
-    bar: "#D98B5F",
-    track: "#F2E3D5",
+    band: "#FFDFCF",
+    ink: "#8F3600",
+    tint: "#FFF0E8",
+    bar: "#E85A1B",
+    track: "#FCE5D9",
     what: "Scans about 250 stocks for a clean break of their 9:30 to 9:35 range. Decides at 9:38 AM, may add a trade until 10:15 AM, and closes every trade by 11:00 AM. Each trade is a broker bracket: its stop and target wait at Alpaca.",
   },
   vwap_pullback: {
     name: "Ride the Trend",
-    band: "#DCE8DE",
-    ink: "#2F5A45",
-    tint: "#EDF3EE",
-    bar: "#6E9C82",
-    track: "#DDE9E0",
+    band: "#CDEFF1",
+    ink: "#06707A",
+    tint: "#E6F7F8",
+    bar: "#0A8F9C",
+    track: "#D5F0F2",
     what: "Version 2. When a stock pushes to a new high (or low), it waits for a quiet, low-volume dip back toward the day's average price, then joins only if the move picks up speed again. Mornings only.",
   },
   news_momentum: {
     name: "Big News",
-    band: "#F1DDDF",
-    ink: "#7A3343",
-    tint: "#F7EBED",
-    bar: "#C47A88",
-    track: "#EFDFE2",
+    band: "#FFD6EA",
+    ink: "#A3135B",
+    tint: "#FFEAF4",
+    bar: "#D61F7A",
+    track: "#FBDDEC",
     what: "Jumps in when a company gets very big news and lots of people rush to trade it.",
   },
   mean_reversion: {
     name: "Snap Back",
-    band: "#E0E1F0",
-    ink: "#3E4478",
-    tint: "#EEEFF7",
-    bar: "#8189C4",
-    track: "#E2E3F1",
+    band: "#E2D8FF",
+    ink: "#4A2AB5",
+    tint: "#F0EBFF",
+    bar: "#6D3BFF",
+    track: "#E6DEFF",
     what: "Bets that a stock that ran too far, too fast will bounce back a little.",
   },
-  // Overnight holds: labels only, in the neutral colors (no new palette until the mockups are approved).
+  // Overnight holds: one ink colour for all three (they are the only plays that run past the close).
   overnight_nvda: {
-    name: "NVDA overnight", band: "#ECE9DE", ink: "#5D5A73", tint: "#F3F1EA", bar: "#A7A2B8", track: "#E7E3D6",
+    name: "NVDA overnight", band: "#E3E6F1", ink: "#0E1330", tint: "#F1F3FA", bar: "#0E1330", track: "#DFE3F0",
     what: "Buys NVDA at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
   },
   overnight_iren: {
-    name: "IREN overnight", band: "#ECE9DE", ink: "#5D5A73", tint: "#F3F1EA", bar: "#A7A2B8", track: "#E7E3D6",
+    name: "IREN overnight", band: "#E3E6F1", ink: "#0E1330", tint: "#F1F3FA", bar: "#0E1330", track: "#DFE3F0",
     what: "Buys IREN at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
   },
   overnight_hut: {
-    name: "HUT overnight", band: "#ECE9DE", ink: "#5D5A73", tint: "#F3F1EA", bar: "#A7A2B8", track: "#E7E3D6",
+    name: "HUT overnight", band: "#E3E6F1", ink: "#0E1330", tint: "#F1F3FA", bar: "#0E1330", track: "#DFE3F0",
     what: "Buys HUT at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
   },
 };
 
 export const NEUTRAL_THEME: Omit<StrategyTheme, "name" | "what"> = {
-  band: "#ECE9DE",
-  ink: "#5D5A73",
-  tint: "#F3F1EA",
-  bar: "#A7A2B8",
-  track: "#E7E3D6",
+  band: "#E6EAF5",
+  ink: "#4B5273",
+  tint: "#F1F3FB",
+  bar: "#8A91B0",
+  track: "#E3E7F3",
 };
 
 /** Theme + copy for a strategy id. Unknown ids fall back to neutral grey with the raw name. */
@@ -501,10 +501,10 @@ export const LEVEL_WORD: Record<string, string> = { LOW: "calm", NORMAL: "normal
 export const LEVEL_CHIP: Record<string, string> = { LOW: "Calm", NORMAL: "Normal", ELEVATED: "Nervous", CRISIS: "Panic" };
 /** One neutral scale (grey, then deepening amber). Never the strategy colors, never terracotta. */
 export const LEVEL_COLORS: Record<string, { bg: string; ink: string }> = {
-  LOW: { bg: "#ECE9DE", ink: "#4A4760" },
-  NORMAL: { bg: "#E9E5D6", ink: "#4A4760" },
-  ELEVATED: { bg: "#F2E2BC", ink: "#5C4310" },
-  CRISIS: { bg: "#E6C57E", ink: "#4A3208" },
+  LOW: { bg: "#E6EAF5", ink: "#3F4663" },
+  NORMAL: { bg: "#DDE2F2", ink: "#3F4663" },
+  ELEVATED: { bg: "#FFE9A8", ink: "#6A4500" },
+  CRISIS: { bg: "#FFC94D", ink: "#4A3000" },
 };
 
 export const TREND_WORD: Record<string, string> = { BULLISH: "rising", BEARISH: "falling", NEUTRAL: "flat", UNKNOWN: "unclear" };

@@ -117,7 +117,7 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
               </h2>
               <span
                 className="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-                style={durable ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
+                style={durable ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#FFEFEA", color: "#C2300F" }}
               >
                 {durable ? <ShieldCheck className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
                 {durable ? "Saving normally" : disabled ? "Saving is off" : "Saving problem"}
@@ -165,7 +165,7 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
 
           <div aria-live="polite" className="mt-4 space-y-2">
             {error && (
-              <div className="flex items-center justify-between gap-3 rounded-2xl border p-3 text-sm" style={{ borderColor: "#EFD8C5", background: "#FAF0E6", color: "#7A3E1D" }}>
+              <div className="flex items-center justify-between gap-3 rounded-2xl border p-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
                 <span>{error}. Previously loaded trades are still shown.</span>
                 <button type="button" onClick={() => void load()} aria-label="Retry" className="rounded-lg p-1.5 hover:bg-white">
                   <RefreshCw className="h-3.5 w-3.5" />
@@ -188,7 +188,7 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
                         <span>{historyDateLabel(day)}</span>
                         <span className="mt-1 flex items-center justify-between pl-4 text-xs font-normal text-muted">
                           <span>{count} finished {count === 1 ? "trade" : "trades"}{session?.aggregate_only ? " · daily total only" : ""}</span>
-                          <span className="font-bold tabular-nums" style={{ color: pnl < 0 ? "#8F4424" : "#2F6B4C" }}>{formatSignedMoney(pnl)}</span>
+                          <span className="font-bold tabular-nums" style={{ color: pnl < 0 ? "#C2300F" : "#0A7D53" }}>{formatSignedMoney(pnl)}</span>
                         </span>
                       </summary>
                       {session?.aggregate_only ? (
@@ -202,7 +202,7 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
                             type="button"
                             key={trade.trade_id}
                             onClick={() => setSelected(trade)}
-                            className="grid w-full grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr_auto] items-center gap-3 rounded-2xl border border-line bg-white p-3 text-left hover:bg-[#FAF8F2]"
+                            className="grid w-full grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr_auto] items-center gap-3 rounded-2xl border border-line bg-white p-3 text-left hover:bg-[#F6F8FE]"
                           >
                             <div>
                               <div className="text-sm font-semibold text-ink">
@@ -214,7 +214,7 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
                             <div className="flex items-center gap-1.5">
                               <span
                                 className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
-                                style={trade.realized_pnl >= 0 ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#F6E3DA", color: "#8F4424" }}
+                                style={trade.realized_pnl >= 0 ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#FFEFEA", color: "#C2300F" }}
                               >
                                 {formatSignedMoney(trade.realized_pnl)}
                               </span>
@@ -237,7 +237,7 @@ export default function TradeHistory({ open, onClose, ledgerRevision, streamPers
                 type="button"
                 disabled={loadingMore}
                 onClick={() => void load(data.next_cursor || undefined, true)}
-                className="min-h-[44px] w-full rounded-xl border border-line bg-white text-sm font-semibold text-[#3E3A57] disabled:opacity-50"
+                className="min-h-[44px] w-full rounded-xl border border-line bg-white text-sm font-semibold text-[#2A3150] disabled:opacity-50"
               >
                 {loadingMore ? "Loading…" : "Load older trades"}
               </button>
@@ -290,7 +290,7 @@ function Tile({ label, value, tone }: { label: string; value: string; tone?: "ga
   return (
     <div className="rounded-2xl border border-line bg-white p-3">
       <span className="block text-xs text-muted">{label}</span>
-      <span className="tabular-nums text-sm font-bold" style={tone === "loss" ? { color: "#8F4424" } : tone === "gain" ? { color: "#2F6B4C" } : { color: "#1D1A33" }}>
+      <span className="tabular-nums text-sm font-bold" style={tone === "loss" ? { color: "#C2300F" } : tone === "gain" ? { color: "#0A7D53" } : { color: "#0E1330" }}>
         {value}
       </span>
     </div>
@@ -299,7 +299,7 @@ function Tile({ label, value, tone }: { label: string; value: string; tone?: "ga
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-[#FAF8F2] p-3">
+    <div className="rounded-2xl border border-line bg-[#F6F8FE] p-3">
       <span className="block text-xs text-muted">{label}</span>
       <span className="font-semibold text-ink">{value}</span>
     </div>

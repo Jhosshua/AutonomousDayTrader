@@ -4,7 +4,7 @@ import assert from "node:assert";
 
 const FRONTEND_DIR = path.resolve(import.meta.dirname, "..");
 
-console.log("🔍 Verifying plain-language dashboard architecture (2026-09-24 redesign)...");
+console.log("🔍 Verifying plain-language dashboard architecture (2026-09-24 redesign, bright palette 2026-10-04)...");
 
 // 1. Verify file inventory (post-redesign contract).
 const requiredFiles = [
@@ -60,26 +60,28 @@ for (const file of deletedFiles) {
 }
 console.log("  ✅ Verified old dark-theme-only components were removed");
 
-// 2. Verify the new "muted palette" light theme tokens in tailwind.config.js and globals.css.
+// 2. Verify the bright light theme tokens in tailwind.config.js and globals.css (2026-10-04 replaced the muted palette).
 const tailwindConfig = fs.readFileSync(path.join(FRONTEND_DIR, "tailwind.config.js"), "utf8");
-for (const token of ["#F7F3EC", "#1D1A33", "#5D5A73", "#2E3244", "#2F6B4C", "#8F4424"]) {
+for (const token of ["#EEF1FA", "#0E1330", "#5B6283", "#2B4BFF", "#0A7D53", "#C2300F", "#C6F432", "#8A4B00"]) {
   assert(tailwindConfig.includes(token), `Missing light-theme token ${token} in tailwind config`);
 }
-console.log("  ✅ Verified light 'muted palette' design tokens in tailwind.config.js");
+console.log("  ✅ Verified bright design tokens in tailwind.config.js");
 
 const globalsCss = fs.readFileSync(path.join(FRONTEND_DIR, "app/globals.css"), "utf8");
 assert(globalsCss.includes("prefers-reduced-motion"), "Missing prefers-reduced-motion block in globals.css (F14)");
 assert(globalsCss.includes("@keyframes breathe"), "Missing breathe keyframe in globals.css");
-assert(globalsCss.includes("@keyframes drift"), "Missing drift keyframe in globals.css");
+assert(!globalsCss.includes("@keyframes drift"), "The blurred drift blobs were removed (2026-10-04): no drift keyframe expected");
 assert(globalsCss.includes("tabular-nums"), "Missing tabular-nums utility in globals.css");
-console.log("  ✅ Verified reduced-motion block and mockup-matched keyframes");
+console.log("  ✅ Verified reduced-motion block and keyframes");
 
 // 3. Fonts: @fontsource npm packages, never next/font/google (F15).
 const pkgJson = JSON.parse(fs.readFileSync(path.join(FRONTEND_DIR, "package.json"), "utf8"));
-assert(pkgJson.dependencies["@fontsource/fraunces"], "Missing @fontsource/fraunces dependency (F15)");
+assert(pkgJson.dependencies["@fontsource/bricolage-grotesque"], "Missing @fontsource/bricolage-grotesque dependency (F15)");
+assert(!pkgJson.dependencies["@fontsource/fraunces"], "Fraunces was replaced by Bricolage Grotesque (2026-10-04)");
 assert(pkgJson.dependencies["@fontsource/instrument-sans"], "Missing @fontsource/instrument-sans dependency (F15)");
 const layout = fs.readFileSync(path.join(FRONTEND_DIR, "app/layout.tsx"), "utf8");
-assert(layout.includes("@fontsource/fraunces"), "layout.tsx must import @fontsource/fraunces");
+assert(layout.includes("@fontsource/bricolage-grotesque"), "layout.tsx must import @fontsource/bricolage-grotesque");
+assert(!layout.includes("fraunces"), "layout.tsx must not import Fraunces any more");
 assert(layout.includes("@fontsource/instrument-sans"), "layout.tsx must import @fontsource/instrument-sans");
 assert(!layout.includes('from "next/font'), "layout.tsx must NOT import from next/font (F15)");
 assert(!/maximumScale\s*:/.test(layout), "layout.tsx must not set a maximumScale value (F16)");

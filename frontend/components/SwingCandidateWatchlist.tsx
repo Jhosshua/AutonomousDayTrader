@@ -66,10 +66,10 @@ function CheckIcon({ state }: { state: CheckState }) {
 }
 
 const BANDS = [
-  "linear-gradient(90deg, #8FB8A0, #7E9CC8)",
-  "linear-gradient(90deg, #7E9CC8, #8189C4)",
-  "linear-gradient(90deg, #8189C4, #A884B5)",
-  "linear-gradient(90deg, #A884B5, #D8A0A8)",
+  "#8A91B0",
+  "#2B4BFF",
+  "#6D3BFF",
+  "#0A7D53",
 ];
 
 export default function SwingCandidateWatchlist({ candidates = [], loading = false }: SwingCandidateWatchlistProps) {
@@ -110,13 +110,13 @@ export default function SwingCandidateWatchlist({ candidates = [], loading = fal
                     </div>
                     <span
                       className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-bold"
-                      style={passed >= 3 ? { background: "#E4EFE7", color: "#2F6B4C" } : { background: "#EEEFF7", color: "#3E4478" }}
+                      style={passed >= 3 ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#F0EBFF", color: "#4A2AB5" }}
                     >
                       {passed} of 4
                     </span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full" style={{ background: "#F3ECDF" }}>
-                    <div className="grow h-full rounded-full" style={{ width: `${passed * 25}%`, background: "linear-gradient(90deg, #5E9A7A, #7E9CC8)" }} />
+                  <div className="h-2 overflow-hidden rounded-full" style={{ background: "#E3E7F3" }}>
+                    <div className="grow h-full rounded-full" style={{ width: `${passed * 25}%`, background: "#0A7D53" }} />
                   </div>
                   <div className="flex flex-col gap-2.5">
                     {checks.map((chk) => (
@@ -125,10 +125,10 @@ export default function SwingCandidateWatchlist({ candidates = [], loading = fal
                           className="mt-0.5 flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full"
                           style={
                             chk.state === "pass"
-                              ? { background: "#5E9A7A", color: "#FFFFFF" }
+                              ? { background: "#0A7D53", color: "#FFFFFF" }
                               : chk.state === "fail"
-                              ? { background: "#F3ECDF", color: "#5D5A73" }
-                              : { background: "#F3ECDF", color: "#5D5A73" }
+                              ? { background: "#E3E7F3", color: "#5B6283" }
+                              : { background: "#E3E7F3", color: "#5B6283" }
                           }
                         >
                           <CheckIcon state={chk.state} />

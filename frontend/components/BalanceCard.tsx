@@ -75,10 +75,10 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
             style={
               isDown
-                ? { background: "#F6E3DA", color: "#8F4424" }
+                ? { background: "#FFEFEA", color: "#C2300F" }
                 : isUp
-                ? { background: "#E4EFE7", color: "#2F6B4C" }
-                : { background: "#F3F1EA", color: "#5D5A73" }
+                ? { background: "#E9F8F0", color: "#0A7D53" }
+                : { background: "#F1F3FB", color: "#5B6283" }
             }
           >
             {isDown ? <ArrowDown className="h-3.5 w-3.5" /> : isUp ? <ArrowUp className="h-3.5 w-3.5" /> : null}
@@ -94,7 +94,7 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
         <div className="flex items-baseline justify-between gap-3 text-xs">
           <span className="text-muted">Finished trades today</span>
           {hasTrades && (
-            <span className="text-sm font-semibold tabular-nums" style={{ color: finalValue < 0 ? "#8F4424" : finalValue > 0 ? "#2F6B4C" : "#5D5A73" }}>
+            <span className="text-sm font-semibold tabular-nums" style={{ color: finalValue < 0 ? "#C2300F" : finalValue > 0 ? "#0A7D53" : "#5B6283" }}>
               {finalValue < 0 ? "-" : finalValue > 0 ? "+" : ""}{formatMoney(Math.abs(finalValue))}
             </span>
           )}
@@ -103,33 +103,22 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
           {hasTrades ? (
             <svg width="100%" height="100%" viewBox="0 0 560 150" preserveAspectRatio="none" role="img"
               aria-label={`Chart of today's finished trades: cumulative result ${finalValue >= 0 ? "up" : "down"} ${formatMoney(Math.abs(finalValue))}`}>
-              <defs>
-                <linearGradient id="balanceLine" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0" stopColor="#6E9C82" />
-                  <stop offset="0.5" stopColor="#8189C4" />
-                  <stop offset="1" stopColor="#C47A88" />
-                </linearGradient>
-                <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#8189C4" stopOpacity="0.25" />
-                  <stop offset="1" stopColor="#C47A88" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <line x1="0" y1={zeroY} x2="560" y2={zeroY} stroke="#CFC6B3" strokeWidth="1" strokeDasharray="4 5" vectorEffect="non-scaling-stroke" />
-              <path className="fadein" d={fillPath} fill="url(#balanceFill)" />
-              <path className="draw" d={path} fill="none" stroke="url(#balanceLine)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <line x1="0" y1={zeroY} x2="560" y2={zeroY} stroke="#C4CBE3" strokeWidth="1" strokeDasharray="4 5" vectorEffect="non-scaling-stroke" />
+              <path className="fadein" d={fillPath} fill="#2B4BFF" fillOpacity="0.12" />
+              <path className="draw" d={path} fill="none" stroke="#2B4BFF" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             </svg>
           ) : (
             <div className="flex h-full items-center justify-center gap-3 text-center">
-              <div className="h-px flex-1" style={{ background: "#EFE4D2" }} />
+              <div className="h-px flex-1" style={{ background: "#DDE2F2" }} />
               <span className="text-xs text-muted">No trades yet today</span>
-              <div className="h-px flex-1" style={{ background: "#EFE4D2" }} />
+              <div className="h-px flex-1" style={{ background: "#DDE2F2" }} />
             </div>
           )}
         </div>
         <div className="relative flex justify-between text-[11px] text-muted">
           <span>9:30 AM</span>
           {hasTrades && nowPct > 12 && nowPct < 88 && (
-            <span className="absolute -translate-x-1/2" style={{ left: `${nowPct}%`, color: "#7A3343", fontWeight: 600 }}>Now</span>
+            <span className="absolute -translate-x-1/2" style={{ left: `${nowPct}%`, color: "#2B4BFF", fontWeight: 600 }}>Now</span>
           )}
           <span>4:00 PM</span>
         </div>

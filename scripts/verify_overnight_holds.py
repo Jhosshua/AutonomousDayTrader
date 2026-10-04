@@ -396,7 +396,7 @@ def run_matrix(s: Session) -> None:
     common(s, "morning_unsold", ["IREN"], [])
     equals(s, "[data-testid=overnight-unsold-banner]", UNSOLD_IREN, "morning_unsold banner")
     banner_color = p.eval_on_selector("[data-testid=overnight-unsold-banner]", "e => getComputedStyle(e).color")
-    check(banner_color == "rgb(143, 68, 36)", f"[{s.label}] unsold banner uses the existing alarm red #8F4424 ({banner_color})")
+    check(banner_color == "rgb(194, 48, 15)", f"[{s.label}] unsold banner uses the alarm red #C2300F ({banner_color})")
     equals(s, "[data-testid=safety-overnight-result]", "Overnight holds made $122.44 today. This is not counted in the limit above.", "morning_unsold result")
     equals(s, "[data-testid=overnight-summary]", SUMMARY_NVDA_HUT, "morning_unsold summary (IREN still held)")
 

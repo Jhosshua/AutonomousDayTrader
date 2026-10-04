@@ -18,7 +18,7 @@ export default function StrategyTable({ strategies, ledgerByStrategy, showPro }:
         <h2 className="font-display text-lg font-semibold text-ink">The {strategies.length} ways it trades</h2>
         <div className="text-xs text-muted"><span>Colored bar = hours it may trade. Dark line = now.</span> <span>Tap a row for how it works.</span></div>
       </div>
-      <div className={`${ROW_GRID} bg-[#FBF8F2] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted`} aria-hidden="true">
+      <div className={`${ROW_GRID} bg-[#F6F8FE] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted`} aria-hidden="true">
         <span className="hidden lg:block">Playbook</span>
         <span className="hidden lg:block">Status</span>
         <span className="relative col-span-3 col-start-2 block h-4 font-medium normal-case tracking-normal lg:col-span-1 lg:col-start-3">

@@ -46,11 +46,11 @@ export const ROW_GRID =
 const UNDER_ROW = "col-span-4 col-start-1 lg:col-span-3 lg:col-start-2";
 
 const CHIP_STYLES: Record<string, { bg: string; fg: string }> = {
-  sage: { bg: "#FFFFFF", fg: "#2F5A45" },
-  lavender: { bg: "#FFFFFF", fg: "#3E4478" },
-  grey: { bg: "#FFFFFF", fg: "#5D5A73" },
-  amber: { bg: "#FFFFFF", fg: "#8A5A12" },
-  terracotta: { bg: "#FFFFFF", fg: "#8F4424" },
+  sage: { bg: "#FFFFFF", fg: "#0B5A3C" },
+  lavender: { bg: "#FFFFFF", fg: "#4A2AB5" },
+  grey: { bg: "#FFFFFF", fg: "#5B6283" },
+  amber: { bg: "#FFFFFF", fg: "#8A4B00" },
+  terracotta: { bg: "#FFFFFF", fg: "#C2300F" },
 };
 
 function OrbOrphanResolve({ symbol }: { symbol: string }) {
@@ -82,7 +82,7 @@ function OrbOrphanResolve({ symbol }: { symbol: string }) {
   return (
     <div className="mt-2">
       <button type="button" onClick={resolve} disabled={busy} data-testid="orb-resolve-orphan"
-        className="min-h-[44px] rounded-lg border border-[#8F4424]/60 bg-white px-3 py-1.5 text-xs font-semibold text-[#8F4424]">
+        className="min-h-[44px] rounded-lg border border-[#C2300F]/60 bg-white px-3 py-1.5 text-xs font-semibold text-[#C2300F]">
         {busy ? "Checking Alpaca…" : armed ? `Confirm: clear ${symbol}` : `I closed ${symbol} at Alpaca: clear it`}
       </button>
       {msg && <div className="mt-1 text-xs font-normal">{msg}</div>}
@@ -114,7 +114,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
   const orbOpen = strategy.orb ? (strategy.orb.unrealized_pnl ?? 0) : 0;
   const pnl = (ledgerAgg?.realized_pnl ?? strategy.daily_pnl ?? 0) + orbOpen;
   const tradesCount = (ledgerAgg?.trades_count ?? strategy.trades_count ?? 0) + (strategy.orb?.open_trades.length ?? 0);
-  const pnlColor = pnl > 0 ? "#2F6B4C" : pnl < 0 ? "#8F4424" : "#5D5A73";
+  const pnlColor = pnl > 0 ? "#0A7D53" : pnl < 0 ? "#C2300F" : "#5B6283";
 
   // F9: an early-close day note must surface even when there's already a signals/orders lead.
   const earlyCloseNote = win?.notes?.find((n) => n.toLowerCase().includes("early"));
@@ -153,7 +153,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
         aria-expanded={open}
         aria-controls={open ? detailsId : undefined}
         data-testid="strategy-row-toggle"
-        className={`${ROW_GRID} min-h-[52px] w-full items-center gap-y-1 px-4 py-2 text-left transition-colors hover:bg-[#FBF8F2] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#4A5190]`}
+        className={`${ROW_GRID} min-h-[52px] w-full items-center gap-y-1 px-4 py-2 text-left transition-colors hover:bg-[#F6F8FE] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2B4BFF]`}
       >
         <span className="col-span-2 col-start-1 row-start-1 flex min-w-0 items-center gap-2.5 lg:col-span-1">
           <span
@@ -175,7 +175,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
         >
           <span
             className={chip.breathing ? "breathe inline-block h-2 w-2 rounded-full" : "inline-block h-2 w-2 rounded-full"}
-            style={{ background: resting || chip.tone === "grey" ? "#A7A2B8" : theme.bar }}
+            style={{ background: resting || chip.tone === "grey" ? "#8A91B0" : theme.bar }}
           />
           {chip.label}
         </span>
@@ -191,12 +191,12 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
           {showNow && (
             <span
               className="breathe absolute -top-1 block h-4 w-[3px] rounded-sm"
-              style={{ left: `${nowLeft}%`, background: "#1D1A33" }}
+              style={{ left: `${nowLeft}%`, background: "#0E1330" }}
             />
           )}
         </span>
 
-        <span className={`${UNDER_ROW} row-start-3 text-[13px] leading-snug text-[#3E3A57] lg:row-start-2`} data-testid="strategy-decisions">
+        <span className={`${UNDER_ROW} row-start-3 text-[13px] leading-snug text-[#2A3150] lg:row-start-2`} data-testid="strategy-decisions">
           {note}
         </span>
 
@@ -214,7 +214,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
 
       {hasStatus && (
         <div className={`${ROW_GRID} px-4 pb-2.5`}>
-        <div className={`${UNDER_ROW} flex flex-col gap-1.5 text-[13px] leading-snug text-[#3E3A57]`} data-testid="strategy-status">
+        <div className={`${UNDER_ROW} flex flex-col gap-1.5 text-[13px] leading-snug text-[#2A3150]`} data-testid="strategy-status">
           {trendOff && <div className="font-semibold">New entries switched off</div>}
           {trendAddonsOff && <div>Extra flow, spread and prior-volume checks switched off.</div>}
           {or15Holding && <div>{strategy.or15?.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : strategy.or15?.protection_confirmed ? "Safety exit and target held at the broker." : "Confirming protection with the broker."}</div>}
@@ -237,20 +237,20 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
           {orbAlerts.map((a) => {
             const orphan = (strategy.orb?.orphans ?? []).find((o) => o.text === a);
             return (
-              <div key={a} role="alert" className="break-words rounded-lg border border-[#8F4424]/60 bg-white p-2 text-sm font-semibold text-[#8F4424]" data-testid="orb-alert">
+              <div key={a} role="alert" className="break-words rounded-lg border border-[#C2300F]/60 bg-white p-2 text-sm font-semibold text-[#C2300F]" data-testid="orb-alert">
                 {a}
                 {orphan && <OrbOrphanResolve symbol={orphan.symbol} />}
               </div>
             );
           })}
           {orbProblem && (
-            <div role="alert" className="break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-sm text-[#8F4424]" data-testid="orb-init-error">
+            <div role="alert" className="break-words rounded-lg border border-[#C2300F]/30 bg-white p-2 text-sm text-[#C2300F]" data-testid="orb-init-error">
               {orbProblem}
               {showPro && (strategy.orb?.errors.length ?? 0) > 0 && <div className="mt-1 text-xs">{strategy.orb?.errors.map((e) => e.alarm || e.kind).join(", ")}</div>}
             </div>
           )}
           {triError && (
-            <div role="alert" className="break-words rounded-lg border border-[#8F4424]/30 bg-white p-2 text-sm text-[#8F4424]" data-testid="tri-engine-broker-issue">
+            <div role="alert" className="break-words rounded-lg border border-[#C2300F]/30 bg-white p-2 text-sm text-[#C2300F]" data-testid="tri-engine-broker-issue">
               Broker issue: check the paper account. Order management will keep retrying.
               {showPro && <div className="mt-1 text-xs">{triError}</div>}
             </div>
@@ -263,7 +263,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
         <div id={detailsId} className="grid gap-3 px-4 pb-4 pt-1 lg:grid-cols-2 lg:pl-[54px]" data-testid="strategy-details">
           <div className="flex flex-col gap-2">
             <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: theme.ink }}>How it works</div>
-            <p className="text-sm leading-relaxed text-[#3E3A57]">{theme.what}</p>
+            <p className="text-sm leading-relaxed text-[#2A3150]">{theme.what}</p>
             {showPro && (
               <div className="flex flex-col gap-1 self-start rounded-lg px-2.5 py-1.5 text-xs font-semibold" style={{ background: theme.tint, color: theme.ink }}>
                 <span>Pro name: {strategy.name}</span>
