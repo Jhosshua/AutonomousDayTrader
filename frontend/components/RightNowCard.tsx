@@ -32,7 +32,7 @@ export default function RightNowCard({
 
   return (
     <div
-      className="rise relative flex flex-col gap-2 rounded-[18px] bg-darkcard px-3 py-2 text-white sm:px-4 lg:flex-row lg:items-center lg:gap-4"
+      className="rise relative flex flex-col gap-2 rounded-[18px] bg-darkcard px-3 py-1.5 text-white sm:px-4 lg:flex-row lg:items-center lg:gap-4"
       style={{ animationDelay: "120ms" }}
       data-testid="status-strip"
     >
@@ -42,7 +42,14 @@ export default function RightNowCard({
           data-count={attention.length}
           className={`inline-flex min-h-[32px] flex-shrink-0 items-center gap-1.5 self-start rounded-full px-3 text-sm font-bold ${calm ? "bg-lime text-ink" : "bg-warnbg text-warn"}`}
         >
-          {calm ? <Check className="h-4 w-4" strokeWidth={3} aria-hidden="true" /> : <AlertTriangle className="h-4 w-4" aria-hidden="true" />}
+          {calm ? (
+            <span className="relative inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
+              <span className="ping2 absolute inset-0 rounded-full bg-ink/30" />
+              <Check className="relative h-4 w-4" strokeWidth={3} />
+            </span>
+          ) : (
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          )}
           {attentionPillText(attention.length)}
         </span>
         <div className="min-w-0 text-sm leading-snug sm:text-[15px]">

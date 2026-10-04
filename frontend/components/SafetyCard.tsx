@@ -56,7 +56,7 @@ export default function SafetyCard({
 
   return (
     <div
-      className="rise hover-card flex flex-col gap-3 rounded-[22px] border p-4 sm:p-5"
+      className="rise hover-card flex flex-col gap-2 rounded-[22px] border p-3 sm:p-3.5"
       style={{ background: "#E9F8F0", borderColor: "#BFE6D3", animationDelay: "380ms" }}
       data-testid="risk-telemetry"
     >
@@ -93,7 +93,12 @@ export default function SafetyCard({
         )}
       </div>
 
-      <div className="flex items-start gap-2.5 border-t pt-3" style={{ borderColor: "#BFE6D3" }}>
+      {/* The three rule paragraphs: one disclosure, closed by default. The meter, its sentence, the overnight
+          result line, the button and the "not included" note stay visible. */}
+      <details className="border-t pt-1" style={{ borderColor: "#BFE6D3" }} data-testid="safety-rules-details">
+        <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold text-ink">The safety rules</summary>
+        <div className="flex flex-col gap-3 pb-1 pt-1">
+      <div className="flex items-start gap-2.5">
         <Moon className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#2B4BFF" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           {ovn && ovn.buysOn ? (
@@ -112,7 +117,7 @@ export default function SafetyCard({
         </div>
       </div>
       <div className="flex items-start gap-2.5">
-        <TriangleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#C2300F" }} aria-hidden="true" />
+        <TriangleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#8A4B00" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           {ovn ? (
             <><b>Every day trade has an exit plan.</b> A price where it gives up, set before it buys. Overnight holds have no stop and sell at the next open.</>
@@ -121,6 +126,9 @@ export default function SafetyCard({
           )}
         </div>
       </div>
+
+        </div>
+      </details>
 
       <button
         type="button"

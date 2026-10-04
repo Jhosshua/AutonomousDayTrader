@@ -304,29 +304,33 @@ export default function Home() {
           </div>
         )}
 
-        <BalanceCard
-          equity={state.account.equity}
-          dailyPnl={state.account.daily_pnl}
-          todayTrades={todayLedger.items}
-          loading={todayLedger.loading && todayLedger.items.length === 0}
-          overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
-          history={ledgerHistoryLine(allLedger, todayEt)}
-        />
-
-        {overnightOn && (
-          <OvernightHolds
-            holds={holdViews}
-            tonight={tonightLines}
-            summary={overnightSummary}
-            noBuyActive={noBuyActive}
-            disabledReason={disabledReason}
-            onSetNoBuy={setNoBuyTonight}
-          />
-        )}
-
         {mode === "intraday" ? (
-          <div className="fadein grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="flex min-w-0 flex-col gap-3">
+          // Quick trades: two columns from lg up. Balance sits top right, the left stack runs the whole height, Safety and
+          // Results stack under Balance. DOM order is the phone order: Balance, left stack, right stack (no CSS order).
+          <div className="fadein grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-[auto_1fr]">
+            <BalanceCard
+              equity={state.account.equity}
+              dailyPnl={state.account.daily_pnl}
+              todayTrades={todayLedger.items}
+              loading={todayLedger.loading && todayLedger.items.length === 0}
+              overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
+              history={ledgerHistoryLine(allLedger, todayEt)}
+              narrow
+              className="lg:col-start-2 lg:row-start-1"
+            />
+
+            <div className="flex min-w-0 flex-col gap-3 lg:col-span-1 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+              {overnightOn && (
+                <OvernightHolds
+                  holds={holdViews}
+                  tonight={tonightLines}
+                  summary={overnightSummary}
+                  noBuyActive={noBuyActive}
+                  disabledReason={disabledReason}
+                  onSetNoBuy={setNoBuyTonight}
+                />
+              )}
+
               <HoldingNow
                 positions={intradayPositions}
                 marketContext={state.market_context}
@@ -339,7 +343,7 @@ export default function Home() {
               <StrategyTable strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} />
             </div>
 
-            <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex min-w-0 flex-col gap-3 lg:col-start-2 lg:row-start-2">
               <SafetyCard
                 drawdownDollars={state.account.risk_drawdown ?? state.account.daily_drawdown}
                 maxDailyLossDollars={healthLimits.maxDailyLossDollars}
@@ -362,16 +366,38 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="fadein flex flex-col gap-4">
-            <SwingTelemetryBar swingState={state.swing} showPro={showPro} />
-            <ActiveSwingPositionsTable
-              positions={state.swing?.positions ?? []}
-              onExitNextOpen={swingExitNextOpen}
-              onExitImmediate={swingExitImmediate}
-              onTightenStop={swingTightenStop}
+          // Slow trades: exactly what it showed before (no Safety, no Results), plus the overnight holds that were
+          // always above both views.
+          <>
+            <BalanceCard
+              equity={state.account.equity}
+              dailyPnl={state.account.daily_pnl}
+              todayTrades={todayLedger.items}
+              loading={todayLedger.loading && todayLedger.items.length === 0}
+              overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
+              history={ledgerHistoryLine(allLedger, todayEt)}
             />
-            <SwingCandidateWatchlist candidates={state.swing?.candidates ?? []} />
-          </div>
+            {overnightOn && (
+              <OvernightHolds
+                holds={holdViews}
+                tonight={tonightLines}
+                summary={overnightSummary}
+                noBuyActive={noBuyActive}
+                disabledReason={disabledReason}
+                onSetNoBuy={setNoBuyTonight}
+              />
+            )}
+            <div className="fadein flex flex-col gap-4">
+              <SwingTelemetryBar swingState={state.swing} showPro={showPro} />
+              <ActiveSwingPositionsTable
+                positions={state.swing?.positions ?? []}
+                onExitNextOpen={swingExitNextOpen}
+                onExitImmediate={swingExitImmediate}
+                onTightenStop={swingTightenStop}
+              />
+              <SwingCandidateWatchlist candidates={state.swing?.candidates ?? []} />
+            </div>
+          </>
         )}
 
         {showPro && <ExecutionLog records={state.recent_activity} maxItems={20} />}

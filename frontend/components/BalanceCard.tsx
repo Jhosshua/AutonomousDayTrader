@@ -19,6 +19,9 @@ interface BalanceCardProps {
   overnightNote?: string | null;
   /** All-time line from the full ledger. Null until the ledger has loaded, and on a ledger error (never a guess). */
   history?: { sinceStart: number; lastDay: { pnl: number; label: string } | null } | null;
+  /** In the 420 px right-hand column of the Quick trades grid: tighter padding and a slightly narrower number column. */
+  narrow?: boolean;
+  className?: string;
 }
 
 const SESSION_START_MIN = 9 * 60 + 30;
@@ -26,7 +29,7 @@ const SESSION_START_MIN = 9 * 60 + 30;
 /** F6: the chart is NOT a balance history. It is cumulative realized P&L of today's FINISHED
  * trades, a step line starting at $0. The balance number above it is the live account equity,
  * a separate figure. */
-export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, overnightNote, history }: BalanceCardProps) {
+export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, overnightNote, history, narrow = false, className = "" }: BalanceCardProps) {
   const isDown = dailyPnl < 0;
   const isUp = dailyPnl > 0;
 
@@ -63,12 +66,12 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
   }, [todayTrades]);
 
   return (
-    <div className="rise hover-card flex flex-col gap-3 rounded-[22px] border border-line bg-white p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5">
-      <div className="flex flex-col gap-2 sm:w-[46%] sm:justify-center">
+    <div className={`rise hover-card flex flex-col rounded-[22px] border border-line bg-white ${narrow ? "gap-2 p-3.5 sm:flex-row sm:items-stretch sm:gap-4 sm:p-4" : "gap-3 p-4 sm:flex-row sm:items-stretch sm:gap-5 sm:p-5"} ${className}`} data-testid="balance-card">
+      <div className={`flex flex-col gap-2 ${narrow ? "sm:w-[44%] sm:justify-center" : "sm:w-[46%] sm:justify-center"}`}>
       <div className="flex flex-row items-start justify-between gap-3 sm:flex-col sm:gap-2">
         <div className="flex flex-col gap-0.5">
           <div className="text-xs text-muted">Your balance</div>
-          <div className="font-display text-3xl font-medium tracking-tight tabular-nums text-ink">
+          <div className="font-display text-3xl font-bold tracking-tight tabular-nums text-ink">
             {formatMoney(equity)}
           </div>
           {overnightNote && <div className="text-xs leading-snug text-muted" data-testid="balance-overnight-note">{overnightNote}</div>}
@@ -94,8 +97,8 @@ export default function BalanceCard({ equity, dailyPnl, todayTrades, loading, ov
       </div>
         {history && (
           <div className="text-xs leading-snug text-muted" data-testid="balance-history">
-            Since start <MoneyText value={history.sinceStart} />
-            {history.lastDay && <> · Last trading day <MoneyText value={history.lastDay.pnl} /> ({history.lastDay.label})</>}
+            <span className="whitespace-nowrap">Since start <MoneyText value={history.sinceStart} />{history.lastDay && " ·"}</span>
+            {history.lastDay && <> Last trading day <MoneyText value={history.lastDay.pnl} /> ({history.lastDay.label})</>}
           </div>
         )}
       </div>

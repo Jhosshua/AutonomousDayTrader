@@ -144,7 +144,7 @@ function TradeRow({ trade, byDay, onOpen }: { trade: TradeRecord; byDay: boolean
       onClick={(e) => onOpen(trade, e.currentTarget)}
       data-testid="results-trade"
       data-trade-id={trade.trade_id}
-      className="grid min-h-[48px] w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-line px-3 py-1.5 text-left transition-colors hover:bg-[#F6F8FE] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2B4BFF]"
+      className="grid min-h-[44px] w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-line px-3 py-1 text-left transition-colors hover:bg-[#F6F8FE] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2B4BFF]"
     >
       <div className="flex h-8 w-8 items-center justify-center rounded-xl text-base font-bold" style={{ background: theme.track, color: theme.ink }} aria-hidden="true">
         {isLong ? "↑" : "↓"}
@@ -290,10 +290,19 @@ export default function ResultsPanel({ ledger, today, streamPersistence }: Resul
 
   return (
     <section className="rise flex flex-col rounded-[22px] border border-line bg-white" style={{ animationDelay: "300ms" }} data-testid="results-panel">
-      <div className="flex flex-col gap-1.5 px-4 pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-display text-lg font-semibold text-ink">Results</h2>
-          <div className="inline-flex rounded-xl border border-line bg-white p-0.5" role="group" aria-label="Group results by">
+      <div className="flex flex-col gap-0.5 px-4 pt-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h2 className="font-display text-lg font-semibold text-ink">Results</h2>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+              style={durable ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#FFF4DB", color: "#8A4B00" }}
+            >
+              {durable ? <ShieldCheck className="h-3 w-3" aria-hidden="true" /> : <AlertTriangle className="h-3 w-3" aria-hidden="true" />}
+              {durable ? "Saving normally" : disabled ? "Saving is off" : "Saving problem"}
+            </span>
+          </div>
+          <div className="inline-flex rounded-xl border border-line bg-white" role="group" aria-label="Group results by">
             {([
               { id: "day", label: "By day", testid: "results-tab-day" },
               { id: "playbook", label: "By playbook", testid: "results-tab-playbook" },
@@ -304,26 +313,19 @@ export default function ResultsPanel({ ledger, today, streamPersistence }: Resul
                 aria-pressed={grouping === g}
                 onClick={() => switchTo(g)}
                 data-testid={testid}
-                className={`min-h-[44px] rounded-lg px-3 text-sm font-semibold transition-colors ${grouping === g ? "bg-darkcard text-white" : "text-muted hover:text-ink"}`}
+                className={`min-h-[44px] rounded-lg px-2.5 text-[13px] font-semibold transition-colors ${grouping === g ? "bg-darkcard text-white" : "text-muted hover:text-ink"}`}
               >
                 {label}
               </button>
             ))}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted" data-testid="results-summary">
+        <div className="text-xs text-muted" data-testid="results-summary">
           {items.length > 0 && (
             <span>
               {trades(items.length)} · {wins} won, {losses} lost{dailyOnly > 0 ? ` · ${dailyOnly} more on daily-total-only days` : ""}
             </span>
           )}
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-            style={durable ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#FFF4DB", color: "#8A4B00" }}
-          >
-            {durable ? <ShieldCheck className="h-3 w-3" aria-hidden="true" /> : <AlertTriangle className="h-3 w-3" aria-hidden="true" />}
-            {durable ? "Saving normally" : disabled ? "Saving is off" : "Saving problem"}
-          </span>
         </div>
       </div>
 
@@ -352,7 +354,7 @@ export default function ResultsPanel({ ledger, today, streamPersistence }: Resul
                       onClick={() => toggle(g.key)}
                       aria-expanded={open}
                       aria-controls={open ? panelId : undefined}
-                      className="grid min-h-[52px] w-full grid-cols-[10px_minmax(0,1fr)_72px_auto_16px] items-center gap-x-2.5 px-4 py-1.5 text-left transition-colors hover:bg-[#F6F8FE] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2B4BFF] sm:grid-cols-[10px_minmax(0,1fr)_96px_auto_16px]"
+                      className="grid min-h-[44px] w-full grid-cols-[10px_minmax(0,1fr)_72px_auto_16px] items-center gap-x-2.5 px-4 py-1 text-left transition-colors hover:bg-[#F6F8FE] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2B4BFF] sm:grid-cols-[10px_minmax(0,1fr)_96px_auto_16px]"
                     >
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: g.dot }} aria-hidden="true" />
                       <span className="min-w-0">
@@ -361,7 +363,7 @@ export default function ResultsPanel({ ledger, today, streamPersistence }: Resul
                       </span>
                       <DivergingBar total={g.total} max={max} index={index} />
                       <span className="text-right text-sm font-bold tabular-nums" style={{ color: totalColour(g.total) }} data-testid="results-total">
-                        {formatSignedMoney(g.total)}
+                        {g.total === 0 ? formatMoney(0) : formatSignedMoney(g.total)}
                       </span>
                       <ChevronDown className="h-4 w-4 text-muted transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : undefined }} aria-hidden="true" />
                     </button>
