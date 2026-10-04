@@ -175,6 +175,10 @@ class Session:
 
     def text(self, sel: str) -> str:
         loc = self.page.locator(sel)
+        if loc.count() and "risk-telemetry" in sel:
+            # 2026-10-04: the three Safety rule paragraphs sit in one closed "The safety rules" disclosure (plan
+            # section 2.6). This check is about their exact words, so the disclosure is opened before reading.
+            loc.first.evaluate("e => e.querySelectorAll('details').forEach(d => { d.open = true; })")
         return norm(loc.first.inner_text()) if loc.count() else ""
 
     def close(self) -> None:
