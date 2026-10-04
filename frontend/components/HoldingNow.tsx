@@ -4,13 +4,14 @@ import { CircleHelp, Lock, ScanSearch, SlidersHorizontal } from "lucide-react";
 import { MarketContext, Position } from "@/types/trading";
 import { useActionButton } from "@/hooks/useActionButton";
 import {
-  ADAPTIVE_IDS,
-  FIXED_PLAN_IDS,
   adaptiveWhy,
   companyName,
   etTimeLabel,
   formatMoney,
   formatSignedMoney,
+  hasNoSafetyExit,
+  HoldingKind,
+  holdingKind,
   NEUTRAL_THEME,
   orbBoxText,
   stillHeldLine,
@@ -25,14 +26,9 @@ interface HoldingNowProps {
   onTightenStop: (symbol: string, newStop: number) => boolean;
 }
 
-type Kind = "adaptive" | "fixed" | "orb" | "none";
+type Kind = HoldingKind;
 
-function kindOf(id: string | undefined): Kind {
-  if (id === "orb") return "orb";
-  if (id && ADAPTIVE_IDS.includes(id)) return "adaptive";
-  if (id && FIXED_PLAN_IDS.includes(id)) return "fixed";
-  return "none";
-}
+const kindOf = holdingKind; // shared with the status strip (plain.ts), which counts "not linked" as needing a look
 
 const BADGE_TEXT: Record<Kind, string> = {
   adaptive: "Sized for the market when it bought",
@@ -169,7 +165,7 @@ function HoldingRow({
 
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:col-start-1" data-testid="holding-plan">
             <Tile label="Safety exit" testid="holding-tile-stop">
-              <div className="font-semibold">{stop != null ? formatMoney(stop) : "No safety exit set"}</div>
+              <div className="font-semibold">{!hasNoSafetyExit(position) && stop != null ? formatMoney(stop) : "No safety exit set"}</div>
               {movedFrom != null && <div className="text-xs text-muted">started at {formatMoney(movedFrom)}</div>}
               {bracketed && !t1Done && <div className="text-xs text-muted">Moves to break-even after the first target, then follows the price.</div>}
               {bracketed && t1Done && <div className="text-xs text-muted">First target sold. It now follows the price.</div>}

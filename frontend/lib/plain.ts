@@ -940,3 +940,149 @@ export function ledgerHistoryLine(
     lastDay: last ? { pnl: last.realized_pnl, label: dayLabel(last.session_date) } : null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Needs-a-look (2026-10-04 status strip). One short plain label per thing that already raises a visible alarm
+// somewhere on the page. The helpers below are the SAME expressions the alarm components use, so the strip and the
+// alarm can never disagree.
+// ---------------------------------------------------------------------------
+
+/** Fields of a playbook the alarm helpers read (a structural subset of StrategyState). */
+export interface AlarmStrategyLike {
+  id: string;
+  name?: string;
+  orb?: {
+    init_error: string | null;
+    errors: { alarm?: string; symbol?: string }[];
+    alerts?: string[];
+    orphans?: { symbol: string; text: string }[];
+  } | null;
+  tri_engine?: { last_error?: string | null } | null;
+}
+
+/** ORB's plain-language alerts (an orphan position is one of them). */
+export function orbAlertsOf(s: AlarmStrategyLike): string[] {
+  return s.orb?.alerts ?? [];
+}
+
+/** "ORB reported a problem" text: its start-up error, or an error that is neither an alert nor an orphan's. */
+export function orbProblemOf(s: AlarmStrategyLike): string | null {
+  if (!s.orb) return null;
+  return (
+    s.orb.init_error ||
+    (s.orb.errors.some((e) => e.alarm !== "orb_alert" && !(s.orb?.orphans ?? []).some((o) => o.symbol === e.symbol))
+      ? "ORB reported a problem; check the paper account."
+      : null)
+  );
+}
+
+/** The tri-engine's last broker error, if any. */
+export function triErrorOf(s: AlarmStrategyLike): string | null {
+  return s.tri_engine?.last_error ?? null;
+}
+
+/** Which kind of playbook a held position belongs to; "none" = not linked to a strategy (HoldingNow's badge). */
+export type HoldingKind = "adaptive" | "fixed" | "orb" | "none";
+
+export function holdingKind(id: string | null | undefined): HoldingKind {
+  if (id === "orb") return "orb";
+  if (id && ADAPTIVE_IDS.includes(id)) return "adaptive";
+  if (id && FIXED_PLAN_IDS.includes(id)) return "fixed";
+  return "none";
+}
+
+/** HoldingNow's "No safety exit set" condition. */
+export function hasNoSafetyExit(p: { stop_loss?: number | null }): boolean {
+  return (p.stop_loss ?? null) == null;
+}
+
+/** HoldingNow's two warnings about a quick trade: "Not linked to a strategy" and "No safety exit set". */
+export function positionWarning(p: { stop_loss?: number | null; strategy_id?: string | null }): "no-safety-exit" | "not-linked" | null {
+  if (holdingKind(p.strategy_id) === "none") return "not-linked";
+  if (hasNoSafetyExit(p)) return "no-safety-exit";
+  return null;
+}
+
+/** True when the page should say the price feed is down: no feed is connected. An empty list counts as down once
+ * data has arrived (the caller only asks after the first frame). */
+export function isFeedDown(ingestion: Record<string, string> | null | undefined): boolean {
+  const vals = Object.values(ingestion || {});
+  return vals.length === 0 || vals.every((v) => v !== "connected");
+}
+
+export interface AttentionItem {
+  key: string;
+  label: string;
+}
+
+export interface AttentionInputs {
+  connectionState: string;
+  feedDown: boolean;
+  brokerMismatch: boolean;
+  savingProblem: boolean;
+  /** Overnight stocks still unsold after 9:31 AM. */
+  unsold: string[];
+  breakerHit: boolean;
+  strategies: AlarmStrategyLike[];
+  overnight: {
+    initError?: string | null;
+    /** Symbols of holds or rows that carry a non-empty needs_look. */
+    needsLook: string[];
+  };
+  /** Today's finished-trades list failed to load (the strip's "Trades today" would read a silent 0). */
+  ledgerError: boolean;
+  /** Quick-trade positions (overnight holds excluded). */
+  positions: { symbol: string; stop_loss?: number | null; strategy_id?: string | null }[];
+}
+
+/** Everything on the page that needs the operator, de-duplicated by key. Fail closed: a condition that throws counts
+ * as "needs a look" (key check-failed). A field the backend does not send is NOT an alarm. */
+export function collectAttention(i: AttentionInputs): AttentionItem[] {
+  const out = new Map<string, string>();
+  const add = (key: string, label: string) => { if (!out.has(key)) out.set(key, label); };
+  const guard = (fn: () => void) => {
+    try {
+      fn();
+    } catch {
+      add("check-failed", "a page check failed");
+    }
+  };
+
+  guard(() => { if (i.connectionState !== "live") add("connection", "not connected to the robot"); });
+  guard(() => { if (i.feedDown) add("feed", "price feed down"); });
+  guard(() => { if (i.brokerMismatch) add("mismatch", "positions do not match Alpaca"); });
+  guard(() => { if (i.savingProblem) add("saving", "saving problem"); });
+  guard(() => { if (i.unsold.length > 0) add("unsold", `${joinNames(i.unsold)} not sold yet`); });
+  guard(() => { if (i.breakerHit) add("breaker", "daily loss limit hit"); });
+  for (const s of i.strategies) {
+    guard(() => {
+      const label = s.name || strategyTheme(s.id, s.id).name;
+      if (s.orb?.init_error) add("orb-init", "Opening Range Breakout could not start");
+      else if (orbProblemOf(s)) add("orb-problem", "Opening Range Breakout reported a problem");
+      const orphans = s.orb?.orphans ?? [];
+      for (const a of orbAlertsOf(s)) {
+        const orphan = orphans.find((o) => o.text === a);
+        if (orphan) add(`orb-orphan:${orphan.symbol}`, `${orphan.symbol} left open by Opening Range Breakout`);
+        else add("orb-alert", "Opening Range Breakout alert");
+      }
+      for (const o of orphans) add(`orb-orphan:${o.symbol}`, `${o.symbol} left open by Opening Range Breakout`);
+      if (triErrorOf(s)) add(`tri:${s.id}`, `broker issue on ${strategyTheme(s.id, label).name}`);
+    });
+  }
+  guard(() => { if (i.overnight.initError) add("overnight-init", "overnight holds could not start"); });
+  guard(() => { for (const sym of i.overnight.needsLook) add(`overnight-look:${sym}`, `${sym} overnight hold needs a look`); });
+  guard(() => { if (i.ledgerError) add("ledger", "today's trades did not load"); });
+  for (const p of i.positions) {
+    guard(() => {
+      const w = positionWarning(p);
+      if (w === "no-safety-exit") add(`unprotected:${p.symbol}`, `${p.symbol} has no safety exit`);
+      else if (w === "not-linked") add(`unprotected:${p.symbol}`, `${p.symbol} is not linked to a strategy`);
+    });
+  }
+  return [...out].map(([key, label]) => ({ key, label }));
+}
+
+/** The pill's words. */
+export function attentionPillText(count: number): string {
+  return count === 0 ? "No alarms" : count === 1 ? "1 needs a look" : `${count} need a look`;
+}

@@ -21,12 +21,14 @@ import ExecutionLog from "@/components/ExecutionLog";
 import OvernightHolds, { HoldView } from "@/components/OvernightHolds";
 import { AlertTriangle, WifiOff } from "lucide-react";
 import {
+  collectAttention,
   countdownToClose,
   etDateKey,
   etDateOfIso,
   etMinutesOfDay,
   etParts,
   groupLedgerByStrategy,
+  isFeedDown,
   ledgerHistoryLine,
   isOvernightPosition,
   joinNames,
@@ -183,9 +185,29 @@ export default function Home() {
   });
 
   // F8: always-visible plain-language problem banners (not behind "Show pro words").
-  const feedDown = Object.values(state.ingestion || {}).length > 0 &&
-    Object.values(state.ingestion || {}).every((v) => v !== "connected");
+  // (an empty feed list counts as down once data has arrived: no feed is connected)
+  const feedDown = isFeedDown(state.ingestion);
   const savingProblem = state.persistence.status !== "durable" && state.persistence.status !== "disabled";
+
+  // Everything on the page that needs the operator. The status strip's pill and its list read this one list.
+  const attention = collectAttention({
+    connectionState,
+    feedDown,
+    brokerMismatch: !!state.broker?.mismatch,
+    savingProblem,
+    unsold,
+    breakerHit: !!state.account.is_circuit_broken,
+    strategies: state.strategies,
+    overnight: {
+      initError: ovn?.state?.init_error ?? null,
+      needsLook: Array.from(new Set([
+        ...(ovn?.holds ?? []).filter((h) => (h.needs_look ?? []).length > 0).map((h) => h.symbol),
+        ...(ovn?.rows ?? []).filter((r) => (r.needs_look ?? []).length > 0).map((r) => r.symbol),
+      ])),
+    },
+    ledgerError: !!todayLedger.error,
+    positions: intradayPositions,
+  });
 
   // F7: the brand header is static copy, not account data, so it renders immediately - only
   // the financial content area waits for a real snapshot instead of showing synthetic zeros.
@@ -224,6 +246,16 @@ export default function Home() {
             ))}
           </div>
         )}
+
+        <RightNowCard
+          sentence={heroSentence}
+          tradesToday={tradesToday}
+          wins={wins}
+          losses={losses}
+          countdownLabel={countdownLabel}
+          countdownValue={countdownValue}
+          attention={attention}
+        />
 
         {connectionState !== "live" && (
           <div
@@ -272,24 +304,14 @@ export default function Home() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
-          <BalanceCard
-            equity={state.account.equity}
-            dailyPnl={state.account.daily_pnl}
-            todayTrades={todayLedger.items}
-            loading={todayLedger.loading && todayLedger.items.length === 0}
-            overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
-            history={ledgerHistoryLine(allLedger, todayEt)}
-          />
-          <RightNowCard
-            sentence={heroSentence}
-            tradesToday={tradesToday}
-            wins={wins}
-            losses={losses}
-            countdownLabel={countdownLabel}
-            countdownValue={countdownValue}
-          />
-        </section>
+        <BalanceCard
+          equity={state.account.equity}
+          dailyPnl={state.account.daily_pnl}
+          todayTrades={todayLedger.items}
+          loading={todayLedger.loading && todayLedger.items.length === 0}
+          overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
+          history={ledgerHistoryLine(allLedger, todayEt)}
+        />
 
         {overnightOn && (
           <OvernightHolds

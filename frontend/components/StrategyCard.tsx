@@ -11,6 +11,8 @@ import {
   isWithinSession,
   rangesToSegments,
   sessionPct,
+  orbAlertsOf,
+  orbProblemOf,
   strategyNoteLine,
   strategyTheme,
   windowToChip,
@@ -19,6 +21,7 @@ import {
   trancheName,
   planStatusText,
   trendBlockText,
+  triErrorOf,
 } from "@/lib/plain";
 
 const ICONS: Record<string, typeof Sunrise> = {
@@ -130,11 +133,10 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
   );
 
   // Alarms render OUTSIDE the collapsible details: never hidden behind a click.
-  const orbAlerts = strategy.orb?.alerts ?? [];
-  const orbProblem = strategy.orb
-    ? (strategy.orb.init_error || (strategy.orb.errors.some((e) => e.alarm !== "orb_alert" && !(strategy.orb?.orphans ?? []).some((o) => o.symbol === e.symbol)) ? "ORB reported a problem; check the paper account." : null))
-    : null;
-  const triError = strategy.tri_engine?.last_error ?? null;
+  // (the same helpers feed the status strip's "needs a look" list, so the two can never disagree)
+  const orbAlerts = orbAlertsOf(strategy);
+  const orbProblem = orbProblemOf(strategy);
+  const triError = triErrorOf(strategy);
   const hasAlarm = orbAlerts.length > 0 || !!orbProblem || !!triError;
   // Live status that must not hide behind a click either (plan section 8, P1).
   const orb = strategy.orb;

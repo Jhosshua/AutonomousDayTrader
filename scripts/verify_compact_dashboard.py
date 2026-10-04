@@ -121,6 +121,7 @@ ALLOWED_MISSING: Dict[str, str] = {
     "What it did today": "the section is now 'Results'; today is its first group (PLAN_2026_10_04 section 6)",
     "Trade history": "the history drawer button is gone: history is the always-visible Results panel",
     "No finished trades today. Your previous days are saved in Trade history.": "now 'No finished trades today.' inside Results, nothing is saved 'in' a drawer any more",
+    "Right now": "the small label above the sentence is gone: the status strip is the status line (PLAN_2026_10_04 section 6)",
     "Loading today's trades…": "now 'Loading results…'",
     "Couldn't load today's trades": "now the muted line 'Couldn't refresh results. Showing the last ones loaded.' (never red)",
     # The drawer-only texts of PLAN section 6 / 11.4 (range buttons, Balance/Result/Trades/Fees tiles, "Load older trades",
