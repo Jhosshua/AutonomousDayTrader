@@ -1,0 +1,28 @@
+{
+  "commit": "c8194ebbd0dc51b0e7dfb34e9807bb06528b5ee6",
+  "deployment_id": "8c5fdcdf-f426-4a15-b6d6-8bdb8d65d8a0",
+  "status": "SUCCESS",
+  "health_timestamp": "2026-09-27T22:10:39.342772+00:00",
+  "http_health": 200,
+  "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28",
+  "mode": "v2_live",
+  "addons_enforced": true,
+  "profiles_ready": 9,
+  "profile_sessions": 5,
+  "account_equity": 49702.1,
+  "broker_mismatch": false,
+  "persistence": "durable",
+  "tests_passed": 1195,
+  "historical_replays_passed": 4,
+  "historical_ride_the_trend_signals": 0,
+  "chrome_route": "browser-use with local Chrome, approved using browser-harness mac-approve",
+  "live_viewports": [
+    1440,
+    390
+  ],
+  "populated_fixture_viewports": [
+    1440,
+    390,
+    320
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "summary_sha256": "33c271358b0ee32c5c4202efe4f19fc8b55e19d817e6db32e011b1f8f9e98e49",
+  "checks": {
+    "feature_label_rows": 244,
+    "threshold_pairs": 3844,
+    "independent_exact_rule_tests": 369,
+    "independent_heldout_folds": 8,
+    "audited_cash_ledgers": 52,
+    "independent_economic_summaries": 492
+  },
+  "method": "Independent Fraction hypergeometric convolution, full threshold rescan on every exact date-preserving label assignment, independent Fisher contingency table and cash aggregation.",
+  "auditor_sha256": "90629f947a3cdfa8e74d7d6a5e89b3ee6f4ea105cca996b47b1ab35bd725e477",
+  "live_trading": false
+}

@@ -1,0 +1,52 @@
+{
+  "status": "PASS",
+  "completed_utc": "2026-09-27T02:09:09.581977+00:00",
+  "unit_tests_passed": 440,
+  "new_gradient_tests": 8,
+  "new_direct_replays": 775,
+  "candidate_policy_scenarios": 16820,
+  "independent_audit_status": "PASS",
+  "figures_visually_inspected": [
+    "profit_vs_aggression.png",
+    "fee_attribution.png",
+    "cohort_coverage.png",
+    "cohort_sensitivity.png"
+  ],
+  "task_owned_processes_remaining": [],
+  "production_strategy_files_unchanged": true,
+  "live_activation": false,
+  "code_sha256": {
+    "backend/app/microstructure/aggression_gradient.py": "4d1be82641084974551ec20ae57e6a9c038d0356049b028c2982d65c81937641",
+    "backend/tests/unit/test_microstructure_aggression_gradient.py": "ac55e4ed694045e38fc8f1c2cbe5a0c24975288df767926f6cc6d9788a47936b",
+    "scripts/run_aggression_gradient.py": "2b6d3f2100ee51537546026f31e6f0e08f03206bc2683cf34fd77ab5270014b4",
+    "scripts/run_aggression_extension.py": "57766b2b79a906c7faef38dda5b99428117cd6d1aaeda182016d5e0bd3315ddf",
+    "scripts/report_aggression_gradient.py": "422572e0bd38769df6a3bea66e0c4d0d3969322b7e18f117dbab7df7c4a38a29",
+    "scripts/audit_aggression_gradient.py": "b058bc744ee60e77b160d4788e1f7edfd5ed9214c22352d45401a1961e5df3ca",
+    "docs/microstructure/AGGRESSION_GRADIENT_2026_09_26.md": "38b79da42ba19a59da0a72d111bb278aa605401e8f9131b0656ae56b7d66c1e9"
+  },
+  "artifact_sha256": {
+    "Aggression Gradient Report.md": "0cc9b64feb22dded6e2f3ca0e09290d962ffc4e49aa06fab82ccb128c7a299d4",
+    "aggression_gradient_report.json": "11b61016c12c4c9bb6a81bca87c8cfb9254bbc6cc8884997338821bd07049aef",
+    "analysis_code_before_results.json": "7a9eca54bdeac6191c0eef8ecd8eea59db6410c1dd7d44c367cf39e95400673e",
+    "arrival_saturation_proofs.json": "7bb7301041e29afa050806911f543d0544034395e0dbdb2b8a9a67687759dc24",
+    "cache_verification.json": "5eaba61f63c04ef9093c02ced2c1b137dfaf505a5c26f5446ac2cce50c2fb371",
+    "candidate_grid.jsonl": "b50e6c1ed77942227147d909c2be25aa06c242b35127a0392abd0b57e49dd0f7",
+    "cohort_coverage.png": "d357d3db97a1663c40cbb06d82ed49baf08cf6334d6cf99649ffa6144051e90e",
+    "cohort_sensitivity.png": "44c1331d5d7bd71081ae92655dcde62f05f6c8ad5fb271f3d360c169082143a7",
+    "complete_candidate_grid.jsonl": "3b1e14c136a8909e1b8b406f89e74bf02a318e0e0ec945904c6d5d78989b1119",
+    "complete_execution_manifest.json": "970e735f1e48a4c3ca40006f5dc2d7aed168a6e9ce9406caa5ed378c8b2a03d4",
+    "conditional_offset_validation.json": "d1f25b744120406eb087ba193ee5313c1a37e3e691fbefa55d66a5dae8def2ad",
+    "depth_extension_plan.json": "4febd199156627dcfe35560efa3659f5aa7e11594731628115ad57fd457befec",
+    "execution_code_manifest.json": "d8cd995fabb48a74d671fd11b2b8553e81531e48ca7a60baa5f2b6a4ff1f1200",
+    "execution_manifest.json": "df0c2aac8f9074bf888eb8242b5b9433fa1faadc8a32cfffa59d48ed3112764a",
+    "fee_attribution.png": "58c7334eac2174d270c98b293c7ba1624721c63ac4d34c403f49702ce3abe213",
+    "frozen_config.json": "f5be3c4a8c9e9d25d0f029ba4be76250d61039469df1ee62fbc62746c059b448",
+    "independent_aggression_audit.json": "ea76005d58a72f949d6a7f1d54628e62ebcd458a1fb3b9a4f2de47c507792ca8",
+    "offset_selection_protocol.json": "f0d17e4b79c9ddd5de4852d4f83f6945c29d5a5bf7dd0e145aecd8fa72eb7679",
+    "optimal_entry_research.json": "898ef0b33579a59957d5edb50fe2e8b3d2a9b96f77b456632af3fff9270a020f",
+    "profit_vs_aggression.png": "394af56006165b223ca4b4b08c2d4a003fcd0f0c49906adbbfefd91b05dad372",
+    "profit_vs_aggression_data.json": "f698e7031f230b373d5ceacea2a5ad5c17663bb341d61b282768ddcc5dc6880a"
+  },
+  "reporting_revision": "Added cohort sensitivity figure, full-cohort context, profit concentration and fee-attribution explanations after initial rendering; audited numerical report unchanged.",
+  "supplement_validation": "Optimal-entry summaries equal audited curve rows; passive contributions reconcile in integer price units (1,099,840)."
+}

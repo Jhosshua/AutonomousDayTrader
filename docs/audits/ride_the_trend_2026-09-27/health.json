@@ -1,0 +1,269 @@
+{
+  "status": "healthy",
+  "mode": "production",
+  "upstream_configured": true,
+  "timestamp": "2026-09-27T22:10:39.342772+00:00",
+  "account": {
+    "equity": 49702.1,
+    "cash": 49702.1,
+    "buying_power": 198808.4,
+    "status": "EOD_FLAT",
+    "open_positions": 0
+  },
+  "risk": {
+    "status": "ARMED",
+    "level": "NORMAL",
+    "drawdown_dollars": 0.0,
+    "drawdown_pct": 0.0
+  },
+  "flattening": {
+    "phase": "MARKET_CLOSED",
+    "audit_passed": true
+  },
+  "ports": {
+    "api": 8080,
+    "ui": 3005,
+    "mock": 8080
+  },
+  "relay": {
+    "stock": "connected",
+    "news": "connected",
+    "vix": "connected"
+  },
+  "research": {
+    "disk": true,
+    "path": "/data/research.sqlite3",
+    "queued": 0,
+    "written": 0,
+    "pending": 0,
+    "dropped": 0,
+    "errors": 0,
+    "last_error": null
+  },
+  "ride_the_trend": {
+    "data_layers": {
+      "required": true,
+      "layer1_ticks": {
+        "live": false,
+        "trades_seen": 0
+      },
+      "layer2_book": {
+        "live": false,
+        "quotes_seen": 0,
+        "depth": "top_of_book_nbbo"
+      },
+      "layer3_timestamps": {
+        "source": "exchange_nanoseconds",
+        "velocity_window_s": 60,
+        "raw_prints": 0
+      },
+      "layer4_macro": {
+        "calendar_loaded": true,
+        "error": null,
+        "regime": "spy_qqq_vwap_ema+vix"
+      }
+    },
+    "tape": {
+      "symbols": [],
+      "trades_seen": 0,
+      "quotes_seen": 0,
+      "rejected": 0,
+      "duplicates": 0,
+      "ineligible": 0,
+      "outages": 0,
+      "open_outage": false,
+      "raw_prints_total": 0,
+      "per_symbol": {}
+    },
+    "regime": {
+      "symbols": [
+        "XLK",
+        "XLC",
+        "XLY",
+        "XLF",
+        "UUP",
+        "SHY",
+        "IEF"
+      ],
+      "sector_map": {
+        "AAPL": "XLK",
+        "NVDA": "XLK",
+        "AMD": "XLK",
+        "MSFT": "XLK",
+        "PLTR": "XLK",
+        "META": "XLC",
+        "GOOGL": "XLC",
+        "AMZN": "XLY",
+        "COIN": "XLF"
+      },
+      "bars_seen": 0,
+      "per_symbol": {
+        "XLK": {
+          "bars": 0,
+          "session": null,
+          "last_bar": null,
+          "last_bar_age_s": null
+        },
+        "XLC": {
+          "bars": 0,
+          "session": null,
+          "last_bar": null,
+          "last_bar_age_s": null
+        },
+        "XLY": {
+          "bars": 0,
+          "session": null,
+          "last_bar": null,
+          "last_bar_age_s": null
+        },
+        "XLF": {
+          "bars": 0,
+          "session": null,
+          "last_bar": null,
+          "last_bar_age_s": null
+        },
+        "UUP": {
+          "bars": 0,
+          "session": null,
+          "last_bar": null,
+          "last_bar_age_s": null
+        },
+        "SHY": {
+          "bars": 0,
+          "session": null,
+          "last_bar": null,
+          "last_bar_age_s": null
+        },
+        "IEF": {
+          "bars": 0,
+          "session": null,
+          "last_bar": null,
+          "last_bar_age_s": null
+        }
+      }
+    },
+    "profiles": {
+      "last_build": "2026-09-27T22:08:18.129089+00:00",
+      "errors": {},
+      "required_sessions": 5,
+      "profiles": {
+        "AAPL": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 2,
+          "bucket_width": 0.341
+        },
+        "AMD": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 3,
+          "bucket_width": 0.6304
+        },
+        "AMZN": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 4,
+          "bucket_width": 0.2497
+        },
+        "COIN": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 4,
+          "bucket_width": 0.1951
+        },
+        "GOOGL": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 7,
+          "bucket_width": 0.3439
+        },
+        "META": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 5,
+          "bucket_width": 0.7519
+        },
+        "MSFT": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 2,
+          "bucket_width": 0.5161
+        },
+        "NVDA": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 3,
+          "bucket_width": 0.2251
+        },
+        "PLTR": {
+          "for_session": "2026-09-27",
+          "sessions": 5,
+          "nodes": 4,
+          "bucket_width": 0.1897
+        }
+      }
+    },
+    "addons_enforced": true,
+    "enforced_gates": [],
+    "macro_today": "No scheduled macro releases today."
+  },
+  "broker": {
+    "mode": "alpaca_paper",
+    "account_number": "PA3CSVDZMMPY",
+    "alpaca_equity": 49702.1,
+    "alpaca_cash": 49702.1,
+    "alpaca_positions": {},
+    "equity_drift": 0.0,
+    "mismatch": false,
+    "mismatch_detail": null,
+    "last_check_at": "2026-09-27T22:10:22.277501+00:00",
+    "last_order_at": null,
+    "orders_sent": 0,
+    "fills_booked": 0,
+    "last_error": null
+  },
+  "persistence": {
+    "status": "durable",
+    "required": true,
+    "schema_version": 2,
+    "checkpoint_revision": 44179,
+    "ledger_revision": 26,
+    "last_checkpoint_at": "2026-09-27T20:55:16.210938+00:00",
+    "restored_at": "2026-09-27T22:08:15.569898+00:00",
+    "error": null
+  },
+  "limits": {
+    "max_daily_loss_dollars": 1242.5525,
+    "max_position_notional": 24851.05,
+    "max_position_equity_pct": 0.5,
+    "max_concurrent_positions": 3,
+    "base_trade_risk_pct": 0.01,
+    "stop_distance_pct": [
+      0.004,
+      0.04
+    ]
+  },
+  "feeds": {
+    "bars": {
+      "received": 0,
+      "last_age_sec": null
+    },
+    "quotes": {
+      "received": 0,
+      "last_age_sec": null
+    },
+    "trades": {
+      "received": 0,
+      "last_age_sec": null
+    },
+    "news": {
+      "received": 0,
+      "last_age_sec": null
+    },
+    "vix": {
+      "last_poll_age_sec": 0.4,
+      "value_age_sec": 179738.1,
+      "stale": false
+    }
+  }
+}

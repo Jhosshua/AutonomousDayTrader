@@ -1,0 +1,331 @@
+[
+  {
+    "id": "orb",
+    "name": "Opening Range Breakout",
+    "status": "ACTIVE",
+    "daily_pnl": 0.0,
+    "win_rate": 0.0,
+    "trades_count": 0,
+    "sharpe": 0.0,
+    "window": {
+      "state": "MARKET_CLOSED",
+      "headline": "Market closed",
+      "can_open_now": false,
+      "in_hours": false,
+      "hours": "9:30 AM - 11:30 AM",
+      "ranges": [
+        [
+          "09:30",
+          "11:30"
+        ]
+      ],
+      "trading_day": false,
+      "schedule_text": "Market closed today. Next: tomorrow 9:30 AM.",
+      "next_change_at": "2026-09-28T09:30:00-04:00",
+      "blockers": [],
+      "limits": [],
+      "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+      "notes": [
+        "Morning only. Needs the first 5 minutes to set the range."
+      ],
+      "evaluated_at": "2026-09-27T18:08:28-04:00"
+    },
+    "decisions": {
+      "signals_today": 0,
+      "orders_today": 0,
+      "blocked_today": 0,
+      "top_block_reason": null,
+      "top_block_text": null,
+      "blocked_by_reason": {}
+    }
+  },
+  {
+    "id": "vwap_pullback",
+    "name": "Ride the Trend v2 (VWAP structure, thin pullback, resumption speed)",
+    "status": "ACTIVE",
+    "daily_pnl": 0.0,
+    "win_rate": 0.0,
+    "trades_count": 0,
+    "sharpe": 0.0,
+    "version": "v2",
+    "policy_id": "V2_NBBO_ADDONS_AUDIT_2026_09_28",
+    "mode": "v2_live",
+    "excluded_symbols": [
+      "TSLA",
+      "CDE",
+      "SPY",
+      "QQQ"
+    ],
+    "first_possible_signal": "10:09",
+    "last_evaluated_bar": null,
+    "today_counts": {},
+    "setups_today": 0,
+    "signals_emitted_today": 0,
+    "data_layers": {
+      "required": true,
+      "layer1_ticks": {
+        "live": false,
+        "trades_seen": 0
+      },
+      "layer2_book": {
+        "live": false,
+        "quotes_seen": 0,
+        "depth": "top_of_book_nbbo"
+      },
+      "layer3_timestamps": {
+        "source": "exchange_nanoseconds",
+        "velocity_window_s": 60,
+        "raw_prints": 0
+      },
+      "layer4_macro": {
+        "calendar_loaded": true,
+        "error": null,
+        "regime": "spy_qqq_vwap_ema+vix"
+      }
+    },
+    "enforced_gates": [],
+    "addons_enforced": true,
+    "last_block_by_symbol": {},
+    "profiles_ready": {
+      "ready": 9,
+      "total": 9,
+      "missing": []
+    },
+    "window": {
+      "state": "MARKET_CLOSED",
+      "headline": "Market closed",
+      "can_open_now": false,
+      "in_hours": false,
+      "hours": "9:30 AM - 11:30 AM",
+      "ranges": [
+        [
+          "09:30",
+          "11:30"
+        ]
+      ],
+      "trading_day": false,
+      "schedule_text": "Market closed today. Next: tomorrow 9:30 AM.",
+      "next_change_at": "2026-09-28T09:30:00-04:00",
+      "blockers": [],
+      "limits": [],
+      "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+      "notes": [
+        "Version 2 (since Sept 28): mornings only, 9:45 to 11:30 AM; first possible entry about 10:09 AM. Needs a quiet pullback and a fast resumption.",
+        "No scheduled macro releases today.",
+        "Dollar and rates data not flowing yet.",
+        "Prior-days volume profiles ready for 9 of 9 stocks."
+      ],
+      "evaluated_at": "2026-09-27T18:08:28-04:00"
+    },
+    "decisions": {
+      "signals_today": 0,
+      "orders_today": 0,
+      "blocked_today": 0,
+      "top_block_reason": null,
+      "top_block_text": null,
+      "blocked_by_reason": {}
+    }
+  },
+  {
+    "id": "news_momentum",
+    "name": "Catalyst News Momentum Breakout",
+    "status": "ACTIVE",
+    "daily_pnl": 0.0,
+    "win_rate": 0.0,
+    "trades_count": 0,
+    "sharpe": 0.0,
+    "window": {
+      "state": "MARKET_CLOSED",
+      "headline": "Market closed",
+      "can_open_now": false,
+      "in_hours": false,
+      "hours": "9:30 AM - 3:45 PM",
+      "ranges": [
+        [
+          "09:30",
+          "15:45"
+        ]
+      ],
+      "trading_day": false,
+      "schedule_text": "Market closed today. Next: tomorrow 9:30 AM.",
+      "next_change_at": "2026-09-28T09:30:00-04:00",
+      "blockers": [],
+      "limits": [],
+      "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
+      "notes": [
+        "Rare by design: needs very strong news plus a volume spike."
+      ],
+      "evaluated_at": "2026-09-27T18:08:28-04:00"
+    },
+    "decisions": {
+      "signals_today": 0,
+      "orders_today": 0,
+      "blocked_today": 0,
+      "top_block_reason": null,
+      "top_block_text": null,
+      "blocked_by_reason": {}
+    }
+  },
+  {
+    "id": "mean_reversion",
+    "name": "Statistical Mean Reversion / Exhaustion Fades",
+    "status": "ACTIVE",
+    "daily_pnl": 0.0,
+    "win_rate": 0.0,
+    "trades_count": 0,
+    "sharpe": 0.0,
+    "window": {
+      "state": "MARKET_CLOSED",
+      "headline": "Market closed",
+      "can_open_now": false,
+      "in_hours": false,
+      "hours": "10:00 AM - 3:45 PM",
+      "ranges": [
+        [
+          "10:00",
+          "15:45"
+        ]
+      ],
+      "trading_day": false,
+      "schedule_text": "Market closed today. Next: tomorrow 10:00 AM.",
+      "next_change_at": "2026-09-28T10:00:00-04:00",
+      "blockers": [],
+      "limits": [],
+      "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
+      "notes": [
+        "Sits out the opening half hour."
+      ],
+      "evaluated_at": "2026-09-27T18:08:28-04:00"
+    },
+    "decisions": {
+      "signals_today": 0,
+      "orders_today": 0,
+      "blocked_today": 0,
+      "top_block_reason": null,
+      "top_block_text": null,
+      "blocked_by_reason": {}
+    }
+  },
+  {
+    "id": "tsla_asymmetric_dual",
+    "name": "TSLA Asymmetric Opening Range",
+    "status": "ACTIVE",
+    "daily_pnl": 0.0,
+    "win_rate": 0.0,
+    "trades_count": 0,
+    "sharpe": 0.0,
+    "tri_engine": {
+      "version": "ASYMMETRIC_DUAL_PAPER_V1",
+      "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+      "symbol": "TSLA",
+      "phase": "SKIPPED",
+      "reason": "CALENDAR_UNAVAILABLE_OR_CLOSED",
+      "quantity": 0,
+      "last_error": null,
+      "side": null,
+      "mode": "alpaca_paper",
+      "risk_reserved": 0.0,
+      "risk_budget": 372.76574999999997,
+      "or_high": null,
+      "or_low": null,
+      "or_mid": null,
+      "qqq_close": null,
+      "qqq_vwap": null,
+      "entry_due": null,
+      "incomplete": false,
+      "tranches": []
+    },
+    "window": {
+      "state": "MARKET_CLOSED",
+      "headline": "Market closed today.",
+      "can_open_now": false,
+      "in_hours": false,
+      "hours": "9:45 AM\u201311:30 ET",
+      "ranges": [
+        [
+          "09:45",
+          "11:30"
+        ]
+      ],
+      "trading_day": false,
+      "schedule_text": "Market closed today.",
+      "next_change_at": null,
+      "blockers": [],
+      "limits": [],
+      "market_text": "Market closed today.",
+      "notes": [
+        "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+      ],
+      "evaluated_at": "2026-09-27T18:08:28.504298-04:00"
+    },
+    "decisions": {
+      "signals_today": 0,
+      "orders_today": 0,
+      "blocked_today": 0,
+      "top_block_reason": null,
+      "top_block_text": null,
+      "blocked_by_reason": {}
+    }
+  },
+  {
+    "id": "cde_asymmetric_dual",
+    "name": "CDE Asymmetric Opening Range",
+    "status": "ACTIVE",
+    "daily_pnl": 0.0,
+    "win_rate": 0.0,
+    "trades_count": 0,
+    "sharpe": 0.0,
+    "tri_engine": {
+      "version": "ASYMMETRIC_DUAL_PAPER_V1",
+      "source_sha256": "f89a762e09f69c72f38e8c49ae411fdb64b9b67e569a0ad127c821d0607642bb",
+      "symbol": "CDE",
+      "phase": "SKIPPED",
+      "reason": "CALENDAR_UNAVAILABLE_OR_CLOSED",
+      "quantity": 0,
+      "last_error": null,
+      "side": null,
+      "mode": "alpaca_paper",
+      "risk_reserved": 0.0,
+      "risk_budget": 372.76574999999997,
+      "or_high": null,
+      "or_low": null,
+      "or_mid": null,
+      "qqq_close": null,
+      "qqq_vwap": null,
+      "entry_due": null,
+      "incomplete": false,
+      "tranches": []
+    },
+    "window": {
+      "state": "MARKET_CLOSED",
+      "headline": "Market closed today.",
+      "can_open_now": false,
+      "in_hours": false,
+      "hours": "9:45 AM\u201312:00 ET",
+      "ranges": [
+        [
+          "09:45",
+          "12:00"
+        ]
+      ],
+      "trading_day": false,
+      "schedule_text": "Market closed today.",
+      "next_change_at": null,
+      "blockers": [],
+      "limits": [],
+      "market_text": "Market closed today.",
+      "notes": [
+        "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
+      ],
+      "evaluated_at": "2026-09-27T18:08:28.504298-04:00"
+    },
+    "decisions": {
+      "signals_today": 0,
+      "orders_today": 0,
+      "blocked_today": 0,
+      "top_block_reason": null,
+      "top_block_text": null,
+      "blocked_by_reason": {}
+    }
+  }
+]

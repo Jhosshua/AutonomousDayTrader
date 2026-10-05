@@ -1,0 +1,136 @@
+{
+  "status": "PASS",
+  "checks": {
+    "curve_labels": 488,
+    "independent_rule_predictions": 3474,
+    "heldout_fold_rows": 386,
+    "independent_economic_summaries": 44,
+    "independent_tape_windows": 60,
+    "independent_flow_rate_snapshots": 20
+  },
+  "source_math_evidence": [
+    {
+      "candidate_id": "10e4813bdcbb50c518c87d9fc33bcc758c6f76f0dbbba121d18e018ef91caabb",
+      "symbol": "AAPL",
+      "date": "2025-12-08",
+      "source_prefix_rows": 655323
+    },
+    {
+      "candidate_id": "2b6918d1b882a9e8c452ae85f8d13a2cd83a3447def821a913b1ef81f59934a5",
+      "symbol": "JPM",
+      "date": "2026-06-12",
+      "source_prefix_rows": 76262
+    },
+    {
+      "candidate_id": "2ef02af00bf93bc5e3b7adba1a1af80baea278cc4ae0f7965370db34f28986c7",
+      "symbol": "WFC",
+      "date": "2019-12-30",
+      "source_prefix_rows": 76373
+    },
+    {
+      "candidate_id": "63fc8725f23409829ecef4705f1fcf5e43166177f8591594650cdb23c78ed9d5",
+      "symbol": "GS",
+      "date": "2025-12-10",
+      "source_prefix_rows": 35739
+    },
+    {
+      "candidate_id": "683c9d9675d8d071a4e7a22cbe3ae7de0c4a27ead93b9a59ee29ad0c1a426bd2",
+      "symbol": "GE",
+      "date": "2020-01-30",
+      "source_prefix_rows": 154337
+    },
+    {
+      "candidate_id": "68bf69c583c731e93689374072372626a4b186762cc558559f57ceac842e794b",
+      "symbol": "WFC",
+      "date": "2026-06-12",
+      "source_prefix_rows": 184747
+    },
+    {
+      "candidate_id": "69da2946ef83b1d7fe3e0f7de6577f3752f9e36d0ec3c657672473ab5e2175e6",
+      "symbol": "MRK",
+      "date": "2026-06-12",
+      "source_prefix_rows": 31872
+    },
+    {
+      "candidate_id": "7452ca68c269756bff06e611a01771aa6f3c7d8bea1cd1bc40fc8867b0554513",
+      "symbol": "NVDA",
+      "date": "2026-06-12",
+      "source_prefix_rows": 2737848
+    },
+    {
+      "candidate_id": "7d7c1d0f5ecea240ca4fd44384b6ee03f646905275476f514d5491b8980f162f",
+      "symbol": "COST",
+      "date": "2019-12-30",
+      "source_prefix_rows": 66200
+    },
+    {
+      "candidate_id": "85f159fb93922da66308f920b12da3e636ea14000589cb51992f8e88fd04a06a",
+      "symbol": "BAC",
+      "date": "2019-12-30",
+      "source_prefix_rows": 107326
+    },
+    {
+      "candidate_id": "9eeb2740d5c81eb8c79f5cc17a4b6507e706f9a0b28f344df49441b8ef8ab3ef",
+      "symbol": "DD",
+      "date": "2019-12-30",
+      "source_prefix_rows": 24857
+    },
+    {
+      "candidate_id": "be6f9c4f6c62374560065525e16ae84388fe285776436a6bb551ddfe7f7cf998",
+      "symbol": "WMT",
+      "date": "2026-06-12",
+      "source_prefix_rows": 195872
+    },
+    {
+      "candidate_id": "c5c3b01968b74817ee0d2bceefb8e27de7943d45f988131018a0f7ba2d27735d",
+      "symbol": "CVX",
+      "date": "2021-07-13",
+      "source_prefix_rows": 82278
+    },
+    {
+      "candidate_id": "caadcbe52dd8c76636e432e754550b7c977f67869474b1aed0b22f756c11915e",
+      "symbol": "HD",
+      "date": "2025-12-09",
+      "source_prefix_rows": 49263
+    },
+    {
+      "candidate_id": "cdea225d9998e368ba78a8d36f7369feb44c520c6e0367375c01e376f5b1f5f4",
+      "symbol": "AMD",
+      "date": "2019-07-30",
+      "source_prefix_rows": 237500
+    },
+    {
+      "candidate_id": "d4dc4ef0adc2f56e4ddc12214b58128d051dc5158101c3ab3be30647b2b59e5a",
+      "symbol": "JNJ",
+      "date": "2019-12-30",
+      "source_prefix_rows": 24117
+    },
+    {
+      "candidate_id": "e04bf11c042d1a5a40e4c134006b70e9ad83f1df3e58fd979535ab49f8e77061",
+      "symbol": "AAPL",
+      "date": "2026-06-12",
+      "source_prefix_rows": 721803
+    },
+    {
+      "candidate_id": "e2781980953a280482626161f5d2c6958aed257531080dc2ac16720907f6e512",
+      "symbol": "LMT",
+      "date": "2019-12-30",
+      "source_prefix_rows": 48240
+    },
+    {
+      "candidate_id": "f7c8895959cbae4f3a96540d8f0990be9df1b6042ed65c96c0c48230d3714375",
+      "symbol": "LOW",
+      "date": "2025-12-10",
+      "source_prefix_rows": 12416
+    },
+    {
+      "candidate_id": "f93bc54c19b7c3f64db5681b00e66c931a0aa74d84e0d7cb97780ccf2dd8b9e5",
+      "symbol": "JNJ",
+      "date": "2026-06-12",
+      "source_prefix_rows": 173107
+    }
+  ],
+  "portable_dot_decisions_identical": true,
+  "portable_dot_max_probability_delta": 7.563949466771192e-13,
+  "no_new_execution_replays": true
+}

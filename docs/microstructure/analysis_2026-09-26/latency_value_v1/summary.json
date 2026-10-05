@@ -1,0 +1,83 @@
+{
+ "post_only:0|250ms": {
+  "net_usd": -1034.517,
+  "trades": 17,
+  "winners": 7,
+  "maker_shares": 8441,
+  "rebate_at_0p002": 16.882,
+  "profitable_days": 3,
+  "days": 12
+ },
+ "post_only:0|50ms": {
+  "net_usd": -1197.875,
+  "trades": 14,
+  "winners": 6,
+  "maker_shares": 7981,
+  "rebate_at_0p002": 15.962,
+  "profitable_days": 2,
+  "days": 12
+ },
+ "post_only:0|1ms": {
+  "net_usd": -963.498,
+  "trades": 18,
+  "winners": 8,
+  "maker_shares": 10976,
+  "rebate_at_0p002": 21.952,
+  "profitable_days": 3,
+  "days": 12
+ },
+ "ladder:2|250ms": {
+  "net_usd": -21358.172,
+  "trades": 224,
+  "winners": 83,
+  "maker_shares": 29832,
+  "rebate_at_0p002": 59.664,
+  "profitable_days": 1,
+  "days": 12
+ },
+ "ladder:2|50ms": {
+  "net_usd": -21760.104,
+  "trades": 227,
+  "winners": 83,
+  "maker_shares": 29984,
+  "rebate_at_0p002": 59.968,
+  "profitable_days": 1,
+  "days": 12
+ },
+ "ladder:2|1ms": {
+  "net_usd": -21774.782,
+  "trades": 229,
+  "winners": 84,
+  "maker_shares": 30296,
+  "rebate_at_0p002": 60.592,
+  "profitable_days": 1,
+  "days": 12
+ },
+ "market|250ms": {
+  "net_usd": -50421.349,
+  "trades": 355,
+  "winners": 118,
+  "maker_shares": 18877,
+  "rebate_at_0p002": 37.754,
+  "profitable_days": 0,
+  "days": 12
+ },
+ "market|50ms": {
+  "net_usd": -50360.139,
+  "trades": 355,
+  "winners": 117,
+  "maker_shares": 18877,
+  "rebate_at_0p002": 37.754,
+  "profitable_days": 0,
+  "days": 12
+ },
+ "market|1ms": {
+  "net_usd": -50569.689,
+  "trades": 355,
+  "winners": 117,
+  "maker_shares": 18877,
+  "rebate_at_0p002": 37.754,
+  "profitable_days": 0,
+  "days": 12
+ }
+}

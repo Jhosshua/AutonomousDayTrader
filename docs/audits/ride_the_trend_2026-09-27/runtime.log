@@ -1,0 +1,46 @@
+Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/a9c05229-a9c9-493e-9437-ce54dc178bc0/vol_yox69j3bjv2t0ic0
+Starting Container
+INFO:backend.app.strategies.swing_indicators:Loaded 1590 daily bars across 6 symbols from backend/app/data/daily_bars_seed.json
+INFO:backend.app.strategies.earnings_calendar:Loaded 15 earnings events across 5 symbols from backend/app/data/earnings_calendar.json
+INFO:     Started server process [2]
+INFO:     Waiting for application startup.
+INFO:AutonomousDayTrader:Starting AutonomousDayTrader backend on port 8005...
+INFO:AutonomousDayTrader:Ride the Trend v2 symbol state rebuilt from session bars: {'rebuilt': {}, 'dropped': [], 'failed': [], 'invalidated': []}
+INFO:AutonomousDayTrader:Restored durable trading state revision 44179: equity=$49702.10, positions=0, trades=26
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=AAPL&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://paper-api.alpaca.markets/v2/account "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://paper-api.alpaca.markets/v2/positions "HTTP/1.1 200 OK"
+INFO:AutonomousDayTrader:Alpaca paper broker attached: account PA3CSVDZMMPY equity 49702.10 positions {} (bot equity 49702.10 positions {})
+INFO:StockWebSocketClient:StockWebSocketClient started targeting wss://alpacarelay-production.up.railway.app/v2/stocks
+INFO:NewsWebSocketClient:NewsWebSocketClient started targeting wss://alpacarelay-production.up.railway.app/news
+INFO:VixClient:VixClient polling started at https://alpacarelay-production.up.railway.app/vix every 5.0s
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/vix "HTTP/1.1 200 OK"
+INFO:StockWebSocketClient:Connecting to Stock WebSocket at wss://alpacarelay-production.up.railway.app/v2/stocks...
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=AMD&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:NewsWebSocketClient:Connecting to News WebSocket at wss://alpacarelay-production.up.railway.app/news...
+INFO:     Application startup complete.
+INFO:StockWebSocketClient:Successfully authenticated with AlpacaRelay Stock WS
+INFO:StockWebSocketClient:Subscribed channels: bars=24, quotes=17, trades=17
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=AMZN&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/health "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=COIN&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=GOOGL&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=META&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=MSFT&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=NVDA&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/data/v2/stocks/bars?symbols=PLTR&start=2026-09-13T00%3A00%3A00Z&end=2026-09-27T00%3A00%3A00Z&timeframe=1Min&limit=10000 "HTTP/1.1 200 OK"
+INFO:AutonomousDayTrader:volume profiles rebuilt for 2026-09-27: {'last_build': '2026-09-27T22:08:18.129089+00:00', 'errors': {}, 'required_sessions': 5, 'profiles': {'AAPL': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 2, 'bucket_width': 0.341}, 'AMD': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 3, 'bucket_width': 0.6304}, 'AMZN': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 4, 'bucket_width': 0.2497}, 'COIN': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 4, 'bucket_width': 0.1951}, 'GOOGL': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 7, 'bucket_width': 0.3439}, 'META': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 5, 'bucket_width': 0.7519}, 'MSFT': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 2, 'bucket_width': 0.5161}, 'NVDA': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 3, 'bucket_width': 0.2251}, 'PLTR': {'for_session': '2026-09-27', 'sessions': 5, 'nodes': 4, 'bucket_width': 0.1897}}}
+INFO:httpx:HTTP Request: GET https://paper-api.alpaca.markets/v2/account "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/vix "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://paper-api.alpaca.markets/v2/positions "HTTP/1.1 200 OK"
+INFO:     ('100.64.0.1', 41750) - "WebSocket /ws/ui" [accepted]
+INFO:     connection open
+INFO:     100.64.0.2:25622 - "GET /api/trades?range=today&limit=100 HTTP/1.1" 200 OK
+INFO:     100.64.0.3:50052 - "GET /api/trades?range=7d&limit=1 HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/vix "HTTP/1.1 200 OK"
+INFO:     100.64.0.4:55296 - "GET /health HTTP/1.1" 200 OK
+INFO:     100.64.0.5:20506 - "GET /api/strategies HTTP/1.1" 200 OK
+INFO:     100.64.0.3:50052 - "GET /api/positions HTTP/1.1" 200 OK
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/vix "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://alpacarelay-production.up.railway.app/vix "HTTP/1.1 200 OK"

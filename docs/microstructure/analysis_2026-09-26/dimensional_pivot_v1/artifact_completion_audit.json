@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "completed_utc": "2026-09-27T04:45:12.280389+00:00",
+  "tests": 400,
+  "new_tests": 12,
+  "audit": {
+    "causal_window_unit_and_conservation_checks": 732,
+    "cash_ledgers": 733,
+    "frozen_candidate_outcomes": 1464,
+    "independent_rule_memberships": 1299,
+    "independent_feature_correlations": 108,
+    "independent_exact_hypergeometric_rule_checks": 6104,
+    "heldout_training_quantiles": 48,
+    "heldout_cash_summaries": 36,
+    "matrix_cells": 576
+  },
+  "plots_visually_reviewed": [
+    "full_correlation_matrix.png",
+    "feature_outcome_correlations.png",
+    "combination_outcome_correlations.png",
+    "discovery_vs_date_heldout.png"
+  ],
+  "new_files_whitespace_clean": true,
+  "production_files_unchanged": [
+    "backend/app/strategies/tri_engine.py",
+    "backend/app/core/tri_execution.py",
+    "backend/app/strategies/tsla_or15_retest.py"
+  ],
+  "owned_processes_remaining": [],
+  "no_servers_started": true,
+  "summary_sha256": "2e159348550971b7294cee447504a29440429e95650703247c4c5790d038a3e8"
+}

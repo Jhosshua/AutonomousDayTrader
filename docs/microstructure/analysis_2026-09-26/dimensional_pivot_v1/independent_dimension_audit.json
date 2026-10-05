@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "summary_sha256": "2e159348550971b7294cee447504a29440429e95650703247c4c5790d038a3e8",
+  "checks": {
+    "causal_window_unit_and_conservation_checks": 732,
+    "cash_ledgers": 733,
+    "frozen_candidate_outcomes": 1464,
+    "independent_rule_memberships": 1299,
+    "independent_feature_correlations": 108,
+    "independent_exact_hypergeometric_rule_checks": 6104,
+    "heldout_training_quantiles": 48,
+    "heldout_cash_summaries": 36,
+    "matrix_cells": 576
+  },
+  "methods": "Independent price/depth arithmetic; raw fill cash; scipy rank correlations; exact hypergeometric convolution versus Monte Carlo; training-only quantiles and memberships.",
+  "full_prefix_events": 33225736,
+  "source_bytes_verified": 20664495578
+}

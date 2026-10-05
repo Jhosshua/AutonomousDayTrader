@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "summary_sha256": "9fd3bf0342778161dc41400641734425f8c4681c8303df3696216b874b1780b6",
+  "method": "Independent cash-sign summation and midpoint threshold partition enumeration; no imports from runner or aggregation helper.",
+  "checks": {
+    "raw_archives": 12,
+    "raw_bytes": 83160933276,
+    "normalized_artifacts": 684,
+    "normalized_bytes": 48659440400,
+    "stock_days": 624,
+    "candidates": 373,
+    "distinct_ledgers": 35,
+    "distinct_ledger_fills": 162,
+    "exact_threshold_pairs": 333,
+    "display_threshold_pairs": 1681,
+    "distinct_membership_sets": 6,
+    "all_leg_fee_roots_exact": true,
+    "unknowns_preserved": true,
+    "rule_not_retuned": true,
+    "stage_order_verified": true,
+    "source_execution_and_candidate_hashes_verified": true,
+    "verdict_recomputed": true
+  }
+}

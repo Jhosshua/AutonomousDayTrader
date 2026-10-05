@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "summary_sha256": "e1dd460e1295eadf6e45b829b2d8d9d869db8cc130fb8960c5e5b0b9be930108",
+  "checks": {
+    "threshold_memberships": 60516,
+    "independent_cash_ledgers": 733,
+    "candidate_outcomes": 1464,
+    "direct_surface_cells": 1452384,
+    "profile_economics": 90,
+    "independently_certified_optima": 15,
+    "winner_correlation_cells": 5046,
+    "training_only_global_optima": 78,
+    "heldout_economics": 24,
+    "training_only_policy_choices": 26,
+    "independent_null_global_rescans": 48
+  },
+  "method": "Independent direct membership x integer cash sums, exhaustive maxima and tie breaks; no production suffix-sum optimizer used. Raw fill cash, winner matrices, every training optimum, and 48 diagnostic permutation maxima independently checked."
+}

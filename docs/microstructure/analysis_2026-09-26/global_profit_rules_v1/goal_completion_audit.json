@@ -1,0 +1,92 @@
+{
+  "status": "PASS",
+  "objective_file": "/Users/mo/.codex/attachments/53b4938e-7139-427f-8086-56803236c6cf/pasted-text-1.txt",
+  "objective_sha256": "31d80b35084bb6cfe17378edebb15f7a3c4835984ba7a513b952d2deecf9f8de",
+  "requirements": [
+    {
+      "requirement": "Scan all 244 signals and isolate every positive net outcome",
+      "evidence": [
+        "candidate_profit_panel.jsonl",
+        "winner_dna.json"
+      ],
+      "proof": "244 unique candidates; all six policy/stress winner subsets checked against frozen valid net_price_units > 0.",
+      "status": "VERIFIED"
+    },
+    {
+      "requirement": "Winner-only feature correlation and common denominator",
+      "evidence": [
+        "winner_dna.json",
+        "winner_dna_correlations.png"
+      ],
+      "proof": "Six 29x29 winner-only matrices; 5046 correlation cells independently recomputed; winner/nonwinner distributions and all-winner envelope evaluated.",
+      "status": "VERIFIED"
+    },
+    {
+      "requirement": "Automated exact lambda/T profit optimization without individual tuning",
+      "evidence": [
+        "threshold_axes.json",
+        "all_profit_surfaces.npz",
+        "discovered_rules.json",
+        "independent_global_profit_audit.json"
+      ],
+      "proof": "Every one of 60516 upper-tail pairs tested; direct integer cash audit certifies 15 complete/partial/stress optima, with deterministic ties.",
+      "status": "VERIFIED"
+    },
+    {
+      "requirement": "Global stress test over full 244-candidate pool",
+      "evidence": [
+        "systemic_rule_report.json",
+        "optimizer_validation.json"
+      ],
+      "proof": "All chosen rules applied to all 244; both structural matching stresses retained, existing execution and exits fixed.",
+      "status": "VERIFIED"
+    },
+    {
+      "requirement": "Total net P/L divided by total number of signals",
+      "evidence": [
+        "systemic_rule_report.json",
+        "Systemic Rule Report.md"
+      ],
+      "proof": "Primary global density uses 244 denominator, separately from selected/filled counts. Resolved passive=119.444/244; resolved market=482.724/244.",
+      "status": "VERIFIED"
+    },
+    {
+      "requirement": "Failure rate and high-lambda zero-profit outcomes",
+      "evidence": [
+        "systemic_rule_report.json",
+        "Systemic Rule Report.md"
+      ],
+      "proof": "Joint-rule and high-lambda-only counts separate profits, losses, zero/unfilled and unknown outcomes; passive failure 10/12; market losing count 3/7.",
+      "status": "VERIFIED"
+    },
+    {
+      "requirement": "Systemic Rule Report with exact rule, maximum and capture count",
+      "evidence": [
+        "Systemic Rule Report.md",
+        "discovered_rules.json",
+        "global_profit_surfaces.png"
+      ],
+      "proof": "Aggregate policy/cohort report, no named individual-signal case study. Exact full-precision cutoffs, counts, global metric, winner DNA, validation and unknown-P/L limits included.",
+      "status": "VERIFIED"
+    }
+  ],
+  "tests": 419,
+  "new_optimizer_tests": 19,
+  "summary_sha256": "e1dd460e1295eadf6e45b829b2d8d9d869db8cc130fb8960c5e5b0b9be930108",
+  "report_sha256": "8743e285b794f20f12a51427d2aa455c96db3e6399ca6717f693e3e3ed18bd0a",
+  "production_unchanged": [
+    "backend/app/strategies/tri_engine.py",
+    "backend/app/core/tri_execution.py",
+    "backend/app/strategies/tsla_or15_retest.py"
+  ],
+  "owned_processes_remaining": [],
+  "no_servers_started": true,
+  "plots_reviewed": [
+    "global_profit_surfaces.png",
+    "winner_dna_correlations.png",
+    "profit_capture_frontier.png",
+    "optimization_validation.png"
+  ],
+  "completed_utc": "2026-09-27T05:58:11.236069+00:00",
+  "scope_limit": "The analysis and requested report are complete. No claim of a systemic production edge or of maximum total P/L for cohorts containing unresolved outcomes."
+}

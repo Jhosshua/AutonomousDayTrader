@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "report_sha256": "9a1e9e9c1c9831490a24666d998c5167e8871fafd4f62b5efac233ed57f3f220",
+  "auditor_sha256": "f037fb59a436526e7b17e87073c75bb0ab48e0eb8ce25651920e2e48f2bbe0eb",
+  "direct_execution_ledgers": 104,
+  "decimal_parameter_points": 9002,
+  "individual_order_tick_checks": 36008,
+  "direct_off_tick_rejections": 8910,
+  "independent_depth_saturation_checks": 4,
+  "exact_fee_root_checks": 164,
+  "legal_portfolio_parity_checks": 184,
+  "reused_error_curve_points": 606,
+  "signal_strength_rows": 2,
+  "strength_interpolation": false,
+  "limitation": "Exactness is conditional on the fixed replay policy and assumptions; decimal inputs do not create sub-cent executable price states or extra independent observations."
+}

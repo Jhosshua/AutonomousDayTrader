@@ -1,0 +1,53 @@
+{
+  "status": "PASS",
+  "completed_utc": "2026-09-27T03:46:50.397493+00:00",
+  "unit_tests_passed": 388,
+  "new_extreme_threshold_tests": 10,
+  "threshold_pairs": 3844,
+  "distinct_cohorts": 123,
+  "exact_null_assignments": 612,
+  "independent_audit_status": "PASS",
+  "numerical_results_unchanged_after_manifest_revision": true,
+  "reproducible_after_audit_and_render": true,
+  "literal_extreme_and_joint_representatives_verified": true,
+  "raw_lambda_units_and_sum_verified": true,
+  "figures_visually_inspected": [
+    "joint_tightening_path.png",
+    "threshold_search_map.png",
+    "threshold_profitability.png"
+  ],
+  "task_owned_processes_remaining": [],
+  "production_strategy_files_unchanged": true,
+  "live_activation": false,
+  "code_sha256": {
+    "backend/app/microstructure/extreme_thresholds.py": "acbec7e9e07614332a4d75ee89049b4396b2620031f57fecc4600ccb719dae56",
+    "backend/tests/unit/test_microstructure_extreme_thresholds.py": "32e76c6e8ebf58e764cb9f7cc67e31701dc3a6b93ad016a7dbadcc7e6007c878",
+    "scripts/analyze_extreme_thresholds.py": "8fc9fa7c8e9df6f91441f6d1d9bd1bf47217df522c87b1f3d717521c6370d4a9",
+    "scripts/audit_extreme_thresholds.py": "90629f947a3cdfa8e74d7d6a5e89b3ee6f4ea105cca996b47b1ab35bd725e477",
+    "scripts/render_extreme_thresholds.py": "101adbbec54ffc7a03be14d1f731e5d28e70074e4048e7f3d13e760c4476e1fb",
+    "docs/microstructure/EXTREME_THRESHOLDS_2026_09_26.md": "42b8ecaf99445aed44cbb305cee12c3f188ccddaddeeb51f54aef0f20701d19d"
+  },
+  "artifact_sha256": {
+    "Extreme Signal Profile.md": "7c03bd8c6080617bbfff999e5a72fdf56c7b2aa410adbad7267d2535bd75ed6c",
+    "all_threshold_profiles.json": "5392102567292001610457fae3f4607b925f8f57d4f119246e378a3c61313198",
+    "analysis_protocol.json": "0c3d994075e3654bb319ec1f8a464f25feaea5cd7a1d464abd0e8f7835a5efd0",
+    "date_held_out_validation.json": "9e3042b189d43fcccfb168a43ec9e130d61baa3b851130ef7210a44866bed100",
+    "equivalent_joint_threshold.json": "c9783b3ad41115e57ea27447e4de40cffce3b4371cb42d29e0aabd10b0964aab",
+    "exact_test_results.json": "a722a43f5396d0368339b559c8dec2d4b18a32b34a1cee5b9bffd9122cc37a70",
+    "execution_code_manifest.json": "58d857ffde10be4b59bfbea076d078b311ccbb0423755859a4bdbe2b8757277c",
+    "execution_code_manifest_initial.json": "0d9bdf22712324cd1c787576e2d9c592fe10c8fc6cf9407bb73f88c5857b4014",
+    "execution_input_hashes.json": "43927b79363a6cfeade555bf8c26b731c85675ba9ce9db764c061cf0e03833b3",
+    "extreme_signal_profile.json": "33c271358b0ee32c5c4202efe4f19fc8b55e19d817e6db32e011b1f8f9e98e49",
+    "feature_label_panel.json": "bb31402340bb41adf9bb53721a9f548d8a8555ec2e7bb3fa8abba3a86d4a030c",
+    "independent_extreme_audit.json": "02fb4a2624f50fe7b9c1efac4f29664a4b9db57e52af1b1778c83c9a38a95425",
+    "initial_numerical_summary.json": "5f3a72359c42c5aca16d7d342a30adbf563e60849e3f4582af6451a5347f9177",
+    "joint_tightening_path.json": "b3c64541e6e02a9bb10c7283a377e330d434fc8d4dad3675ef99670ee73a573b",
+    "joint_tightening_path.png": "72b4f4c666b9b9a6ccfbf314cf144fe13cbb463e9311ef3699b9bccadd1e01ca",
+    "reproduction_check.json": "03416e7baafdf51324e078ac62da83ae2b88b110bc8f0e4fb8369c03c5ca3442",
+    "runner_reproducibility_revision.json": "0cd33cdbb12b8a0e1f9b0f1598d02b08d8f364861fde8074be6b3d80ce8193f9",
+    "selected_profile_members.json": "0f52b97ff4ac80d3669a6f2701055027ba7292220e7ee31c9fa4d501ed1932e4",
+    "threshold_family.json": "28631e7152c0109b3bf88a3244405d107155b58aaa9e241475b926a7c6b4d000",
+    "threshold_profitability.png": "806b34c8c496938b9db9bbefa9be9cac72cd1c77ad152fc0a62a24fa60ba95a0",
+    "threshold_search_map.png": "4d09f3b7a39e599e867a4def996de386feae80a8d9aaff65532cbaefd2c36801"
+  }
+}

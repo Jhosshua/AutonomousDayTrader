@@ -1,0 +1,1381 @@
+[
+  {
+    "id": "8c5fdcdf-f426-4a15-b6d6-8bdb8d65d8a0",
+    "status": "SUCCESS",
+    "createdAt": "2026-09-27T22:07:09.856Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "c8194ebbd0dc51b0e7dfb34e9807bb06528b5ee6",
+      "commitMessage": "Fix Ride the Trend data integrity, profile rebuild races and missing card diagnostics",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:ba08858a5c28f3dfc7ad07118831dbb6f15cc3321cc64e993cef5f47d47461d4",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "34da556a-85f5-438a-871c-1b1a85d01df2",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T21:43:07.513Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "26d19a5256f4eaba722d7ccb0deb63af823b4d3b",
+      "commitMessage": "MEMORY: record the add-ons deploy verification\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:d0280c9a000512193396ae9219133e20f23e61aba103defa35cc155955429373",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "da62c6e2-9f5f-45d9-91e2-423a2f186ddb",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T21:41:01.687Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "350a77a43b26ef16c15e1482ea4a54c3c036d4ca",
+      "commitMessage": "Ride the Trend add-ons enforced live: session cumulative delta, spread proxy, volume-profile nodes\n\n(A) Session delta from per-minute aggregates with a decision-time cutoff, feed generations restart at a\nreconnect or gap, partial totals labeled, 30 minutes of continuous feed and trade delivery to the cutoff\nrequired. (B) Spread proxy: spread in force at the start of each second carried forward, last 10 s vs the\ntrailing 30-minute median, gate 1.5x and 30 bps; crossed quotes invalidate classification, spread and book\nuntil a valid quote; locked markets ignored. (C) Volume profile of the five prior sessions from 1-minute\nbars (overlap-weighted 0.1% buckets, nodes >= 1.5x median), support under the pullback extreme and a clear\nroad to the first target (shared executable stop/target helper), profiles fetched from the relay with\ngenerations, bounds and a worker-thread build; card shows per-symbol readiness and last block reason.\nAll three enforced from day one (RIDE_THE_TREND_ADDONS_ENFORCED). Codex plan attack (21) and code review\n(30, 10 P0) fixed and triaged in docs/ride_the_trend_v2/. 1,132 tests green; four real replays pass.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:d0280c9a000512193396ae9219133e20f23e61aba103defa35cc155955429373",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "8e45bfb2-01a3-44c9-8802-4af23dcace7e",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T20:56:07.109Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "a84e33ca30b7909c2ba389a9d5a2a935a06529e5",
+      "commitMessage": "MEMORY: record the part-2 deploy verification\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:d3059f06f42095ce3df7ac55fffb6d0933a9052c534267a2971da706126620b9",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "6b2b6fcc-5587-42b6-8f94-4c20d5f3f8bd",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T20:55:13.156Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "7142f419fe03b7c08a881c6b434e7b2a639db415",
+      "commitMessage": "Ride the Trend v2: policy id and version always come from the code, not the restored checkpoint\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:d3059f06f42095ce3df7ac55fffb6d0933a9052c534267a2971da706126620b9",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "b5ed47ea-31f9-4c70-9851-c0c6a9dc7dc0",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T20:43:35.718Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "87d60223ea4cbb6ea79c94d3357e672d2300e058",
+      "commitMessage": "Ride the Trend data layers part 2: raw print store, real-time delta measures, regime ETF feed (recorded, promotable)\n\nLayer 1: per-second raw print store (packed columns, whole-second eviction, coverage on every query,\nquote-history classification of late prints, trade-id de-duplication, ineligible conditions excluded).\nLayer 3: impulse, pullback, resumption and rolling-30-minute delta plus velocity and book recorded on\nevery resumption evaluation from one complete-and-finite snapshot; gates only when named in\nRIDE_THE_TREND_ENFORCED_GATES. Layer 4: RegimeFeed for XLK/XLC/XLY/XLF/UUP/SHY/IEF (bars only),\nsector direction and relative return, dollar and rates wind, recorded at decision time and in admission.\nQuote-classified floor set from the live feed (25-51% of volume prints at the inside).\n\nTwo Codex code-review rounds (34 + 7 findings) drove the per-second redesign, completeness on every\ngate, admissibility before mutation, atomic re-sort, outage intervals and regime hardening; reviews and\ntriage in docs/ride_the_trend_v2/. 1,127 tests green; three real mornings plus an all-arms run replayed\nwith all seven ETF streams (0 signals, invariants held); step-0 funnel diagnostics for the operator.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:5ef6141c676507280ac0da86b24a933e0c443fc2a18dde1af021806c142ed025",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "1274ddbd-78bc-4bff-be57-9c3ebfdfff58",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T19:32:22.829Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "86212fbf85f35565a53228c78a980ac0a5eef676",
+      "commitMessage": "Tick tape: time-weighted book imbalance and late-second ordering fix; data layers part 2 plan after Codex attack\n\nTwo live bugs from the Codex plan review: the late-second re-sort never ran, and book imbalance\nwas weighted by quote-update count. Plan for the raw feed, real-time delta and macro/correlation\nlayers revised (absorption veto dropped as unreachable, coverage-aware queries, per-candidate\nregime dependency, record-then-promote rollout). Suite 1,122 green.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:4ddf9124c2d188db1864d08ca1ecbc54fc4fd507392fc7a32ac88ab7c976accd",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "3c32c680-27f3-4318-858f-e9c5b39f3874",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T18:57:19.766Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "a37856936591ed667f8e904df9edd6ed87ca550a",
+      "commitMessage": "MEMORY: record the Ride the Trend v2 deploy (ef789a3) and live verification\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:290c25adebc239d03dc2289d569fc8698891b0eda65b8c20974004e3f64bf4bf",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "a00d245c-3695-403f-a51e-c31299e30377",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T18:55:42.489Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "ef789a3871c7338c19241bff997ab761e5414af0",
+      "commitMessage": "Ride the Trend v2: four required data layers, fail-closed gates, trail-only runner (not yet deployed)\n\nReplaces the vwap_pullback strategy with a deterministic VWAP-structure machine gated by\nLayer 1 tick aggression (SIP prints classified at bid/ask), Layer 2 top-of-book imbalance,\nLayer 3 velocity on exchange nanosecond stamps, and Layer 4 regime (SPY/QQQ, VIX, relative\nstrength, macro blackout calendar). Stop computed once (stop_is_final), 1R half + trail-only\nrunner, mornings only, TSLA/CDE/SPY/QQQ excluded, state rebuilt safely after restarts.\n\nEvidence: 59 new tests (1,121 total green), real-tick dry runs of 3 sessions through the live\nhandlers (0 signals, all invariants held, coexists with the other arms), a full fake session\nthrough main proving entry -> bracket -> T1 -> trail -> stop and the 15:55 flatten. Codex code\nreview (34 findings, 8 P0) fixed and triaged in docs/ride_the_trend_v2/. Stale plan files\narchived under docs/plans_archive/. Push held for the operator's decision.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:290c25adebc239d03dc2289d569fc8698891b0eda65b8c20974004e3f64bf4bf",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "bc6c17a2-9e41-4efd-9574-e79ebd68c818",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T18:08:13.844Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "b63d3d5290efdf66f78e97f409d207f949bfac85",
+      "commitMessage": "Ride the Trend v2 plan draft v4: LIVE from day one per operator, market entry kept, shadow dropped\n\nOperator rejected shadow-first. v2 rules trade on the paper account Monday 09-28 under\nRIDE_THE_TREND_MODE=v2_live. Resting-limit entry removed (it was not one of the five\nprinciples and needed a new order lifecycle). Codex findings that still apply listed in section 7.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:efce1d8c2ff2007c59d455b1342b7c09e0dba3ac77b40217c0cde8ddc4584da5",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "e2e28106-3caa-4f87-afc6-3e842dae50a9",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T18:01:42.300Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "283598210551c792f972faf8099c6f9098f84024",
+      "commitMessage": "Ride the Trend v2 plan (draft v3) after two Codex attack rounds; shadow-first, no code change\n\nPlan maps the operator's five principles onto the bot, freezes one policy (V2_FULL) and ten\npre-registered rows, and ships Monday as shadow only: v1 stops placing orders, v2 is measured\nlive with its own research store. Broker-order mode is a separate milestone behind an activation\nhash. Codex rounds 1 and 2 (54 findings) saved under docs/ride_the_trend_v2/, all accepted.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:efce1d8c2ff2007c59d455b1342b7c09e0dba3ac77b40217c0cde8ddc4584da5",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "5ddb5e95-8162-4c80-9298-5e48660902c7",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T07:43:11.317Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "258b8aba761d126c9f2546919a3e7aff0591b54f",
+      "commitMessage": "Research: Ride the Trend (vwap_pullback) has no edge; 50-hypothesis backtest 2024-2026\n\nParity-proven 1-min replay of the live rules on the 12 watchlist symbols:\n4,407 trades, mean R -0.055 (SE 0.013), +0.001 with zero cost; forward drift\nafter 36k signals is 0 bps at every horizon. 69 rule variants found nothing\npositive across IS/VAL/HOLD. Recommendation: turn the strategy off. No bot\ncode changed.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:a746114c128d36f8dc21ca4776a58e6923821bf96c9d85f28e0c69e38b7c38ce",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "5389b3ad-5d8a-4761-919e-b5428bdaf4cf",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T07:21:25.212Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "74b4c5c758d91410399bbeb5ab2c561db46e6952",
+      "commitMessage": "Measure value of faster execution and rebates on the 373 archive trades\n\nRe-runs every candidate at 250ms/50ms/1ms order latency (250ms reproduces the\nfrozen results exactly). P/L barely moves and maker rebates total under $100,\nso a latency/rebate stack cannot rescue the current signals. Logged in MEMORY.md.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:a746114c128d36f8dc21ca4776a58e6923821bf96c9d85f28e0c69e38b7c38ce",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "2793908e-e636-4b6b-8543-11d4b2820558",
+    "status": "REMOVED",
+    "createdAt": "2026-09-27T06:58:01.074Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "2183e234eae548583537cfce61f319f4e6642ebd",
+      "commitMessage": "Impact Factor (dPrice/Volume) sweep: frozen one-shot test, NO-GO\n\nAdds outcome-blind impact feature extraction and the sweep runner (reuses the\nvelocity-pivot block sign-flip and permutation tests). 536 rules, no rule\nprofitable after luck adjustment or out of sample. Logged in MEMORY.md.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:67cf0691909522bbeea7e89332b6c4dd3da66a011c9f6076f4b85894f26f3a10",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "9ca1e68f-cc94-446d-b3c8-f97d94a7902e",
+    "status": "REMOVED",
+    "createdAt": "2026-09-26T06:34:59.480Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "e033306355194c6f388e5cb3e5e442624174bdeb",
+      "commitMessage": "Fix tri-engine recovery and restore clear daily trade history",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:5658cd429197558c02c0b67fc403bac81d976a6af58e52ab1e2e899c3ff4ad3f",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "34152efa-90ac-4e6d-9fa7-684c8127a554",
+    "status": "REMOVED",
+    "createdAt": "2026-09-26T05:52:41.664Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "814f35ff3a3b2946a2bd24edfd7c036b8402982b",
+      "commitMessage": "Tri-engine cards say 'Market closed today' on weekends and holidays\n\nAfter the deploy the live cards read 'Skipped today; a required check did\nnot pass' on a Saturday, with a warning blocker. A closed market is normal,\nnot a failed check, so show it plainly with no blocker.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:b26b33c42224c70e35132421c923694e5ba117e1b6c5ff8a0e3dfb6be55bf4e3",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "26b5eb4d-2739-451c-ab01-c8265809f27b",
+    "status": "REMOVED",
+    "createdAt": "2026-09-26T05:50:07.513Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "25a4fe5aa046881acf48ea4f7474e0cfab39c6f6",
+      "commitMessage": "Add Tesla + Coeur Morning Plan (tri-engine) as live paper arms\n\nImplements /Users/mo/multi_stock_edge_lab_3yr/EXECUTION_PLAN.md as two\nfixed-rule arms on the Alpaca paper account, no shadow period:\ntsla_asymmetric_dual (half 1.5R/180m, half 2R/240m, one OCO per half) and\ncde_asymmetric_dual (2R/180m). The old OR15 arm takes no new entries.\n\nOperator decisions: market entries at T+2 for both sides (the plan's\nnumbers come from a T+2 raw-open fill), TSLA first come first served\nwith the older arms, 09:30-09:44 opening range as written, plan orders\nsized by 0.75% stop risk without the $25k cap (it refused 92 of 146 real\n2026 TSLA trades). Daily loss stop is min($1,500, 2.5% of session-start\nequity) and survives restarts.\n\nFinding: the research behind the plan's win rates built its range and\nQQQ VWAP from 04:00 pre-market bars. With that quirk emulated the live\nsignal code matches the research on 565/565 TSLA days; as written, TSLA\n2R and CDE backtest as not significant. Details in\ndocs/tri_engine/EVIDENCE.md.\n\nFixed from reviews: Codex E1-E6; save on every quote; lost entry reply\nforgetting broker shares; transient 429/5xx closing trades; request\nbursts; feed reconnect flattening; transient partial fills killing\ntrades; stuck-cancel partials left unprotected; missing Dockerfile copy\nof the frozen source (startup would have failed on Railway).\n\nVerified: backend 773 passed (1 pre-existing date-bound swing test fails\non HEAD too), dry run 29/29, real-day handler replay 145/146 TSLA and\n178/178 simulable CDE exits equal to the research simulator, old-to-new\ncheckpoint upgrade, dashboard 7 states at desktop and phone width.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:8f4e00af707fec7b6757b054cdbb4da4291ddc9ae8898c847c189d453baa007d",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "f16d2456-a21b-4a60-a154-c84a685fef57",
+    "status": "REMOVED",
+    "createdAt": "2026-09-25T21:55:56.949Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "548c1e9dc008ddfcc228f0aedadd2a645acdad8d",
+      "commitMessage": "OR15 audit: tolerate 0.5s clock skew on bar completion and quote age\n\nLive Railway probe: bars arrive 0.05-0.14s after the minute. The zero-tolerance\ncheck meant a small host clock drift would skip every TSLA session or block the\nentry. Trading rules unchanged. Red-then-green tests added; 963 tests pass;\nOR15 dry run PASS with regenerated evidence (new implementation hash).\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:5dd8e4830cba750c1c9e9bb70e8cd8d5601505d6403ceab7b462c713df78abbe",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "6016b72c-3f2b-4e31-9472-f45a82be932b",
+    "status": "REMOVED",
+    "createdAt": "2026-09-25T21:39:12.157Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "f912e01e8338fd014d004e0e116eecd78309c88e",
+      "commitMessage": "OR15: record new implementation hash after research hooks; regenerated dry-run evidence (PASS)\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "imageDigest": "sha256:d463784a55508173318a59945bd00d213e164da1266ea5c8affa2601bffa0444",
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  },
+  {
+    "id": "dd851538-6afc-4567-81b7-ff556f06b02c",
+    "status": "REMOVED",
+    "createdAt": "2026-09-25T21:38:47.753Z",
+    "meta": {
+      "branch": "main",
+      "buildOnly": false,
+      "commitAuthor": "Jhosshua",
+      "commitHash": "6a5ec343eaeb6e9c88e9ea446002369996a88dc8",
+      "commitMessage": "Document research recording: usage, verification, limits, lessons\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+      "fileServiceManifest": {},
+      "logsV2": true,
+      "nixpacksProviders": [],
+      "plan": "pro",
+      "propertyFileMapping": {
+        "build.builder": "$.build.builder",
+        "build.dockerfilePath": "$.build.dockerfilePath",
+        "deploy.healthcheckPath": "$.deploy.healthcheckPath",
+        "deploy.healthcheckTimeout": "$.deploy.healthcheckTimeout",
+        "deploy.restartPolicyMaxRetries": "$.deploy.restartPolicyMaxRetries",
+        "deploy.restartPolicyType": "$.deploy.restartPolicyType"
+      },
+      "reason": "deploy",
+      "repo": "Jhosshua/AutonomousDayTrader",
+      "rootDirectory": null,
+      "runtime": "V2",
+      "serviceManifest": {
+        "build": {
+          "buildCommand": null,
+          "buildEnvironment": "V3",
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "/Dockerfile",
+          "nixpacksConfigPath": null,
+          "nixpacksPlan": null,
+          "watchPatterns": []
+        },
+        "deploy": {
+          "cronSchedule": null,
+          "drainingSeconds": null,
+          "healthcheckPath": null,
+          "healthcheckTimeout": null,
+          "ipv6EgressEnabled": false,
+          "limitOverride": null,
+          "multiRegionConfig": {
+            "sfo": {
+              "numReplicas": 1
+            }
+          },
+          "numReplicas": 1,
+          "overlapSeconds": null,
+          "preDeployCommand": null,
+          "preDeployTimeoutSeconds": null,
+          "region": null,
+          "registryCredentials": null,
+          "requiredMountPath": null,
+          "restartPolicyMaxRetries": 10,
+          "restartPolicyType": "ON_FAILURE",
+          "runtime": "V2",
+          "sleepApplication": false,
+          "startCommand": null,
+          "useLegacyStacker": false
+        }
+      },
+      "volumeMounts": [
+        "/data"
+      ]
+    }
+  }
+]

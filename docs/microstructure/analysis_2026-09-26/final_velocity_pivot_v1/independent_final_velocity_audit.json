@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "summary_sha256": "23161e148650c41676fe00e5859313c95e810efaee170f84930c8d140e34f2a6",
+  "method": "Independent feature differences, signed fill cash, broadcast membership enumeration, sparse integer block sums, non-BLAS exact sign flips and C++ integer prefix-sum enumeration of every raw rule for every permutation.",
+  "checks": {
+    "raw_sessions": 12,
+    "raw_bytes": 83160933276,
+    "normalized_sources": 373,
+    "source_bytes": 27821522226,
+    "stock_days": 624,
+    "candidates": 373,
+    "execution_branches": 2238,
+    "distinct_ledgers": 1189,
+    "distinct_ledger_fills": 12512,
+    "raw_feature_rules": 514726,
+    "unique_cohorts": 124888,
+    "eligible_rule_policy_pairs": 24212,
+    "exact_week_sign_flips": 1024,
+    "independent_integer_profit_maxima": 10000,
+    "all_cash_integer_exact": true,
+    "unknowns_never_zero_profit": true,
+    "causal_cutoffs_verified": true,
+    "no_lambda_T_model_inputs": true,
+    "global_multiple_search_correction_verified": true,
+    "verdict_recomputed": true,
+    "numeric_warning_resolution": "Accelerate matmul emitted floating-point flags; every actual output was finite where eligible. Independent sparse integer cash, non-BLAS sign flips, and all 10000 C++ integer profit maxima reproduced the results."
+  },
+  "artifact_sha256": {
+    "independent_integer_null_maxima.txt": "d78289920bfd0b34fa980a8e1abedd8291ec5dacb948900f6cfd1f789f8d4b6f",
+    "independent_cash.tsv": "b3d490e8bfdcbfd163d795f22032838674d7144a7d39edb9be29699c46f2486e",
+    "independent_orders.bin": "bd39d18c616f644155d6bf05ba18c76f655b39c363e77352a5a144965137d941"
+  }
+}

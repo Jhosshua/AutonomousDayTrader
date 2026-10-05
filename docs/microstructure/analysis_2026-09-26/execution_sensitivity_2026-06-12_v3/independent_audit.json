@@ -1,0 +1,80 @@
+{
+  "status": "PASS",
+  "report_sha256": "9478fe2cc0574e2749f6b4d9f588f0c4699df0c40090ad53b07cfa6b995983be",
+  "audit_code_sha256": "43e91ceaa7c2cfe57e49f77d6d3c5ee2dfc82828587652c6504654431488b7ae",
+  "source_sha256": "a08c9db1d1f1f8e653e4a4eb03bb2f97022a631351158556982a3cdc0f0d1351",
+  "cash_and_quantity_ledgers_checked": 16,
+  "markout_asof_checks": 98,
+  "source_rows_examined": 15586441,
+  "market_entry_depth_checks": [
+    {
+      "symbol": "TSLA",
+      "ns": 35220251000000,
+      "side": "SELL",
+      "quantity": 114,
+      "levels": {
+        "3966900": 114
+      },
+      "unfilled": 0
+    },
+    {
+      "symbol": "CDE",
+      "ns": 37020251000000,
+      "side": "BUY",
+      "quantity": 1136,
+      "levels": {
+        "167900": 225,
+        "168000": 837,
+        "168100": 74
+      },
+      "unfilled": 0
+    }
+  ],
+  "stop_first_hit_checks": [
+    {
+      "symbol": "TSLA",
+      "scenario": "strict",
+      "scale": 2,
+      "tranche": 0,
+      "active_ns": 35220512000000,
+      "trigger_ns": 41199416974664,
+      "stop_units": 4002000,
+      "is_long": false,
+      "first_hit_ns": 41199416974664
+    },
+    {
+      "symbol": "TSLA",
+      "scenario": "strict",
+      "scale": 2,
+      "tranche": 1,
+      "active_ns": 35220512000000,
+      "trigger_ns": 41199416974664,
+      "stop_units": 4002000,
+      "is_long": false,
+      "first_hit_ns": 41199416974664
+    },
+    {
+      "symbol": "TSLA",
+      "scenario": "residual_add",
+      "scale": 2,
+      "tranche": 0,
+      "active_ns": 35220512000000,
+      "trigger_ns": 41199416974664,
+      "stop_units": 4002000,
+      "is_long": false,
+      "first_hit_ns": 41199416974664
+    },
+    {
+      "symbol": "TSLA",
+      "scenario": "residual_add",
+      "scale": 2,
+      "tranche": 1,
+      "active_ns": 35220512000000,
+      "trigger_ns": 41199416974664,
+      "stop_units": 4002000,
+      "is_long": false,
+      "first_hit_ns": 41199416974664
+    }
+  ],
+  "limits": "Independent checks cover cash, quantity, original market-entry depth, midpoint marks and first stop triggers. They do not prove the residual-add order-type assumption or market-impact model."
+}

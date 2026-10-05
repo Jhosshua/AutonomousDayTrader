@@ -1,0 +1,719 @@
+{
+  "status": "COMPLETE",
+  "stage": 3,
+  "completed_utc": "2026-09-27T06:22:18.779464+00:00",
+  "protocol_sha256": "7f333a6eb7646079786839e9d94809b371d0b2492feeb0a2994eb85e05431320",
+  "stage_1_sha256": "66b3c31ef8090a874c54da6083b34e1409197d21c2c6cfe7ecab9396e6b76e23",
+  "stage_2_sha256": "461c5b01b240d4f709e5b4b0758686bef94d64518eabdb46764a7c47bd7e8a0b",
+  "coverage": {
+    "session_count": 12,
+    "stock_days": 624,
+    "strategy_symbols": 52,
+    "candidate_count": 373,
+    "old_candidates": 244,
+    "new_candidates": 129,
+    "status_counts": {
+      "CANDIDATE": 373,
+      "NO_SETUP": 139,
+      "INCOMPLETE_OPENING_BARS": 112
+    },
+    "all_files_accounted": true,
+    "per_session": {
+      "2019-01-30": {
+        "CANDIDATE": 26,
+        "NO_SETUP": 15,
+        "INCOMPLETE_OPENING_BARS": 11
+      },
+      "2019-03-27": {
+        "CANDIDATE": 40,
+        "INCOMPLETE_OPENING_BARS": 9,
+        "NO_SETUP": 3
+      },
+      "2019-07-30": {
+        "CANDIDATE": 27,
+        "INCOMPLETE_OPENING_BARS": 17,
+        "NO_SETUP": 8
+      },
+      "2019-08-30": {
+        "CANDIDATE": 37,
+        "INCOMPLETE_OPENING_BARS": 11,
+        "NO_SETUP": 4
+      },
+      "2019-10-30": {
+        "NO_SETUP": 10,
+        "CANDIDATE": 26,
+        "INCOMPLETE_OPENING_BARS": 16
+      },
+      "2019-12-30": {
+        "CANDIDATE": 38,
+        "INCOMPLETE_OPENING_BARS": 10,
+        "NO_SETUP": 4
+      },
+      "2020-01-30": {
+        "CANDIDATE": 37,
+        "NO_SETUP": 6,
+        "INCOMPLETE_OPENING_BARS": 9
+      },
+      "2021-07-13": {
+        "NO_SETUP": 30,
+        "CANDIDATE": 16,
+        "INCOMPLETE_OPENING_BARS": 6
+      },
+      "2025-12-08": {
+        "CANDIDATE": 24,
+        "NO_SETUP": 22,
+        "INCOMPLETE_OPENING_BARS": 6
+      },
+      "2025-12-09": {
+        "NO_SETUP": 25,
+        "CANDIDATE": 23,
+        "INCOMPLETE_OPENING_BARS": 4
+      },
+      "2025-12-10": {
+        "CANDIDATE": 39,
+        "INCOMPLETE_OPENING_BARS": 7,
+        "NO_SETUP": 6
+      },
+      "2026-06-12": {
+        "CANDIDATE": 40,
+        "INCOMPLETE_OPENING_BARS": 6,
+        "NO_SETUP": 6
+      }
+    }
+  },
+  "rule": {
+    "lambda_min": 511.0,
+    "T_min": 0.39
+  },
+  "execution_policy": "market",
+  "economics": {
+    "10000": {
+      "selected": 12,
+      "valid": 12,
+      "unknown": 0,
+      "wins": 4,
+      "losses": 8,
+      "zero": 0,
+      "filled": 12,
+      "known_gross_units": -12692100,
+      "known_fees_units": 777540,
+      "known_net_units": -13469640,
+      "known_net_usd": -1346.964,
+      "net_usd": -1346.964,
+      "net_per_pool_candidate_usd": -3.6111635388739947,
+      "taker_shares_all_legs": 25918,
+      "maker_shares_all_legs": 130,
+      "taker_notional_usd": 848591.54,
+      "break_even_taker_fee_usd_per_share_per_leg": -0.04897021375106104,
+      "break_even_fraction": {
+        "numerator": -126921,
+        "denominator": 2591800
+      },
+      "break_even_taker_fee_bps": -14.956665724006628,
+      "incremental_slippage_headroom_usd_per_taker_share": -0.051970213751061034,
+      "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+      "extra_slippage": {
+        "0": {
+          "known_net_usd": -1346.964,
+          "net_usd": -1346.964
+        },
+        "0.0025": {
+          "known_net_usd": -1411.759,
+          "net_usd": -1411.759
+        },
+        "0.005": {
+          "known_net_usd": -1476.554,
+          "net_usd": -1476.554
+        },
+        "0.01": {
+          "known_net_usd": -1606.144,
+          "net_usd": -1606.144
+        }
+      }
+    },
+    "0": {
+      "selected": 12,
+      "valid": 12,
+      "unknown": 0,
+      "wins": 4,
+      "losses": 8,
+      "zero": 0,
+      "filled": 12,
+      "known_gross_units": -12692100,
+      "known_fees_units": 777540,
+      "known_net_units": -13469640,
+      "known_net_usd": -1346.964,
+      "net_usd": -1346.964,
+      "net_per_pool_candidate_usd": -3.6111635388739947,
+      "taker_shares_all_legs": 25918,
+      "maker_shares_all_legs": 130,
+      "taker_notional_usd": 848591.54,
+      "break_even_taker_fee_usd_per_share_per_leg": -0.04897021375106104,
+      "break_even_fraction": {
+        "numerator": -126921,
+        "denominator": 2591800
+      },
+      "break_even_taker_fee_bps": -14.956665724006628,
+      "incremental_slippage_headroom_usd_per_taker_share": -0.051970213751061034,
+      "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+      "extra_slippage": {
+        "0": {
+          "known_net_usd": -1346.964,
+          "net_usd": -1346.964
+        },
+        "0.0025": {
+          "known_net_usd": -1411.759,
+          "net_usd": -1411.759
+        },
+        "0.005": {
+          "known_net_usd": -1476.554,
+          "net_usd": -1476.554
+        },
+        "0.01": {
+          "known_net_usd": -1606.144,
+          "net_usd": -1606.144
+        }
+      }
+    }
+  },
+  "maker_control": {
+    "10000": {
+      "selected": 12,
+      "valid": 12,
+      "unknown": 0,
+      "wins": 1,
+      "losses": 1,
+      "zero": 10,
+      "filled": 2,
+      "known_gross_units": -3043600,
+      "known_fees_units": 70980,
+      "known_net_units": -3114580,
+      "known_net_usd": -311.458,
+      "net_usd": -311.458,
+      "net_per_pool_candidate_usd": -0.8350080428954424,
+      "taker_shares_all_legs": 2366,
+      "maker_shares_all_legs": 2366,
+      "taker_notional_usd": 43900.64,
+      "break_even_taker_fee_usd_per_share_per_leg": -0.12863905325443786,
+      "break_even_fraction": {
+        "numerator": -1087,
+        "denominator": 8450
+      },
+      "break_even_taker_fee_bps": -69.32928540449524,
+      "incremental_slippage_headroom_usd_per_taker_share": -0.1316390532544379,
+      "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+      "extra_slippage": {
+        "0": {
+          "known_net_usd": -311.458,
+          "net_usd": -311.458
+        },
+        "0.0025": {
+          "known_net_usd": -317.373,
+          "net_usd": -317.373
+        },
+        "0.005": {
+          "known_net_usd": -323.288,
+          "net_usd": -323.288
+        },
+        "0.01": {
+          "known_net_usd": -335.118,
+          "net_usd": -335.118
+        }
+      }
+    },
+    "0": {
+      "selected": 12,
+      "valid": 12,
+      "unknown": 0,
+      "wins": 0,
+      "losses": 0,
+      "zero": 12,
+      "filled": 0,
+      "known_gross_units": 0,
+      "known_fees_units": 0,
+      "known_net_units": 0,
+      "known_net_usd": 0.0,
+      "net_usd": 0.0,
+      "net_per_pool_candidate_usd": 0.0,
+      "taker_shares_all_legs": 0,
+      "maker_shares_all_legs": 0,
+      "taker_notional_usd": 0.0,
+      "break_even_taker_fee_usd_per_share_per_leg": null,
+      "break_even_fraction": null,
+      "break_even_taker_fee_bps": null,
+      "incremental_slippage_headroom_usd_per_taker_share": null,
+      "fee_root_status": "NO_TAKER_FILLS",
+      "extra_slippage": {
+        "0": {
+          "known_net_usd": 0.0,
+          "net_usd": 0.0
+        },
+        "0.0025": {
+          "known_net_usd": 0.0,
+          "net_usd": 0.0
+        },
+        "0.005": {
+          "known_net_usd": 0.0,
+          "net_usd": 0.0
+        },
+        "0.01": {
+          "known_net_usd": 0.0,
+          "net_usd": 0.0
+        }
+      }
+    }
+  },
+  "new_sessions_economics": {
+    "10000": {
+      "selected": 4,
+      "valid": 4,
+      "unknown": 0,
+      "wins": 0,
+      "losses": 4,
+      "zero": 0,
+      "filled": 4,
+      "known_gross_units": -15068700,
+      "known_fees_units": 148860,
+      "known_net_units": -15217560,
+      "known_net_usd": -1521.756,
+      "net_usd": -1521.756,
+      "net_per_pool_candidate_usd": -4.079774798927614,
+      "taker_shares_all_legs": 4962,
+      "maker_shares_all_legs": 0,
+      "taker_notional_usd": 170036.97,
+      "break_even_taker_fee_usd_per_share_per_leg": -0.3036819830713422,
+      "break_even_fraction": {
+        "numerator": -50229,
+        "denominator": 165400
+      },
+      "break_even_taker_fee_bps": -88.62013949084131,
+      "incremental_slippage_headroom_usd_per_taker_share": -0.3066819830713422,
+      "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+      "extra_slippage": {
+        "0": {
+          "known_net_usd": -1521.756,
+          "net_usd": -1521.756
+        },
+        "0.0025": {
+          "known_net_usd": -1534.161,
+          "net_usd": -1534.161
+        },
+        "0.005": {
+          "known_net_usd": -1546.566,
+          "net_usd": -1546.566
+        },
+        "0.01": {
+          "known_net_usd": -1571.376,
+          "net_usd": -1571.376
+        }
+      }
+    },
+    "0": {
+      "selected": 4,
+      "valid": 4,
+      "unknown": 0,
+      "wins": 0,
+      "losses": 4,
+      "zero": 0,
+      "filled": 4,
+      "known_gross_units": -15068700,
+      "known_fees_units": 148860,
+      "known_net_units": -15217560,
+      "known_net_usd": -1521.756,
+      "net_usd": -1521.756,
+      "net_per_pool_candidate_usd": -4.079774798927614,
+      "taker_shares_all_legs": 4962,
+      "maker_shares_all_legs": 0,
+      "taker_notional_usd": 170036.97,
+      "break_even_taker_fee_usd_per_share_per_leg": -0.3036819830713422,
+      "break_even_fraction": {
+        "numerator": -50229,
+        "denominator": 165400
+      },
+      "break_even_taker_fee_bps": -88.62013949084131,
+      "incremental_slippage_headroom_usd_per_taker_share": -0.3066819830713422,
+      "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+      "extra_slippage": {
+        "0": {
+          "known_net_usd": -1521.756,
+          "net_usd": -1521.756
+        },
+        "0.0025": {
+          "known_net_usd": -1534.161,
+          "net_usd": -1534.161
+        },
+        "0.005": {
+          "known_net_usd": -1546.566,
+          "net_usd": -1546.566
+        },
+        "0.01": {
+          "known_net_usd": -1571.376,
+          "net_usd": -1571.376
+        }
+      }
+    }
+  },
+  "raw_zone": {
+    "center_positive": false,
+    "symmetric_radius_percent": 0.0,
+    "radius_is_lower_bound": false,
+    "first_failure": {
+      "lambda_min": 511.0,
+      "T_min": 0.39,
+      "economics": {
+        "10000": {
+          "selected": 12,
+          "valid": 12,
+          "unknown": 0,
+          "wins": 4,
+          "losses": 8,
+          "zero": 0,
+          "filled": 12,
+          "known_gross_units": -12692100,
+          "known_fees_units": 777540,
+          "known_net_units": -13469640,
+          "known_net_usd": -1346.964,
+          "net_usd": -1346.964,
+          "net_per_pool_candidate_usd": -3.6111635388739947,
+          "taker_shares_all_legs": 25918,
+          "maker_shares_all_legs": 130,
+          "taker_notional_usd": 848591.54,
+          "break_even_taker_fee_usd_per_share_per_leg": -0.04897021375106104,
+          "break_even_fraction": {
+            "numerator": -126921,
+            "denominator": 2591800
+          },
+          "break_even_taker_fee_bps": -14.956665724006628,
+          "incremental_slippage_headroom_usd_per_taker_share": -0.051970213751061034,
+          "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+          "extra_slippage": {
+            "0": {
+              "known_net_usd": -1346.964,
+              "net_usd": -1346.964
+            },
+            "0.0025": {
+              "known_net_usd": -1411.759,
+              "net_usd": -1411.759
+            },
+            "0.005": {
+              "known_net_usd": -1476.554,
+              "net_usd": -1476.554
+            },
+            "0.01": {
+              "known_net_usd": -1606.144,
+              "net_usd": -1606.144
+            }
+          }
+        },
+        "0": {
+          "selected": 12,
+          "valid": 12,
+          "unknown": 0,
+          "wins": 4,
+          "losses": 8,
+          "zero": 0,
+          "filled": 12,
+          "known_gross_units": -12692100,
+          "known_fees_units": 777540,
+          "known_net_units": -13469640,
+          "known_net_usd": -1346.964,
+          "net_usd": -1346.964,
+          "net_per_pool_candidate_usd": -3.6111635388739947,
+          "taker_shares_all_legs": 25918,
+          "maker_shares_all_legs": 130,
+          "taker_notional_usd": 848591.54,
+          "break_even_taker_fee_usd_per_share_per_leg": -0.04897021375106104,
+          "break_even_fraction": {
+            "numerator": -126921,
+            "denominator": 2591800
+          },
+          "break_even_taker_fee_bps": -14.956665724006628,
+          "incremental_slippage_headroom_usd_per_taker_share": -0.051970213751061034,
+          "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+          "extra_slippage": {
+            "0": {
+              "known_net_usd": -1346.964,
+              "net_usd": -1346.964
+            },
+            "0.0025": {
+              "known_net_usd": -1411.759,
+              "net_usd": -1411.759
+            },
+            "0.005": {
+              "known_net_usd": -1476.554,
+              "net_usd": -1476.554
+            },
+            "0.01": {
+              "known_net_usd": -1606.144,
+              "net_usd": -1606.144
+            }
+          }
+        }
+      }
+    },
+    "full_box_pass": false,
+    "axis_intervals": null
+  },
+  "one_cent_stress_zone": {
+    "center_positive": false,
+    "symmetric_radius_percent": 0.0,
+    "radius_is_lower_bound": false,
+    "first_failure": {
+      "lambda_min": 511.0,
+      "T_min": 0.39,
+      "economics": {
+        "10000": {
+          "selected": 12,
+          "valid": 12,
+          "unknown": 0,
+          "wins": 4,
+          "losses": 8,
+          "zero": 0,
+          "filled": 12,
+          "known_gross_units": -12692100,
+          "known_fees_units": 777540,
+          "known_net_units": -13469640,
+          "known_net_usd": -1346.964,
+          "net_usd": -1346.964,
+          "net_per_pool_candidate_usd": -3.6111635388739947,
+          "taker_shares_all_legs": 25918,
+          "maker_shares_all_legs": 130,
+          "taker_notional_usd": 848591.54,
+          "break_even_taker_fee_usd_per_share_per_leg": -0.04897021375106104,
+          "break_even_fraction": {
+            "numerator": -126921,
+            "denominator": 2591800
+          },
+          "break_even_taker_fee_bps": -14.956665724006628,
+          "incremental_slippage_headroom_usd_per_taker_share": -0.051970213751061034,
+          "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+          "extra_slippage": {
+            "0": {
+              "known_net_usd": -1346.964,
+              "net_usd": -1346.964
+            },
+            "0.0025": {
+              "known_net_usd": -1411.759,
+              "net_usd": -1411.759
+            },
+            "0.005": {
+              "known_net_usd": -1476.554,
+              "net_usd": -1476.554
+            },
+            "0.01": {
+              "known_net_usd": -1606.144,
+              "net_usd": -1606.144
+            }
+          }
+        },
+        "0": {
+          "selected": 12,
+          "valid": 12,
+          "unknown": 0,
+          "wins": 4,
+          "losses": 8,
+          "zero": 0,
+          "filled": 12,
+          "known_gross_units": -12692100,
+          "known_fees_units": 777540,
+          "known_net_units": -13469640,
+          "known_net_usd": -1346.964,
+          "net_usd": -1346.964,
+          "net_per_pool_candidate_usd": -3.6111635388739947,
+          "taker_shares_all_legs": 25918,
+          "maker_shares_all_legs": 130,
+          "taker_notional_usd": 848591.54,
+          "break_even_taker_fee_usd_per_share_per_leg": -0.04897021375106104,
+          "break_even_fraction": {
+            "numerator": -126921,
+            "denominator": 2591800
+          },
+          "break_even_taker_fee_bps": -14.956665724006628,
+          "incremental_slippage_headroom_usd_per_taker_share": -0.051970213751061034,
+          "fee_root_status": "NONPOSITIVE_BEFORE_FEES",
+          "extra_slippage": {
+            "0": {
+              "known_net_usd": -1346.964,
+              "net_usd": -1346.964
+            },
+            "0.0025": {
+              "known_net_usd": -1411.759,
+              "net_usd": -1411.759
+            },
+            "0.005": {
+              "known_net_usd": -1476.554,
+              "net_usd": -1476.554
+            },
+            "0.01": {
+              "known_net_usd": -1606.144,
+              "net_usd": -1606.144
+            }
+          }
+        }
+      }
+    },
+    "full_box_pass": false,
+    "axis_intervals": null
+  },
+  "worst_raw": {
+    "unknown_cells": 0,
+    "net_usd": -1587.122,
+    "crossing_bps": 10000,
+    "lambda_min": 528.6800257283049,
+    "T_min": 0.3705
+  },
+  "worst_one_cent": {
+    "unknown_cells": 0,
+    "net_usd": -1839.462,
+    "crossing_bps": 10000,
+    "lambda_min": 528.6800257283049,
+    "T_min": 0.3705
+  },
+  "minimum_known_local_fee_root_usd_per_share_per_leg": -0.0598961718316557,
+  "local_fee_root_complete": true,
+  "capital_exposure": {
+    "10000": {
+      "complete": true,
+      "unknown_branches": 0,
+      "daily": {
+        "2019-01-30": {
+          "peak_entry_cost_usd": 18971.82,
+          "at_exchange_ns": 36540251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-03-27": {
+          "peak_entry_cost_usd": 18841.73,
+          "at_exchange_ns": 35220251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-08-30": {
+          "peak_entry_cost_usd": 24209.94,
+          "at_exchange_ns": 35760251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-10-30": {
+          "peak_entry_cost_usd": 22631.0,
+          "at_exchange_ns": 36120251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-12-30": {
+          "peak_entry_cost_usd": 71914.52,
+          "at_exchange_ns": 35280251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2020-01-30": {
+          "peak_entry_cost_usd": 150628.66,
+          "at_exchange_ns": 37320251000000,
+          "concurrent_positions": 4,
+          "exceeds_frozen_buying_power": false
+        },
+        "2025-12-08": {
+          "peak_entry_cost_usd": 57692.59,
+          "at_exchange_ns": 36840251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2025-12-10": {
+          "peak_entry_cost_usd": 87793.31,
+          "at_exchange_ns": 38160251000000,
+          "concurrent_positions": 2,
+          "exceeds_frozen_buying_power": false
+        }
+      },
+      "peak_entry_cost_usd": 150628.66,
+      "any_buying_power_excess": false,
+      "interpretation": "Absolute entry-cost exposure only; no capital allocation, risk-cap or marked-to-market portfolio simulation. Same timestamps use deterministic candidate/fill ordering."
+    },
+    "0": {
+      "complete": true,
+      "unknown_branches": 0,
+      "daily": {
+        "2019-01-30": {
+          "peak_entry_cost_usd": 18971.82,
+          "at_exchange_ns": 36540251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-03-27": {
+          "peak_entry_cost_usd": 18841.73,
+          "at_exchange_ns": 35220251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-08-30": {
+          "peak_entry_cost_usd": 24209.94,
+          "at_exchange_ns": 35760251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-10-30": {
+          "peak_entry_cost_usd": 22631.0,
+          "at_exchange_ns": 36120251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2019-12-30": {
+          "peak_entry_cost_usd": 71914.52,
+          "at_exchange_ns": 35280251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2020-01-30": {
+          "peak_entry_cost_usd": 150628.66,
+          "at_exchange_ns": 37320251000000,
+          "concurrent_positions": 4,
+          "exceeds_frozen_buying_power": false
+        },
+        "2025-12-08": {
+          "peak_entry_cost_usd": 57692.59,
+          "at_exchange_ns": 36840251000000,
+          "concurrent_positions": 1,
+          "exceeds_frozen_buying_power": false
+        },
+        "2025-12-10": {
+          "peak_entry_cost_usd": 87793.31,
+          "at_exchange_ns": 38160251000000,
+          "concurrent_positions": 2,
+          "exceeds_frozen_buying_power": false
+        }
+      },
+      "peak_entry_cost_usd": 150628.66,
+      "any_buying_power_excess": false,
+      "interpretation": "Absolute entry-cost exposure only; no capital allocation, risk-cap or marked-to-market portfolio simulation. Same timestamps use deterministic candidate/fill ordering."
+    }
+  },
+  "verdict": "NO-GO",
+  "reason_codes": [
+    "BASE_NOT_FULLY_RESOLVED_POSITIVE",
+    "FAILS_PARAMETER_ROBUSTNESS",
+    "FAILS_ONE_CENT_SLIPPAGE_STRESS"
+  ],
+  "limitations": [
+    "T is a signed-subset imbalance proxy, not a calibrated probability.",
+    "Taker entry is the execution profile behind this rule; passive control is separately reported.",
+    "Twelve sparse local sessions and 52 frozen strategy stocks; not continuous 2019-2026 history.",
+    "Old eight dates were used to discover this rule; four remaining dates are chronological backfill, not prospective validation.",
+    "Net is aggregate independent full-position candidate replay, not a capital-constrained portfolio return.",
+    "Fee/slippage sensitivity holds fills/exits fixed and adds cash costs on every taker leg.",
+    "Structural matching scenarios are bounds, not probability estimates."
+  ],
+  "artifact_sha256": {
+    "analysis_protocol.json": "7f333a6eb7646079786839e9d94809b371d0b2492feeb0a2994eb85e05431320",
+    "source_manifest.json": "667964bac5d04bf8e7eec5f6481dd4a1c78a0a753d1d8e2c5f9a3e24c139e92a",
+    "coverage.json": "94136f6451c53a2fd534d5fc5aea6a4c032c350dde30934d5c8a5f8f699c4e4e",
+    "stock_day_accounting.json": "c413a6bbeb95c1b0b2f8639a7cc6c804a5e29acb8867f87ba024652c6132d5db",
+    "candidate_panel.jsonl": "dd5d8c0309d3188906a28c652f2bfe9cf478f1e4810b7b5e2beae93d5f97bdc4",
+    "execution_input_hashes.json": "9752c71b5d41419e72d99495b92844668f2f85544e2728ec613a764703eb2dc1",
+    "execution_code_manifest.json": "e7f63609eba5aa3d1ba89904a16eace62ed0ece5f3f5f8a12122f9e2b8a08900",
+    "verified_input_manifests.json": "ce7f1af14876ea821fc1e289196f6d5fee052d37164c1550f1eb4d53186cbc7f",
+    "stage_1.json": "66b3c31ef8090a874c54da6083b34e1409197d21c2c6cfe7ecab9396e6b76e23",
+    "stage_2.json": "461c5b01b240d4f709e5b4b0758686bef94d64518eabdb46764a7c47bd7e8a0b",
+    "exact_sensitivity.json": "d8d24a0972790b4c9ef8c2ee4baea4bccbd6f48e59a6526c06d435a3c8a71abd",
+    "display_sensitivity.json": "6d90e338932e91fdcb1db78e048696f1e873a35c090c574b0ef92c0b80e8ced1"
+  }
+}

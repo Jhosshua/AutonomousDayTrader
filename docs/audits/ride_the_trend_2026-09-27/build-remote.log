@@ -1,0 +1,47 @@
+[INFO]    Linting and checking validity of types ...
+
+[INFO]    Collecting page data ...
+
+[INFO]    Generating static pages (0/4) ...
+
+[INFO]    Generating static pages (1/4) 
+   Generating static pages (2/4) 
+   Generating static pages (3/4) 
+ ✓ Generating static pages (4/4)
+
+[INFO]    Finalizing page optimization ...
+   Collecting build traces ...
+
+[INFO]    Exporting (0/2) ...
+
+[INFO]  ✓ Exporting (2/2)
+
+[INFO] 
+[INFO] Route (app)                                 Size  First Load JS
+┌ ○ /                                    66.6 kB         169 kB
+└ ○ /_not-found                            992 B         104 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/255-f7c4c205ddd80098.js       46.5 kB
+  ├ chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB
+  └ other shared chunks (total)           1.9 kB
+
+
+
+[INFO] ○  (Static)  prerendered as static content
+
+
+[INFO] [ui-build 6/6] RUN npm run build
+[INFO] [stage-1  8/11] COPY --from=ui-build /src/frontend/out ./frontend/out
+[INFO] [stage-1  8/11] COPY --from=ui-build /src/frontend/out ./frontend/out
+[INFO] [stage-1  9/11] COPY tests ./tests
+[INFO] [stage-1  9/11] COPY tests ./tests
+[INFO] [stage-1 10/11] COPY scripts ./scripts
+[INFO] [stage-1 10/11] COPY scripts ./scripts
+[INFO] [stage-1 11/11] COPY README.md PROJECT.md ORIGINAL_REQUEST.md ./
+[INFO] [stage-1 11/11] COPY README.md PROJECT.md ORIGINAL_REQUEST.md ./
+[INFO] exporting to docker image format
+[INFO] exporting to docker image format
+containerimage.descriptor: eyJtZWRpYVR5cGUiOiJhcHBsaWNhdGlvbi92bmQub2NpLmltYWdlLm1hbmlmZXN0LnYxK2pzb24iLCJkaWdlc3QiOiJzaGEyNTY6YjA5YmQxMDI5YmE4ZGViZmM0MTAyZmVlNDk5OWM2NDFlZmI3OTJiMGVkMjBiMDUxNjViOThhMzVlNzg5NWI2OSIsInNpemUiOjI5NTMsImFubm90YXRpb25zIjp7Im9yZy5vcGVuY29udGFpbmVycy5pbWFnZS5jcmVhdGVkIjoiMjAyNi0wOS0yN1QyMjowNzo0MloifSwicGxhdGZvcm0iOnsiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJvcyI6ImxpbnV4In19
+containerimage.config.digest: sha256:f59d7bb9c444f5699ffc1c75cb358e94dfd502ff7ed2a6b4f11e2b01822bf539
+containerimage.digest: sha256:b09bd1029ba8debfc4102fee4999c641efb792b0ed20b05165b98a35e7895b69
+[INFO] image push

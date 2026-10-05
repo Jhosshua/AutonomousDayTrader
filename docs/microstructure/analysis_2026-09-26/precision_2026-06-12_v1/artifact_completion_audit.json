@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "report_sha256": "9a1e9e9c1c9831490a24666d998c5167e8871fafd4f62b5efac233ed57f3f220",
+  "heatmap_cells_checked": 36008,
+  "heatmap_candidate_rows": 2,
+  "interpolated_strength_values": 0,
+  "copied_error_curve_artifacts_exact": true,
+  "original_strategy_and_exits_unchanged": true,
+  "all_requested_artifacts_present_and_hash_verified": true,
+  "unit_test_command": "python3 -m pytest -q backend/tests/unit/test_microstructure_*.py backend/tests/unit/test_tri_signals.py",
+  "unit_test_result": "410 passed in 4.98s. Numerical core unchanged after testing; subsequent renderer/auditor presentation changes independently rechecked.",
+  "presentation_revision_only": true,
+  "original_numeric_report_unchanged": true,
+  "final_visual_checks": "Heatmap, precision curve with peak inset, full-range fee boundary, and copied error-decay plot inspected; labels legible and no values clipped."
+}

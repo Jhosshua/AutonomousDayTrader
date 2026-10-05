@@ -1,0 +1,76 @@
+
+> autonomous-day-trader-ui@1.0.0 test
+> node scripts/verify_ui.mjs && node scripts/test_websocket_resilience.mjs
+
+🔍 Verifying plain-language dashboard architecture (2026-09-24 redesign)...
+  ✅ Verified package.json (870 bytes)
+  ✅ Verified tsconfig.json (598 bytes)
+  ✅ Verified tailwind.config.js (2923 bytes)
+  ✅ Verified postcss.config.js (83 bytes)
+  ✅ Verified app/layout.tsx (1116 bytes)
+  ✅ Verified app/page.tsx (10981 bytes)
+  ✅ Verified app/globals.css (4192 bytes)
+  ✅ Verified types/trading.ts (8069 bytes)
+  ✅ Verified lib/plain.ts (19185 bytes)
+  ✅ Verified lib/apiBase.ts (481 bytes)
+  ✅ Verified hooks/useTradingStream.ts (18659 bytes)
+  ✅ Verified hooks/useTodayLedger.ts (4179 bytes)
+  ✅ Verified hooks/useActionButton.ts (3824 bytes)
+  ✅ Verified hooks/useHealthLimits.ts (1378 bytes)
+  ✅ Verified components/Header.tsx (4651 bytes)
+  ✅ Verified components/BalanceCard.tsx (5955 bytes)
+  ✅ Verified components/RightNowCard.tsx (2861 bytes)
+  ✅ Verified components/SegmentedModeToggle.tsx (1467 bytes)
+  ✅ Verified components/StrategyCard.tsx (10153 bytes)
+  ✅ Verified components/StrategyCarousel.tsx (1159 bytes)
+  ✅ Verified components/HoldingNow.tsx (5955 bytes)
+  ✅ Verified components/RecentTrades.tsx (5318 bytes)
+  ✅ Verified components/SafetyCard.tsx (4197 bytes)
+  ✅ Verified components/ExecutionLog.tsx (1817 bytes)
+  ✅ Verified components/TradeHistory.tsx (15531 bytes)
+  ✅ Verified components/SwingTelemetryBar.tsx (4534 bytes)
+  ✅ Verified components/SwingCandidateWatchlist.tsx (6607 bytes)
+  ✅ Verified components/ActiveSwingPositionsTable.tsx (6984 bytes)
+  ✅ Verified old dark-theme-only components were removed
+  ✅ Verified light 'muted palette' design tokens in tailwind.config.js
+  ✅ Verified reduced-motion block and mockup-matched keyframes
+  ✅ Verified offline-safe fonts (F15) and pinch-zoom left enabled (F16)
+  ✅ Verified WebSocket action payloads are unchanged (port 8005, all 6 actions)
+  ✅ Verified no window.confirm/alert/prompt usage
+  ✅ Verified all required data-testids are present on their new elements
+  ✅ Verified all five strategy themes and OR15 fixed protection controls
+  ✅ Verified B1 button copy change (never 'stop everything')
+  ✅ Verified overflow-x guard on body
+  ✅ Verified UI safe port 3005 allocation (avoiding host port 3000 collision)
+
+🎉 All plain-language dashboard architectural checks PASSED!
+🚀 Running WebSocket Hook & Client State Resilience Stress Suite...
+
+[TEST 1] Testing High-Frequency State Message Updates (100 msg/sec & 1,000 burst)...
+  Processed 100 messages in 8.65ms (0.0865ms/msg)
+  ✅ High-frequency 100 msg/s test PASSED with 0 state drops.
+  Extreme 1,000 message burst completed in 0.76ms (throughput: 1307617 msg/sec)
+  ✅ Extreme 1,000 message burst PASSED.
+
+[TEST 2] Testing Malformed JSON and Adversarial Payloads...
+  Successfully caught and handled 6 malformed frame errors without crashing.
+  ✅ Malformed JSON resilience & self-healing PASSED.
+
+[TEST 3] Testing Manual Action Serialization Parity...
+  Dispatched payloads verified:
+    1. FLATTEN_POSITION: {"action":"FLATTEN_POSITION","symbol":"NVDA"}
+    2. FLATTEN_ALL: {"action":"FLATTEN_ALL"}
+    3. TIGHTEN_STOP: {"action":"TIGHTEN_STOP","symbol":"AAPL","new_stop":151.75}
+    4. SWING_EXIT_NEXT_OPEN: {"action":"SWING_EXIT_NEXT_OPEN","symbol":"LRCX"}
+    5. SWING_EXIT_IMMEDIATE: {"action":"SWING_EXIT_IMMEDIATE","symbol":"MU"}
+    6. SWING_TIGHTEN_STOP: {"action":"SWING_TIGHTEN_STOP","symbol":"AMD","new_stop":145.5}
+  ✅ Action serialization parity PASSED.
+
+[TEST 4] Testing Simulated React Tree Mounting & Error Boundary Intactness...
+  React tree remained mounted through 100 rapid-fire interleaved events (51 safe renders).
+  ✅ React component tree integrity PASSED.
+
+[TEST 5] Testing Swing Payload Resilience & Nullish Defaults for entry_atr & entry_date (Defect 7)...
+  ✅ Swing payload resilience & nullish defaults (Defect 7) PASSED.
+
+🎉 ALL 5 WEBSOCKET RESILIENCE & STREAMING STRESS TESTS PASSED!

@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "report_sha256": "f036fff334a953763a2630453d436454944b644369cc3b41f956d90335e24088",
+  "audit_code_sha256": "de7446d78000a243051b6d88ba6700312a2980fd492e9089ffca56bc92c4eb9d",
+  "explicit_run_ledgers": 191,
+  "candidate_grid_points": 3948,
+  "portfolio_grid_points": 1974,
+  "independent_depth_alias_checks": 2247,
+  "zero_trigger_alpha_alias_checks": 3660,
+  "fee_surface_checks": 199374,
+  "peak_and_maximin_checks": true,
+  "limitation": "This verifies the declared scenarios and exact economic accounting. It does not establish the real crossing-order eligibility, out-of-sample performance or a continuous optimum."
+}

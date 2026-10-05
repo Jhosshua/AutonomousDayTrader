@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "report_sha256": "e3f038210af9670b015e94400e61e21525f92705ea4024fe9ceb549ecc46d431",
+  "independent_audit_sha256": "324a50dfacda606dfeeff854497f7a3556b028c42ee4a5f15998896a0815c3c0",
+  "numeric_results_unchanged_by_missingness_note": true,
+  "defined_flow_alignment_candidates": 224,
+  "undefined_flow_alignment_candidates": 20,
+  "unit_test_command": "python3 -m pytest -q backend/tests/unit/test_microstructure_*.py backend/tests/unit/test_tri_signals.py",
+  "unit_tests_observed_passed": 423,
+  "rendered_figures_visually_inspected": [
+    "global_offset_sensitivity.png",
+    "all_signal_robustness_map.png",
+    "flow_alignment_heatmap.png",
+    "sector_frequency_and_value.png"
+  ],
+  "production_strategy_files_unchanged": true,
+  "scope": "Fixed-candidate historical research; no live-account activation or deployment."
+}

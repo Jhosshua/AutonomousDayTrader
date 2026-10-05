@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "report_sha256": "072e4fd3346a6a4fb28967228d8c1c0457dae5b25a4287a2d90ac3a0827fea05",
+  "auditor_sha256": "f3a34a7224b2bb4f90eaab1e52435f9adc93e12f73721bf3fd141f624ee3a45b",
+  "complete_execution_ledgers": 463,
+  "partial_retention_portfolio_points": 606,
+  "exact_probability_portfolio_points": 606,
+  "zero_trigger_alias_checks": 776,
+  "static_boolean_assignments": 76,
+  "primary_full_depth_entry_checks": 2,
+  "original_grid_parity_checks": 126,
+  "boundary_and_fragility_verified": true,
+  "limitation": "Conditional crossing-model stress only. No empirical probability calibration, independent sample expansion, passive-maker edge, or live robustness is established."
+}
