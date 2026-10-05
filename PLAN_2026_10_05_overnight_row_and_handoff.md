@@ -92,8 +92,8 @@ No trading behaviour change. No change to OvernightHolds, the no-buy control or 
 ## Deploy
 
 - Codex reviews the diff before deploy.
-- Push to `main` (push = Railway redeploy). Set `DAY_ONE_BUILD_REVISION` first. Do not restart inside 15:44 to 16:05 ET (the closing buy) or 18:55 to 19:05 ET (sale queue). Those are the D8 windows; the operator said deploy now, so deploy at the first minute outside them.
-- After deploy: `/health` overnight running, live, enabled; `/api/overnight` has `x6`; live page screenshot shows the 7 rows.
+- Push to `main` (push = Railway redeploy). Set `DAY_ONE_BUILD_REVISION` first. Deploy only inside the logged D8 windows (16:10 to 18:50, 19:15 to 08:50 on trading days, see v2 T1), at the first minute available.
+- After deploy: `/ready` 200, `/health` healthy with `day_one.source_revision_match` true, overnight running, live, enabled; `/api/overnight` has `x6` and `today`; live page shows the 7 rows.
 
 ## Risks
 

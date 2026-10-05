@@ -1,5 +1,13 @@
 # ERRORS.md — AutonomousDayTrader
 
+## 2026-10-05: Visual checks need the right installs, and one overnight test is flaky on main
+
+**What did not work:** `npm run build` failed on the first try with "Can't resolve '@fontsource/bricolage-grotesque'" (local node_modules older than package-lock). The compact dashboard's old export (149f5a3^) failed to build with a symlinked node_modules from the current tree (it needs framer-motion and fraunces). `test_lifespan_build_with_its_worker_pool_and_the_relay_bar_count` failed 1 in 5 runs.
+
+**What worked instead:** `npm ci` in frontend/ before building. Each old export gets its own `npm ci` (the bright check's acd11cf export can share the current node_modules). The flaky test fails 6 of 15 runs on a clean export of main too (thread pool timing), so it is not caused by the overnight row change; it is not fixed here.
+
+**Note for next time:** run `npm ci` first after pulling; build old exports from `git archive <sha> frontend` in the scratchpad with their own install; run a failing threaded test 15 times on main before blaming the diff.
+
 ## 2026-09-25: Research "coverage complete" flag took three rounds to be honest
 
 **What did not work:** First version folded bars only for ACTIVE brackets and demanded a bar at the exit minute, so every 15:55 auto-flatten, quote-hit stop and OR15 broker exit read "incomplete" while bar-triggered exits read "complete" (a filter on the flag would have biased stop/hours analysis). Second version fixed that but ignored whole missing days for swing and let bars after a late-booked exit count toward MFE. The market-trend snapshot was also read at wall-clock time while admission reads it at the signal's bar time.

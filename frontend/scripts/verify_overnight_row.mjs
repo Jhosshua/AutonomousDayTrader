@@ -112,6 +112,16 @@ eq(st({ etMin: T(15, 50), tooLate: true, rows: tonight("SKIPPED", { reason: "BUY
 eq(st({ etMin: T(15, 47), rows: tonight("IDLE", { block: "BROKER_MISMATCH" }) })[2].status, "problem", "steps: blocked send is a problem");
 eq(st({ today: { full_day: false, reason: "EARLY_CLOSE", sale_date: null } }), null, "steps: early close day with nothing open shows no steps");
 
+// --- Codex review fixes ---------------------------------------------------------------------------------
+eq(chip({ todayEt: "2026-10-07", etMin: T(8, 0), holds: [{ symbol: "IREN", saleDate: TUE }] }).label, "Selling", "codex: a hold past its sale day is never green before the next open");
+eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 47), x6: [job({ qty: 100, filled_qty: 1, done: false })] })), "Closing NVDA now so Overnight can buy it at the close (1 of 100 shares closed).", "codex: a partial early close is not called closed");
+eq(st({ etMin: T(15, 47), rows: tonight("BUY_SENT"), x6: [job({ qty: 100, filled_qty: 1, done: false })] })[1].status, "now", "codex: partial early close step is Now, not Done");
+eq(st({ etMin: T(15, 52), tooLate: true, rows: tonight("BUY_ACCEPTED"), x6: [job({ qty: 100, filled_qty: 1, done: false })] })[1].text, "The day trade in NVDA was not fully closed in time.", "codex: a partial early close after 3:49:30 is a problem, never 'no day trade'");
+const mixQ = [row("NVDA", { state: "SALE_QUEUED", buy_date: MON, sale_date: TUE, reserved: true }), row("IREN", { state: "HELD", buy_date: MON, sale_date: TUE, reserved: true })];
+eq(st({ etMin: T(20, 0), tooLate: true, rows: mixQ })[5].text, "Sale queued for NVDA. IREN not queued yet.", "codex: one queued sale does not mark the queue step done");
+const mixS = [row("NVDA", { state: "SOLD", buy_date: MON, sale_date: TUE, reserved: true }), row("IREN", { state: "SALE_QUEUED", buy_date: MON, sale_date: TUE, reserved: true })];
+eq(st({ todayEt: TUE, etMin: T(9, 32), rows: mixS })[6].text, "Sold NVDA. IREN not sold yet.", "codex: a half sold night names what is not sold");
+
 // --- negative control: the detectors can fail -------------------------------------------------------
 let caught = false;
 try { eq(chip({}).label, "Buys at 3:46 PM", "negative control"); } catch { caught = true; }

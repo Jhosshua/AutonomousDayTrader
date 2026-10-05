@@ -1120,6 +1120,7 @@ export interface OvnRowLike {
 export interface OvnX6Like {
   symbol: string;
   date: string;
+  qty?: number | null;
   done: boolean;
   strategy_id: string | null;
   filled_at: string | null;
@@ -1179,7 +1180,7 @@ export function saleWhen(saleDate: string | null | undefined, todayEt: string): 
 export function overnightChip(i: OvernightRowInputs): OvnChip {
   if (i.holds.length > 0) {
     const first = i.holds.map((h) => h.saleDate).filter((d): d is string => !!d).sort()[0] ?? null;
-    if (first && first <= i.todayEt && i.etMin >= OPEN_MIN) return { label: "Selling", tone: "amber", breathing: true };
+    if (first && (first < i.todayEt || (first === i.todayEt && i.etMin >= OPEN_MIN))) return { label: "Selling", tone: "amber", breathing: true };
     return { label: `Holding ${i.holds.length} until ${saleWhen(first, i.todayEt)}`, tone: "sage", breathing: true };
   }
   if (!i.running) return { label: "Not running", tone: "grey", breathing: false };
@@ -1237,6 +1238,10 @@ function minutesOfIso(iso: string | null | undefined): number | null {
 export function x6NoteFor(strategyId: string, i: OvernightRowInputs): string | null {
   const jobs = i.x6.filter((j) => j.date === i.todayEt && j.strategy_id === strategyId);
   for (const j of jobs) {
+    if ((j.filled_qty ?? 0) > 0 && !j.done) {
+      if (i.tooLate) continue;
+      return `Closing ${j.symbol} now so Overnight can buy it at the close (${j.filled_qty} of ${j.qty ?? "?"} shares closed).`;
+    }
     if ((j.filled_qty ?? 0) > 0) {
       const at = j.filled_at ? etTimeLabel(j.filled_at) : "";
       const m = minutesOfIso(j.filled_at);
@@ -1285,13 +1290,15 @@ export function overnightSteps(i: OvernightRowInputs, nameOf: (strategyId: strin
   steps.push({ key: "lockout", time: "3:45 PM", status: at(LOCKOUT_MIN) ? "done" : "next", text: `Day playbooks stop opening ${syms}.` });
 
   const jobs = i.x6.filter((j) => j.date === date);
-  const closed = jobs.filter((j) => (j.filled_qty ?? 0) > 0);
+  const closed = jobs.filter((j) => (j.filled_qty ?? 0) > 0 && j.done);
   const closing = jobs.filter((j) => !j.done);
   let x6: OvnStep;
   if (closed.length > 0) {
     x6 = { key: "x6", time: "3:46 PM", status: "done", text: closed.map((j) => `${j.strategy_id ? `${nameOf(j.strategy_id)}'s ` : ""}${j.symbol} trade was closed early${j.filled_at ? ` at ${etTimeLabel(j.filled_at)}` : ""}.`).join(" ") };
   } else if (closing.length > 0 && date === i.todayEt && !i.tooLate) {
     x6 = { key: "x6", time: "3:46 PM", status: "now", text: `Closing the day trade in ${joinNames(closing.map((j) => j.symbol))}.` };
+  } else if (closing.length > 0) {
+    x6 = { key: "x6", time: "3:46 PM", status: "problem", text: `The day trade in ${joinNames(closing.map((j) => j.symbol))} was not fully closed in time.` };
   } else if (at(BUY_SEND_MIN) && !allSkipped) {
     x6 = { key: "x6", time: "3:46 PM", status: "done", text: "No day trade needed closing." };
   } else {
@@ -1321,7 +1328,8 @@ export function overnightSteps(i: OvernightRowInputs, nameOf: (strategyId: strin
 
   const queued = has(["SALE_QUEUED", "SOLD"]);
   if (allSkipped) steps.push({ key: "queue", time: "7:00 PM", status: skipStatus, text: "No sale to queue." });
-  else if (queued.length > 0) steps.push({ key: "queue", time: "7:00 PM", status: "done", text: "The sale waits at Alpaca for the open, even if the robot restarts." });
+  else if (queued.length > 0 && queued.length === bought.length) steps.push({ key: "queue", time: "7:00 PM", status: "done", text: "The sale waits at Alpaca for the open, even if the robot restarts." });
+  else if (queued.length > 0) steps.push({ key: "queue", time: "7:00 PM", status: "now", text: `Sale queued for ${names(queued)}. ${names(bought.filter((r) => !queued.includes(r)))} not queued yet.` });
   else if (bought.length > 0 && (past || at(SALE_QUEUE_MIN))) steps.push({ key: "queue", time: "7:00 PM", status: "now", text: "Sending the sale for the open to Alpaca." });
   else steps.push({ key: "queue", time: "7:00 PM", status: "next", text: "The sale for the open goes to Alpaca." });
 
@@ -1330,6 +1338,7 @@ export function overnightSteps(i: OvernightRowInputs, nameOf: (strategyId: strin
   const soldTime = sale && sale !== i.todayEt ? `9:30 AM ${dayLabel(sale).split(" ")[0]}` : "9:30 AM";
   if (allSkipped) steps.push({ key: "sold", time: soldTime, status: skipStatus, text: "Nothing to sell." });
   else if (sold.length > 0 && sold.length === live.length && sold.every((r) => r.reserved === false)) steps.push({ key: "sold", time: soldTime, status: "done", text: `Sold at the open. ${names(sold)} went back to the day playbooks.` });
+  else if (sold.length > 0 && sold.length < live.length) steps.push({ key: "sold", time: soldTime, status: "now", text: `Sold ${names(sold)}. ${names(live.filter((r) => !sold.includes(r)))} not sold yet.` });
   else if (sold.length > 0) steps.push({ key: "sold", time: soldTime, status: "now", text: "Sold, waiting for Alpaca to show it flat." });
   else steps.push({ key: "sold", time: soldTime, status: "next", text: `Sold at the open${when}. Then the day playbooks can trade ${night ? "them" : "these stocks"} again.` });
   return steps;
