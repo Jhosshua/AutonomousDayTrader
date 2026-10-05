@@ -287,7 +287,7 @@
    "init_error": null,
    "intents": [],
    "last_booking": {
-    "alpaca_order_id": "758c4217-d991-4864-bdb3-998b1b2c157b",
+    "alpaca_order_id": "350fb901-2a54-41c5-aa66-2ffa6ffab5a2",
     "at": "2026-10-01T09:30:01-04:00",
     "buy_date": "2026-09-30",
     "event": "BOOKED",
@@ -351,7 +351,14 @@
    "splits": {},
    "unsold_after_0931": []
   },
-  "unsold_after_0931": []
+  "today": {
+   "date": "2026-10-01",
+   "full_day": true,
+   "reason": null,
+   "sale_date": "2026-10-02"
+  },
+  "unsold_after_0931": [],
+  "x6": []
  },
  "persistence": {
   "last_checkpoint_at": null,
@@ -363,200 +370,200 @@
  "recent_activity": [
   {
    "event_type": "ORDER_CREATED",
-   "id": "ord_b19a871d759a",
+   "id": "ord_250d05ecd7c8",
    "message": "NONE -> CREATED (Order initialized)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "NVDA",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "ORDER_CREATED"
   },
   {
    "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_b19a871d759a",
-   "message": "CREATED -> CREATED (Overnight buy 3fd6be3d-617a-4b52-9bc8-758dfffe91e5 at Alpaca)",
+   "id": "ord_250d05ecd7c8",
+   "message": "CREATED -> CREATED (Overnight buy 8bbf5b50-c02a-4a68-a826-d1c5c3112aaa at Alpaca)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "NVDA",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "OVERNIGHT_BROKER_ORDER"
   },
   {
    "event_type": "FULL_FILL",
-   "id": "ord_b19a871d759a",
+   "id": "ord_250d05ecd7c8",
    "message": "CREATED -> FILLED (Filled 43 @ $228.87, fee $0.00)",
    "price": 228.87,
    "qty": 43,
    "quantity": 43,
    "symbol": "NVDA",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "FULL_FILL"
   },
   {
    "event_type": "ORDER_CREATED",
-   "id": "ord_f1652cac7fe0",
+   "id": "ord_fd95e2cc3f5b",
    "message": "NONE -> CREATED (Order initialized)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "IREN",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "ORDER_CREATED"
   },
   {
    "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_f1652cac7fe0",
-   "message": "CREATED -> CREATED (Overnight buy 39a7aad1-9479-4323-8362-8c835bc649a5 at Alpaca)",
+   "id": "ord_fd95e2cc3f5b",
+   "message": "CREATED -> CREATED (Overnight buy 5369117f-b45d-4869-9a3e-8fbcddf8babf at Alpaca)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "IREN",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "OVERNIGHT_BROKER_ORDER"
   },
   {
    "event_type": "FULL_FILL",
-   "id": "ord_f1652cac7fe0",
+   "id": "ord_fd95e2cc3f5b",
    "message": "CREATED -> FILLED (Filled 238 @ $41.73, fee $0.00)",
    "price": 41.73,
    "qty": 238,
    "quantity": 238,
    "symbol": "IREN",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "FULL_FILL"
   },
   {
    "event_type": "ORDER_CREATED",
-   "id": "ord_c63cde68fae4",
+   "id": "ord_6a63c8d81f5f",
    "message": "NONE -> CREATED (Order initialized)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "HUT",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "ORDER_CREATED"
   },
   {
    "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_c63cde68fae4",
-   "message": "CREATED -> CREATED (Overnight buy f0a249c5-f840-43bf-91f5-35a694d3bd89 at Alpaca)",
+   "id": "ord_6a63c8d81f5f",
+   "message": "CREATED -> CREATED (Overnight buy fce1a49b-e092-428d-b3a0-962dc0ff9d6c at Alpaca)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "HUT",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "OVERNIGHT_BROKER_ORDER"
   },
   {
    "event_type": "FULL_FILL",
-   "id": "ord_c63cde68fae4",
+   "id": "ord_6a63c8d81f5f",
    "message": "CREATED -> FILLED (Filled 107 @ $92.75, fee $0.00)",
    "price": 92.75,
    "qty": 107,
    "quantity": 107,
    "symbol": "HUT",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "FULL_FILL"
   },
   {
    "event_type": "ORDER_CREATED",
-   "id": "ord_6fd5ab63b7ad",
+   "id": "ord_bc8141f5625e",
    "message": "NONE -> CREATED (Order initialized)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "NVDA",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "ORDER_CREATED"
   },
   {
    "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_6fd5ab63b7ad",
-   "message": "CREATED -> CREATED (Overnight sell 2a7c5524-06cc-402b-bcba-f6d49eef8bfb at Alpaca)",
+   "id": "ord_bc8141f5625e",
+   "message": "CREATED -> CREATED (Overnight sell 1de3c519-790a-41de-868a-a11fc609ed6a at Alpaca)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "NVDA",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "OVERNIGHT_BROKER_ORDER"
   },
   {
    "event_type": "FULL_FILL",
-   "id": "ord_6fd5ab63b7ad",
+   "id": "ord_bc8141f5625e",
    "message": "CREATED -> FILLED (Filled 43 @ $221.00, fee $0.00)",
    "price": 221.0,
    "qty": 43,
    "quantity": 43,
    "symbol": "NVDA",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "FULL_FILL"
   },
   {
    "event_type": "ORDER_CREATED",
-   "id": "ord_7ee585d49222",
+   "id": "ord_0aa3c741edae",
    "message": "NONE -> CREATED (Order initialized)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "IREN",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "ORDER_CREATED"
   },
   {
    "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_7ee585d49222",
-   "message": "CREATED -> CREATED (Overnight sell 34536fec-a0a7-44dd-a7ec-3de7214adf40 at Alpaca)",
+   "id": "ord_0aa3c741edae",
+   "message": "CREATED -> CREATED (Overnight sell b7bfd20b-0804-48d6-9e33-e44010dad953 at Alpaca)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "IREN",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "OVERNIGHT_BROKER_ORDER"
   },
   {
    "event_type": "FULL_FILL",
-   "id": "ord_7ee585d49222",
+   "id": "ord_0aa3c741edae",
    "message": "CREATED -> FILLED (Filled 238 @ $38.90, fee $0.00)",
    "price": 38.9,
    "qty": 238,
    "quantity": 238,
    "symbol": "IREN",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "FULL_FILL"
   },
   {
    "event_type": "ORDER_CREATED",
-   "id": "ord_847e59f3b5db",
+   "id": "ord_9f1ce69fc0d5",
    "message": "NONE -> CREATED (Order initialized)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "HUT",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "ORDER_CREATED"
   },
   {
    "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_847e59f3b5db",
-   "message": "CREATED -> CREATED (Overnight sell 758c4217-d991-4864-bdb3-998b1b2c157b at Alpaca)",
+   "id": "ord_9f1ce69fc0d5",
+   "message": "CREATED -> CREATED (Overnight sell 350fb901-2a54-41c5-aa66-2ffa6ffab5a2 at Alpaca)",
    "price": 0.0,
    "qty": 0,
    "quantity": 0,
    "symbol": "HUT",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "OVERNIGHT_BROKER_ORDER"
   },
   {
    "event_type": "FULL_FILL",
-   "id": "ord_847e59f3b5db",
+   "id": "ord_9f1ce69fc0d5",
    "message": "CREATED -> FILLED (Filled 107 @ $86.10, fee $0.00)",
    "price": 86.1,
    "qty": 107,
    "quantity": 107,
    "symbol": "HUT",
-   "timestamp": "19:30:20",
+   "timestamp": "17:54:40",
    "type": "FULL_FILL"
   }
  ],
@@ -603,7 +610,7 @@
      "ORB is switched off: no new trades (open ORB trades are still closed by their rules)."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:20-04:00",
+    "evaluated_at": "2026-10-05T13:54:40-04:00",
     "headline": "Done for today",
     "hours": "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
     "in_hours": false,
@@ -697,13 +704,13 @@
    "window": {
     "blockers": [],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:20-04:00",
+    "evaluated_at": "2026-10-05T13:54:40-04:00",
     "headline": "Done for today",
     "hours": "9:30 AM - 11:30 AM",
     "in_hours": false,
     "limits": [],
     "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
-    "next_change_at": "2026-10-01T09:30:00-04:00",
+    "next_change_at": "2026-10-06T09:30:00-04:00",
     "notes": [
      "Version 2 (since Sept 28): mornings only, 9:45 to 11:30 AM; first possible entry about 10:09 AM. Needs a quiet pullback and a fast resumption.",
      "No scheduled macro releases today.",
@@ -740,7 +747,7 @@
    "window": {
     "blockers": [],
     "can_open_now": true,
-    "evaluated_at": "2026-09-30T15:30:20-04:00",
+    "evaluated_at": "2026-10-05T13:54:40-04:00",
     "headline": "Can trade, with limits",
     "hours": "9:30 AM - 3:45 PM",
     "in_hours": true,
@@ -748,7 +755,7 @@
      "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
     ],
     "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
-    "next_change_at": "2026-09-30T15:45:00-04:00",
+    "next_change_at": "2026-10-05T15:45:00-04:00",
     "notes": [
      "Rare by design: needs very strong news plus a volume spike."
     ],
@@ -784,13 +791,13 @@
      "Market direction unknown."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:20-04:00",
+    "evaluated_at": "2026-10-05T13:54:40-04:00",
     "headline": "Blocked right now",
     "hours": "10:00 AM - 3:45 PM",
     "in_hours": true,
     "limits": [],
     "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
-    "next_change_at": "2026-09-30T15:45:00-04:00",
+    "next_change_at": "2026-10-05T15:45:00-04:00",
     "notes": [
      "Sits out the opening half hour."
     ],
@@ -847,7 +854,7 @@
      "Waiting for the price feed."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:20.893852-04:00",
+    "evaluated_at": "2026-10-05T13:54:40.738884-04:00",
     "headline": "Learning the first 15 minutes.",
     "hours": "9:45 AM\u201311:30 ET",
     "in_hours": false,
@@ -910,7 +917,7 @@
      "Waiting for the price feed."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:20.893852-04:00",
+    "evaluated_at": "2026-10-05T13:54:40.738884-04:00",
     "headline": "Learning the first 15 minutes.",
     "hours": "9:45 AM\u201312:00 ET",
     "in_hours": false,
@@ -963,7 +970,7 @@
     "rs_stock_60d": -25.14,
     "rsi_2": 73.59,
     "rsi_pass": false,
-    "sma_200": 268.9574,
+    "sma_200": 268.9575,
     "sma_200_pass": true,
     "status": "INELIGIBLE",
     "symbol": "LRCX"
@@ -1005,18 +1012,17 @@
     "close": 1071.88,
     "daily_atr_14": 49.8424,
     "date": "2026-09-23",
-    "earnings_blackout": true,
-    "earnings_date": "2026-09-30",
+    "earnings_blackout": false,
+    "earnings_date": null,
     "is_held": false,
     "is_staged": false,
-    "next_earnings_date": "2026-09-30",
+    "next_earnings_date": null,
     "panic_trigger": false,
     "price": 1071.88,
     "qualified": false,
     "rejection_reasons": [
      "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
-     "RSI2_62.40_NOT_BELOW_10",
-     "EARNINGS_BLACKOUT_ACTIVE"
+     "RSI2_62.40_NOT_BELOW_10"
     ],
     "relative_strength_ok": false,
     "rs_60d_qqq": 2.47,
@@ -1028,7 +1034,7 @@
     "rsi_pass": false,
     "sma_200": 652.5792,
     "sma_200_pass": true,
-    "status": "BLOCKED",
+    "status": "INELIGIBLE",
     "symbol": "MU"
    },
    {
@@ -1088,7 +1094,7 @@
     "rs_stock_60d": -7.77,
     "rsi_2": 19.94,
     "rsi_pass": false,
-    "sma_200": 950.6204,
+    "sma_200": 950.6203,
     "sma_200_pass": false,
     "status": "INELIGIBLE",
     "symbol": "GS"
@@ -1098,7 +1104,7 @@
   "last_close_data_note": null,
   "last_close_entries_withheld": false,
   "last_scan_session_date": "2026-09-30",
-  "last_scan_time": "2026-09-30T19:30:20.412273+00:00",
+  "last_scan_time": "2026-10-05T17:54:40.240862+00:00",
   "max_slots": 2,
   "positions": [],
   "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
@@ -1106,7 +1112,7 @@
   "status": "STANDBY",
   "strategy_name": "2-Day Panic Dip (Connors RSI-2)"
  },
- "timestamp": "2026-09-30T19:30:20.893808+00:00",
+ "timestamp": "2026-10-05T17:54:40.738848+00:00",
  "type": "STATE_UPDATE",
  "working_orders_count": 0
 }

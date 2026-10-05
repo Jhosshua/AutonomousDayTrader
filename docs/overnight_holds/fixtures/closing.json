@@ -379,7 +379,14 @@
    "splits": {},
    "unsold_after_0931": []
   },
-  "unsold_after_0931": []
+  "today": {
+   "date": "2026-09-30",
+   "full_day": true,
+   "reason": null,
+   "sale_date": "2026-10-01"
+  },
+  "unsold_after_0931": [],
+  "x6": []
  },
  "persistence": {
   "last_checkpoint_at": null,
@@ -432,7 +439,7 @@
      "ORB is switched off: no new trades (open ORB trades are still closed by their rules)."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:19-04:00",
+    "evaluated_at": "2026-10-05T13:54:39-04:00",
     "headline": "Done for today",
     "hours": "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
     "in_hours": false,
@@ -526,13 +533,13 @@
    "window": {
     "blockers": [],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:19-04:00",
+    "evaluated_at": "2026-10-05T13:54:39-04:00",
     "headline": "Done for today",
     "hours": "9:30 AM - 11:30 AM",
     "in_hours": false,
     "limits": [],
     "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
-    "next_change_at": "2026-10-01T09:30:00-04:00",
+    "next_change_at": "2026-10-06T09:30:00-04:00",
     "notes": [
      "Version 2 (since Sept 28): mornings only, 9:45 to 11:30 AM; first possible entry about 10:09 AM. Needs a quiet pullback and a fast resumption.",
      "No scheduled macro releases today.",
@@ -571,7 +578,7 @@
      "End-of-day close-out has started: no new trades."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:19-04:00",
+    "evaluated_at": "2026-10-05T13:54:39-04:00",
     "headline": "Blocked right now",
     "hours": "9:30 AM - 3:45 PM",
     "in_hours": true,
@@ -579,7 +586,7 @@
      "Market direction unknown: only extreme news (score 0.85+, volume 5x+) can trade."
     ],
     "market_text": "Market direction unknown (index data not ready), so new trades are blocked. Exception: extreme news (score 0.85+, volume 5x+).",
-    "next_change_at": "2026-09-30T15:45:00-04:00",
+    "next_change_at": "2026-10-05T15:45:00-04:00",
     "notes": [
      "Rare by design: needs very strong news plus a volume spike."
     ],
@@ -616,13 +623,13 @@
      "Market direction unknown."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:19-04:00",
+    "evaluated_at": "2026-10-05T13:54:39-04:00",
     "headline": "Blocked right now",
     "hours": "10:00 AM - 3:45 PM",
     "in_hours": true,
     "limits": [],
     "market_text": "Market direction unknown (index data not ready), so new trades are blocked.",
-    "next_change_at": "2026-09-30T15:45:00-04:00",
+    "next_change_at": "2026-10-05T15:45:00-04:00",
     "notes": [
      "Sits out the opening half hour."
     ],
@@ -679,7 +686,7 @@
      "Waiting for the price feed."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:19.871955-04:00",
+    "evaluated_at": "2026-10-05T13:54:39.667354-04:00",
     "headline": "No qualifying setup today.",
     "hours": "9:45 AM\u201311:30 ET",
     "in_hours": false,
@@ -742,7 +749,7 @@
      "Waiting for the price feed."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-09-30T15:30:19.871955-04:00",
+    "evaluated_at": "2026-10-05T13:54:39.667354-04:00",
     "headline": "No qualifying setup today.",
     "hours": "9:45 AM\u201312:00 ET",
     "in_hours": false,
@@ -795,7 +802,7 @@
     "rs_stock_60d": -25.14,
     "rsi_2": 73.59,
     "rsi_pass": false,
-    "sma_200": 268.9574,
+    "sma_200": 268.9575,
     "sma_200_pass": true,
     "status": "INELIGIBLE",
     "symbol": "LRCX"
@@ -837,18 +844,17 @@
     "close": 1071.88,
     "daily_atr_14": 49.8424,
     "date": "2026-09-23",
-    "earnings_blackout": true,
-    "earnings_date": "2026-09-30",
+    "earnings_blackout": false,
+    "earnings_date": null,
     "is_held": false,
     "is_staged": false,
-    "next_earnings_date": "2026-09-30",
+    "next_earnings_date": null,
     "panic_trigger": false,
     "price": 1071.88,
     "qualified": false,
     "rejection_reasons": [
      "WEAKER_THAN_QQQ_STOCK_-6.39%_QQQ_+2.47%",
-     "RSI2_62.40_NOT_BELOW_10",
-     "EARNINGS_BLACKOUT_ACTIVE"
+     "RSI2_62.40_NOT_BELOW_10"
     ],
     "relative_strength_ok": false,
     "rs_60d_qqq": 2.47,
@@ -860,7 +866,7 @@
     "rsi_pass": false,
     "sma_200": 652.5792,
     "sma_200_pass": true,
-    "status": "BLOCKED",
+    "status": "INELIGIBLE",
     "symbol": "MU"
    },
    {
@@ -920,7 +926,7 @@
     "rs_stock_60d": -7.77,
     "rsi_2": 19.94,
     "rsi_pass": false,
-    "sma_200": 950.6204,
+    "sma_200": 950.6203,
     "sma_200_pass": false,
     "status": "INELIGIBLE",
     "symbol": "GS"
@@ -938,7 +944,7 @@
   "status": "STANDBY",
   "strategy_name": "2-Day Panic Dip (Connors RSI-2)"
  },
- "timestamp": "2026-09-30T19:30:19.871930+00:00",
+ "timestamp": "2026-10-05T17:54:39.667334+00:00",
  "type": "STATE_UPDATE",
  "working_orders_count": 0
 }

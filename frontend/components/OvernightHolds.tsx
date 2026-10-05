@@ -69,7 +69,7 @@ export default function OvernightHolds({ holds, tonight, summary, noBuyActive, d
   const label = sending ? "Saving…" : confirming ? "Tap again to confirm" : noBuyActive ? "Turn tonight's buy back on" : "No overnight buy tonight";
 
   return (
-    <section className="flex flex-col gap-2" data-testid="overnight-holds">
+    <section id="overnight-holds" className="flex scroll-mt-4 flex-col gap-2" data-testid="overnight-holds">
       <h2 className="font-display text-lg font-semibold text-ink">Overnight holds</h2>
 
       {holds.map((h) => {

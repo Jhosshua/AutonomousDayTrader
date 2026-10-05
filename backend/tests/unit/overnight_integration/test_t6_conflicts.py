@@ -170,3 +170,35 @@ def test_an_unsold_hold_does_not_use_a_day_slot_or_the_sector_limit(main_runtime
     h.day_trade("MU", 50, 101.0, 99.0)
     assert h.r.account.positions["AMD"].shares == 50
     assert h.r.account.positions["MU"].shares == 50
+
+
+def test_payload_lists_the_early_close_for_the_page(main_runtime):
+    """PLAN_2026_10_05 B1: the page reads which playbook's day trade closed early, and when."""
+    h = MainOvernight(main_runtime, at(THU, 15, 30))
+    _prices(h)
+    assert h.r.overnight.payload(at(THU, 15, 30))["x6"] == []
+    h.day_trade("NVDA", 20, 180.0, 178.0, strategy_id="vwap_pullback")
+    h.price("NVDA", 181.0)
+    h.run(at(THU, 15, 46, 30))
+    rows = h.r.overnight.payload(at(THU, 15, 46, 30))["x6"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert (row["symbol"], row["date"], row["qty"], row["side"], row["strategy_id"]) == \
+        ("NVDA", "2026-10-01", 20, "sell", "vwap_pullback")
+    assert row["done"] is True and row["filled_at"] is not None and row["filled_qty"] == 20
+    assert row["order_id"] in {leg["order_id"] for leg in h.r.pending_trade_records[next(iter(
+        k for k, v in h.r.pending_trade_records.items() if v.get("symbol") == "NVDA"))]["fill_legs"]}
+    # a job older than 5 days is left out
+    assert h.r.overnight.payload(at(date(2026, 10, 7), 10, 0))["x6"] == []
+    assert len(h.r.overnight.payload(at(date(2026, 10, 5), 9, 0))["x6"]) == 1
+
+
+def test_payload_says_whether_today_buys(main_runtime):
+    """PLAN_2026_10_05: the page must know a full day (buys) from an early close or a closed day."""
+    h = MainOvernight(main_runtime, at(THU, 10, 0))
+    t = h.r.overnight.payload(at(THU, 10, 0))["today"]
+    assert t == {"date": "2026-10-01", "full_day": True, "reason": None, "sale_date": "2026-10-02"}
+    sat = h.r.overnight.payload(at(date(2026, 10, 3), 10, 0))["today"]
+    assert sat["full_day"] is False and sat["reason"] == osch.NOT_TRADING_DAY and sat["sale_date"] is None
+    early = h.r.overnight.payload(at(date(2026, 11, 27), 10, 0))["today"]
+    assert early["full_day"] is False and early["reason"] == osch.EARLY_CLOSE

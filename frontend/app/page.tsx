@@ -9,7 +9,7 @@ import Header, { useProWordsToggle } from "@/components/Header";
 import SegmentedModeToggle, { TradingMode } from "@/components/SegmentedModeToggle";
 import BalanceCard from "@/components/BalanceCard";
 import RightNowCard from "@/components/RightNowCard";
-import StrategyTable from "@/components/StrategyTable";
+import StrategyTable, { StrategyTableOvernight } from "@/components/StrategyTable";
 import HoldingNow from "@/components/HoldingNow";
 import MarketMoodCard from "@/components/MarketMoodCard";
 import ResultsPanel from "@/components/ResultsPanel";
@@ -38,6 +38,7 @@ import {
   rightNowSentence,
   tonightStatusLine,
   unsoldBannerText,
+  strategyTheme,
 } from "@/lib/plain";
 
 export default function Home() {
@@ -171,6 +172,29 @@ export default function Home() {
     ovnBuysOn && etMin < 15 * 60 + 46
       ? intradayPositions.find((p) => plannedTonight.some((r) => r.symbol === p.symbol))?.symbol ?? null
       : null;
+  // The Overnight playbook row and the 3:45 PM handoff (PLAN_2026_10_05). Only with the overnight payload.
+  const tableOvernight: StrategyTableOvernight | null = ovn
+    ? {
+        inputs: {
+          running: ovnRunning,
+          modeOn: ovnBuysOn,
+          enabled: ovn.settings?.enabled ?? [],
+          today: ovn.today ?? null,
+          tradingDay: tradingDayToday,
+          todayEt,
+          etMin,
+          tooLate,
+          noBuyActive,
+          rows: ovn.rows ?? [],
+          holds: holdViews.filter((h) => !h.bookOnly).map((h) => ({ symbol: h.symbol, saleDate: h.saleDate })),
+          x6: ovn.x6 ?? [],
+        },
+        realizedToday: state.account.overnight_realized_today ?? ovn.state?.realized_today ?? null,
+        sizeNote: ovn.rows?.[0]?.size_note ?? null,
+        nameOf: (sid: string) => strategyTheme(sid, state.strategies.find((s) => s.id === sid)?.name ?? sid).name,
+      }
+    : null;
+
   const countdownValue = countdownToClose(now, firstTradingDayFlag, x6Symbol ? 15 * 60 + 46 : undefined);
   const countdownLabel = x6Symbol ? `${x6Symbol} quick trade closes in` : "Quick trades close in";
 
@@ -343,7 +367,7 @@ export default function Home() {
 
               <MarketMoodCard context={state.market_context} tradingDay={firstTradingDayFlag} />
 
-              <StrategyTable strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} />
+              <StrategyTable strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} overnight={tableOvernight} />
             </div>
 
             <div className="flex min-w-0 flex-col gap-3 lg:col-start-2 lg:row-start-2">
@@ -356,8 +380,8 @@ export default function Home() {
                 overnight={
                   overnightOn
                     ? {
-                        buysOn: ovnBuysOn,
-                        symbols: ovn?.settings?.enabled?.length ? ovn.settings.enabled : ["NVDA", "IREN", "HUT"],
+                        buysOn: ovnBuysOn && (ovn?.settings?.enabled?.length ?? 0) > 0,
+                        symbols: ovn?.settings?.enabled ?? [],
                         pct: ovn?.settings?.pct ?? null,
                         resultToday: state.account.overnight_realized_today ?? null,
                         holdsCount: holdViews.length,

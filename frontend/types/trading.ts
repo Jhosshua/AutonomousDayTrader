@@ -289,6 +289,24 @@ export interface OvernightPayload {
   no_buy_tonight?: boolean;
   no_buy_until?: string;
   unsold_after_0931?: string[];
+  /** X6: day trades closed early for a closing auction buy, last 5 days (new backend only). */
+  x6?: OvernightX6[];
+  /** Today's calendar as the closing buy judges it: full_day false on an early close or a closed market (new backend only). */
+  today?: { date: string; full_day: boolean; reason: string | null; sale_date: string | null };
+}
+
+export interface OvernightX6 {
+  symbol: string;
+  date: string;
+  qty: number | null;
+  side: string | null;
+  done: boolean;
+  order_id: string | null;
+  /** The day playbook whose trade was closed (null on jobs saved before 2026-10-05). */
+  strategy_id: string | null;
+  filled_at: string | null;
+  /** Shares actually closed at Alpaca (0 when nothing was sent, e.g. Alpaca already held none). */
+  filled_qty?: number;
 }
 
 export interface AuditRecord {

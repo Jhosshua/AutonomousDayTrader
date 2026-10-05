@@ -391,7 +391,8 @@ class OvernightIntegration:
         order.estimated_price = pos.market_price
         today = et_date(self._now())
         self.ledger["x6"][sym] = {"order_id": order.id, "date": today.isoformat(), "attempt": 1, "qty": pos.shares,
-                                  "side": side.value.lower(), "booked": {}, "done": False}
+                                  "side": side.value.lower(), "booked": {}, "done": False,
+                                  "strategy_id": getattr(pos, "strategy_id", None), "filled_at": None}
         log.warning("Overnight %s: closing the day trade (%d shares) early for the closing auction buy (X6)",
                     sym, pos.shares)
         self._x6_step(sym)
@@ -459,6 +460,7 @@ class OvernightIntegration:
             at = _parse(row.get("filled_at"), self._now())
             fill = r.engine._apply_fill_to_ledger(order, delta, round(px, 4), 0.0, 0.0, at)
             job["booked"][oid] = {"qty": total, "notional": total * avg}
+            job["filled_at"] = at.isoformat()
             r._reconcile_fills([fill])
             r._checkpoint_runtime("OVERNIGHT_X6_FILL")
         if is_terminal(row):
@@ -892,4 +894,42 @@ class OvernightIntegration:
         out["no_buy_tonight"] = ctl.state["control"].get("no_buy_date") == today.isoformat()
         out["no_buy_until"] = et(today, osch.BUY_GIVE_UP).isoformat()
         out["unsold_after_0931"] = ctl.unsold_after_0931(now)
+        out["x6"] = self.x6_view(now)
+        out["today"] = self.today_view(ctl, today)
+        return out
+
+    @staticmethod
+    def today_view(ctl: Any, today: date) -> Dict[str, Any]:
+        """Today's calendar as the closing buy judges it (osch.calendar_gate), for the page: a full day
+        buys, an early close or a closed market does not. Read only, never raises."""
+        try:
+            ok, reason = osch.calendar_gate(today, ctl.calendar)
+        except Exception:
+            ok, reason = False, osch.CALENDAR_NOT_COVERED
+        sale = None
+        if ok:
+            try:
+                sale = osch.sale_date(today, ctl.calendar)
+            except Exception:
+                sale = None
+        return {"date": today.isoformat(), "full_day": ok, "reason": None if ok else reason,
+                "sale_date": sale.isoformat() if sale else None}
+
+    def x6_view(self, now: datetime) -> List[Dict[str, Any]]:
+        """Day trades closed early for a closing auction buy (X6), for the page. Only jobs from the last
+        5 calendar days (ET), so a weekend or holiday morning can still say what happened before the
+        night. The page matches each one to its night by date. Read only."""
+        today = et_date(now)
+        out = []
+        for sym, job in sorted(self.ledger.get("x6", {}).items()):
+            try:
+                age = (today - date.fromisoformat(job.get("date") or "")).days
+            except ValueError:
+                continue
+            if not 0 <= age <= 5:
+                continue
+            out.append({"symbol": sym, "date": job["date"], "qty": job.get("qty"), "side": job.get("side"),
+                        "done": bool(job.get("done")), "order_id": job.get("order_id"),
+                        "strategy_id": job.get("strategy_id"), "filled_at": job.get("filled_at"),
+                        "filled_qty": sum(int(v.get("qty") or 0) for v in (job.get("booked") or {}).values())})
         return out

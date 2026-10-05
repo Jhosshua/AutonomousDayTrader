@@ -145,6 +145,16 @@ const testidLocations = {
   "strategy-status": "components/StrategyCard.tsx",
   "orb-init-error": "components/StrategyCard.tsx",
   "tri-engine-broker-issue": "components/StrategyCard.tsx",
+  // 2026-10-05 overnight row and the 3:45 PM handoff (PLAN_2026_10_05_overnight_row_and_handoff.md)
+  "strategy-row-overnight": "components/OvernightPlaybookRow.tsx",
+  "overnight-steps": "components/OvernightPlaybookRow.tsx",
+  "overnight-holds-link": "components/OvernightPlaybookRow.tsx",
+  "handoff-note": "components/StrategyTable.tsx",
+  "axis-labels": "components/StrategyTable.tsx",
+  "night-legend": "components/StrategyTable.tsx",
+  "handoff-band": "components/StrategyCard.tsx",
+  "night-part": "components/StrategyCard.tsx",
+  "x6-note": "components/StrategyCard.tsx",
 };
 for (const [testid, file] of Object.entries(testidLocations)) {
   const content = fs.readFileSync(path.join(FRONTEND_DIR, file), "utf8");

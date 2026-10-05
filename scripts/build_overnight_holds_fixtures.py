@@ -170,6 +170,21 @@ def main() -> int:
     h.step(at(FRI, 20, 0))
     frames["weekend"] = stamp(frame(r), at(FRI, 20, 0))
 
+    # 8b. (PLAN_2026_10_05) 15:47:10 after Ride the Trend's NVDA day trade was closed early at 15:46 (X6)
+    h = MainOvernight(r, at(WED, 15, 30), equity=EQUITY)
+    prices(h)
+    h.day_trade("NVDA", 20, CLOSE["NVDA"], CLOSE["NVDA"] - 2.0, strategy_id="vwap_pullback")
+    h.price("NVDA", CLOSE["NVDA"] + 1.0)
+    h.run(at(WED, 15, 47, 10), every=5)
+    frames["x6_closing"] = stamp(frame(r), at(WED, 15, 47, 10))
+
+    # 8c. (PLAN_2026_10_05) Friday Nov 27 2026, a 1:00 PM early close: no buy today
+    BF = date(2026, 11, 27)
+    h = MainOvernight(r, at(BF, 11, 0), equity=EQUITY)
+    prices(h)
+    h.step(at(BF, 11, 0))
+    frames["early_close"] = stamp(frame(r), at(BF, 11, 0))
+
     # 9. a loss limit day (derived): the day frame with the loss stop flag set
     loss = copy.deepcopy(frames["day"])
     loss["account"]["is_circuit_broken"] = True

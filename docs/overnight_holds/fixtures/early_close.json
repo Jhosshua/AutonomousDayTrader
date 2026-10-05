@@ -1,8 +1,8 @@
 {
- "_fixed_now": "2026-09-30T20:00:00-04:00",
+ "_fixed_now": "2026-11-27T11:00:00-05:00",
  "account": {
-  "buying_power": 169102.6,
-  "cash": 20002.6,
+  "buying_power": 198800.0,
+  "cash": 49700.0,
   "daily_drawdown": 0.0,
   "daily_drawdown_pct": 0.0,
   "daily_pnl": 0.0,
@@ -13,103 +13,9 @@
   "overnight_realized_today": 0.0,
   "risk_drawdown": 0.0,
   "risk_level": "NORMAL",
-  "status": "EOD_FLAT"
+  "status": "ACTIVE"
  },
- "all_positions": [
-  {
-   "avg_entry_price": 228.87,
-   "bracket_status": null,
-   "cost_basis": 9841.41,
-   "current_price": 228.87,
-   "entry_context": null,
-   "entry_price": 228.87,
-   "exit_due": "2026-10-01T09:30:00-04:00",
-   "fees_paid": 0.0,
-   "fixed_protection": false,
-   "initial_stop": null,
-   "market_price": 228.87,
-   "market_value": 9841.41,
-   "orb_context": null,
-   "overnight": true,
-   "plan_risk_pct": null,
-   "qty": 43,
-   "r_multiple": null,
-   "realized_pnl": 0.0,
-   "runner_policy": null,
-   "shares": 43,
-   "side": "LONG",
-   "stop_loss": null,
-   "strategy_id": "overnight_nvda",
-   "symbol": "NVDA",
-   "take_profit_1": null,
-   "take_profit_2": null,
-   "target_1_filled": null,
-   "unrealized_pnl": 0.0,
-   "unrealized_pnl_pct": 0.0
-  },
-  {
-   "avg_entry_price": 41.73,
-   "bracket_status": null,
-   "cost_basis": 9931.74,
-   "current_price": 41.73,
-   "entry_context": null,
-   "entry_price": 41.73,
-   "exit_due": "2026-10-01T09:30:00-04:00",
-   "fees_paid": 0.0,
-   "fixed_protection": false,
-   "initial_stop": null,
-   "market_price": 41.73,
-   "market_value": 9931.74,
-   "orb_context": null,
-   "overnight": true,
-   "plan_risk_pct": null,
-   "qty": 238,
-   "r_multiple": null,
-   "realized_pnl": 0.0,
-   "runner_policy": null,
-   "shares": 238,
-   "side": "LONG",
-   "stop_loss": null,
-   "strategy_id": "overnight_iren",
-   "symbol": "IREN",
-   "take_profit_1": null,
-   "take_profit_2": null,
-   "target_1_filled": null,
-   "unrealized_pnl": 0.0,
-   "unrealized_pnl_pct": 0.0
-  },
-  {
-   "avg_entry_price": 92.75,
-   "bracket_status": null,
-   "cost_basis": 9924.25,
-   "current_price": 92.75,
-   "entry_context": null,
-   "entry_price": 92.75,
-   "exit_due": "2026-10-01T09:30:00-04:00",
-   "fees_paid": 0.0,
-   "fixed_protection": false,
-   "initial_stop": null,
-   "market_price": 92.75,
-   "market_value": 9924.25,
-   "orb_context": null,
-   "overnight": true,
-   "plan_risk_pct": null,
-   "qty": 107,
-   "r_multiple": null,
-   "realized_pnl": 0.0,
-   "runner_policy": null,
-   "shares": 107,
-   "side": "LONG",
-   "stop_loss": null,
-   "strategy_id": "overnight_hut",
-   "symbol": "HUT",
-   "take_profit_1": null,
-   "take_profit_2": null,
-   "target_1_filled": null,
-   "unrealized_pnl": 0.0,
-   "unrealized_pnl_pct": 0.0
-  }
- ],
+ "all_positions": [],
  "broker": {
   "account_number": null,
   "mismatch": false,
@@ -128,7 +34,7 @@
    "mean_reversion"
   ],
   "base_risk_pct": 1.0,
-  "market_status": "CLOSED",
+  "market_status": "OPEN",
   "market_trend": "UNKNOWN",
   "market_trend_reason": "MISSING_INDEX_BARS",
   "max_concurrent_positions": 3,
@@ -140,7 +46,7 @@
   "sizing_multiplier": 1.0,
   "stop_multiplier": 1.0,
   "time_multiplier": 1.0,
-  "time_phase": "POST_MARKET",
+  "time_phase": "TREND_CONTINUATION",
   "vix": 20.0,
   "vix_age_seconds": null,
   "vix_regime": "NORMAL",
@@ -178,73 +84,11 @@
  },
  "overnight": {
   "fidelity": [],
-  "holds": [
-   {
-    "buy_avg": 228.87,
-    "buy_date": "2026-09-30",
-    "needs_look": [],
-    "nights": "weeknight",
-    "sale_date": "2026-10-01",
-    "shares": 43,
-    "state": "SALE_QUEUED",
-    "strategy_id": "overnight_nvda",
-    "symbol": "NVDA"
-   },
-   {
-    "buy_avg": 41.73,
-    "buy_date": "2026-09-30",
-    "needs_look": [],
-    "nights": "weeknight",
-    "sale_date": "2026-10-01",
-    "shares": 238,
-    "state": "SALE_QUEUED",
-    "strategy_id": "overnight_iren",
-    "symbol": "IREN"
-   },
-   {
-    "buy_avg": 92.75,
-    "buy_date": "2026-09-30",
-    "needs_look": [],
-    "nights": "weeknight",
-    "sale_date": "2026-10-01",
-    "shares": 107,
-    "state": "SALE_QUEUED",
-    "strategy_id": "overnight_hut",
-    "symbol": "HUT"
-   }
-  ],
+  "holds": [],
   "intents": [],
   "no_buy_tonight": false,
-  "no_buy_until": "2026-09-30T15:49:30-04:00",
-  "queued_sales": [
-   {
-    "buy_date": "2026-09-30",
-    "cid": "adt-ovn-NVDA-20260930-sell-1",
-    "qty": 43,
-    "sale_date": "2026-10-01",
-    "status": "new",
-    "symbol": "NVDA",
-    "tif": "opg"
-   },
-   {
-    "buy_date": "2026-09-30",
-    "cid": "adt-ovn-IREN-20260930-sell-1",
-    "qty": 238,
-    "sale_date": "2026-10-01",
-    "status": "new",
-    "symbol": "IREN",
-    "tif": "opg"
-   },
-   {
-    "buy_date": "2026-09-30",
-    "cid": "adt-ovn-HUT-20260930-sell-1",
-    "qty": 107,
-    "sale_date": "2026-10-01",
-    "status": "new",
-    "symbol": "HUT",
-    "tif": "opg"
-   }
-  ],
+  "no_buy_until": "2026-11-27T15:49:30-05:00",
+  "queued_sales": [],
   "research": {
    "at_10000_each": {
     "losing_months": "8 of 36",
@@ -357,63 +201,63 @@
   "rows": [
    {
     "block": null,
-    "buy_avg": 228.87,
-    "buy_date": "2026-09-30",
+    "buy_avg": null,
+    "buy_date": null,
     "enabled": true,
-    "held_qty": 43,
+    "held_qty": 0,
     "name": "NVDA overnight",
     "needs_look": [],
-    "qty": 43,
-    "realized": 0.0,
+    "qty": null,
+    "realized": null,
     "reason": null,
-    "reserved": true,
-    "sale_date": "2026-10-01",
-    "sale_text": "NVDA overnight sells at the 9:30 AM open on Thu Oct 1.",
-    "size_note": "20% of the account a night (about $9,940), no stop",
-    "state": "SALE_QUEUED",
+    "reserved": false,
+    "sale_date": null,
+    "sale_text": null,
+    "size_note": "20% of the account a night, no stop",
+    "state": null,
     "strategy_id": "overnight_nvda",
     "symbol": "NVDA",
-    "tonight": true
+    "tonight": false
    },
    {
     "block": null,
-    "buy_avg": 41.73,
-    "buy_date": "2026-09-30",
+    "buy_avg": null,
+    "buy_date": null,
     "enabled": true,
-    "held_qty": 238,
+    "held_qty": 0,
     "name": "IREN overnight",
     "needs_look": [],
-    "qty": 238,
-    "realized": 0.0,
+    "qty": null,
+    "realized": null,
     "reason": null,
-    "reserved": true,
-    "sale_date": "2026-10-01",
-    "sale_text": "IREN overnight sells at the 9:30 AM open on Thu Oct 1.",
-    "size_note": "20% of the account a night (about $9,940), no stop",
-    "state": "SALE_QUEUED",
+    "reserved": false,
+    "sale_date": null,
+    "sale_text": null,
+    "size_note": "20% of the account a night, no stop",
+    "state": null,
     "strategy_id": "overnight_iren",
     "symbol": "IREN",
-    "tonight": true
+    "tonight": false
    },
    {
     "block": null,
-    "buy_avg": 92.75,
-    "buy_date": "2026-09-30",
+    "buy_avg": null,
+    "buy_date": null,
     "enabled": true,
-    "held_qty": 107,
+    "held_qty": 0,
     "name": "HUT overnight",
     "needs_look": [],
-    "qty": 107,
-    "realized": 0.0,
+    "qty": null,
+    "realized": null,
     "reason": null,
-    "reserved": true,
-    "sale_date": "2026-10-01",
-    "sale_text": "HUT overnight sells at the 9:30 AM open on Thu Oct 1.",
-    "size_note": "20% of the account a night (about $9,940), no stop",
-    "state": "SALE_QUEUED",
+    "reserved": false,
+    "sale_date": null,
+    "sale_text": null,
+    "size_note": "20% of the account a night, no stop",
+    "state": null,
     "strategy_id": "overnight_hut",
     "symbol": "HUT",
-    "tonight": true
+    "tonight": false
    }
   ],
   "settings": {
@@ -439,96 +283,14 @@
     "IREN",
     "HUT"
    ],
-   "holds": [
-    "NVDA",
-    "IREN",
-    "HUT"
-   ],
+   "holds": [],
    "init_error": null,
    "intents": [],
-   "last_booking": {
-    "alpaca_order_id": "2edec7fa-c43a-4f2f-80d3-60c029ac3463",
-    "at": "2026-09-30T16:00:05-04:00",
-    "buy_date": "2026-09-30",
-    "event": "BOOKED",
-    "price": 92.75,
-    "qty": 107,
-    "realized": null,
-    "role": "buy",
-    "symbol": "HUT"
-   },
+   "last_booking": null,
    "mode": "live",
    "needs_look": [],
-   "nights": [
-    {
-     "block": null,
-     "buy_avg": 228.87,
-     "buy_date": "2026-09-30",
-     "held_qty": 43,
-     "needs_look": [],
-     "qty": 43,
-     "realized": 0.0,
-     "reason": null,
-     "sale_date": "2026-10-01",
-     "state": "SALE_QUEUED",
-     "symbol": "NVDA"
-    },
-    {
-     "block": null,
-     "buy_avg": 41.73,
-     "buy_date": "2026-09-30",
-     "held_qty": 238,
-     "needs_look": [],
-     "qty": 238,
-     "realized": 0.0,
-     "reason": null,
-     "sale_date": "2026-10-01",
-     "state": "SALE_QUEUED",
-     "symbol": "IREN"
-    },
-    {
-     "block": null,
-     "buy_avg": 92.75,
-     "buy_date": "2026-09-30",
-     "held_qty": 107,
-     "needs_look": [],
-     "qty": 107,
-     "realized": 0.0,
-     "reason": null,
-     "sale_date": "2026-10-01",
-     "state": "SALE_QUEUED",
-     "symbol": "HUT"
-    }
-   ],
-   "queued_sales": [
-    {
-     "buy_date": "2026-09-30",
-     "cid": "adt-ovn-NVDA-20260930-sell-1",
-     "qty": 43,
-     "sale_date": "2026-10-01",
-     "status": "new",
-     "symbol": "NVDA",
-     "tif": "opg"
-    },
-    {
-     "buy_date": "2026-09-30",
-     "cid": "adt-ovn-IREN-20260930-sell-1",
-     "qty": 238,
-     "sale_date": "2026-10-01",
-     "status": "new",
-     "symbol": "IREN",
-     "tif": "opg"
-    },
-    {
-     "buy_date": "2026-09-30",
-     "cid": "adt-ovn-HUT-20260930-sell-1",
-     "qty": 107,
-     "sale_date": "2026-10-01",
-     "status": "new",
-     "symbol": "HUT",
-     "tif": "opg"
-    }
-   ],
+   "nights": [],
+   "queued_sales": [],
    "realized_offset": {
     "amount": 0.0,
     "date": null
@@ -540,10 +302,10 @@
    "unsold_after_0931": []
   },
   "today": {
-   "date": "2026-09-30",
-   "full_day": true,
-   "reason": null,
-   "sale_date": "2026-10-01"
+   "date": "2026-11-27",
+   "full_day": false,
+   "reason": "EARLY_CLOSE",
+   "sale_date": null
   },
   "unsold_after_0931": [],
   "x6": []
@@ -553,140 +315,9 @@
   "restored_at": null,
   "status": "disabled"
  },
- "positions_count": 3,
- "primary_position": {
-  "avg_entry_price": 228.87,
-  "bracket_status": null,
-  "chart_points": [],
-  "cost_basis": 9841.41,
-  "current_price": 228.87,
-  "entry_context": null,
-  "entry_price": 228.87,
-  "exit_due": "2026-10-01T09:30:00-04:00",
-  "fees_paid": 0.0,
-  "fixed_protection": false,
-  "initial_stop": null,
-  "market_price": 228.87,
-  "market_value": 9841.41,
-  "orb_context": null,
-  "overnight": true,
-  "plan_risk_pct": null,
-  "qty": 43,
-  "r_multiple": null,
-  "realized_pnl": 0.0,
-  "runner_policy": null,
-  "shares": 43,
-  "side": "LONG",
-  "stop_loss": null,
-  "strategy_id": "overnight_nvda",
-  "symbol": "NVDA",
-  "take_profit_1": null,
-  "take_profit_2": null,
-  "target_1_filled": null,
-  "unrealized_pnl": 0.0,
-  "unrealized_pnl_pct": 0.0
- },
- "recent_activity": [
-  {
-   "event_type": "ORDER_CREATED",
-   "id": "ord_01446f7f0d8b",
-   "message": "NONE -> CREATED (Order initialized)",
-   "price": 0.0,
-   "qty": 0,
-   "quantity": 0,
-   "symbol": "NVDA",
-   "timestamp": "17:54:39",
-   "type": "ORDER_CREATED"
-  },
-  {
-   "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_01446f7f0d8b",
-   "message": "CREATED -> CREATED (Overnight buy a2293260-b8ce-4f8f-8122-50b753105f7c at Alpaca)",
-   "price": 0.0,
-   "qty": 0,
-   "quantity": 0,
-   "symbol": "NVDA",
-   "timestamp": "17:54:39",
-   "type": "OVERNIGHT_BROKER_ORDER"
-  },
-  {
-   "event_type": "FULL_FILL",
-   "id": "ord_01446f7f0d8b",
-   "message": "CREATED -> FILLED (Filled 43 @ $228.87, fee $0.00)",
-   "price": 228.87,
-   "qty": 43,
-   "quantity": 43,
-   "symbol": "NVDA",
-   "timestamp": "17:54:39",
-   "type": "FULL_FILL"
-  },
-  {
-   "event_type": "ORDER_CREATED",
-   "id": "ord_522d9a09c2c0",
-   "message": "NONE -> CREATED (Order initialized)",
-   "price": 0.0,
-   "qty": 0,
-   "quantity": 0,
-   "symbol": "IREN",
-   "timestamp": "17:54:39",
-   "type": "ORDER_CREATED"
-  },
-  {
-   "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_522d9a09c2c0",
-   "message": "CREATED -> CREATED (Overnight buy 667a45a3-22be-4d8b-84c4-ff621d3627e9 at Alpaca)",
-   "price": 0.0,
-   "qty": 0,
-   "quantity": 0,
-   "symbol": "IREN",
-   "timestamp": "17:54:39",
-   "type": "OVERNIGHT_BROKER_ORDER"
-  },
-  {
-   "event_type": "FULL_FILL",
-   "id": "ord_522d9a09c2c0",
-   "message": "CREATED -> FILLED (Filled 238 @ $41.73, fee $0.00)",
-   "price": 41.73,
-   "qty": 238,
-   "quantity": 238,
-   "symbol": "IREN",
-   "timestamp": "17:54:39",
-   "type": "FULL_FILL"
-  },
-  {
-   "event_type": "ORDER_CREATED",
-   "id": "ord_41085e52e1d7",
-   "message": "NONE -> CREATED (Order initialized)",
-   "price": 0.0,
-   "qty": 0,
-   "quantity": 0,
-   "symbol": "HUT",
-   "timestamp": "17:54:39",
-   "type": "ORDER_CREATED"
-  },
-  {
-   "event_type": "OVERNIGHT_BROKER_ORDER",
-   "id": "ord_41085e52e1d7",
-   "message": "CREATED -> CREATED (Overnight buy 2edec7fa-c43a-4f2f-80d3-60c029ac3463 at Alpaca)",
-   "price": 0.0,
-   "qty": 0,
-   "quantity": 0,
-   "symbol": "HUT",
-   "timestamp": "17:54:39",
-   "type": "OVERNIGHT_BROKER_ORDER"
-  },
-  {
-   "event_type": "FULL_FILL",
-   "id": "ord_41085e52e1d7",
-   "message": "CREATED -> FILLED (Filled 107 @ $92.75, fee $0.00)",
-   "price": 92.75,
-   "qty": 107,
-   "quantity": 107,
-   "symbol": "HUT",
-   "timestamp": "17:54:39",
-   "type": "FULL_FILL"
-  }
- ],
+ "positions_count": 0,
+ "primary_position": null,
+ "recent_activity": [],
  "recent_news": [],
  "strategies": [
   {
@@ -730,7 +361,7 @@
      "ORB is switched off: no new trades (open ORB trades are still closed by their rules)."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-10-05T13:54:39-04:00",
+    "evaluated_at": "2026-10-05T13:54:41-04:00",
     "headline": "Done for today",
     "hours": "Decides 9:38 AM, may add trades until 10:15 AM, closes by 11:00 AM",
     "in_hours": false,
@@ -824,7 +455,7 @@
    "window": {
     "blockers": [],
     "can_open_now": false,
-    "evaluated_at": "2026-10-05T13:54:39-04:00",
+    "evaluated_at": "2026-10-05T13:54:41-04:00",
     "headline": "Done for today",
     "hours": "9:30 AM - 11:30 AM",
     "in_hours": false,
@@ -865,12 +496,10 @@
    "trades_count": 0,
    "win_rate": 0.0,
    "window": {
-    "blockers": [
-     "End-of-day close-out has started: no new trades."
-    ],
-    "can_open_now": false,
-    "evaluated_at": "2026-10-05T13:54:39-04:00",
-    "headline": "Blocked right now",
+    "blockers": [],
+    "can_open_now": true,
+    "evaluated_at": "2026-10-05T13:54:41-04:00",
+    "headline": "Can trade, with limits",
     "hours": "9:30 AM - 3:45 PM",
     "in_hours": true,
     "limits": [
@@ -888,7 +517,7 @@
      ]
     ],
     "schedule_text": "In its trading hours until 3:45 PM.",
-    "state": "BLOCKED",
+    "state": "LIMITED",
     "trading_day": true
    }
   },
@@ -910,11 +539,10 @@
    "win_rate": 0.0,
    "window": {
     "blockers": [
-     "End-of-day close-out has started: no new trades.",
      "Market direction unknown."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-10-05T13:54:39-04:00",
+    "evaluated_at": "2026-10-05T13:54:41-04:00",
     "headline": "Blocked right now",
     "hours": "10:00 AM - 3:45 PM",
     "in_hours": true,
@@ -958,11 +586,11 @@
     "or_high": null,
     "or_low": null,
     "or_mid": null,
-    "phase": "NO_SIGNAL",
+    "phase": "SKIPPED",
     "qqq_close": null,
     "qqq_vwap": null,
     "quantity": 0,
-    "reason": null,
+    "reason": "MISSING_OPENING_RANGE_BAR",
     "risk_budget": 372.75,
     "risk_reserved": 0.0,
     "side": null,
@@ -974,15 +602,16 @@
    "win_rate": 0.0,
    "window": {
     "blockers": [
-     "Waiting for the price feed."
+     "Waiting for the price feed.",
+     "Session checks did not pass."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-10-05T13:54:39.977925-04:00",
-    "headline": "No qualifying setup today.",
+    "evaluated_at": "2026-10-05T13:54:41.065930-04:00",
+    "headline": "Skipped today; a required check did not pass.",
     "hours": "9:45 AM\u201311:30 ET",
     "in_hours": false,
     "limits": [],
-    "market_text": "No qualifying setup today.",
+    "market_text": "Skipped today; a required check did not pass.",
     "next_change_at": null,
     "notes": [
      "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
@@ -993,7 +622,7 @@
       "11:30"
      ]
     ],
-    "schedule_text": "No qualifying setup today.",
+    "schedule_text": "Skipped today; a required check did not pass.",
     "state": "DONE_FOR_DAY",
     "trading_day": true
    }
@@ -1021,11 +650,11 @@
     "or_high": null,
     "or_low": null,
     "or_mid": null,
-    "phase": "NO_SIGNAL",
+    "phase": "SKIPPED",
     "qqq_close": null,
     "qqq_vwap": null,
     "quantity": 0,
-    "reason": null,
+    "reason": "MISSING_OPENING_RANGE_BAR",
     "risk_budget": 372.75,
     "risk_reserved": 0.0,
     "side": null,
@@ -1037,15 +666,16 @@
    "win_rate": 0.0,
    "window": {
     "blockers": [
-     "Waiting for the price feed."
+     "Waiting for the price feed.",
+     "Session checks did not pass."
     ],
     "can_open_now": false,
-    "evaluated_at": "2026-10-05T13:54:39.977925-04:00",
-    "headline": "No qualifying setup today.",
+    "evaluated_at": "2026-10-05T13:54:41.065930-04:00",
+    "headline": "Skipped today; a required check did not pass.",
     "hours": "9:45 AM\u201312:00 ET",
     "in_hours": false,
     "limits": [],
-    "market_text": "No qualifying setup today.",
+    "market_text": "Skipped today; a required check did not pass.",
     "next_change_at": null,
     "notes": [
      "Paper execution; one setup per day. Entries are market orders two minutes after the signal minute."
@@ -1056,7 +686,7 @@
       "12:00"
      ]
     ],
-    "schedule_text": "No qualifying setup today.",
+    "schedule_text": "Skipped today; a required check did not pass.",
     "state": "DONE_FOR_DAY",
     "trading_day": true
    }
@@ -1226,8 +856,8 @@
   "flattening_exempt": true,
   "last_close_data_note": null,
   "last_close_entries_withheld": false,
-  "last_scan_session_date": "2026-09-30",
-  "last_scan_time": "2026-10-05T17:54:39.742587+00:00",
+  "last_scan_session_date": null,
+  "last_scan_time": null,
   "max_slots": 2,
   "positions": [],
   "schedule_text": "Checks the 4:00 PM close for sharp dips; any buy or sell happens at the next 9:30 AM open.",
@@ -1235,7 +865,7 @@
   "status": "STANDBY",
   "strategy_name": "2-Day Panic Dip (Connors RSI-2)"
  },
- "timestamp": "2026-10-05T17:54:39.977899+00:00",
+ "timestamp": "2026-10-05T17:54:41.065911+00:00",
  "type": "STATE_UPDATE",
  "working_orders_count": 0
 }

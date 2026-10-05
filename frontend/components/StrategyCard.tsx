@@ -10,7 +10,7 @@ import {
   formatSignedMoney,
   isWithinSession,
   rangesToSegments,
-  sessionPct,
+  axisPct,
   orbAlertsOf,
   orbProblemOf,
   strategyNoteLine,
@@ -38,6 +38,12 @@ interface StrategyCardProps {
   strategy: StrategyState;
   ledgerAgg?: StrategyLedgerAgg;
   showPro: boolean;
+  /** Overnight on: the hours bar gets a night part (9:30 to 4 PM on 0 to 88%). */
+  nightAxis?: boolean;
+  /** Draw the 3:45 to 4:00 PM handoff stripes. */
+  handoffBand?: boolean;
+  /** X6: this playbook's trade was closed early for tonight's overnight buy. */
+  x6Note?: string | null;
 }
 
 /** Row grid shared with StrategyTable's column header so the hours bars line up. Phone: name / result /
@@ -93,7 +99,32 @@ function OrbOrphanResolve({ symbol }: { symbol: string }) {
   );
 }
 
-export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyCardProps) {
+/** The night part of an hours bar (after 4 PM to the next 9:30 AM, not to scale). */
+export function NightPart() {
+  return (
+    <span
+      className="absolute inset-y-0 right-0 block rounded-r-full"
+      style={{ left: `${axisPct(16 * 60, true)}%`, background: "#DFE3F0" }}
+      data-testid="night-part"
+      aria-hidden="true"
+    />
+  );
+}
+
+/** The 3:45 to 4:00 PM handoff stripes on an hours bar (night axis). */
+export function HandoffBand() {
+  const left = axisPct(15 * 60 + 45, true);
+  return (
+    <span
+      className="absolute -top-1 -bottom-1 block rounded-sm"
+      style={{ left: `${left}%`, width: `${axisPct(16 * 60, true) - left}%`, background: "repeating-linear-gradient(135deg, #8A91B0 0 2px, transparent 2px 5px)" }}
+      data-testid="handoff-band"
+      aria-hidden="true"
+    />
+  );
+}
+
+export default function StrategyCard({ strategy, ledgerAgg, showPro, nightAxis = false, handoffBand = false, x6Note = null }: StrategyCardProps) {
   const [open, setOpen] = useState(false);
   const theme = strategyTheme(strategy.id, strategy.name);
   const Icon = ICONS[strategy.id] || Waves;
@@ -108,10 +139,10 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
   const chipStyle = CHIP_STYLES[chip.tone] || CHIP_STYLES.grey;
   const resting = win?.state === "DONE_FOR_DAY" || win?.state === "PAUSED" || win?.state === "MARKET_CLOSED";
 
-  const segments = rangesToSegments(win?.ranges);
+  const segments = rangesToSegments(win?.ranges, nightAxis);
   const nowMin = etMinutesOfDay();
   const showNow = (win?.trading_day ?? true) && isWithinSession(nowMin);
-  const nowLeft = sessionPct(nowMin);
+  const nowLeft = axisPct(nowMin, nightAxis);
 
   // ORB: the bottom line includes its open (unrealized) P&L, not only closed trades
   const orbOpen = strategy.orb ? (strategy.orb.unrealized_pnl ?? 0) : 0;
@@ -143,7 +174,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
   const trendOff = strategy.id === "vwap_pullback" && strategy.mode === "off";
   const trendAddonsOff = strategy.id === "vwap_pullback" && !strategy.addons_enforced;
   const or15Holding = strategy.or15?.phase === "HOLDING";
-  const hasStatus = !!orb?.step || (orb?.open_trades.length ?? 0) > 0 || trendOff || trendAddonsOff || or15Holding;
+  const hasStatus = !!orb?.step || (orb?.open_trades.length ?? 0) > 0 || trendOff || trendAddonsOff || or15Holding || !!x6Note;
   const detailsId = `strategy-details-${strategy.id}`;
 
   return (
@@ -190,6 +221,8 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
               style={{ left: `${seg.left}%`, width: `${seg.width}%`, background: theme.bar, opacity: resting ? 0.5 : 1 }}
             />
           ))}
+          {nightAxis && <NightPart />}
+          {handoffBand && <HandoffBand />}
           {showNow && (
             <span
               className="breathe absolute -top-1 block h-4 w-[3px] rounded-sm"
@@ -217,6 +250,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro }: StrategyC
       {hasStatus && (
         <div className={`${ROW_GRID} px-4 pb-2.5`}>
         <div className={`${UNDER_ROW} flex flex-col gap-1.5 text-[13px] leading-snug text-[#2A3150]`} data-testid="strategy-status">
+          {x6Note && <div className="font-semibold" data-testid="x6-note">{x6Note}</div>}
           {trendOff && <div className="font-semibold">New entries switched off</div>}
           {trendAddonsOff && <div>Extra flow, spread and prior-volume checks switched off.</div>}
           {or15Holding && <div>{strategy.or15?.mode === "offline_raw_open" ? "Fixed safety exit and target in this replay." : strategy.or15?.protection_confirmed ? "Safety exit and target held at the broker." : "Confirming protection with the broker."}</div>}
