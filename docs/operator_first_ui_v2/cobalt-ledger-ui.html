@@ -1,0 +1,2454 @@
+<div id="cobalt-ledger-review">
+  <style>
+    #cobalt-ledger-review {
+      --cobalt-accent: #2b4bff;
+      --cobalt-ink: #111932;
+      --cobalt-muted: #66708b;
+      --cobalt-line: #dce2ef;
+      --cobalt-canvas: #edf1f7;
+      --cobalt-panel: #ffffff;
+      --cobalt-soft: #f5f7fb;
+      --cobalt-soft-blue: #edf1ff;
+      --cobalt-positive: #087a52;
+      --cobalt-positive-soft: #e8f7f0;
+      --cobalt-negative: #c53b22;
+      --cobalt-negative-soft: #fff0eb;
+      --cobalt-warning: #9c5a00;
+      --cobalt-warning-soft: #fff3d8;
+      --cobalt-radius: 8px;
+      width: 100%;
+      color-scheme: light;
+      color: var(--cobalt-ink);
+      font-family: "Instrument Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #cobalt-ledger-review,
+    #cobalt-ledger-review * {
+      box-sizing: border-box;
+    }
+
+    #cobalt-ledger-review button,
+    #cobalt-ledger-review select {
+      font: inherit;
+    }
+
+    #cobalt-ledger-review button {
+      cursor: pointer;
+    }
+
+    #cobalt-ledger-review .cobalt-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-review-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid light-dark(#d9dfeb, #34405a);
+      border-radius: 12px;
+      background: light-dark(#ffffff, #121a2b);
+      color: light-dark(#111932, #f4f7ff);
+    }
+
+    #cobalt-ledger-review .cobalt-review-group {
+      display: grid;
+      gap: 5px;
+    }
+
+    #cobalt-ledger-review .cobalt-review-label {
+      color: light-dark(#66708b, #aeb8ce);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #cobalt-ledger-review .cobalt-review-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 10px;
+      background: light-dark(#edf1f7, #0b1120);
+    }
+
+    #cobalt-ledger-review .cobalt-review-options button {
+      min-width: 54px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 7px;
+      padding: 6px 11px;
+      background: transparent;
+      color: inherit;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-review-options button[aria-pressed="true"] {
+      background: var(--cobalt-accent);
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-review-note {
+      margin-left: auto;
+      align-self: center;
+      color: light-dark(#66708b, #aeb8ce);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage {
+      width: 100%;
+      padding: 14px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: light-dark(#dfe5f0, #080d18);
+    }
+
+    #cobalt-ledger-review .cobalt-app {
+      width: min(100%, 1380px);
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid #d5dce9;
+      border-radius: 12px;
+      background: var(--cobalt-canvas);
+      box-shadow: 0 18px 55px rgba(33, 47, 88, 0.13);
+      transition: width 200ms ease, border-radius 200ms ease;
+    }
+
+    #cobalt-ledger-review .cobalt-app-header {
+      display: grid;
+      grid-template-columns: minmax(210px, 1fr) auto auto;
+      align-items: center;
+      gap: 18px;
+      min-height: 62px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--cobalt-line);
+      background: var(--cobalt-panel);
+    }
+
+    #cobalt-ledger-review .cobalt-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 9px;
+      background: var(--cobalt-accent);
+      color: #ffffff;
+      font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-copy strong,
+    #cobalt-ledger-review .cobalt-brand-copy span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-copy strong {
+      font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-copy span {
+      margin-top: 1px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-app-nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    #cobalt-ledger-review .cobalt-app-nav button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 7px;
+      padding: 0 12px;
+      background: transparent;
+      color: var(--cobalt-muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-app-nav button[aria-current="page"] {
+      background: var(--cobalt-soft-blue);
+      color: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-live {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cobalt-positive);
+      box-shadow: 0 0 0 4px var(--cobalt-positive-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="reconnect"] .cobalt-live-dot {
+      background: var(--cobalt-warning);
+      box-shadow: 0 0 0 4px var(--cobalt-warning-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-state-block {
+      display: none !important;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="normal"] .cobalt-state-normal,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="needs"] .cobalt-state-needs,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="reconnect"] .cobalt-state-reconnect {
+      display: block !important;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="normal"] .cobalt-live .cobalt-state-normal,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="needs"] .cobalt-live .cobalt-state-needs,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="reconnect"] .cobalt-live .cobalt-state-reconnect {
+      display: inline !important;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="normal"] .cobalt-status.cobalt-state-normal,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state="reconnect"] .cobalt-status.cobalt-state-reconnect {
+      display: flex !important;
+    }
+
+    #cobalt-ledger-review .cobalt-status {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 10px 12px 0;
+      min-height: 44px;
+      padding: 8px 11px;
+      border: 1px solid #cfe5db;
+      border-radius: var(--cobalt-radius);
+      background: var(--cobalt-positive-soft);
+      color: #145e46;
+      font-size: 13px;
+    }
+
+    #cobalt-ledger-review .cobalt-status-mark {
+      display: grid;
+      width: 24px;
+      height: 24px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 6px;
+      background: #ffffff;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-status.cobalt-state-reconnect {
+      border-color: #eedba9;
+      background: var(--cobalt-warning-soft);
+      color: #7b4800;
+    }
+
+    #cobalt-ledger-review .cobalt-content-page {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-content-page.cobalt-page-visible {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-page {
+      padding: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-top-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(290px, 0.78fr);
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-panel {
+      border: 1px solid var(--cobalt-line);
+      border-radius: var(--cobalt-radius);
+      background: var(--cobalt-panel);
+    }
+
+    #cobalt-ledger-review .cobalt-performance {
+      padding: 16px;
+      border-radius: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-eyebrow {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h1,
+    #cobalt-ledger-review .cobalt-section-head h2,
+    #cobalt-ledger-review .cobalt-section-head h3 {
+      margin: 3px 0 0;
+      font-weight: 500;
+      line-height: 1.2;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h1 {
+      font-size: 22px;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h2 {
+      font-size: 17px;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h3 {
+      font-size: 15px;
+    }
+
+    #cobalt-ledger-review .cobalt-period-tabs,
+    #cobalt-ledger-review .cobalt-breakdown-tabs {
+      display: flex;
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--cobalt-line);
+      border-radius: 9px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-period-tabs button,
+    #cobalt-ledger-review .cobalt-breakdown-tabs button {
+      min-width: 50px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 10px;
+      background: transparent;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-period-tabs button[aria-selected="true"],
+    #cobalt-ledger-review .cobalt-breakdown-tabs button[aria-selected="true"] {
+      background: var(--cobalt-accent);
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-performance-numbers {
+      display: grid;
+      grid-template-columns: minmax(190px, 1.1fr) repeat(2, minmax(130px, 0.65fr));
+      gap: 14px;
+      align-items: end;
+      margin-top: 16px;
+    }
+
+    #cobalt-ledger-review .cobalt-equity-label,
+    #cobalt-ledger-review .cobalt-fact-label {
+      display: block;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-equity {
+      display: block;
+      margin-top: 2px;
+      font-size: 38px;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-delta-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 7px;
+      margin-top: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-delta-money {
+      font-size: 21px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-delta-percent {
+      border-radius: 6px;
+      padding: 3px 7px;
+      background: var(--cobalt-positive-soft);
+      color: var(--cobalt-positive);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-positive {
+      color: var(--cobalt-positive);
+    }
+
+    #cobalt-ledger-review .cobalt-negative {
+      color: var(--cobalt-negative);
+    }
+
+    #cobalt-ledger-review .cobalt-period-fact {
+      padding-left: 13px;
+      border-left: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-period-fact strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 18px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-period-fact small {
+      display: block;
+      margin-top: 3px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-title {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-note {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-wrap {
+      position: relative;
+      width: 100%;
+      min-height: 216px;
+      margin-top: 6px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart {
+      display: block;
+      width: 100%;
+      height: 216px;
+      overflow: visible;
+    }
+
+    #cobalt-ledger-review .cobalt-chart text {
+      fill: var(--cobalt-muted);
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart .cobalt-axis-title {
+      fill: var(--cobalt-ink);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-grid {
+      stroke: #e3e7ef;
+      stroke-width: 1;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-zero {
+      stroke: #9ba5bb;
+      stroke-width: 1;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-line {
+      fill: none;
+      stroke: var(--cobalt-accent);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-area {
+      fill: rgba(43, 75, 255, 0.08);
+      stroke: none;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-point {
+      fill: #ffffff;
+      stroke: var(--cobalt-accent);
+      stroke-width: 2;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-hit {
+      fill: transparent;
+      cursor: crosshair;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-guide {
+      display: none;
+      stroke: #8791a7;
+      stroke-width: 1;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-end {
+      fill: var(--cobalt-ink) !important;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-tooltip {
+      position: absolute;
+      z-index: 12;
+      display: none;
+      max-width: 210px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: #111932;
+      color: #ffffff;
+      font-size: 12px;
+      line-height: 1.35;
+      pointer-events: none;
+      transform: translate(-50%, calc(-100% - 10px));
+      box-shadow: 0 10px 24px rgba(17, 25, 50, 0.24);
+    }
+
+    #cobalt-ledger-review .cobalt-tooltip strong {
+      display: block;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-tooltip.cobalt-tooltip-visible {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-next {
+      padding: 14px;
+    }
+
+    #cobalt-ledger-review .cobalt-robot-state {
+      margin-top: 12px;
+      padding: 11px;
+      border-radius: 7px;
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-robot-state strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-robot-state span {
+      display: block;
+      margin-top: 3px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-event-list {
+      margin-top: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-event {
+      display: grid;
+      grid-template-columns: 58px 8px minmax(0, 1fr);
+      gap: 8px;
+      padding: 10px 0;
+      border-top: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-event:first-child {
+      border-top: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-event time {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-event-dot {
+      width: 8px;
+      height: 8px;
+      margin-top: 4px;
+      border: 2px solid var(--cobalt-accent);
+      border-radius: 50%;
+    }
+
+    #cobalt-ledger-review .cobalt-event strong,
+    #cobalt-ledger-review .cobalt-event span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-event strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-event span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-loss-limit {
+      margin-top: 10px;
+      padding-top: 11px;
+      border-top: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-loss-limit-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-loss-track {
+      height: 7px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e8ebf2;
+    }
+
+    #cobalt-ledger-review .cobalt-loss-fill {
+      width: 3.6%;
+      height: 100%;
+      background: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-needs-panel {
+      margin-top: 10px;
+      overflow: hidden;
+      border-color: #efbaa9;
+      background: #fff8f5;
+    }
+
+    #cobalt-ledger-review .cobalt-needs-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 14px;
+      background: #f05a3c;
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-needs-head strong {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-needs-head span {
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-issue {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px 14px;
+      border-top: 1px solid #f2d4c9;
+    }
+
+    #cobalt-ledger-review .cobalt-issue:first-of-type {
+      border-top: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-number {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 7px;
+      background: var(--cobalt-negative-soft);
+      color: var(--cobalt-negative);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-copy strong,
+    #cobalt-ledger-review .cobalt-issue-copy span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-copy strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-copy span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-action {
+      min-height: 44px;
+      border: 1px solid #bec8da;
+      border-radius: 7px;
+      padding: 0 13px;
+      background: #ffffff;
+      color: var(--cobalt-ink);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-action-primary {
+      border-color: var(--cobalt-accent);
+      background: var(--cobalt-accent);
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-action-danger {
+      border-color: #d94d33;
+      background: #d94d33;
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-lower-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-panel-pad {
+      padding: 13px;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-list {
+      margin: 10px -13px -13px;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-row {
+      display: grid;
+      grid-template-columns: 7px minmax(170px, 1.2fr) minmax(140px, 0.8fr) 96px 72px 20px;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      min-height: 54px;
+      padding: 7px 13px;
+      border: 0;
+      border-top: 1px solid var(--cobalt-line);
+      background: transparent;
+      color: inherit;
+      text-align: left;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-row[aria-pressed="true"] {
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark {
+      width: 4px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark.cobalt-mark-pink {
+      background: #c62a70;
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark.cobalt-mark-orange {
+      background: #c65128;
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark.cobalt-mark-gold {
+      background: #9a7000;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-name strong,
+    #cobalt-ledger-review .cobalt-holding-name span,
+    #cobalt-ledger-review .cobalt-holding-next strong,
+    #cobalt-ledger-review .cobalt-holding-next span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-name strong,
+    #cobalt-ledger-review .cobalt-holding-next strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-name span,
+    #cobalt-ledger-review .cobalt-holding-next span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-money,
+    #cobalt-ledger-review .cobalt-holding-percent {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-detail {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 12px 13px;
+      border-top: 1px solid #cad4ed;
+      background: #f0f3ff;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact {
+      padding: 8px;
+      border: 1px solid #d8dff0;
+      border-radius: 7px;
+      background: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact span,
+    #cobalt-ledger-review .cobalt-detail-fact strong {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact strong {
+      margin-top: 3px;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 162px;
+    }
+
+    #cobalt-ledger-review .cobalt-action-result {
+      min-height: 16px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    #cobalt-ledger-review .cobalt-history-rows {
+      margin: 9px -13px -13px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 90px 72px 18px;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 50px;
+      padding: 7px 13px;
+      border: 0;
+      border-top: 1px solid var(--cobalt-line);
+      background: transparent;
+      color: inherit;
+      text-align: left;
+    }
+
+    #cobalt-ledger-review .cobalt-history-row[aria-pressed="true"] {
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-history-date strong,
+    #cobalt-ledger-review .cobalt-history-date span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-history-date strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-history-date span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-money,
+    #cobalt-ledger-review .cobalt-history-percent {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail {
+      margin-top: 10px;
+      padding: 11px;
+      border: 1px solid #d6ddef;
+      border-radius: 7px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail-head strong {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail-head span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact {
+      padding: 8px;
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact span,
+    #cobalt-ledger-review .cobalt-mini-fact strong {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact strong {
+      margin-top: 2px;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-history-page-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-main {
+      padding: 14px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-summary {
+      padding: 14px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-summary-numbers {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact {
+      padding: 10px;
+      border-radius: 7px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact span,
+    #cobalt-ledger-review .cobalt-summary-fact strong {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact strong {
+      margin-top: 3px;
+      font-size: 16px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-list {
+      margin-top: 12px;
+      border-top: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) 100px 82px 90px 28px;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      min-height: 52px;
+      padding: 7px 4px;
+      border: 0;
+      border-bottom: 1px solid var(--cobalt-line);
+      background: transparent;
+      color: inherit;
+      text-align: left;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row[aria-pressed="true"] {
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row strong,
+    #cobalt-ledger-review .cobalt-breakdown-row span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-number-cell {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-drawer {
+      margin-top: 11px;
+      padding: 12px;
+      border-left: 3px solid var(--cobalt-accent);
+      border-radius: 0 7px 7px 0;
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-detail-drawer h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-drawer p {
+      margin: 4px 0 0;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trades {
+      margin-top: 9px;
+      border-top: 1px solid #cfd8f0;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trade {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #cfd8f0;
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trade strong {
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trade span {
+      color: var(--cobalt-muted);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview {
+      padding: 12px 0 24px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-app {
+      width: 390px;
+      max-width: 100%;
+      border-radius: 16px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-app-header {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      padding: 8px 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-app-nav {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-live {
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-live time {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-page {
+      padding: 8px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-top-grid,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-lower-grid,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-history-page-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-performance {
+      padding: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-section-head {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-period-tabs,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      width: 100%;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-tabs {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-period-tabs button,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-tabs button {
+      min-width: 0;
+      min-height: 44px;
+      padding: 0 5px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-performance-numbers {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-equity-box {
+      grid-column: 1 / 3;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-equity {
+      font-size: 34px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-period-fact {
+      padding: 8px;
+      border: 0;
+      border-radius: 7px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-chart-wrap,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-chart {
+      min-height: 204px;
+      height: 204px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-issue {
+      grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-issue .cobalt-action {
+      grid-column: 2;
+      width: 100%;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-row {
+      grid-template-columns: 6px minmax(0, 1fr) 78px 58px 16px;
+      gap: 6px;
+      padding: 7px 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-next {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-detail {
+      grid-template-columns: 1fr;
+      padding: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-detail-facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-detail-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+      min-width: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-detail-actions button {
+      min-width: 0;
+      min-height: 44px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-action-result {
+      grid-column: 1 / 3;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-history-row {
+      grid-template-columns: minmax(0, 1fr) 78px 62px 16px;
+      gap: 5px;
+      padding: 7px 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-mini-facts,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-history-summary-numbers {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-row {
+      grid-template-columns: minmax(0, 1fr) 76px 62px 20px;
+      gap: 5px;
+      min-height: 56px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-row .cobalt-hide-phone {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav {
+      position: sticky;
+      bottom: 0;
+      z-index: 8;
+      display: none;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 3px;
+      margin: 9px 8px 8px;
+      padding: 4px;
+      border: 1px solid var(--cobalt-line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 8px 24px rgba(20, 31, 64, 0.14);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav button[aria-current="page"] {
+      background: var(--cobalt-soft-blue);
+      color: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-phone-nav {
+      display: grid;
+    }
+
+    #cobalt-ledger-review .cobalt-dense .cobalt-page {
+      padding: 9px;
+    }
+
+    #cobalt-ledger-review .cobalt-dense .cobalt-performance,
+    #cobalt-ledger-review .cobalt-dense .cobalt-panel-pad,
+    #cobalt-ledger-review .cobalt-dense .cobalt-next,
+    #cobalt-ledger-review .cobalt-dense .cobalt-history-main,
+    #cobalt-ledger-review .cobalt-dense .cobalt-history-summary {
+      padding: 11px;
+    }
+
+    #cobalt-ledger-review .cobalt-flash {
+      animation: cobaltFlash 900ms ease;
+    }
+
+    #cobalt-ledger-review .cobalt-open {
+      animation: cobaltOpen 180ms ease both;
+      transform-origin: top;
+    }
+
+    @keyframes cobaltFlash {
+      0% {
+        background: #fff4bd;
+      }
+      100% {
+        background: transparent;
+      }
+    }
+
+    @keyframes cobaltOpen {
+      from {
+        opacity: 0.2;
+        transform: translateY(-5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 900px) {
+      #cobalt-ledger-review .cobalt-top-grid,
+      #cobalt-ledger-review .cobalt-lower-grid,
+      #cobalt-ledger-review .cobalt-history-page-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #cobalt-ledger-review .cobalt-app-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+      }
+
+      #cobalt-ledger-review .cobalt-app-nav {
+        grid-column: 1 / 3;
+        justify-content: space-between;
+        border-top: 1px solid var(--cobalt-line);
+        padding-top: 6px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      #cobalt-ledger-review .cobalt-review-note {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      #cobalt-ledger-review .cobalt-preview-stage {
+        padding: 8px 0 18px;
+      }
+    }
+
+    @media (max-width: 340px) {
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-app,
+      #cobalt-ledger-review .cobalt-app {
+        width: 320px;
+        max-width: 100%;
+      }
+
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-equity {
+        font-size: 30px;
+      }
+
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-row {
+        grid-template-columns: 5px minmax(0, 1fr) 72px 16px;
+      }
+
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-percent {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #cobalt-ledger-review *,
+      #cobalt-ledger-review *::before,
+      #cobalt-ledger-review *::after {
+        animation: none !important;
+        scroll-behavior: auto !important;
+        transition: none !important;
+      }
+    }
+  </style>
+
+  <div class="cobalt-review-bar" aria-label="Design review controls">
+    <div class="cobalt-review-group">
+      <span class="cobalt-review-label">Page</span>
+      <div class="cobalt-review-options" role="group" aria-label="Choose a page">
+        <button type="button" data-review-page="today" aria-pressed="true">Today</button>
+        <button type="button" data-review-page="history" aria-pressed="false">History</button>
+      </div>
+    </div>
+    <div class="cobalt-review-group">
+      <span class="cobalt-review-label">State</span>
+      <div class="cobalt-review-options" role="group" aria-label="Choose an operating state">
+        <button type="button" data-review-state="normal" aria-pressed="true">Normal</button>
+        <button type="button" data-review-state="needs" aria-pressed="false">Needs you</button>
+        <button type="button" data-review-state="reconnect" aria-pressed="false">Reconnecting</button>
+      </div>
+    </div>
+    <div class="cobalt-review-group">
+      <span class="cobalt-review-label">View</span>
+      <div class="cobalt-review-options" role="group" aria-label="Choose a viewport">
+        <button type="button" data-review-viewport="desktop" aria-pressed="true">Desktop</button>
+        <button type="button" data-review-viewport="phone" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="cobalt-review-note">Current fixture values plus illustrative history for layout review</div>
+  </div>
+
+  <div class="cobalt-preview-stage" data-state="normal" data-viewport="desktop">
+    <div class="cobalt-app">
+      <header class="cobalt-app-header">
+        <div class="cobalt-brand">
+          <div class="cobalt-brand-mark" aria-hidden="true">DT</div>
+          <div class="cobalt-brand-copy">
+            <strong>Day Trader</strong>
+            <span>Practice money, real paper orders</span>
+          </div>
+        </div>
+        <nav class="cobalt-app-nav" aria-label="Main navigation">
+          <button type="button" data-app-page="today" aria-current="page">Today</button>
+          <button type="button">Holdings</button>
+          <button type="button" data-app-page="history">History</button>
+          <button type="button">Plans</button>
+          <button type="button">Controls</button>
+        </nav>
+        <div class="cobalt-live">
+          <span class="cobalt-live-dot" aria-hidden="true"></span>
+          <span class="cobalt-state-block cobalt-state-normal">Live</span>
+          <span class="cobalt-state-block cobalt-state-needs">Live</span>
+          <span class="cobalt-state-block cobalt-state-reconnect">Reconnecting</span>
+          <time datetime="2026-09-29T11:56:00-04:00">Tue, Sep 29 · 11:56 AM</time>
+        </div>
+      </header>
+
+      <div class="cobalt-status cobalt-state-block cobalt-state-normal">
+        <span class="cobalt-status-mark" aria-hidden="true">✓</span>
+        <span><strong>No action needed.</strong> Five stocks are held and the robot is managing their exits.</span>
+      </div>
+      <div class="cobalt-status cobalt-state-block cobalt-state-reconnect">
+        <span class="cobalt-status-mark" aria-hidden="true">↻</span>
+        <span><strong>Prices may be old.</strong> Existing protection remains at Alpaca while the connection returns.</span>
+      </div>
+
+      <main>
+        <section class="cobalt-content-page cobalt-page-visible" data-content-page="today">
+          <div class="cobalt-page">
+            <section class="cobalt-panel cobalt-needs-panel cobalt-state-block cobalt-state-needs" aria-label="Required actions">
+              <div class="cobalt-needs-head">
+                <strong>2 things need you</strong>
+                <span>Five other problems are retrying or paused safely</span>
+              </div>
+              <div class="cobalt-issue">
+                <span class="cobalt-issue-number">1</span>
+                <div class="cobalt-issue-copy"><strong>40 RKLB shares have no matching order</strong><span>Close the shares and cancel their orders at Alpaca, then clear the record here.</span></div>
+                <button type="button" class="cobalt-action" data-mock-action data-confirm="true" data-action-label="Clear RKLB">Clear RKLB</button>
+              </div>
+              <div class="cobalt-issue">
+                <span class="cobalt-issue-number">2</span>
+                <div class="cobalt-issue-copy"><strong>The robot and Alpaca disagree about held stocks</strong><span>New trades are paused. Existing protection remains in place.</span></div>
+                <button type="button" class="cobalt-action">See differences</button>
+              </div>
+            </section>
+
+            <div class="cobalt-top-grid">
+              <section class="cobalt-panel cobalt-performance" aria-labelledby="cobalt-performance-title">
+                <div class="cobalt-section-head">
+                  <div>
+                    <div class="cobalt-eyebrow">Performance</div>
+                    <h1 id="cobalt-performance-title" data-performance-headline>Up today</h1>
+                  </div>
+                  <div class="cobalt-period-tabs" role="tablist" aria-label="Performance period">
+                    <button type="button" role="tab" data-period="day" aria-selected="true">Day</button>
+                    <button type="button" role="tab" data-period="week" aria-selected="false">Week</button>
+                    <button type="button" role="tab" data-period="month" aria-selected="false">Month</button>
+                    <button type="button" role="tab" data-period="all" aria-selected="false">All</button>
+                  </div>
+                </div>
+
+                <div class="cobalt-performance-numbers">
+                  <div class="cobalt-equity-box">
+                    <span class="cobalt-equity-label">Current equity</span>
+                    <strong class="cobalt-equity" data-performance-equity>$50,245.10</strong>
+                    <div class="cobalt-delta-line">
+                      <strong class="cobalt-delta-money cobalt-positive" data-performance-delta>+$245.10</strong>
+                      <span class="cobalt-delta-percent" data-performance-percent>↑ 0.49%</span>
+                    </div>
+                    <span class="cobalt-chart-note" data-performance-basis>Compared with $50,000.00 at today's open</span>
+                  </div>
+                  <div class="cobalt-period-fact">
+                    <span class="cobalt-fact-label" data-finished-label>Finished trades today</span>
+                    <strong class="cobalt-positive" data-finished-value>+$51.10</strong>
+                    <small data-finished-note>13 trades, 7 won</small>
+                  </div>
+                  <div class="cobalt-period-fact">
+                    <span class="cobalt-fact-label" data-open-label>Open holdings since entry</span>
+                    <strong class="cobalt-positive" data-open-value>+$411.20</strong>
+                    <small data-open-note>Independent from account change</small>
+                  </div>
+                </div>
+
+                <div class="cobalt-chart-head">
+                  <span class="cobalt-chart-title" data-chart-heading>Finished trade result today</span>
+                  <span class="cobalt-chart-note" data-chart-caption>Open holdings are not included</span>
+                </div>
+                <div class="cobalt-chart-wrap">
+                  <svg class="cobalt-chart" data-performance-chart role="img" aria-labelledby="cobalt-chart-title cobalt-chart-desc">
+                    <title id="cobalt-chart-title">Selected performance period</title>
+                    <desc id="cobalt-chart-desc">Finished trade result today rose from zero dollars to positive fifty one dollars and ten cents.</desc>
+                    <g data-chart-grid></g>
+                    <path class="cobalt-chart-area" data-chart-area></path>
+                    <path class="cobalt-chart-line" data-chart-line></path>
+                    <line class="cobalt-chart-guide" data-chart-guide></line>
+                    <g data-chart-points></g>
+                    <g data-chart-labels></g>
+                    <rect class="cobalt-chart-hit" data-chart-hit aria-label="Explore chart points"></rect>
+                    <text class="cobalt-axis-title" data-axis="y">US dollars</text>
+                    <text class="cobalt-axis-title" data-axis="x">Time</text>
+                  </svg>
+                  <div class="cobalt-tooltip" role="tooltip" data-chart-tooltip></div>
+                </div>
+              </section>
+
+              <aside class="cobalt-panel cobalt-next" aria-labelledby="cobalt-next-title">
+                <div class="cobalt-section-head">
+                  <div>
+                    <div class="cobalt-eyebrow">Now and next</div>
+                    <h2 id="cobalt-next-title">The robot is managing 5</h2>
+                  </div>
+                </div>
+                <div class="cobalt-robot-state">
+                  <strong>Earliest automatic close · 3:55 PM</strong>
+                  <span>No operator action is needed.</span>
+                </div>
+                <div class="cobalt-event-list">
+                  <div class="cobalt-event">
+                    <time>2:00 PM</time>
+                    <span class="cobalt-event-dot" aria-hidden="true"></span>
+                    <div><strong>Ride the Trend watches again</strong><span>Source backed event</span></div>
+                  </div>
+                  <div class="cobalt-event">
+                    <time>3:55 PM</time>
+                    <span class="cobalt-event-dot" aria-hidden="true"></span>
+                    <div><strong>Quick trades close</strong><span>Stocks still open sell automatically</span></div>
+                  </div>
+                  <div class="cobalt-event">
+                    <time>4:00 PM</time>
+                    <span class="cobalt-event-dot" aria-hidden="true"></span>
+                    <div><strong>Market closes</strong><span>Slow trades check after the close</span></div>
+                  </div>
+                </div>
+                <div class="cobalt-loss-limit">
+                  <div class="cobalt-loss-limit-line"><span>Day loss limit remaining</span><strong>$1,446.99 of $1,500</strong></div>
+                  <div class="cobalt-loss-track" aria-hidden="true"><div class="cobalt-loss-fill"></div></div>
+                </div>
+              </aside>
+            </div>
+
+            <div class="cobalt-lower-grid">
+              <section class="cobalt-panel cobalt-panel-pad" aria-labelledby="cobalt-holdings-title">
+                <div class="cobalt-section-head">
+                  <div>
+                    <div class="cobalt-eyebrow">Holdings</div>
+                    <h2 id="cobalt-holdings-title">Five Quick stocks</h2>
+                  </div>
+                  <span class="cobalt-chart-note">Dollar and percent are since entry</span>
+                </div>
+                <div class="cobalt-holding-list">
+                  <button type="button" class="cobalt-holding-row" aria-pressed="false" data-holding data-company="Apple" data-symbol="AAPL" data-entry="$236.10" data-protection="$236.40" data-sale="3:55 PM" data-plan="Ride the Trend" data-result="+$145.60 · +1.19%">
+                    <span class="cobalt-plan-mark"></span>
+                    <span class="cobalt-holding-name"><strong>Apple AAPL</strong><span>52 shares · bet it goes up</span></span>
+                    <span class="cobalt-holding-next"><strong>Sells by 3:55 PM</strong><span>Protection $236.40</span></span>
+                    <span class="cobalt-holding-money cobalt-positive">+$145.60</span>
+                    <span class="cobalt-holding-percent cobalt-positive">+1.19%</span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                  <button type="button" class="cobalt-holding-row" aria-pressed="true" data-holding data-company="Nvidia" data-symbol="NVDA" data-entry="$184.00" data-protection="$177.56" data-sale="$189.15" data-plan="Big News" data-result="+$59.40 · +0.60%">
+                    <span class="cobalt-plan-mark cobalt-mark-pink"></span>
+                    <span class="cobalt-holding-name"><strong>Nvidia NVDA</strong><span>54 shares · bet it goes up</span></span>
+                    <span class="cobalt-holding-next"><strong>Sells by 3:55 PM</strong><span>Protection $177.56</span></span>
+                    <span class="cobalt-holding-money cobalt-positive">+$59.40</span>
+                    <span class="cobalt-holding-percent cobalt-positive">+0.60%</span>
+                    <span aria-hidden="true">⌄</span>
+                  </button>
+                  <button type="button" class="cobalt-holding-row" aria-pressed="false" data-holding data-company="Microsoft" data-symbol="MSFT" data-entry="$512.00" data-protection="$514.05" data-sale="3:55 PM" data-plan="Snap Back" data-result="+$19.20 · +0.16%">
+                    <span class="cobalt-plan-mark"></span>
+                    <span class="cobalt-holding-name"><strong>Microsoft MSFT</strong><span>24 shares · bet it goes down</span></span>
+                    <span class="cobalt-holding-next"><strong>Closes by 3:55 PM</strong><span>Protection $514.05</span></span>
+                    <span class="cobalt-holding-money cobalt-positive">+$19.20</span>
+                    <span class="cobalt-holding-percent cobalt-positive">+0.16%</span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                  <button type="button" class="cobalt-holding-row" aria-pressed="false" data-holding data-company="Palantir" data-symbol="PLTR" data-entry="$41.20" data-protection="Broker managed" data-sale="11:00 AM" data-plan="Opening Range" data-result="+$117.00 · +1.58%">
+                    <span class="cobalt-plan-mark cobalt-mark-orange"></span>
+                    <span class="cobalt-holding-name"><strong>Palantir PLTR</strong><span>180 shares · bet it goes up</span></span>
+                    <span class="cobalt-holding-next"><strong>Broker manages the exit</strong><span>Sells by 11:00 AM</span></span>
+                    <span class="cobalt-holding-money cobalt-positive">+$117.00</span>
+                    <span class="cobalt-holding-percent cobalt-positive">+1.58%</span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                  <button type="button" class="cobalt-holding-row" aria-pressed="false" data-holding data-company="Tesla" data-symbol="TSLA" data-entry="$412.00" data-protection="Two parts remain" data-sale="Fixed sale plan" data-plan="Tesla Morning Plan" data-result="+$70.00 · +0.85%">
+                    <span class="cobalt-plan-mark cobalt-mark-gold"></span>
+                    <span class="cobalt-holding-name"><strong>Tesla TSLA</strong><span>20 shares · fixed plan</span></span>
+                    <span class="cobalt-holding-next"><strong>Fixed sale plan</strong><span>Two parts remain</span></span>
+                    <span class="cobalt-holding-money cobalt-positive">+$70.00</span>
+                    <span class="cobalt-holding-percent cobalt-positive">+0.85%</span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                  <div class="cobalt-holding-detail cobalt-open" data-holding-detail>
+                    <div>
+                      <div class="cobalt-section-head">
+                        <h3><span data-detail-company>Nvidia</span> <span data-detail-symbol>NVDA</span> · <span class="cobalt-positive" data-detail-result>+$59.40 · +0.60%</span></h3>
+                      </div>
+                      <div class="cobalt-detail-facts">
+                        <div class="cobalt-detail-fact"><span>Bought at</span><strong data-detail-entry>$184.00</strong></div>
+                        <div class="cobalt-detail-fact"><span>Protection</span><strong data-detail-protection>$177.56</strong></div>
+                        <div class="cobalt-detail-fact"><span>Planned sale</span><strong data-detail-sale>$189.15</strong></div>
+                        <div class="cobalt-detail-fact"><span>Plan</span><strong data-detail-plan>Big News</strong></div>
+                      </div>
+                    </div>
+                    <div class="cobalt-detail-actions">
+                      <button type="button" class="cobalt-action cobalt-action-primary" data-mock-action data-confirm="true" data-action-label="Sell now">Sell now</button>
+                      <button type="button" class="cobalt-action" data-mock-action data-action-label="Move protection to entry">Move protection to entry</button>
+                      <span class="cobalt-action-result" aria-live="polite"></span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="cobalt-panel cobalt-panel-pad" aria-labelledby="cobalt-recent-title">
+                <div class="cobalt-section-head">
+                  <div>
+                    <div class="cobalt-eyebrow">Recent history</div>
+                    <h2 id="cobalt-recent-title">Five trading days</h2>
+                  </div>
+                  <button type="button" class="cobalt-action" data-app-page="history">Open History</button>
+                </div>
+                <div class="cobalt-history-rows" data-recent-history></div>
+                <div class="cobalt-history-detail" data-recent-detail></div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section class="cobalt-content-page" data-content-page="history">
+          <div class="cobalt-page">
+            <div class="cobalt-history-page-grid">
+              <section class="cobalt-panel cobalt-history-main" aria-labelledby="cobalt-history-title">
+                <div class="cobalt-section-head">
+                  <div>
+                    <div class="cobalt-eyebrow">History</div>
+                    <h1 id="cobalt-history-title">Performance with full detail</h1>
+                  </div>
+                  <div class="cobalt-period-tabs" role="tablist" aria-label="History period">
+                    <button type="button" role="tab" data-period="day" aria-selected="true">Day</button>
+                    <button type="button" role="tab" data-period="week" aria-selected="false">Week</button>
+                    <button type="button" role="tab" data-period="month" aria-selected="false">Month</button>
+                    <button type="button" role="tab" data-period="all" aria-selected="false">All</button>
+                  </div>
+                </div>
+                <div class="cobalt-chart-head">
+                  <span class="cobalt-chart-title" data-history-chart-heading>Finished trade result today</span>
+                  <span class="cobalt-chart-note" data-history-range>Tue, Sep 29</span>
+                </div>
+                <div class="cobalt-chart-wrap">
+                  <svg class="cobalt-chart" data-history-chart role="img" aria-label="History chart for the selected period">
+                    <g data-chart-grid></g>
+                    <path class="cobalt-chart-area" data-chart-area></path>
+                    <path class="cobalt-chart-line" data-chart-line></path>
+                    <line class="cobalt-chart-guide" data-chart-guide></line>
+                    <g data-chart-points></g>
+                    <g data-chart-labels></g>
+                    <rect class="cobalt-chart-hit" data-chart-hit aria-label="Explore history chart points"></rect>
+                    <text class="cobalt-axis-title" data-axis="y">US dollars</text>
+                    <text class="cobalt-axis-title" data-axis="x">Time</text>
+                  </svg>
+                  <div class="cobalt-tooltip" role="tooltip" data-chart-tooltip></div>
+                </div>
+                <div class="cobalt-section-head" style="margin-top:12px">
+                  <div class="cobalt-breakdown-tabs" role="tablist" aria-label="History breakdown">
+                    <button type="button" role="tab" data-breakdown="days" aria-selected="true">Days</button>
+                    <button type="button" role="tab" data-breakdown="plans" aria-selected="false">Plans</button>
+                    <button type="button" role="tab" data-breakdown="trades" aria-selected="false">Trades</button>
+                  </div>
+                  <span class="cobalt-chart-note" data-history-completeness>Complete sample history</span>
+                </div>
+                <div class="cobalt-breakdown-list" data-breakdown-list></div>
+                <div class="cobalt-detail-drawer cobalt-open" data-history-drawer></div>
+              </section>
+
+              <aside class="cobalt-panel cobalt-history-summary" aria-labelledby="cobalt-period-summary-title">
+                <div class="cobalt-section-head">
+                  <div>
+                    <div class="cobalt-eyebrow">Selected period</div>
+                    <h2 id="cobalt-period-summary-title" data-summary-title>Today</h2>
+                  </div>
+                </div>
+                <div class="cobalt-history-summary-numbers">
+                  <div class="cobalt-summary-fact"><span>Account change</span><strong class="cobalt-positive" data-summary-delta>+$245.10</strong></div>
+                  <div class="cobalt-summary-fact"><span>Percent change</span><strong class="cobalt-positive" data-summary-percent>+0.49%</strong></div>
+                  <div class="cobalt-summary-fact"><span>Period opening</span><strong data-summary-opening>$50,000.00</strong></div>
+                  <div class="cobalt-summary-fact"><span>Current equity</span><strong data-summary-current>$50,245.10</strong></div>
+                  <div class="cobalt-summary-fact"><span>Finished trades</span><strong data-summary-finished>+$51.10</strong></div>
+                  <div class="cobalt-summary-fact"><span>Trades</span><strong data-summary-trades>13</strong></div>
+                </div>
+                <div class="cobalt-history-detail" style="margin-top:10px">
+                  <div class="cobalt-history-detail-head">
+                    <strong data-best-day>Best day · Tue, Sep 29</strong>
+                    <span class="cobalt-positive" data-best-day-value>+0.49% · +$245.10</span>
+                  </div>
+                  <div class="cobalt-history-detail-head" style="margin-top:8px">
+                    <strong data-worst-day>Worst day · Tue, Sep 29</strong>
+                    <span class="cobalt-positive" data-worst-day-value>+0.49% · +$245.10</span>
+                  </div>
+                </div>
+                <p class="cobalt-chart-note" data-summary-note style="margin:10px 0 0">Account change uses today's opening equity. Finished trades and open holdings are separate facts.</p>
+              </aside>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <nav class="cobalt-phone-nav" aria-label="Phone navigation">
+        <button type="button" data-app-page="today" aria-current="page">Today</button>
+        <button type="button">Holdings</button>
+        <button type="button" data-app-page="history">History</button>
+        <button type="button">Controls</button>
+      </nav>
+    </div>
+  </div>
+
+  <div class="cobalt-sr-only" aria-live="polite" data-live-update></div>
+
+  <script>
+    (() => {
+      const root = document.getElementById("cobalt-ledger-review");
+      const stage = root.querySelector(".cobalt-preview-stage");
+      const app = root.querySelector(".cobalt-app");
+      const liveUpdate = root.querySelector("[data-live-update]");
+
+      const prefs = {
+        radius: 8,
+        accent: "#2b4bff",
+        compact: true,
+        chartFill: true
+      };
+
+      const periods = {
+        day: {
+          title: "Today",
+          headline: "Up today",
+          equity: 50245.10,
+          opening: 50000,
+          delta: 245.10,
+          percent: 0.49,
+          basis: "Compared with $50,000.00 at today's open",
+          finished: 51.10,
+          finishedLabel: "Finished trades today",
+          finishedNote: "13 trades, 7 won",
+          open: 411.20,
+          openLabel: "Open holdings since entry",
+          openNote: "Independent from account change",
+          chartHeading: "Finished trade result today",
+          chartCaption: "Open holdings are not included",
+          range: "Tue, Sep 29",
+          xAxis: "Eastern time",
+          yAxis: "US dollars",
+          trades: 13,
+          best: ["Tue, Sep 29", 0.49, 245.10],
+          worst: ["Tue, Sep 29", 0.49, 245.10],
+          points: [
+            { label: "9:30 AM", value: 0 },
+            { label: "10:05 AM", value: 32.40 },
+            { label: "10:48 AM", value: -18.60 },
+            { label: "12:15 PM", value: 14.20 },
+            { label: "2:32 PM", value: 67.30 },
+            { label: "3:12 PM", value: 51.10 }
+          ]
+        },
+        week: {
+          title: "Last 7 days",
+          headline: "Up over 7 days",
+          equity: 50245.10,
+          opening: 49961.60,
+          delta: 283.50,
+          percent: 0.57,
+          basis: "Compared with $49,961.60 seven calendar days ago",
+          finished: 338.30,
+          finishedLabel: "Finished trades in period",
+          finishedNote: "31 trades across 5 trading days",
+          open: 411.20,
+          openLabel: "Open holdings since entry",
+          openNote: "Not part of the period chart",
+          chartHeading: "Closing equity by trading day",
+          chartCaption: "The last point is live equity",
+          range: "Sep 23 to Sep 29",
+          xAxis: "Trading day",
+          yAxis: "US dollars",
+          trades: 31,
+          best: ["Tue, Sep 29", 0.49, 245.10],
+          worst: ["Mon, Sep 28", -0.18, -90.00],
+          points: [
+            { label: "Wed 23", value: 49961.60 },
+            { label: "Thu 24", value: 50073.80 },
+            { label: "Fri 25", value: 50015.60 },
+            { label: "Mon 28", value: 50000.00 },
+            { label: "Tue 29", value: 50245.10 }
+          ]
+        },
+        month: {
+          title: "Last 30 days",
+          headline: "Up over 30 days",
+          equity: 50245.10,
+          opening: 49612.00,
+          delta: 633.10,
+          percent: 1.28,
+          basis: "Compared with $49,612.00 thirty calendar days ago",
+          finished: 701.40,
+          finishedLabel: "Finished trades in period",
+          finishedNote: "96 trades across 20 trading days",
+          open: 411.20,
+          openLabel: "Open holdings since entry",
+          openNote: "Not part of the period chart",
+          chartHeading: "Closing equity by trading day",
+          chartCaption: "Selected dates shown",
+          range: "Aug 31 to Sep 29",
+          xAxis: "Trading day",
+          yAxis: "US dollars",
+          trades: 96,
+          best: ["Tue, Sep 29", 0.49, 245.10],
+          worst: ["Thu, Sep 10", -0.43, -214.70],
+          points: [
+            { label: "Aug 31", value: 49612.00 },
+            { label: "Sep 4", value: 49842.40 },
+            { label: "Sep 10", value: 49627.70 },
+            { label: "Sep 16", value: 49910.20 },
+            { label: "Sep 22", value: 49961.60 },
+            { label: "Sep 28", value: 50000.00 },
+            { label: "Sep 29", value: 50245.10 }
+          ]
+        },
+        all: {
+          title: "Since recorded history",
+          headline: "Up since recorded history",
+          equity: 50245.10,
+          opening: 50000,
+          delta: 245.10,
+          percent: 0.49,
+          basis: "Compared with the earliest complete durable opening",
+          finished: 1048.60,
+          finishedLabel: "Finished trades recorded",
+          finishedNote: "142 trades",
+          open: 411.20,
+          openLabel: "Open holdings since entry",
+          openNote: "Not part of historical finished trades",
+          chartHeading: "Closing equity by recorded session",
+          chartCaption: "Selected dates shown",
+          range: "Since Sep 1",
+          xAxis: "Recorded session",
+          yAxis: "US dollars",
+          trades: 142,
+          best: ["Tue, Sep 29", 0.49, 245.10],
+          worst: ["Thu, Sep 10", -0.43, -214.70],
+          points: [
+            { label: "Sep 1", value: 50000.00 },
+            { label: "Sep 5", value: 49842.40 },
+            { label: "Sep 10", value: 49627.70 },
+            { label: "Sep 16", value: 49910.20 },
+            { label: "Sep 22", value: 49961.60 },
+            { label: "Sep 28", value: 50000.00 },
+            { label: "Sep 29", value: 50245.10 }
+          ]
+        }
+      };
+
+      const days = [
+        { key: "2026-09-29", label: "Tue, Sep 29", sub: "13 trades · 7 won, 6 lost", opening: 50000, closing: 50245.10, delta: 245.10, percent: 0.49, finished: 51.10, trades: 13 },
+        { key: "2026-09-28", label: "Mon, Sep 28", sub: "3 trades · 1 won, 2 lost", opening: 50090, closing: 50000, delta: -90, percent: -0.18, finished: -90, trades: 3 },
+        { key: "2026-09-25", label: "Fri, Sep 25", sub: "4 trades · 3 won, 1 lost", opening: 50073.80, closing: 50015.60, delta: -58.20, percent: -0.12, finished: -58.20, trades: 4 },
+        { key: "2026-09-24", label: "Thu, Sep 24", sub: "6 trades · 4 won, 2 lost", opening: 49961.60, closing: 50073.80, delta: 112.20, percent: 0.22, finished: 112.20, trades: 6 },
+        { key: "2026-09-23", label: "Wed, Sep 23", sub: "5 trades · daily total only", opening: 49920.50, closing: 49961.60, delta: 41.10, percent: 0.08, finished: 41.10, trades: 5, aggregateOnly: true }
+      ];
+
+      const plans = [
+        { key: "ride", label: "Ride the Trend", sub: "18 loaded trades · 11 won", total: 286.40, contribution: "Best plan" },
+        { key: "news", label: "Big News", sub: "12 loaded trades · 7 won", total: 173.20, contribution: "Second" },
+        { key: "snap", label: "Snap Back", sub: "9 loaded trades · 4 won", total: -42.80, contribution: "Needs review" },
+        { key: "open", label: "Opening Range", sub: "7 loaded trades · 4 won", total: 91.50, contribution: "Complete" },
+        { key: "overnight", label: "Overnight", sub: "6 loaded trades · 3 won", total: 70.20, contribution: "Complete" }
+      ];
+
+      const trades = [
+        { key: "t1", label: "Apple AAPL", sub: "Ride the Trend · sold 3:12 PM", total: 118.40, percent: 0.24, detail: "52 shares · bought $236.10 · sold $238.38" },
+        { key: "t2", label: "Nvidia NVDA", sub: "Big News · sold 2:32 PM", total: 67.30, percent: 0.13, detail: "54 shares · bought $184.00 · sold $185.25" },
+        { key: "t3", label: "Microsoft MSFT", sub: "Snap Back · covered 12:15 PM", total: -53.10, percent: -0.11, detail: "24 shares · sold $512.00 · bought back $514.21" },
+        { key: "t4", label: "Palantir PLTR", sub: "Opening Range · sold 10:48 AM", total: -18.60, percent: -0.04, detail: "180 shares · bought $41.20 · sold $41.10" },
+        { key: "t5", label: "Tesla TSLA", sub: "Tesla Morning Plan · sold 10:05 AM", total: 32.40, percent: 0.06, detail: "20 shares · bought $412.00 · sold $413.62" }
+      ];
+
+      let currentPeriod = "day";
+      let currentBreakdown = "days";
+      let currentPage = "today";
+      let selectedHistoryKey = days[0].key;
+      let chartStates = new WeakMap();
+
+      function money(value, signed = false) {
+        const abs = Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (!signed || value === 0) return `$${abs}`;
+        return `${value > 0 ? "+" : "−"}$${abs}`;
+      }
+
+      function percent(value, signed = false) {
+        if (!signed || value === 0) return `${Math.abs(value).toFixed(2)}%`;
+        return `${value > 0 ? "+" : "−"}${Math.abs(value).toFixed(2)}%`;
+      }
+
+      function toneClass(value) {
+        return value < 0 ? "cobalt-negative" : "cobalt-positive";
+      }
+
+      function applyPreferences() {
+        root.style.setProperty("--cobalt-accent", prefs.accent);
+        root.style.setProperty("--cobalt-radius", `${prefs.radius}px`);
+        app.classList.toggle("cobalt-dense", prefs.compact);
+        root.querySelectorAll("[data-chart-area]").forEach((area) => {
+          area.style.display = prefs.chartFill ? "" : "none";
+        });
+      }
+
+      function selectPeriod(name, announce = true) {
+        currentPeriod = name;
+        const data = periods[name];
+        root.querySelectorAll("[data-period]").forEach((button) => {
+          button.setAttribute("aria-selected", button.dataset.period === name ? "true" : "false");
+        });
+        root.querySelectorAll("[data-performance-equity]").forEach((node) => node.textContent = money(data.equity));
+        root.querySelectorAll("[data-performance-headline]").forEach((node) => node.textContent = data.headline);
+        root.querySelectorAll("[data-performance-delta]").forEach((node) => {
+          node.textContent = money(data.delta, true);
+          node.className = `cobalt-delta-money ${toneClass(data.delta)} cobalt-flash`;
+        });
+        root.querySelectorAll("[data-performance-percent]").forEach((node) => {
+          node.textContent = `${data.percent >= 0 ? "↑" : "↓"} ${Math.abs(data.percent).toFixed(2)}%`;
+          node.style.background = data.percent < 0 ? "var(--cobalt-negative-soft)" : "var(--cobalt-positive-soft)";
+          node.style.color = data.percent < 0 ? "var(--cobalt-negative)" : "var(--cobalt-positive)";
+        });
+        root.querySelectorAll("[data-performance-basis]").forEach((node) => node.textContent = data.basis);
+        root.querySelectorAll("[data-finished-label]").forEach((node) => node.textContent = data.finishedLabel);
+        root.querySelectorAll("[data-finished-value]").forEach((node) => {
+          node.textContent = money(data.finished, true);
+          node.className = toneClass(data.finished);
+        });
+        root.querySelectorAll("[data-finished-note]").forEach((node) => node.textContent = data.finishedNote);
+        root.querySelectorAll("[data-open-label]").forEach((node) => node.textContent = data.openLabel);
+        root.querySelectorAll("[data-open-value]").forEach((node) => {
+          node.textContent = money(data.open, true);
+          node.className = toneClass(data.open);
+        });
+        root.querySelectorAll("[data-open-note]").forEach((node) => node.textContent = data.openNote);
+        root.querySelectorAll("[data-chart-heading]").forEach((node) => node.textContent = data.chartHeading);
+        root.querySelectorAll("[data-chart-caption]").forEach((node) => node.textContent = data.chartCaption);
+        root.querySelectorAll("[data-history-chart-heading]").forEach((node) => node.textContent = data.chartHeading);
+        root.querySelectorAll("[data-history-range]").forEach((node) => node.textContent = data.range);
+        root.querySelectorAll("[data-summary-title]").forEach((node) => node.textContent = data.title);
+        root.querySelectorAll("[data-summary-delta]").forEach((node) => {
+          node.textContent = money(data.delta, true);
+          node.className = toneClass(data.delta);
+        });
+        root.querySelectorAll("[data-summary-percent]").forEach((node) => {
+          node.textContent = percent(data.percent, true);
+          node.className = toneClass(data.percent);
+        });
+        root.querySelectorAll("[data-summary-opening]").forEach((node) => node.textContent = money(data.opening));
+        root.querySelectorAll("[data-summary-current]").forEach((node) => node.textContent = money(data.equity));
+        root.querySelectorAll("[data-summary-finished]").forEach((node) => node.textContent = money(data.finished, true));
+        root.querySelectorAll("[data-summary-trades]").forEach((node) => node.textContent = String(data.trades));
+        root.querySelectorAll("[data-best-day]").forEach((node) => node.textContent = `Best day · ${data.best[0]}`);
+        root.querySelectorAll("[data-best-day-value]").forEach((node) => {
+          node.textContent = `${percent(data.best[1], true)} · ${money(data.best[2], true)}`;
+          node.className = toneClass(data.best[1]);
+        });
+        root.querySelectorAll("[data-worst-day]").forEach((node) => node.textContent = `Worst day · ${data.worst[0]}`);
+        root.querySelectorAll("[data-worst-day-value]").forEach((node) => {
+          node.textContent = `${percent(data.worst[1], true)} · ${money(data.worst[2], true)}`;
+          node.className = toneClass(data.worst[1]);
+        });
+        root.querySelectorAll("[data-summary-note]").forEach((node) => {
+          node.textContent = name === "day"
+            ? "Account change uses today's opening equity. Finished trades and open holdings are separate facts."
+            : "Account change uses the earliest complete opening equity in this period.";
+        });
+        root.querySelectorAll("[data-performance-chart], [data-history-chart]").forEach((svg) => drawChart(svg, data));
+        renderBreakdown();
+        if (announce) liveUpdate.textContent = `${data.title}. Account change ${money(data.delta, true)}, ${percent(data.percent, true)}.`;
+      }
+
+      function formatAxis(value, compact) {
+        const sign = value < 0 ? "−" : "";
+        if (compact && Math.abs(value) >= 1000) return `${sign}$${(Math.abs(value) / 1000).toFixed(1)}k`;
+        return `${sign}${money(Math.abs(value))}`;
+      }
+
+      function sampleCoordinates(coords, count) {
+        if (coords.length === count) return coords;
+        const out = [];
+        for (let i = 0; i < count; i += 1) {
+          const position = (i / Math.max(1, count - 1)) * (coords.length - 1);
+          const left = Math.floor(position);
+          const right = Math.min(coords.length - 1, Math.ceil(position));
+          const mix = position - left;
+          out.push({
+            x: coords[left].x + (coords[right].x - coords[left].x) * mix,
+            y: coords[left].y + (coords[right].y - coords[left].y) * mix
+          });
+        }
+        return out;
+      }
+
+      function pathFrom(coords) {
+        return coords.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+      }
+
+      function areaFrom(coords, baseline) {
+        if (!coords.length) return "";
+        return `${pathFrom(coords)} L${coords[coords.length - 1].x.toFixed(2)},${baseline.toFixed(2)} L${coords[0].x.toFixed(2)},${baseline.toFixed(2)} Z`;
+      }
+
+      function drawChart(svg, data) {
+        const width = Math.max(320, svg.parentElement.getBoundingClientRect().width);
+        const height = stage.classList.contains("cobalt-phone-preview") ? 204 : 216;
+        const margin = { top: 18, right: 22, bottom: 42, left: width < 430 ? 54 : 68 };
+        const innerW = width - margin.left - margin.right;
+        const innerH = height - margin.top - margin.bottom;
+        const values = data.points.map((point) => point.value);
+        let min = Math.min(...values);
+        let max = Math.max(...values);
+        const spread = Math.max(1, max - min);
+        min -= spread * 0.16;
+        max += spread * 0.16;
+        if (data === periods.day) {
+          min = Math.min(min, 0);
+          max = Math.max(max, 0);
+        }
+        const x = (index) => margin.left + (index / Math.max(1, data.points.length - 1)) * innerW;
+        const y = (value) => margin.top + ((max - value) / Math.max(1, max - min)) * innerH;
+        const coords = data.points.map((point, index) => ({ x: x(index), y: y(point.value), point }));
+        const zeroY = y(data === periods.day ? 0 : min);
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        svg.setAttribute("aria-label", `${data.chartHeading}. ${data.points[0].label} ${formatAxis(data.points[0].value, false)}. ${data.points[data.points.length - 1].label} ${formatAxis(data.points[data.points.length - 1].value, false)}.`);
+        const description = svg.querySelector("desc");
+        if (description) description.textContent = svg.getAttribute("aria-label");
+
+        const grid = svg.querySelector("[data-chart-grid]");
+        const ticks = [max, (max + min) / 2, min];
+        grid.innerHTML = ticks.map((tick) => {
+          const tickY = y(tick);
+          return `<line class="cobalt-chart-grid" x1="${margin.left}" y1="${tickY}" x2="${width - margin.right}" y2="${tickY}"></line><text x="${margin.left - 8}" y="${tickY + 4}" text-anchor="end">${formatAxis(tick, width < 430)}</text>`;
+        }).join("") + (data === periods.day ? `<line class="cobalt-chart-zero" x1="${margin.left}" y1="${y(0)}" x2="${width - margin.right}" y2="${y(0)}"></line>` : "");
+
+        const labels = svg.querySelector("[data-chart-labels]");
+        const maxLabels = width < 430 ? 3 : 6;
+        const labelIndexes = new Set();
+        const labelCount = Math.min(maxLabels, data.points.length);
+        for (let slot = 0; slot < labelCount; slot += 1) {
+          labelIndexes.add(Math.round((slot / Math.max(1, labelCount - 1)) * (data.points.length - 1)));
+        }
+        labels.innerHTML = data.points.map((point, index) => {
+          const show = labelIndexes.has(index);
+          if (!show) return "";
+          const anchor = index === 0 ? "start" : index === data.points.length - 1 ? "end" : "middle";
+          return `<text x="${x(index)}" y="${height - 19}" text-anchor="${anchor}">${point.label}</text>`;
+        }).join("") + `<text class="cobalt-chart-end" x="${coords[coords.length - 1].x}" y="${Math.max(14, coords[coords.length - 1].y - 10)}" text-anchor="end">${formatAxis(data.points[data.points.length - 1].value, width < 430)}</text>`;
+
+        const pointGroup = svg.querySelector("[data-chart-points]");
+        pointGroup.innerHTML = coords.map((coord) => `<circle class="cobalt-chart-point" cx="${coord.x}" cy="${coord.y}" r="4"></circle>`).join("");
+
+        const hit = svg.querySelector("[data-chart-hit]");
+        hit.setAttribute("x", String(margin.left));
+        hit.setAttribute("y", String(margin.top));
+        hit.setAttribute("width", String(innerW));
+        hit.setAttribute("height", String(innerH));
+        const guide = svg.querySelector("[data-chart-guide]");
+        guide.setAttribute("y1", String(margin.top));
+        guide.setAttribute("y2", String(margin.top + innerH));
+        svg.querySelector('[data-axis="y"]').setAttribute("transform", `translate(14 ${margin.top + innerH / 2}) rotate(-90)`);
+        svg.querySelector('[data-axis="x"]').setAttribute("x", String(margin.left + innerW / 2));
+        svg.querySelector('[data-axis="x"]').setAttribute("y", String(height - 2));
+        svg.querySelector('[data-axis="x"]').setAttribute("text-anchor", "middle");
+        svg.querySelector('[data-axis="y"]').textContent = data.yAxis;
+        svg.querySelector('[data-axis="x"]').textContent = data.xAxis;
+
+        const line = svg.querySelector("[data-chart-line]");
+        const area = svg.querySelector("[data-chart-area]");
+        const old = chartStates.get(svg);
+        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const target = sampleCoordinates(coords, 24);
+        const finish = () => {
+          line.setAttribute("d", pathFrom(target));
+          area.setAttribute("d", areaFrom(target, data === periods.day ? y(0) : margin.top + innerH));
+          chartStates.set(svg, target);
+        };
+        if (!old || reduced) {
+          finish();
+        } else {
+          const start = sampleCoordinates(old, 24);
+          const begun = performance.now();
+          const animate = (now) => {
+            const progress = Math.min(1, (now - begun) / 200);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const frame = target.map((point, index) => ({
+              x: start[index].x + (point.x - start[index].x) * eased,
+              y: start[index].y + (point.y - start[index].y) * eased
+            }));
+            line.setAttribute("d", pathFrom(frame));
+            area.setAttribute("d", areaFrom(frame, data === periods.day ? y(0) : margin.top + innerH));
+            if (progress < 1) requestAnimationFrame(animate);
+            else chartStates.set(svg, target);
+          };
+          requestAnimationFrame(animate);
+        }
+
+        const tooltip = svg.parentElement.querySelector("[data-chart-tooltip]");
+        const explore = (event) => {
+          const rect = svg.getBoundingClientRect();
+          const localX = ((event.clientX - rect.left) / rect.width) * width;
+          let nearest = coords[0];
+          coords.forEach((coord) => {
+            if (Math.abs(coord.x - localX) < Math.abs(nearest.x - localX)) nearest = coord;
+          });
+          guide.style.display = "block";
+          guide.setAttribute("x1", String(nearest.x));
+          guide.setAttribute("x2", String(nearest.x));
+          tooltip.innerHTML = `<strong>${nearest.point.label}</strong>${formatAxis(nearest.point.value, false)}`;
+          tooltip.style.left = `${(nearest.x / width) * 100}%`;
+          tooltip.style.top = `${(nearest.y / height) * 100}%`;
+          tooltip.classList.add("cobalt-tooltip-visible");
+        };
+        hit.onpointermove = explore;
+        hit.onpointerdown = explore;
+        hit.onpointerleave = () => {
+          guide.style.display = "none";
+          tooltip.classList.remove("cobalt-tooltip-visible");
+        };
+      }
+
+      function renderRecentHistory() {
+        const list = root.querySelector("[data-recent-history]");
+        list.innerHTML = days.map((day) => `
+          <button type="button" class="cobalt-history-row" data-recent-day="${day.key}" aria-pressed="${day.key === selectedHistoryKey}">
+            <span class="cobalt-history-date"><strong>${day.label}</strong><span>${day.sub}</span></span>
+            <span class="cobalt-history-money ${toneClass(day.delta)}">${money(day.delta, true)}</span>
+            <span class="cobalt-history-percent ${toneClass(day.percent)}">${percent(day.percent, true)}</span>
+            <span aria-hidden="true">${day.key === selectedHistoryKey ? "⌄" : "›"}</span>
+          </button>
+        `).join("");
+        const selected = days.find((day) => day.key === selectedHistoryKey) || days[0];
+        const detail = root.querySelector("[data-recent-detail]");
+        detail.innerHTML = `
+          <div class="cobalt-history-detail-head"><strong>${selected.label}</strong><span>${selected.aggregateOnly ? "Daily total only" : "Complete detail"}</span></div>
+          <div class="cobalt-mini-facts">
+            <div class="cobalt-mini-fact"><span>Opening</span><strong>${money(selected.opening)}</strong></div>
+            <div class="cobalt-mini-fact"><span>Closing</span><strong>${money(selected.closing)}</strong></div>
+            <div class="cobalt-mini-fact"><span>Account change</span><strong class="${toneClass(selected.delta)}">${money(selected.delta, true)}</strong></div>
+            <div class="cobalt-mini-fact"><span>Finished trades</span><strong class="${toneClass(selected.finished)}">${money(selected.finished, true)}</strong></div>
+          </div>
+        `;
+      }
+
+      function breakdownData() {
+        if (currentBreakdown === "plans") return plans;
+        if (currentBreakdown === "trades") return trades;
+        if (currentPeriod === "day") return days.slice(0, 1);
+        return days;
+      }
+
+      function renderBreakdown() {
+        const list = root.querySelector("[data-breakdown-list]");
+        const rows = breakdownData();
+        list.innerHTML = rows.map((row, index) => {
+          if (currentBreakdown === "days") {
+            return `
+              <button type="button" class="cobalt-breakdown-row" data-breakdown-key="${row.key}" aria-pressed="${index === 0}">
+                <span><strong>${row.label}</strong><span>${row.sub}</span></span>
+                <span class="cobalt-number-cell cobalt-hide-phone">${money(row.opening)}</span>
+                <span class="cobalt-number-cell ${toneClass(row.delta)}">${money(row.delta, true)}</span>
+                <span class="cobalt-number-cell ${toneClass(row.percent)}">${percent(row.percent, true)}</span>
+                <span aria-hidden="true">›</span>
+              </button>
+            `;
+          }
+          if (currentBreakdown === "plans") {
+            return `
+              <button type="button" class="cobalt-breakdown-row" data-breakdown-key="${row.key}" aria-pressed="${index === 0}">
+                <span><strong>${row.label}</strong><span>${row.sub}</span></span>
+                <span class="cobalt-number-cell cobalt-hide-phone">${row.contribution}</span>
+                <span class="cobalt-number-cell ${toneClass(row.total)}">${money(row.total, true)}</span>
+                <span class="cobalt-number-cell cobalt-hide-phone">Loaded</span>
+                <span aria-hidden="true">›</span>
+              </button>
+            `;
+          }
+          return `
+            <button type="button" class="cobalt-breakdown-row" data-breakdown-key="${row.key}" aria-pressed="${index === 0}">
+              <span><strong>${row.label}</strong><span>${row.sub}</span></span>
+              <span class="cobalt-number-cell cobalt-hide-phone">${row.detail.split(" · ")[0]}</span>
+              <span class="cobalt-number-cell ${toneClass(row.total)}">${money(row.total, true)}</span>
+              <span class="cobalt-number-cell ${toneClass(row.percent)}">${percent(row.percent, true)}</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          `;
+        }).join("");
+        renderHistoryDrawer(rows[0]);
+        const completeness = root.querySelector("[data-history-completeness]");
+        if (currentBreakdown === "plans") {
+          completeness.textContent = "Loaded trades only until server period totals exist";
+        } else if (currentBreakdown === "trades") {
+          completeness.textContent = "Selected sample trades for layout review";
+        } else if (currentPeriod === "day") {
+          completeness.textContent = "Complete sample day";
+        } else if (currentPeriod === "week") {
+          completeness.textContent = "Complete 7 day sample";
+        } else {
+          completeness.textContent = "Selected rows shown, totals use complete session summaries";
+        }
+      }
+
+      function renderHistoryDrawer(row) {
+        const drawer = root.querySelector("[data-history-drawer]");
+        if (!row) {
+          drawer.innerHTML = "";
+          return;
+        }
+        if (currentBreakdown === "days") {
+          drawer.innerHTML = `
+            <h3>${row.label} · ${money(row.delta, true)} · ${percent(row.percent, true)}</h3>
+            <p>${row.aggregateOnly ? "Only the daily total is available. Individual trades are not invented." : `${row.trades} finished trades. Opening ${money(row.opening)}, closing ${money(row.closing)}.`}</p>
+            ${row.aggregateOnly ? "" : `<div class="cobalt-detail-trades"><div class="cobalt-detail-trade"><strong>Ride the Trend · Apple</strong><span class="cobalt-positive">+$118.40</span></div><div class="cobalt-detail-trade"><strong>Big News · Nvidia</strong><span class="cobalt-positive">+$67.30</span></div><div class="cobalt-detail-trade"><strong>Snap Back · Microsoft</strong><span class="cobalt-negative">−$53.10</span></div></div>`}
+          `;
+        } else if (currentBreakdown === "plans") {
+          drawer.innerHTML = `<h3>${row.label} · ${money(row.total, true)}</h3><p>${row.sub}. This prototype labels plan totals as loaded until the server supplies complete period aggregates.</p>`;
+        } else {
+          drawer.innerHTML = `<h3>${row.label} · ${money(row.total, true)} · ${percent(row.percent, true)}</h3><p>${row.detail}. Select the real row to open entry, exit, direction, shares, result, and exit reason.</p>`;
+        }
+      }
+
+      function setBreakdown(name) {
+        currentBreakdown = name;
+        root.querySelectorAll("[data-breakdown]").forEach((button) => {
+          button.setAttribute("aria-selected", button.dataset.breakdown === name ? "true" : "false");
+        });
+        renderBreakdown();
+        liveUpdate.textContent = `History grouped by ${name}.`;
+      }
+
+      function setPage(name) {
+        currentPage = name;
+        root.querySelectorAll("[data-content-page]").forEach((page) => {
+          page.classList.toggle("cobalt-page-visible", page.dataset.contentPage === name);
+        });
+        root.querySelectorAll("[data-review-page]").forEach((button) => {
+          button.setAttribute("aria-pressed", button.dataset.reviewPage === name ? "true" : "false");
+        });
+        root.querySelectorAll("[data-app-page]").forEach((button) => {
+          if (button.dataset.appPage === name) button.setAttribute("aria-current", "page");
+          else button.removeAttribute("aria-current");
+        });
+        requestAnimationFrame(() => {
+          root.querySelectorAll("[data-performance-chart], [data-history-chart]").forEach((svg) => drawChart(svg, periods[currentPeriod]));
+        });
+      }
+
+      function setState(name) {
+        stage.dataset.state = name;
+        root.querySelectorAll("[data-review-state]").forEach((button) => {
+          button.setAttribute("aria-pressed", button.dataset.reviewState === name ? "true" : "false");
+        });
+      }
+
+      function setViewport(name) {
+        stage.dataset.viewport = name;
+        stage.classList.toggle("cobalt-phone-preview", name === "phone");
+        root.querySelectorAll("[data-review-viewport]").forEach((button) => {
+          button.setAttribute("aria-pressed", button.dataset.reviewViewport === name ? "true" : "false");
+        });
+        requestAnimationFrame(() => {
+          root.querySelectorAll("[data-performance-chart], [data-history-chart]").forEach((svg) => drawChart(svg, periods[currentPeriod]));
+        });
+      }
+
+      function selectHolding(button) {
+        root.querySelectorAll("[data-holding]").forEach((row) => {
+          const selected = row === button;
+          row.setAttribute("aria-pressed", selected ? "true" : "false");
+          row.lastElementChild.textContent = selected ? "⌄" : "›";
+        });
+        const detail = root.querySelector("[data-holding-detail]");
+        const mapping = {
+          "[data-detail-company]": button.dataset.company,
+          "[data-detail-symbol]": button.dataset.symbol,
+          "[data-detail-entry]": button.dataset.entry,
+          "[data-detail-protection]": button.dataset.protection,
+          "[data-detail-sale]": button.dataset.sale,
+          "[data-detail-plan]": button.dataset.plan,
+          "[data-detail-result]": button.dataset.result
+        };
+        Object.entries(mapping).forEach(([selector, value]) => {
+          const target = detail.querySelector(selector);
+          if (target) target.textContent = value;
+        });
+        detail.classList.remove("cobalt-open");
+        void detail.offsetWidth;
+        detail.classList.add("cobalt-open");
+      }
+
+      function handleMockAction(button) {
+        const label = button.dataset.actionLabel || button.textContent.trim();
+        const result = button.parentElement.querySelector(".cobalt-action-result");
+        const confirm = button.dataset.confirm === "true";
+        const phase = button.dataset.phase || "idle";
+        if (confirm && phase === "idle") {
+          button.dataset.phase = "confirm";
+          button.classList.add("cobalt-action-danger");
+          button.textContent = "Tap again to confirm";
+          window.setTimeout(() => {
+            if (button.dataset.phase === "confirm") {
+              button.dataset.phase = "idle";
+              button.classList.remove("cobalt-action-danger");
+              button.textContent = label;
+            }
+          }, 4000);
+          return;
+        }
+        button.dataset.phase = "sending";
+        button.disabled = true;
+        button.classList.remove("cobalt-action-danger");
+        button.textContent = "Sent, checking";
+        if (result) result.textContent = "Waiting for a fresh update";
+        window.setTimeout(() => {
+          button.dataset.phase = "done";
+          button.textContent = "Confirmed";
+          if (result) result.textContent = "The new state was verified";
+          window.setTimeout(() => {
+            button.dataset.phase = "idle";
+            button.disabled = false;
+            button.textContent = label;
+            if (result) result.textContent = "";
+          }, 1800);
+        }, 900);
+      }
+
+      root.addEventListener("click", (event) => {
+        const target = event.target;
+        const reviewPage = target.closest("[data-review-page]");
+        if (reviewPage) {
+          setPage(reviewPage.dataset.reviewPage);
+          return;
+        }
+        const reviewState = target.closest("[data-review-state]");
+        if (reviewState) {
+          setState(reviewState.dataset.reviewState);
+          return;
+        }
+        const reviewViewport = target.closest("[data-review-viewport]");
+        if (reviewViewport) {
+          setViewport(reviewViewport.dataset.reviewViewport);
+          return;
+        }
+        const appPage = target.closest("[data-app-page]");
+        if (appPage) {
+          setPage(appPage.dataset.appPage);
+          return;
+        }
+        const period = target.closest("[data-period]");
+        if (period) {
+          selectPeriod(period.dataset.period);
+          return;
+        }
+        const breakdown = target.closest("[data-breakdown]");
+        if (breakdown) {
+          setBreakdown(breakdown.dataset.breakdown);
+          return;
+        }
+        const holding = target.closest("[data-holding]");
+        if (holding) {
+          selectHolding(holding);
+          return;
+        }
+        const recentDay = target.closest("[data-recent-day]");
+        if (recentDay) {
+          selectedHistoryKey = recentDay.dataset.recentDay;
+          renderRecentHistory();
+          return;
+        }
+        const breakdownRow = target.closest("[data-breakdown-key]");
+        if (breakdownRow) {
+          root.querySelectorAll("[data-breakdown-key]").forEach((row) => row.setAttribute("aria-pressed", row === breakdownRow ? "true" : "false"));
+          const selected = breakdownData().find((row) => row.key === breakdownRow.dataset.breakdownKey);
+          renderHistoryDrawer(selected);
+          return;
+        }
+        const action = target.closest("[data-mock-action]");
+        if (action) handleMockAction(action);
+      });
+
+      renderRecentHistory();
+      renderBreakdown();
+      applyPreferences();
+      selectPeriod("day", false);
+
+      const observer = new ResizeObserver(() => {
+        root.querySelectorAll("[data-performance-chart], [data-history-chart]").forEach((svg) => drawChart(svg, periods[currentPeriod]));
+      });
+      root.querySelectorAll(".cobalt-chart-wrap").forEach((wrap) => observer.observe(wrap));
+
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({ container: app, onChange: applyPreferences });
+        tweak.addSlider(prefs, "radius", { label: "Surface radius", min: 4, max: 16, unit: "px", reference: "--cobalt-radius" });
+        tweak.addColorPicker(prefs, "accent", { label: "Product accent", reference: "--cobalt-accent" });
+        tweak.addToggle(prefs, "compact", { label: "Compact spacing", reference: "cobalt.compact" });
+        tweak.addToggle(prefs, "chartFill", { label: "Chart area fill", reference: "cobalt.chartFill" });
+      }
+    })();
+  </script>
+</div>

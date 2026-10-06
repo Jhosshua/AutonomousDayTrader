@@ -771,3 +771,41 @@ DAY_ONE_BUILD_REVISION=7c51e646... set with --skip-deploys, then push main. Veri
 - **First real test of the new parts**: today 15:45 (note above the rows), 15:46 (steps go Done), 16:00 (chip "Holding 3 until 9:30 AM Tue Oct 6"), 19:00 (queue step).
 - **Known, not changed**: the Balance chart's "Now" and "4:00 PM" labels overlap near the close (BalanceCard, older code). The Overnight chip "Buys at the 4 PM close" wraps to two lines in the 150 px desktop status column.
 - **Rollback**: `git revert acd11cf..f7fc44a`, set DAY_ONE_BUILD_REVISION back to 7c51e64692fdc4c57ea90bea41009ecbd1f319084359cf541a36cb6199bf4882 with --skip-deploys, push. No state migration (the two new X6 job keys are ignored by the old code).
+
+### 2026-10-01: Day one production verification
+
+1. What was verified. Railway deployment `6ae23b99-8d5d-4299-8c5e-31ebb1c69dfc` is successful and running commit `adef05d`. The image digest is `sha256:7423d58aa503086e31ccafeaec769554bab6e18a9dba760a3dc9fcddcccbc03a`. The runtime day one source revision is `73d319aaec53611bc414ff74e7ef6fc52996c909d0854aac8c8591df5aead540`.
+2. Production state. Health is healthy, persistence is durable, broker mismatch is false, the Alpaca account is `PA3CSVDZMMPY`, positions are empty, and overnight state is unchanged with three skipped prior night lifecycles. A read only Alpaca query found exactly one day one order, `adt-tom-spy-20261001-entry-1`, an accepted twelve share SPY OPG buy. It found no COIN order.
+3. Tests. The exact combined command passed 56 tests in 0.94 seconds. The previous long wait was not reproduced. No pytest process remained after the interruption.
+4. What was decided. The local throttled compare changes remain uncommitted and are not in production. Railway logs show the deployed artifact polling the accepted SPY OPG order about every two seconds overnight. Do not claim throttling is deployed. Deploying this follow up requires a separate operator confirmation.
+5. Next session priorities. Decide whether to commit and deploy the throttle fix, then verify the live read interval without disturbing the accepted OPG order.
+
+## 2026-10-06 Operator first UI redesign plan and concepts
+
+1. What was decided. Revision 2 of `PLAN_2026_10_06_OPERATOR_FIRST_UI_REDESIGN.md` is the proposed direction. Now and Next is recommended. It uses compact holding rows, one selected detail, authoritative events, exact money labels, canonical action locations, and issue groups named Act now, Robot is handling it, and Information only.
+2. Why. Four independent reviews produced 60 findings, including 18 blockers around action parity, mobile use, stale data, money meaning, and unsupported schedules.
+3. What was rejected and why. Equal alarm treatment, large holding cards, filters that hide exposure, inferred event times, duplicated controls, infinite idle animation, full color plan rows, and three equally complete concepts were rejected because they increase confusion or can misstate live behavior.
+4. Implementation status. No product code changed. The reviewable concepts are under `docs/operator_first_ui/`. Product implementation waits for operator selection.
+
+### 2026-10-01: Day one throttle fix deployed
+
+1. What was decided. Commit `f2866c3` throttles resting broker order reads to about one minute outside the auction window, then returns to two second reads near the relevant market window. The change was limited to the controller and its regression tests.
+2. Deployment. Railway deployment `9ab33e82-29cd-42db-9da5-1993f383406d` completed successfully. The image digest value is `1c2435bbb496f1eb43620efea3912777cd4cb22c9bb6c40836f7dd06e9a818c5`. The runtime source revision is `38670f4023b80d4cec81f07bc1a1f488318d6ffef15510b2ff4d94cdb12daf54`, and health reports source revision match true.
+3. Production evidence. Health is healthy, persistence is durable, broker mismatch is false, positions are empty, overnight state is unchanged, and the accepted order remains `adt-tom-spy-20261001-entry-1` with no COIN order. Live logs show reads at 04:15:31 and 04:16:33, confirming the new interval.
+4. What was rejected and why. The commit was uploaded directly to Railway and was not pushed to `origin/main`, so an automatic GitHub deployment could replace it later. The conservative deployment attestation still reports expected account match false while COIN is reserved before its decision gate. Health is ready and the direct broker account check matches `PA3CSVDZMMPY`.
+
+## 2026-10-06 Performance first UI Revision 4
+
+1. What was decided. Cobalt Ledger replaces Aurora Ledger. Performance now leads with signed dollars and percent. History supports Day, Week, Month, and Since recorded history, then Days, Plans, and Trades detail.
+2. Why. Public design research and two attack reviews found that the prior concept underweighted performance, overstated available chart data, and used too much decorative treatment. The attacks produced ten P0 and nine P1 findings.
+3. What was rejected and why. An intraday equity line was rejected because no intraday equity series exists. Violet, blur, translucent surfaces, dual history explorers, Base UI evaluation, and a first pass dark theme were rejected to reduce visual and implementation risk.
+4. Data rules. Day charts cumulative finished trade result. Longer periods chart recorded closing equity plus the current live point. Account change, finished trade result, and open holdings since entry remain separate facts.
+5. Implementation status. No product code changed. Revision 4 is in `PLAN_2026_10_06_OPERATOR_FIRST_UI_REDESIGN_V3.md`. The reviewable design is under `docs/operator_first_ui_v2/`.
+
+## 2026-10-06 Cobalt Ledger product implementation
+
+1. What was decided. The approved Cobalt Ledger design replaces the Balance and Results panels in the product. Performance leads with signed dollars and percent. History supports Day, Week, Month, and All, then Days, Plans, and Trades.
+2. Why. The operator asked for visible gains and losses, detailed period history, stronger aesthetics, web research, and parallel attack reviews. The implementation keeps account change, finished trade result, and open holding result separate.
+3. What was rejected and why. Synthetic intraday equity, inferred trade details, duplicate destructive controls, a new chart dependency, and persistence decoder changes were rejected because they could misstate money, widen action scope, add supply chain risk, or break checkpoint compatibility.
+4. Verification. Frontend tests include 57 performance checks and 8 history checks. The production build passes. Responsive browser verification passes 31 checks at 1440, 390, and 320 pixels. Backend verification passes 1,513 tests with 6 intentional skips when the unrelated hardcoded `/Users/mo` stress file is excluded.
+5. Deployment gate. The operator authorized deployment. At 19:48 ET production was healthy, ready, durable, broker mismatch false, and flat with no positions or overnight holds. `main.py` changed, so `DAY_ONE_BUILD_REVISION` must be updated with `--skip-deploys` before the GitHub push.

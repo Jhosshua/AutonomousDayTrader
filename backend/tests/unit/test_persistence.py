@@ -203,6 +203,10 @@ async def test_history_exposes_recent_days_and_yesterday_excludes_today(tmp_path
         week = await main.get_trade_history("7d")
         assert [s["session_date"] for s in week["sessions"]] == ["2026-09-25", "2026-09-24", "2026-09-23"]
         assert week["sessions"][-1]["trades_count"] == 0
+        assert week["sessions"][0]["account_change"] == 25.0
+        assert week["sessions"][0]["finished_trade_result"] == 25.0
+        assert week["sessions"][0]["trade_detail_complete"] is True
+        assert week["sessions"][0]["wins"] == 1
         assert week["recovered_sessions"] == []
         yesterday = await main.get_trade_history("yesterday")
         assert [t["trade_id"] for t in yesterday["items"]] == ["25"]
@@ -210,6 +214,100 @@ async def test_history_exposes_recent_days_and_yesterday_excludes_today(tmp_path
         assert [s["session_date"] for s in yesterday["sessions"]] == ["2026-09-25"]
     finally:
         store.close()
+
+
+@pytest.mark.asyncio
+async def test_history_never_stacks_recovered_total_on_detailed_rows(tmp_path, monkeypatch):
+    from backend.app import main
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 26, 6, tzinfo=timezone.utc).astimezone(tz)
+
+    store = TradingStateStore(str(tmp_path / "history-overlap.sqlite3"))
+    monkeypatch.setattr(main, "state_store", store)
+    monkeypatch.setattr(main, "datetime", Clock)
+    try:
+        store.save_checkpoint(
+            {"runtime_state_version": 1},
+            "TEST",
+            trades=[
+                {
+                    "trade_id": "detail",
+                    "session_date": "2026-09-25",
+                    "closed_at": "2026-09-25T15:00:00+00:00",
+                    "strategy_id": "orb",
+                    "realized_pnl": 25.0,
+                    "fees": 1.0,
+                }
+            ],
+        )
+        store.import_session_summary(
+            {
+                "session_date": "2026-09-25",
+                "opening_equity": 50000.0,
+                "closing_equity": 50025.0,
+                "realized_pnl": 25.0,
+                "trades_count": 1,
+                "fees": 1.0,
+                "source": "LEGACY_SUMMARY_IMPORT",
+                "aggregate_only": True,
+            }
+        )
+
+        history = await main.get_trade_history("yesterday")
+
+        assert history["summary"]["trades_count"] == 1
+        assert history["summary"]["realized_pnl"] == 25.0
+        assert history["summary"]["fees"] == 1.0
+        assert history["recovered_sessions"] == []
+        assert history["sessions"][0]["aggregate_only"] is False
+        assert history["sessions"][0]["trade_detail_complete"] is True
+        assert history["sessions"][0]["finished_trade_result"] == 25.0
+    finally:
+        store.close()
+
+
+def test_trade_stats_by_session_include_strategy_breakdown():
+    from backend.app import main
+
+    stats = main._aggregate_trade_stats_by_session(
+        [
+            {
+                "trade_id": "one",
+                "session_date": "2026-09-25",
+                "closed_at": "2026-09-25T14:00:00+00:00",
+                "strategy_id": "orb",
+                "realized_pnl": 30.0,
+                "fees": 0.5,
+            },
+            {
+                "trade_id": "two",
+                "session_date": "2026-09-25",
+                "closed_at": "2026-09-25T15:00:00+00:00",
+                "strategy_id": "orb",
+                "realized_pnl": -10.0,
+                "fees": 0.25,
+            },
+        ]
+    )
+
+    assert stats["2026-09-25"] == {
+        "trades_count": 2,
+        "wins": 1,
+        "losses": 1,
+        "realized_pnl": 20.0,
+        "fees": 0.75,
+        "strategies": {
+            "orb": {
+                "trades_count": 2,
+                "realized_pnl": 20.0,
+                "wins": 1,
+                "losses": 1,
+            }
+        },
+    }
 
 
 def test_checkpoint_checksum_corruption_fails_closed(tmp_path):

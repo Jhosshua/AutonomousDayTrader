@@ -13,6 +13,10 @@ export interface LedgerState {
   /** Every session summary the server sent (not paginated). Empty for a backend that does not send them. */
   sessions: RecoveredSessionSummary[];
   summary: TradeHistoryResponse["summary"] | null;
+  /** Oldest session date represented by the loaded detailed trade rows. */
+  oldestLoadedDate: string | null;
+  /** Complete detailed row count reported by the server for this requested range. */
+  detailedRowsTotal: number | null;
   /** True when the page cap stopped the drain: the trade rows are the most recent ones, day totals are complete. */
   truncated: boolean;
   loading: boolean;
@@ -39,6 +43,8 @@ export function useLedger(range: LedgerRange, ledgerRevision: number, isConnecte
     recoveredSessions: [],
     sessions: [],
     summary: null,
+    oldestLoadedDate: null,
+    detailedRowsTotal: null,
     truncated: false,
     loading: true,
     error: null,
@@ -60,6 +66,7 @@ export function useLedger(range: LedgerRange, ledgerRevision: number, isConnecte
       let recovered: RecoveredSessionSummary[] = [];
       let sessions: RecoveredSessionSummary[] = [];
       let summary: TradeHistoryResponse["summary"] | null = null;
+      let detailedRowsTotal: number | null = null;
       let pages = 0;
       do {
         const params = new URLSearchParams({ range, limit: String(PAGE_LIMIT) });
@@ -72,16 +79,23 @@ export function useLedger(range: LedgerRange, ledgerRevision: number, isConnecte
         recovered = data.recovered_sessions;
         sessions = data.sessions ?? data.recovered_sessions ?? [];
         summary = data.summary;
+        detailedRowsTotal = data.coverage?.detailed_trade_rows ?? detailedRowsTotal;
         cursor = data.next_cursor;
         pages += 1;
       } while (cursor && pages < MAX_PAGES);
 
       if (myGeneration !== generationRef.current) return;
+      const items = dedupeTrades(allItems);
       setState({
-        items: dedupeTrades(allItems),
+        items,
         recoveredSessions: recovered,
         sessions,
         summary,
+        oldestLoadedDate: items.reduce<string | null>(
+          (oldest, item) => oldest == null || item.session_date < oldest ? item.session_date : oldest,
+          null,
+        ),
+        detailedRowsTotal,
         truncated: !!cursor,
         loading: false,
         error: null,

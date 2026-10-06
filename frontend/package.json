@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "node scripts/serve_export.mjs --port 3005",
     "lint": "next lint",
-    "test": "node scripts/verify_ui.mjs && node scripts/verify_palette.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-strip-types scripts/verify_attention.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-strip-types scripts/verify_overnight_row.mjs && node scripts/test_websocket_resilience.mjs"
+    "test": "node scripts/verify_ui.mjs && node scripts/verify_palette.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-strip-types scripts/verify_performance.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-strip-types scripts/verify_history_view.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-strip-types scripts/verify_attention.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --experimental-strip-types scripts/verify_overnight_row.mjs && node scripts/test_websocket_resilience.mjs"
   },
   "dependencies": {
     "@fontsource/bricolage-grotesque": "^5.3.0",

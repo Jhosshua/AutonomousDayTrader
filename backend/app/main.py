@@ -1351,13 +1351,21 @@ def _session_summary(session_day: Any, source: str = "SYSTEM") -> Dict[str, Any]
         if trade.get("session_date") == session_date:
             trades_by_id[trade["trade_id"]] = trade
     session_fees = sum(float(trade.get("fees", 0.0)) for trade in trades_by_id.values())
+    account_change = round(account.equity - account.daily_starting_equity, 2)
+    finished_trade_result = round(
+        sum(float(trade.get("realized_pnl", 0.0)) for trade in trades_by_id.values()),
+        2,
+    )
     # Fixed-plan tranche records contain datetime objects. Immutable summaries go straight to
     # SQLite's JSON writer, unlike recovery state, so normalize them before queuing the summary.
     return _sanitize_for_json({
         "session_date": session_date,
         "opening_equity": round(account.daily_starting_equity, 2),
         "closing_equity": round(account.equity, 2),
-        "realized_pnl": round(account.equity - account.daily_starting_equity, 2),
+        # Keep realized_pnl for old readers. New readers use the explicit fields below.
+        "realized_pnl": account_change,
+        "account_change": account_change,
+        "finished_trade_result": finished_trade_result,
         "trades_count": len(trades_by_id),
         "wins": sum(1 for trade in trades_by_id.values() if float(trade.get("realized_pnl", 0)) > 0),
         "losses": sum(1 for trade in trades_by_id.values() if float(trade.get("realized_pnl", 0)) < 0),
@@ -3806,6 +3814,7 @@ async def get_account_state() -> Dict[str, Any]:
         "fees_paid": snap.fees_paid,
         "daily_pnl": daily_pnl,
         "daily_pnl_pct": daily_pnl_pct,
+        "daily_starting_equity": account.daily_starting_equity,
         "daily_drawdown_dollars": snap.daily_drawdown_dollars,
         "daily_drawdown_pct": snap.daily_drawdown_pct,
         "is_circuit_broken": snap.is_circuit_broken,
@@ -3897,6 +3906,60 @@ async def get_research_rows(
     }
 
 
+def _aggregate_trade_stats_by_session(
+    trades: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for trade in trades:
+        session_date = str(trade.get("session_date") or "")
+        if not session_date:
+            continue
+        slot = out.setdefault(
+            session_date,
+            {
+                "trades_count": 0,
+                "wins": 0,
+                "losses": 0,
+                "realized_pnl": 0.0,
+                "fees": 0.0,
+                "strategies": {},
+            },
+        )
+        pnl = float(trade.get("realized_pnl", 0.0))
+        fees = float(trade.get("fees", 0.0))
+        strategy_id = str(trade.get("strategy_id") or "unknown")
+        strategy = slot["strategies"].setdefault(
+            strategy_id,
+            {
+                "trades_count": 0,
+                "realized_pnl": 0.0,
+                "wins": 0,
+                "losses": 0,
+            },
+        )
+        slot["trades_count"] += 1
+        slot["realized_pnl"] += pnl
+        slot["fees"] += fees
+        strategy["trades_count"] += 1
+        strategy["realized_pnl"] += pnl
+        if pnl > 0:
+            slot["wins"] += 1
+            strategy["wins"] += 1
+        elif pnl < 0:
+            slot["losses"] += 1
+            strategy["losses"] += 1
+
+    for slot in out.values():
+        slot["realized_pnl"] = round(float(slot["realized_pnl"]), 2)
+        slot["fees"] = round(float(slot["fees"]), 4)
+        for strategy in slot["strategies"].values():
+            strategy["realized_pnl"] = round(
+                float(strategy["realized_pnl"]),
+                2,
+            )
+    return out
+
+
 @app.get("/api/trades")
 async def get_trade_history(
     range: str = "7d",
@@ -3924,11 +3987,17 @@ async def get_trade_history(
     except PersistenceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     trade_stats = state_store.aggregate_trade_stats(start_date, end_date=end_date)
+    all_detailed_trades, _ = state_store.list_trades(
+        start_date,
+        limit=max(1, int(trade_stats["trades_count"])),
+        end_date=end_date,
+    )
+    trade_stats_by_session = _aggregate_trade_stats_by_session(all_detailed_trades)
     all_summaries = state_store.list_session_summaries(start_date, end_date=end_date)
     recovered_sessions = [
         summary
         for summary in all_summaries
-        if summary.get("aggregate_only")
+        if summary.get("aggregate_only") and summary.get("session_date") not in trade_stats_by_session
     ]
     trades_count = int(trade_stats["trades_count"]) + sum(int(s.get("trades_count", 0)) for s in recovered_sessions)
     wins = int(trade_stats["wins"])
@@ -3936,7 +4005,7 @@ async def get_trade_history(
     # Aggregate-only recoveries intentionally do not invent win/loss details.
     realized_pnl = round(
         float(trade_stats["realized_pnl"])
-        + sum(float(s.get("realized_pnl", 0.0)) for s in recovered_sessions),
+        + sum(float(s.get("finished_trade_result", s.get("realized_pnl", 0.0))) for s in recovered_sessions),
         2,
     )
     fees = round(
@@ -3948,6 +4017,70 @@ async def get_trade_history(
     if all_summaries:
         earliest = min(all_summaries, key=lambda summary: summary["session_date"])
         opening_equity = float(earliest.get("opening_equity", opening_equity))
+
+    def session_payload(summary: Dict[str, Any]) -> Dict[str, Any]:
+        session_date = str(summary.get("session_date"))
+        detail = trade_stats_by_session.get(session_date)
+        aggregate_only = bool(summary.get("aggregate_only") and detail is None)
+        opening = float(summary.get("opening_equity", 0.0))
+        closing = float(summary.get("closing_equity", opening))
+        account_change = round(
+            float(summary["account_change"])
+            if summary.get("account_change") is not None
+            else closing - opening,
+            2,
+        )
+        if detail is not None:
+            finished_trade_result: Optional[float] = round(float(detail["realized_pnl"]), 2)
+            trades_for_day = int(detail["trades_count"])
+            wins_for_day: Optional[int] = int(detail["wins"])
+            losses_for_day: Optional[int] = int(detail["losses"])
+            fees_for_day = round(float(detail["fees"]), 4)
+            strategies_for_day = detail["strategies"]
+            trade_detail_complete = True
+        elif aggregate_only:
+            finished_trade_result = round(
+                float(summary.get("finished_trade_result", summary.get("realized_pnl", 0.0))),
+                2,
+            )
+            trades_for_day = int(summary.get("trades_count", 0))
+            wins_for_day = None
+            losses_for_day = None
+            fees_for_day = round(float(summary.get("fees", 0.0)), 4)
+            strategies_for_day = summary.get("strategies", {})
+            trade_detail_complete = False
+        else:
+            finished_trade_result = (
+                round(float(summary["finished_trade_result"]), 2)
+                if summary.get("finished_trade_result") is not None
+                and int(summary.get("trades_count", 0)) == 0
+                else None
+            )
+            trades_for_day = int(summary.get("trades_count", 0))
+            wins_for_day = summary.get("wins")
+            losses_for_day = summary.get("losses")
+            fees_for_day = round(float(summary.get("fees", 0.0)), 4)
+            strategies_for_day = summary.get("strategies", {})
+            trade_detail_complete = trades_for_day == 0
+        return {
+            "session_date": session_date,
+            "opening_equity": round(opening, 2),
+            "closing_equity": round(closing, 2),
+            "account_change": account_change,
+            "finished_trade_result": finished_trade_result,
+            "realized_pnl": summary.get("realized_pnl"),
+            "trades_count": trades_for_day,
+            "wins": wins_for_day,
+            "losses": losses_for_day,
+            "fees": fees_for_day,
+            "fees_known": summary.get("fees_known", True),
+            "source": summary.get("source"),
+            "aggregate_only": aggregate_only,
+            "trade_detail_complete": trade_detail_complete,
+            "strategies": strategies_for_day,
+            "note": summary.get("note"),
+        }
+
     return {
         "as_of": datetime.now(timezone.utc).isoformat(),
         "timezone": "America/New_York",
@@ -3969,11 +4102,12 @@ async def get_trade_history(
             "win_rate": round(wins / max(1, wins + losses), 4),
         },
         "items": items,
-        "recovered_sessions": recovered_sessions,
-        "sessions": [{key: summary.get(key) for key in (
-            "session_date", "opening_equity", "closing_equity", "realized_pnl",
-            "trades_count", "fees", "source", "aggregate_only", "note",
-        )} for summary in all_summaries],
+        "recovered_sessions": [session_payload(summary) for summary in recovered_sessions],
+        "sessions": [session_payload(summary) for summary in all_summaries],
+        "coverage": {
+            "detailed_trade_rows": int(trade_stats["trades_count"]),
+            "session_count": len(all_summaries),
+        },
         "next_cursor": next_cursor,
     }
 

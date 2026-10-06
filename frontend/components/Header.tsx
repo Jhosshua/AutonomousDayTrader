@@ -74,13 +74,13 @@ export default function Header({ isConnected, broker, showPro, onTogglePro, chil
     <header className="rise relative flex flex-wrap items-center justify-between gap-3 lg:flex-nowrap">
       <div className="flex items-center gap-3">
         <div
-          className="bob flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg"
+          className="flex h-10 w-10 items-center justify-center rounded-lg shadow-lg"
           style={{ background: "#2B4BFF" }}
         >
           <LineChart className="h-5 w-5 text-white" strokeWidth={1.8} aria-hidden="true" />
         </div>
         <div className="flex flex-col gap-0.5">
-          <div className="font-display text-xl font-semibold tracking-tight text-ink">Day Trader</div>
+          <div className="font-display text-xl font-semibold tracking-tight text-ink">Cobalt Ledger</div>
           <div className="text-xs text-muted" data-testid="account-label">{accountLabel(broker)}</div>
         </div>
       </div>
@@ -88,11 +88,8 @@ export default function Header({ isConnected, broker, showPro, onTogglePro, chil
       {children && <div className="order-last w-full lg:order-none lg:ml-auto lg:w-auto">{children}</div>}
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-2 rounded-full border border-line bg-white/80 px-3 sm:px-4 py-2 text-xs sm:text-sm">
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 sm:px-4 py-2 text-xs sm:text-sm">
           <span className="relative inline-block h-2.5 w-2.5" aria-hidden="true">
-            {isConnected && (
-              <span className="ping2 absolute inset-0 rounded-full" style={{ background: "#0A7D53" }} />
-            )}
             <span
               className="absolute inset-0 rounded-full"
               style={{ background: isConnected ? "#0A7D53" : "#8A91B0" }}
@@ -108,7 +105,7 @@ export default function Header({ isConnected, broker, showPro, onTogglePro, chil
           data-testid="pro-words-toggle"
           aria-pressed={showPro}
           onClick={() => onTogglePro(!showPro)}
-          className="min-h-[44px] rounded-full border px-4 text-xs sm:text-sm font-semibold transition-colors"
+          className="min-h-[44px] rounded-lg border px-4 text-xs sm:text-sm font-semibold transition-colors"
           style={
             showPro
               ? { borderColor: "#2B4BFF", background: "#F0EBFF", color: "#4A2AB5" }

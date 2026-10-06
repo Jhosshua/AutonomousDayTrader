@@ -319,6 +319,7 @@ export function useTradingStream(wsUrl: string = "ws://127.0.0.1:8005/ws/ui") {
                   // different number here, so REST-fallback and live WS never disagree.
                   daily_pnl: accData.daily_pnl ?? prev.account.daily_pnl,
                   daily_pnl_pct: accData.daily_pnl_pct ?? prev.account.daily_pnl_pct,
+                  daily_starting_equity: accData.daily_starting_equity ?? prev.account.daily_starting_equity,
                   daily_drawdown: accData.daily_drawdown_dollars ?? prev.account.daily_drawdown,
                   daily_drawdown_pct: accData.daily_drawdown_pct ?? prev.account.daily_drawdown_pct,
                   is_circuit_broken: accData.is_circuit_broken ?? prev.account.is_circuit_broken,

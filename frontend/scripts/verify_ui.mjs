@@ -18,11 +18,17 @@ const requiredFiles = [
   "types/trading.ts",
   "lib/plain.ts",
   "lib/apiBase.ts",
+  "lib/performance.ts",
+  "lib/historyView.ts",
   "hooks/useTradingStream.ts",
   "hooks/useTodayLedger.ts",
   "hooks/useActionButton.ts",
   "hooks/useHealthLimits.ts",
   "components/Header.tsx",
+  "components/DashboardNavigation.tsx",
+  "components/PerformancePanel.tsx",
+  "components/HistoryExplorer.tsx",
+  "components/RecentHistory.tsx",
   "components/BalanceCard.tsx",
   "components/RightNowCard.tsx",
   "components/SegmentedModeToggle.tsx",
@@ -155,6 +161,9 @@ const testidLocations = {
   "handoff-band": "components/StrategyCard.tsx",
   "night-part": "components/StrategyCard.tsx",
   "x6-note": "components/StrategyCard.tsx",
+  "performance-panel": "components/PerformancePanel.tsx",
+  "history-explorer": "components/HistoryExplorer.tsx",
+  "recent-history": "components/RecentHistory.tsx",
 };
 for (const [testid, file] of Object.entries(testidLocations)) {
   const content = fs.readFileSync(path.join(FRONTEND_DIR, file), "utf8");
@@ -179,7 +188,17 @@ assert(card.includes('data-testid="orb-resolve-orphan"') && card.includes("/api/
 assert(plainLib.includes("Opening Range Breakout (ORBStraddle rules)"), "ORB card must use the ORBStraddle-rules name");
 const holding = fs.readFileSync(path.join(FRONTEND_DIR, "components/HoldingNow.tsx"), "utf8");
 assert(holding.includes("!position.fixed_protection") && holding.includes("Safety exit stays fixed"), "OR15 must disable stop movement");
+assert(holding.includes("unrealizedPercent") && holding.includes("percentLabel"), "Every open holding must show its percentage result");
 console.log("  ✅ Verified all five strategy themes and OR15 fixed protection controls");
+
+const page = fs.readFileSync(path.join(FRONTEND_DIR, "app/page.tsx"), "utf8");
+assert(page.includes("<PerformancePanel"), "The real dashboard must render the performance panel");
+assert(page.includes("<HistoryExplorer"), "The real dashboard must render detailed history");
+assert(page.includes("<DashboardNavigation"), "The real dashboard must render primary navigation");
+assert(!page.includes("<BalanceCard"), "The old balance card must not compete with the performance panel");
+assert(!page.includes("<ResultsPanel"), "The old results panel must not compete with detailed history");
+assert(layout.includes('title: "Cobalt Ledger"'), "The browser metadata must use the Cobalt Ledger product name");
+console.log("  ✅ Verified Cobalt Ledger performance, history, and navigation integration");
 
 // 8. Verify plain-language copy replaced jargon in the swing and safety components (F10).
 const safetyCard = fs.readFileSync(path.join(FRONTEND_DIR, "components/SafetyCard.tsx"), "utf8");

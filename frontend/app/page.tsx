@@ -7,33 +7,45 @@ import { useLedger, useTodayLedger } from "@/hooks/useTodayLedger";
 import { useHealthLimits } from "@/hooks/useHealthLimits";
 import Header, { useProWordsToggle } from "@/components/Header";
 import SegmentedModeToggle, { TradingMode } from "@/components/SegmentedModeToggle";
-import BalanceCard from "@/components/BalanceCard";
 import RightNowCard from "@/components/RightNowCard";
 import StrategyTable, { StrategyTableOvernight } from "@/components/StrategyTable";
 import HoldingNow from "@/components/HoldingNow";
 import MarketMoodCard from "@/components/MarketMoodCard";
-import ResultsPanel from "@/components/ResultsPanel";
 import SafetyCard from "@/components/SafetyCard";
 import SwingTelemetryBar from "@/components/SwingTelemetryBar";
 import SwingCandidateWatchlist from "@/components/SwingCandidateWatchlist";
 import ActiveSwingPositionsTable from "@/components/ActiveSwingPositionsTable";
 import ExecutionLog from "@/components/ExecutionLog";
 import OvernightHolds, { HoldView } from "@/components/OvernightHolds";
+import DashboardNavigation, {
+  DashboardDestination,
+  DashboardPage,
+} from "@/components/DashboardNavigation";
+import PerformancePanel, {
+  PerformancePeriod,
+} from "@/components/PerformancePanel";
+import HistoryExplorer, {
+  HistoryPeriod,
+} from "@/components/HistoryExplorer";
+import RecentHistory from "@/components/RecentHistory";
 import { AlertTriangle, WifiOff } from "lucide-react";
+import { aggregatePerformance, PerformanceAggregation } from "@/lib/performance";
+import { buildHistoryView } from "@/lib/historyView";
 import {
   collectAttention,
+  companyName,
   countdownToClose,
   etDateKey,
   etDateOfIso,
   etMinutesOfDay,
   etParts,
+  etTimeLabel,
   groupLedgerByStrategy,
+  historyDateLabel,
   isFeedDown,
-  ledgerHistoryLine,
   isOvernightPosition,
   joinNames,
   noBuyDisabledReason,
-  overnightBalanceNote,
   overnightHoldingSentence,
   rightNowSentence,
   tonightStatusLine,
@@ -58,6 +70,9 @@ export default function Home() {
 
   const [showPro, setShowPro] = useProWordsToggle();
   const [mode, setMode] = useState<TradingMode>("intraday");
+  const [page, setPage] = useState<DashboardPage>("today");
+  const [performancePeriod, setPerformancePeriod] =
+    useState<PerformancePeriod>("day");
 
   const todayLedger = useTodayLedger(state.ledger_revision, isConnected);
   // every day and every trade since the start: the Results panel and the Balance card's "Since start" line
@@ -165,8 +180,6 @@ export default function Home() {
   ]));
   const firstSale = holdViews.filter((h) => !h.bookOnly).map((h) => h.saleDate).filter((d): d is string => !!d).sort()[0] ?? null;
   const pastSale = state.all_positions.some((p) => isOvernightPosition(p) && p.exit_due && nowMs >= Date.parse(p.exit_due));
-  const holdsValue = holdViews.reduce((sum, h) => sum + h.shares * (h.buyPrice ?? 0), 0);
-
   // X6: a quick trade in a stock bought overnight tonight closes at 3:46 PM, not 3:55 PM
   const x6Symbol =
     ovnBuysOn && etMin < 15 * 60 + 46
@@ -194,6 +207,153 @@ export default function Home() {
         nameOf: (sid: string) => strategyTheme(sid, state.strategies.find((s) => s.id === sid)?.name ?? sid).name,
       }
     : null;
+
+  const dailyOpeningEquity =
+    typeof state.account.daily_starting_equity === "number" &&
+    Number.isFinite(state.account.daily_starting_equity)
+      ? state.account.daily_starting_equity
+      : state.account.equity - state.account.daily_pnl;
+  const openHoldingsResult = state.all_positions.reduce(
+    (sum, position) =>
+      sum +
+      (Number.isFinite(position.unrealized_pnl) ? position.unrealized_pnl : 0),
+    0,
+  );
+  const performanceByPeriod = useMemo(() => {
+    const build = (period: PerformancePeriod): PerformanceAggregation => {
+      const ledger = period === "day" ? todayLedger : allLedger;
+      return aggregatePerformance({
+        period,
+        today: todayEt,
+        currentEquity: state.account.equity,
+        dailyOpeningEquity,
+        openHoldingResult: { dollars: openHoldingsResult },
+        sessions: ledger.sessions,
+        trades: ledger.items,
+        tradesTruncated: ledger.truncated,
+        oldestLoadedDate: ledger.oldestLoadedDate,
+        historyComplete:
+          state.persistence.status === "durable" && ledger.error === null,
+        asOf: state.timestamp,
+      });
+    };
+    return {
+      day: build("day"),
+      week: build("week"),
+      month: build("month"),
+      all: build("all"),
+    };
+  }, [
+    allLedger,
+    dailyOpeningEquity,
+    openHoldingsResult,
+    state.account.equity,
+    state.persistence.status,
+    state.timestamp,
+    todayEt,
+    todayLedger,
+  ]);
+  const selectedPerformance = performanceByPeriod[performancePeriod];
+  const historyData = useMemo(
+    () =>
+      buildHistoryView({
+        performance: performanceByPeriod,
+        sessions: allLedger.sessions,
+        trades: allLedger.items,
+        planName: (strategyId) =>
+          strategyTheme(
+            strategyId,
+            state.strategies.find((strategy) => strategy.id === strategyId)
+              ?.name ?? strategyId,
+          ).name,
+        companyName,
+        dateLabel: historyDateLabel,
+        timeLabel: etTimeLabel,
+      }),
+    [allLedger.items, allLedger.sessions, performanceByPeriod, state.strategies],
+  );
+  const performanceLedger =
+    performancePeriod === "day" ? todayLedger : allLedger;
+  const performanceHeadline =
+    selectedPerformance.accountChange.direction === "unknown"
+      ? "Account performance unavailable"
+      : performancePeriod === "all"
+        ? "Since recorded history"
+        : `${selectedPerformance.accountChange.direction === "flat"
+            ? "Flat"
+            : selectedPerformance.accountChange.direction === "up"
+              ? "Up"
+              : "Down"} ${
+            performancePeriod === "day"
+              ? "today"
+              : performancePeriod === "week"
+                ? "this week"
+                : "this month"
+          }`;
+  const performanceStatus =
+    performanceLedger.error !== null
+      ? { kind: "error" as const, message: performanceLedger.error }
+      : connectionState !== "live"
+        ? {
+            kind: "reconnecting" as const,
+            message: "Showing the latest saved performance while reconnecting.",
+          }
+        : performanceLedger.loading && performanceLedger.items.length === 0
+          ? { kind: "loading" as const, message: "Loading recorded performance" }
+          : { kind: "ready" as const };
+  const partialHistory =
+    selectedPerformance.completeness.partialLabels.length > 0
+      ? {
+          kind: "partial" as const,
+          message: selectedPerformance.completeness.partialLabels.join(" "),
+        }
+      : { kind: "complete" as const };
+  const historyPeriod: HistoryPeriod =
+    performancePeriod === "day"
+      ? "Day"
+      : performancePeriod === "week"
+        ? "Week"
+        : performancePeriod === "month"
+          ? "Month"
+          : "All";
+  const chartPoints = selectedPerformance.chart.points.map((point) => ({
+    value: point.value,
+    label:
+      point.source === "live"
+        ? `Live ${etTimeLabel(point.at)}`
+        : point.source === "finished-trade"
+          ? etTimeLabel(point.at)
+          : historyDateLabel(point.at),
+  }));
+  const fact = (day: PerformanceAggregation["bestDay"]) =>
+    day
+      ? {
+          dateLabel: historyDateLabel(day.date),
+          dollarChange: day.accountChange.signedDollars ?? Number.NaN,
+          percentChange: day.accountChange.percent ?? Number.NaN,
+        }
+      : null;
+
+  const navigate = (destination: DashboardDestination) => {
+    if (destination === "history") {
+      setPage("history");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setPage("today");
+    if (destination === "plans" || destination === "controls") {
+      setMode("intraday");
+    }
+    requestAnimationFrame(() => {
+      if (destination === "today") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const target = document.getElementById(destination);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      target?.focus({ preventScroll: true });
+    });
+  };
 
   const countdownValue = countdownToClose(now, firstTradingDayFlag, x6Symbol ? 15 * 60 + 46 : undefined);
   const countdownLabel = x6Symbol ? `${x6Symbol} quick trade closes in` : "Quick trades close in";
@@ -256,6 +416,7 @@ export default function Home() {
         <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro}>
           <SegmentedModeToggle mode={mode} onModeChange={setMode} />
         </Header>
+        <DashboardNavigation page={page} onNavigate={navigate} />
 
         {showPro && (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-white/70 px-4 py-2 text-xs text-muted">
@@ -271,16 +432,6 @@ export default function Home() {
             ))}
           </div>
         )}
-
-        <RightNowCard
-          sentence={heroSentence}
-          tradesToday={tradesToday}
-          wins={wins}
-          losses={losses}
-          countdownLabel={countdownLabel}
-          countdownValue={countdownValue}
-          attention={attention}
-        />
 
         {connectionState !== "live" && (
           <div
@@ -341,79 +492,132 @@ export default function Home() {
           />
         )}
 
-        {mode === "intraday" ? (
-          // Quick trades: two columns from lg up. Balance sits top right, the left stack runs the whole height, Safety and
-          // Results stack under Balance. DOM order is the phone order: Balance, left stack, right stack (no CSS order).
-          <div className="fadein grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-[auto_1fr]">
-            <BalanceCard
-              equity={state.account.equity}
-              dailyPnl={state.account.daily_pnl}
-              todayTrades={todayLedger.items}
-              loading={todayLedger.loading && todayLedger.items.length === 0}
-              overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
-              history={ledgerHistoryLine(allLedger, todayEt)}
-              narrow
-              className="lg:col-start-2 lg:row-start-1"
-            />
+        <PerformancePanel
+          period={performancePeriod}
+          onPeriodChange={setPerformancePeriod}
+          headline={performanceHeadline}
+          equity={selectedPerformance.currentEquity}
+          dollarChange={selectedPerformance.accountChange.signedDollars}
+          percentChange={selectedPerformance.accountChange.percent}
+          comparisonBasis={selectedPerformance.comparisonLabel}
+          finishedTradeResult={selectedPerformance.finishedTradeResult.signedDollars}
+          openHoldingsResult={selectedPerformance.openHoldingResult.signedDollars}
+          tradeCount={selectedPerformance.tradeCount}
+          chartLabel={
+            selectedPerformance.chart.kind === "cumulative-finished-trade-result"
+              ? "Cumulative finished trade result"
+              : "Closing account equity"
+          }
+          chartPoints={chartPoints}
+          bestDay={fact(selectedPerformance.bestDay)}
+          worstDay={fact(selectedPerformance.worstDay)}
+          status={performanceStatus}
+          historyState={partialHistory}
+        />
 
-            <div className="flex min-w-0 flex-col gap-3 lg:col-span-1 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-
-              <HoldingNow
-                positions={intradayPositions}
-                marketContext={state.market_context}
-                onFlattenPosition={flattenPosition}
-                onTightenStop={tightenStop}
-              />
-
-              <MarketMoodCard context={state.market_context} tradingDay={firstTradingDayFlag} />
-
-              <StrategyTable strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={showPro} overnight={tableOvernight} />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-3 lg:col-start-2 lg:row-start-2">
-              <SafetyCard
-                drawdownDollars={state.account.risk_drawdown ?? state.account.daily_drawdown}
-                maxDailyLossDollars={healthLimits.maxDailyLossDollars}
-                baseTradeRiskPct={healthLimits.baseTradeRiskPct}
-                intradayPositionsCount={intradayPositions.length}
-                onFlattenAll={flattenAll}
-                overnight={
-                  overnightOn
-                    ? {
-                        buysOn: ovnBuysOn && (ovn?.settings?.enabled?.length ?? 0) > 0,
-                        symbols: ovn?.settings?.enabled ?? [],
-                        pct: ovn?.settings?.pct ?? null,
-                        resultToday: state.account.overnight_realized_today ?? null,
-                        holdsCount: holdViews.length,
-                      }
-                    : null
-                }
-              />
-              <ResultsPanel ledger={allLedger} today={todayEt} streamPersistence={state.persistence} />
-            </div>
-          </div>
+        {page === "history" ? (
+          <HistoryExplorer
+            data={historyData}
+            period={historyPeriod}
+            onPeriodChange={(period) =>
+              setPerformancePeriod(
+                period === "Day"
+                  ? "day"
+                  : period === "Week"
+                    ? "week"
+                    : period === "Month"
+                      ? "month"
+                      : "all",
+              )
+            }
+            title="Detailed account history"
+          />
         ) : (
-          // Slow trades: exactly what it showed before (no Safety, no Results), plus the overnight holds that were
-          // always above both views.
           <>
-            <BalanceCard
-              equity={state.account.equity}
-              dailyPnl={state.account.daily_pnl}
-              todayTrades={todayLedger.items}
-              loading={todayLedger.loading && todayLedger.items.length === 0}
-              overnightNote={holdViews.length > 0 ? overnightBalanceNote(holdsValue) : null}
-              history={ledgerHistoryLine(allLedger, todayEt)}
+            <RightNowCard
+              sentence={heroSentence}
+              tradesToday={tradesToday}
+              wins={wins}
+              losses={losses}
+              countdownLabel={countdownLabel}
+              countdownValue={countdownValue}
+              attention={attention}
             />
-            <div className="fadein flex flex-col gap-4">
-              <SwingTelemetryBar swingState={state.swing} showPro={showPro} />
-              <ActiveSwingPositionsTable
-                positions={state.swing?.positions ?? []}
-                onExitNextOpen={swingExitNextOpen}
-                onExitImmediate={swingExitImmediate}
-                onTightenStop={swingTightenStop}
-              />
-              <SwingCandidateWatchlist candidates={state.swing?.candidates ?? []} />
-            </div>
+
+            {mode === "intraday" ? (
+              <div className="fadein grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_420px]">
+                <div className="flex min-w-0 flex-col gap-3">
+                  <div id="holdings" tabIndex={-1} className="scroll-mt-4 outline-none">
+                    <HoldingNow
+                      positions={intradayPositions}
+                      marketContext={state.market_context}
+                      onFlattenPosition={flattenPosition}
+                      onTightenStop={tightenStop}
+                    />
+                    {intradayPositions.length === 0 && (
+                      <section className="rounded-xl border border-line bg-white px-4 py-5">
+                        <h2 className="text-lg font-semibold text-ink">Holdings</h2>
+                        <p className="mt-1 text-sm text-muted">No quick trade holdings are open.</p>
+                      </section>
+                    )}
+                  </div>
+
+                  <MarketMoodCard context={state.market_context} tradingDay={firstTradingDayFlag} />
+
+                  <div id="plans" tabIndex={-1} className="scroll-mt-4 outline-none">
+                    <StrategyTable
+                      strategies={state.strategies}
+                      ledgerByStrategy={ledgerByStrategy}
+                      showPro={showPro}
+                      overnight={tableOvernight}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex min-w-0 flex-col gap-3">
+                  <RecentHistory
+                    days={performanceByPeriod.all.days}
+                    onOpenHistory={() => navigate("history")}
+                  />
+                  <div id="controls" tabIndex={-1} className="scroll-mt-4 outline-none">
+                    <SafetyCard
+                      drawdownDollars={state.account.risk_drawdown ?? state.account.daily_drawdown}
+                      maxDailyLossDollars={healthLimits.maxDailyLossDollars}
+                      baseTradeRiskPct={healthLimits.baseTradeRiskPct}
+                      intradayPositionsCount={intradayPositions.length}
+                      onFlattenAll={flattenAll}
+                      overnight={
+                        overnightOn
+                          ? {
+                              buysOn:
+                                ovnBuysOn &&
+                                (ovn?.settings?.enabled?.length ?? 0) > 0,
+                              symbols: ovn?.settings?.enabled ?? [],
+                              pct: ovn?.settings?.pct ?? null,
+                              resultToday:
+                                state.account.overnight_realized_today ?? null,
+                              holdsCount: holdViews.length,
+                            }
+                          : null
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="fadein flex flex-col gap-4">
+                <SwingTelemetryBar swingState={state.swing} showPro={showPro} />
+                <div id="holdings" tabIndex={-1} className="scroll-mt-4 outline-none">
+                  <ActiveSwingPositionsTable
+                    positions={state.swing?.positions ?? []}
+                    onExitNextOpen={swingExitNextOpen}
+                    onExitImmediate={swingExitImmediate}
+                    onTightenStop={swingTightenStop}
+                  />
+                </div>
+                <SwingCandidateWatchlist candidates={state.swing?.candidates ?? []} />
+              </div>
+            )}
           </>
         )}
 

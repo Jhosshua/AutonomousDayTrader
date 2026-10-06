@@ -491,3 +491,43 @@ right. Run the mutation check.
 **What worked instead:** (1) Stub `window.WebSocket` in the page so later connects fail at once, and close the open route from the main thread; run harnesses with `python3 -u` so a stall shows where it is. (2) Pill and text as one run-on paragraph on phone, shorter labels ("ORB" not "Opening Range Breakout"), three-column stats, tighter paddings.
 
 **Note for next time:** never call a blocking sync Playwright method from inside a route handler. When a height check fails by a small margin, measure each block first (a measure script printing every card's height) instead of nudging paddings.
+
+## 2026-10-01: the combined day one verification command appeared to hang
+
+**What did not work:** resuming the interrupted command with the repository relative virtual environment, or with the unavailable `timeout` utility. The original session had no remaining pytest process, so the five hour wait could not be reproduced as an active test process.
+
+**What worked instead:** use `/Users/jhoshua/ADT-overnight/.venv/bin/python`, isolate each file, then rerun the exact combined command. The three files passed 56 tests in 0.94 seconds.
+
+**Note for next time:** verify the interpreter path and process table before treating a long running test task as a live pytest hang. Add per file verbose runs before starting a long combined command.
+
+## 2026-10-06 Standalone concept verification took several attempts
+
+**What did not work.** The first browser check queried the outer page instead of the rendered iframe. Generic state class names then collided with the host stylesheet. After namespacing them, component display rules still overrode the hidden state rule.
+
+**What worked instead.** Query inside the iframe, namespace every state class, give the state visibility rule explicit priority, then verify all 30 design, state, and viewport combinations.
+
+**Note for next time.** Rendered concept previews are iframe wrapped. Test computed visibility inside that frame, and do not rely on low specificity state utilities.
+
+## 2026-10-06 Tablet and chart label verification took three corrections
+
+**What did not work.** The first responsive rule forced a 390 pixel app at a 736 pixel viewport without phone layout rules. Removing that rule left the desktop header 99 pixels too wide. Four phone chart labels also placed adjacent dates too close together.
+
+**What worked instead.** Stack the major grids below 900 pixels, move the header navigation to its own row at that width, and show three chart labels on narrow screens. The final run passed 48 page, state, viewport, and period combinations plus nine actual widths.
+
+**Note for next time.** Test tablet widths independently from the explicit phone preview. A component can pass 390 and 1024 while still failing at 736.
+
+## 2026-10-06 Local verification environments were inconsistent
+
+**What did not work.** `pytest`, `python`, system Python with pytest, and a cached virtual environment without Pydantic all failed before the correct test interpreter was found. The first visual run used a Python environment without Playwright. A later standalone TypeScript run raced with `next build` over generated `.next` files.
+
+**What worked instead.** Backend tests used `/Users/jhoshua/ADT-overnight/.venv/bin/pytest`. Browser tests used system `python3`, which owns Playwright. TypeScript was rerun after the production build completed.
+
+**Note for next time.** Check interpreter imports before starting tests. Do not run standalone TypeScript and `next build` concurrently because both read or rewrite `.next/types`.
+
+## 2026-10-06 Cobalt Ledger visual harness needed scoped selectors
+
+**What did not work.** The first browser run used the backend test environment, which lacked Playwright. The second run used an unscoped Plans button selector, which matched both primary navigation and the history breakdown.
+
+**What worked instead.** Run the harness with system `python3` and scope Plans and Trades controls to the history explorer.
+
+**Note for next time.** Scope repeated labels to their component before clicking them in strict browser tests.

@@ -10,12 +10,12 @@ import "@fontsource/instrument-sans/600.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Day Trader",
-  description: "A practice trading account explained in plain English: what it's doing right now and why.",
+  title: "Cobalt Ledger",
+  description: "Account performance, holdings, and detailed trading history in one operator dashboard.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Day Trader",
+    title: "Cobalt Ledger",
   },
 };
 

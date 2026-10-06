@@ -1,0 +1,3847 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Cobalt Ledger Ui</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Cobalt Ledger Ui" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Cobalt Ledger Ui&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;cobalt-ledger-review&quot;&gt;
+  &lt;style&gt;
+    #cobalt-ledger-review {
+      --cobalt-accent: #2b4bff;
+      --cobalt-ink: #111932;
+      --cobalt-muted: #66708b;
+      --cobalt-line: #dce2ef;
+      --cobalt-canvas: #edf1f7;
+      --cobalt-panel: #ffffff;
+      --cobalt-soft: #f5f7fb;
+      --cobalt-soft-blue: #edf1ff;
+      --cobalt-positive: #087a52;
+      --cobalt-positive-soft: #e8f7f0;
+      --cobalt-negative: #c53b22;
+      --cobalt-negative-soft: #fff0eb;
+      --cobalt-warning: #9c5a00;
+      --cobalt-warning-soft: #fff3d8;
+      --cobalt-radius: 8px;
+      width: 100%;
+      color-scheme: light;
+      color: var(--cobalt-ink);
+      font-family: &quot;Instrument Sans&quot;, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;
+    }
+
+    #cobalt-ledger-review,
+    #cobalt-ledger-review * {
+      box-sizing: border-box;
+    }
+
+    #cobalt-ledger-review button,
+    #cobalt-ledger-review select {
+      font: inherit;
+    }
+
+    #cobalt-ledger-review button {
+      cursor: pointer;
+    }
+
+    #cobalt-ledger-review .cobalt-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-review-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid light-dark(#d9dfeb, #34405a);
+      border-radius: 12px;
+      background: light-dark(#ffffff, #121a2b);
+      color: light-dark(#111932, #f4f7ff);
+    }
+
+    #cobalt-ledger-review .cobalt-review-group {
+      display: grid;
+      gap: 5px;
+    }
+
+    #cobalt-ledger-review .cobalt-review-label {
+      color: light-dark(#66708b, #aeb8ce);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #cobalt-ledger-review .cobalt-review-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 10px;
+      background: light-dark(#edf1f7, #0b1120);
+    }
+
+    #cobalt-ledger-review .cobalt-review-options button {
+      min-width: 54px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 7px;
+      padding: 6px 11px;
+      background: transparent;
+      color: inherit;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-review-options button[aria-pressed=&quot;true&quot;] {
+      background: var(--cobalt-accent);
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-review-note {
+      margin-left: auto;
+      align-self: center;
+      color: light-dark(#66708b, #aeb8ce);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage {
+      width: 100%;
+      padding: 14px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: light-dark(#dfe5f0, #080d18);
+    }
+
+    #cobalt-ledger-review .cobalt-app {
+      width: min(100%, 1380px);
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid #d5dce9;
+      border-radius: 12px;
+      background: var(--cobalt-canvas);
+      box-shadow: 0 18px 55px rgba(33, 47, 88, 0.13);
+      transition: width 200ms ease, border-radius 200ms ease;
+    }
+
+    #cobalt-ledger-review .cobalt-app-header {
+      display: grid;
+      grid-template-columns: minmax(210px, 1fr) auto auto;
+      align-items: center;
+      gap: 18px;
+      min-height: 62px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--cobalt-line);
+      background: var(--cobalt-panel);
+    }
+
+    #cobalt-ledger-review .cobalt-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 9px;
+      background: var(--cobalt-accent);
+      color: #ffffff;
+      font-family: &quot;Bricolage Grotesque&quot;, ui-sans-serif, system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-copy strong,
+    #cobalt-ledger-review .cobalt-brand-copy span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-copy strong {
+      font-family: &quot;Bricolage Grotesque&quot;, ui-sans-serif, system-ui, sans-serif;
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-brand-copy span {
+      margin-top: 1px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-app-nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    #cobalt-ledger-review .cobalt-app-nav button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 7px;
+      padding: 0 12px;
+      background: transparent;
+      color: var(--cobalt-muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-app-nav button[aria-current=&quot;page&quot;] {
+      background: var(--cobalt-soft-blue);
+      color: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-live {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cobalt-positive);
+      box-shadow: 0 0 0 4px var(--cobalt-positive-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;reconnect&quot;] .cobalt-live-dot {
+      background: var(--cobalt-warning);
+      box-shadow: 0 0 0 4px var(--cobalt-warning-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-state-block {
+      display: none !important;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;normal&quot;] .cobalt-state-normal,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;needs&quot;] .cobalt-state-needs,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;reconnect&quot;] .cobalt-state-reconnect {
+      display: block !important;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;normal&quot;] .cobalt-live .cobalt-state-normal,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;needs&quot;] .cobalt-live .cobalt-state-needs,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;reconnect&quot;] .cobalt-live .cobalt-state-reconnect {
+      display: inline !important;
+    }
+
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;normal&quot;] .cobalt-status.cobalt-state-normal,
+    #cobalt-ledger-review .cobalt-preview-stage[data-state=&quot;reconnect&quot;] .cobalt-status.cobalt-state-reconnect {
+      display: flex !important;
+    }
+
+    #cobalt-ledger-review .cobalt-status {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 10px 12px 0;
+      min-height: 44px;
+      padding: 8px 11px;
+      border: 1px solid #cfe5db;
+      border-radius: var(--cobalt-radius);
+      background: var(--cobalt-positive-soft);
+      color: #145e46;
+      font-size: 13px;
+    }
+
+    #cobalt-ledger-review .cobalt-status-mark {
+      display: grid;
+      width: 24px;
+      height: 24px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 6px;
+      background: #ffffff;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-status.cobalt-state-reconnect {
+      border-color: #eedba9;
+      background: var(--cobalt-warning-soft);
+      color: #7b4800;
+    }
+
+    #cobalt-ledger-review .cobalt-content-page {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-content-page.cobalt-page-visible {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-page {
+      padding: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-top-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(290px, 0.78fr);
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-panel {
+      border: 1px solid var(--cobalt-line);
+      border-radius: var(--cobalt-radius);
+      background: var(--cobalt-panel);
+    }
+
+    #cobalt-ledger-review .cobalt-performance {
+      padding: 16px;
+      border-radius: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-eyebrow {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h1,
+    #cobalt-ledger-review .cobalt-section-head h2,
+    #cobalt-ledger-review .cobalt-section-head h3 {
+      margin: 3px 0 0;
+      font-weight: 500;
+      line-height: 1.2;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h1 {
+      font-size: 22px;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h2 {
+      font-size: 17px;
+    }
+
+    #cobalt-ledger-review .cobalt-section-head h3 {
+      font-size: 15px;
+    }
+
+    #cobalt-ledger-review .cobalt-period-tabs,
+    #cobalt-ledger-review .cobalt-breakdown-tabs {
+      display: flex;
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--cobalt-line);
+      border-radius: 9px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-period-tabs button,
+    #cobalt-ledger-review .cobalt-breakdown-tabs button {
+      min-width: 50px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 10px;
+      background: transparent;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-period-tabs button[aria-selected=&quot;true&quot;],
+    #cobalt-ledger-review .cobalt-breakdown-tabs button[aria-selected=&quot;true&quot;] {
+      background: var(--cobalt-accent);
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-performance-numbers {
+      display: grid;
+      grid-template-columns: minmax(190px, 1.1fr) repeat(2, minmax(130px, 0.65fr));
+      gap: 14px;
+      align-items: end;
+      margin-top: 16px;
+    }
+
+    #cobalt-ledger-review .cobalt-equity-label,
+    #cobalt-ledger-review .cobalt-fact-label {
+      display: block;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-equity {
+      display: block;
+      margin-top: 2px;
+      font-size: 38px;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-delta-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 7px;
+      margin-top: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-delta-money {
+      font-size: 21px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-delta-percent {
+      border-radius: 6px;
+      padding: 3px 7px;
+      background: var(--cobalt-positive-soft);
+      color: var(--cobalt-positive);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-positive {
+      color: var(--cobalt-positive);
+    }
+
+    #cobalt-ledger-review .cobalt-negative {
+      color: var(--cobalt-negative);
+    }
+
+    #cobalt-ledger-review .cobalt-period-fact {
+      padding-left: 13px;
+      border-left: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-period-fact strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 18px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-period-fact small {
+      display: block;
+      margin-top: 3px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-title {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-note {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-wrap {
+      position: relative;
+      width: 100%;
+      min-height: 216px;
+      margin-top: 6px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart {
+      display: block;
+      width: 100%;
+      height: 216px;
+      overflow: visible;
+    }
+
+    #cobalt-ledger-review .cobalt-chart text {
+      fill: var(--cobalt-muted);
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-chart .cobalt-axis-title {
+      fill: var(--cobalt-ink);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-grid {
+      stroke: #e3e7ef;
+      stroke-width: 1;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-zero {
+      stroke: #9ba5bb;
+      stroke-width: 1;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-line {
+      fill: none;
+      stroke: var(--cobalt-accent);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-area {
+      fill: rgba(43, 75, 255, 0.08);
+      stroke: none;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-point {
+      fill: #ffffff;
+      stroke: var(--cobalt-accent);
+      stroke-width: 2;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-hit {
+      fill: transparent;
+      cursor: crosshair;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-guide {
+      display: none;
+      stroke: #8791a7;
+      stroke-width: 1;
+    }
+
+    #cobalt-ledger-review .cobalt-chart-end {
+      fill: var(--cobalt-ink) !important;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-tooltip {
+      position: absolute;
+      z-index: 12;
+      display: none;
+      max-width: 210px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: #111932;
+      color: #ffffff;
+      font-size: 12px;
+      line-height: 1.35;
+      pointer-events: none;
+      transform: translate(-50%, calc(-100% - 10px));
+      box-shadow: 0 10px 24px rgba(17, 25, 50, 0.24);
+    }
+
+    #cobalt-ledger-review .cobalt-tooltip strong {
+      display: block;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-tooltip.cobalt-tooltip-visible {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-next {
+      padding: 14px;
+    }
+
+    #cobalt-ledger-review .cobalt-robot-state {
+      margin-top: 12px;
+      padding: 11px;
+      border-radius: 7px;
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-robot-state strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-robot-state span {
+      display: block;
+      margin-top: 3px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-event-list {
+      margin-top: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-event {
+      display: grid;
+      grid-template-columns: 58px 8px minmax(0, 1fr);
+      gap: 8px;
+      padding: 10px 0;
+      border-top: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-event:first-child {
+      border-top: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-event time {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-event-dot {
+      width: 8px;
+      height: 8px;
+      margin-top: 4px;
+      border: 2px solid var(--cobalt-accent);
+      border-radius: 50%;
+    }
+
+    #cobalt-ledger-review .cobalt-event strong,
+    #cobalt-ledger-review .cobalt-event span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-event strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-event span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-loss-limit {
+      margin-top: 10px;
+      padding-top: 11px;
+      border-top: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-loss-limit-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-loss-track {
+      height: 7px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e8ebf2;
+    }
+
+    #cobalt-ledger-review .cobalt-loss-fill {
+      width: 3.6%;
+      height: 100%;
+      background: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-needs-panel {
+      margin-top: 10px;
+      overflow: hidden;
+      border-color: #efbaa9;
+      background: #fff8f5;
+    }
+
+    #cobalt-ledger-review .cobalt-needs-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 14px;
+      background: #f05a3c;
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-needs-head strong {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-needs-head span {
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-issue {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px 14px;
+      border-top: 1px solid #f2d4c9;
+    }
+
+    #cobalt-ledger-review .cobalt-issue:first-of-type {
+      border-top: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-number {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 7px;
+      background: var(--cobalt-negative-soft);
+      color: var(--cobalt-negative);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-copy strong,
+    #cobalt-ledger-review .cobalt-issue-copy span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-copy strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-issue-copy span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-action {
+      min-height: 44px;
+      border: 1px solid #bec8da;
+      border-radius: 7px;
+      padding: 0 13px;
+      background: #ffffff;
+      color: var(--cobalt-ink);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-action-primary {
+      border-color: var(--cobalt-accent);
+      background: var(--cobalt-accent);
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-action-danger {
+      border-color: #d94d33;
+      background: #d94d33;
+      color: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-lower-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-panel-pad {
+      padding: 13px;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-list {
+      margin: 10px -13px -13px;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-row {
+      display: grid;
+      grid-template-columns: 7px minmax(170px, 1.2fr) minmax(140px, 0.8fr) 96px 72px 20px;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      min-height: 54px;
+      padding: 7px 13px;
+      border: 0;
+      border-top: 1px solid var(--cobalt-line);
+      background: transparent;
+      color: inherit;
+      text-align: left;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-row[aria-pressed=&quot;true&quot;] {
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark {
+      width: 4px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark.cobalt-mark-pink {
+      background: #c62a70;
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark.cobalt-mark-orange {
+      background: #c65128;
+    }
+
+    #cobalt-ledger-review .cobalt-plan-mark.cobalt-mark-gold {
+      background: #9a7000;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-name strong,
+    #cobalt-ledger-review .cobalt-holding-name span,
+    #cobalt-ledger-review .cobalt-holding-next strong,
+    #cobalt-ledger-review .cobalt-holding-next span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-name strong,
+    #cobalt-ledger-review .cobalt-holding-next strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-name span,
+    #cobalt-ledger-review .cobalt-holding-next span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-money,
+    #cobalt-ledger-review .cobalt-holding-percent {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-holding-detail {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 12px 13px;
+      border-top: 1px solid #cad4ed;
+      background: #f0f3ff;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact {
+      padding: 8px;
+      border: 1px solid #d8dff0;
+      border-radius: 7px;
+      background: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact span,
+    #cobalt-ledger-review .cobalt-detail-fact strong {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-fact strong {
+      margin-top: 3px;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 162px;
+    }
+
+    #cobalt-ledger-review .cobalt-action-result {
+      min-height: 16px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    #cobalt-ledger-review .cobalt-history-rows {
+      margin: 9px -13px -13px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 90px 72px 18px;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 50px;
+      padding: 7px 13px;
+      border: 0;
+      border-top: 1px solid var(--cobalt-line);
+      background: transparent;
+      color: inherit;
+      text-align: left;
+    }
+
+    #cobalt-ledger-review .cobalt-history-row[aria-pressed=&quot;true&quot;] {
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-history-date strong,
+    #cobalt-ledger-review .cobalt-history-date span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-history-date strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-history-date span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-money,
+    #cobalt-ledger-review .cobalt-history-percent {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail {
+      margin-top: 10px;
+      padding: 11px;
+      border: 1px solid #d6ddef;
+      border-radius: 7px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail-head strong {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-history-detail-head span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact {
+      padding: 8px;
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact span,
+    #cobalt-ledger-review .cobalt-mini-fact strong {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-mini-fact strong {
+      margin-top: 2px;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-history-page-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-main {
+      padding: 14px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-summary {
+      padding: 14px;
+    }
+
+    #cobalt-ledger-review .cobalt-history-summary-numbers {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact {
+      padding: 10px;
+      border-radius: 7px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact span,
+    #cobalt-ledger-review .cobalt-summary-fact strong {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact span {
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-summary-fact strong {
+      margin-top: 3px;
+      font-size: 16px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-list {
+      margin-top: 12px;
+      border-top: 1px solid var(--cobalt-line);
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) 100px 82px 90px 28px;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      min-height: 52px;
+      padding: 7px 4px;
+      border: 0;
+      border-bottom: 1px solid var(--cobalt-line);
+      background: transparent;
+      color: inherit;
+      text-align: left;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row[aria-pressed=&quot;true&quot;] {
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row strong,
+    #cobalt-ledger-review .cobalt-breakdown-row span {
+      display: block;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row strong {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-breakdown-row span {
+      margin-top: 2px;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-number-cell {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-drawer {
+      margin-top: 11px;
+      padding: 12px;
+      border-left: 3px solid var(--cobalt-accent);
+      border-radius: 0 7px 7px 0;
+      background: var(--cobalt-soft-blue);
+    }
+
+    #cobalt-ledger-review .cobalt-detail-drawer h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-drawer p {
+      margin: 4px 0 0;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trades {
+      margin-top: 9px;
+      border-top: 1px solid #cfd8f0;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trade {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #cfd8f0;
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trade strong {
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-detail-trade span {
+      color: var(--cobalt-muted);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview {
+      padding: 12px 0 24px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-app {
+      width: 390px;
+      max-width: 100%;
+      border-radius: 16px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-app-header {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      padding: 8px 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-app-nav {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-live {
+      font-size: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-live time {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-page {
+      padding: 8px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-top-grid,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-lower-grid,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-history-page-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-performance {
+      padding: 12px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-section-head {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-period-tabs,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      width: 100%;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-tabs {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-period-tabs button,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-tabs button {
+      min-width: 0;
+      min-height: 44px;
+      padding: 0 5px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-performance-numbers {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-equity-box {
+      grid-column: 1 / 3;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-equity {
+      font-size: 34px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-period-fact {
+      padding: 8px;
+      border: 0;
+      border-radius: 7px;
+      background: var(--cobalt-soft);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-chart-wrap,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-chart {
+      min-height: 204px;
+      height: 204px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-issue {
+      grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-issue .cobalt-action {
+      grid-column: 2;
+      width: 100%;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-row {
+      grid-template-columns: 6px minmax(0, 1fr) 78px 58px 16px;
+      gap: 6px;
+      padding: 7px 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-next {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-detail {
+      grid-template-columns: 1fr;
+      padding: 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-detail-facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-detail-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+      min-width: 0;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-detail-actions button {
+      min-width: 0;
+      min-height: 44px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-action-result {
+      grid-column: 1 / 3;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-history-row {
+      grid-template-columns: minmax(0, 1fr) 78px 62px 16px;
+      gap: 5px;
+      padding: 7px 10px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-mini-facts,
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-history-summary-numbers {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-row {
+      grid-template-columns: minmax(0, 1fr) 76px 62px 20px;
+      gap: 5px;
+      min-height: 56px;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-breakdown-row .cobalt-hide-phone {
+      display: none;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav {
+      position: sticky;
+      bottom: 0;
+      z-index: 8;
+      display: none;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 3px;
+      margin: 9px 8px 8px;
+      padding: 4px;
+      border: 1px solid var(--cobalt-line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 8px 24px rgba(20, 31, 64, 0.14);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--cobalt-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    #cobalt-ledger-review .cobalt-phone-nav button[aria-current=&quot;page&quot;] {
+      background: var(--cobalt-soft-blue);
+      color: var(--cobalt-accent);
+    }
+
+    #cobalt-ledger-review .cobalt-phone-preview .cobalt-phone-nav {
+      display: grid;
+    }
+
+    #cobalt-ledger-review .cobalt-dense .cobalt-page {
+      padding: 9px;
+    }
+
+    #cobalt-ledger-review .cobalt-dense .cobalt-performance,
+    #cobalt-ledger-review .cobalt-dense .cobalt-panel-pad,
+    #cobalt-ledger-review .cobalt-dense .cobalt-next,
+    #cobalt-ledger-review .cobalt-dense .cobalt-history-main,
+    #cobalt-ledger-review .cobalt-dense .cobalt-history-summary {
+      padding: 11px;
+    }
+
+    #cobalt-ledger-review .cobalt-flash {
+      animation: cobaltFlash 900ms ease;
+    }
+
+    #cobalt-ledger-review .cobalt-open {
+      animation: cobaltOpen 180ms ease both;
+      transform-origin: top;
+    }
+
+    @keyframes cobaltFlash {
+      0% {
+        background: #fff4bd;
+      }
+      100% {
+        background: transparent;
+      }
+    }
+
+    @keyframes cobaltOpen {
+      from {
+        opacity: 0.2;
+        transform: translateY(-5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 900px) {
+      #cobalt-ledger-review .cobalt-top-grid,
+      #cobalt-ledger-review .cobalt-lower-grid,
+      #cobalt-ledger-review .cobalt-history-page-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #cobalt-ledger-review .cobalt-app-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+      }
+
+      #cobalt-ledger-review .cobalt-app-nav {
+        grid-column: 1 / 3;
+        justify-content: space-between;
+        border-top: 1px solid var(--cobalt-line);
+        padding-top: 6px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      #cobalt-ledger-review .cobalt-review-note {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      #cobalt-ledger-review .cobalt-preview-stage {
+        padding: 8px 0 18px;
+      }
+    }
+
+    @media (max-width: 340px) {
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-app,
+      #cobalt-ledger-review .cobalt-app {
+        width: 320px;
+        max-width: 100%;
+      }
+
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-equity {
+        font-size: 30px;
+      }
+
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-row {
+        grid-template-columns: 5px minmax(0, 1fr) 72px 16px;
+      }
+
+      #cobalt-ledger-review .cobalt-phone-preview .cobalt-holding-percent {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #cobalt-ledger-review *,
+      #cobalt-ledger-review *::before,
+      #cobalt-ledger-review *::after {
+        animation: none !important;
+        scroll-behavior: auto !important;
+        transition: none !important;
+      }
+    }
+  &lt;/style&gt;
+
+  &lt;div class=&quot;cobalt-review-bar&quot; aria-label=&quot;Design review controls&quot;&gt;
+    &lt;div class=&quot;cobalt-review-group&quot;&gt;
+      &lt;span class=&quot;cobalt-review-label&quot;&gt;Page&lt;/span&gt;
+      &lt;div class=&quot;cobalt-review-options&quot; role=&quot;group&quot; aria-label=&quot;Choose a page&quot;&gt;
+        &lt;button type=&quot;button&quot; data-review-page=&quot;today&quot; aria-pressed=&quot;true&quot;&gt;Today&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-review-page=&quot;history&quot; aria-pressed=&quot;false&quot;&gt;History&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;cobalt-review-group&quot;&gt;
+      &lt;span class=&quot;cobalt-review-label&quot;&gt;State&lt;/span&gt;
+      &lt;div class=&quot;cobalt-review-options&quot; role=&quot;group&quot; aria-label=&quot;Choose an operating state&quot;&gt;
+        &lt;button type=&quot;button&quot; data-review-state=&quot;normal&quot; aria-pressed=&quot;true&quot;&gt;Normal&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-review-state=&quot;needs&quot; aria-pressed=&quot;false&quot;&gt;Needs you&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-review-state=&quot;reconnect&quot; aria-pressed=&quot;false&quot;&gt;Reconnecting&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;cobalt-review-group&quot;&gt;
+      &lt;span class=&quot;cobalt-review-label&quot;&gt;View&lt;/span&gt;
+      &lt;div class=&quot;cobalt-review-options&quot; role=&quot;group&quot; aria-label=&quot;Choose a viewport&quot;&gt;
+        &lt;button type=&quot;button&quot; data-review-viewport=&quot;desktop&quot; aria-pressed=&quot;true&quot;&gt;Desktop&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-review-viewport=&quot;phone&quot; aria-pressed=&quot;false&quot;&gt;Phone&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;cobalt-review-note&quot;&gt;Current fixture values plus illustrative history for layout review&lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;cobalt-preview-stage&quot; data-state=&quot;normal&quot; data-viewport=&quot;desktop&quot;&gt;
+    &lt;div class=&quot;cobalt-app&quot;&gt;
+      &lt;header class=&quot;cobalt-app-header&quot;&gt;
+        &lt;div class=&quot;cobalt-brand&quot;&gt;
+          &lt;div class=&quot;cobalt-brand-mark&quot; aria-hidden=&quot;true&quot;&gt;DT&lt;/div&gt;
+          &lt;div class=&quot;cobalt-brand-copy&quot;&gt;
+            &lt;strong&gt;Day Trader&lt;/strong&gt;
+            &lt;span&gt;Practice money, real paper orders&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;nav class=&quot;cobalt-app-nav&quot; aria-label=&quot;Main navigation&quot;&gt;
+          &lt;button type=&quot;button&quot; data-app-page=&quot;today&quot; aria-current=&quot;page&quot;&gt;Today&lt;/button&gt;
+          &lt;button type=&quot;button&quot;&gt;Holdings&lt;/button&gt;
+          &lt;button type=&quot;button&quot; data-app-page=&quot;history&quot;&gt;History&lt;/button&gt;
+          &lt;button type=&quot;button&quot;&gt;Plans&lt;/button&gt;
+          &lt;button type=&quot;button&quot;&gt;Controls&lt;/button&gt;
+        &lt;/nav&gt;
+        &lt;div class=&quot;cobalt-live&quot;&gt;
+          &lt;span class=&quot;cobalt-live-dot&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+          &lt;span class=&quot;cobalt-state-block cobalt-state-normal&quot;&gt;Live&lt;/span&gt;
+          &lt;span class=&quot;cobalt-state-block cobalt-state-needs&quot;&gt;Live&lt;/span&gt;
+          &lt;span class=&quot;cobalt-state-block cobalt-state-reconnect&quot;&gt;Reconnecting&lt;/span&gt;
+          &lt;time datetime=&quot;2026-09-29T11:56:00-04:00&quot;&gt;Tue, Sep 29 · 11:56 AM&lt;/time&gt;
+        &lt;/div&gt;
+      &lt;/header&gt;
+
+      &lt;div class=&quot;cobalt-status cobalt-state-block cobalt-state-normal&quot;&gt;
+        &lt;span class=&quot;cobalt-status-mark&quot; aria-hidden=&quot;true&quot;&gt;✓&lt;/span&gt;
+        &lt;span&gt;&lt;strong&gt;No action needed.&lt;/strong&gt; Five stocks are held and the robot is managing their exits.&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;cobalt-status cobalt-state-block cobalt-state-reconnect&quot;&gt;
+        &lt;span class=&quot;cobalt-status-mark&quot; aria-hidden=&quot;true&quot;&gt;↻&lt;/span&gt;
+        &lt;span&gt;&lt;strong&gt;Prices may be old.&lt;/strong&gt; Existing protection remains at Alpaca while the connection returns.&lt;/span&gt;
+      &lt;/div&gt;
+
+      &lt;main&gt;
+        &lt;section class=&quot;cobalt-content-page cobalt-page-visible&quot; data-content-page=&quot;today&quot;&gt;
+          &lt;div class=&quot;cobalt-page&quot;&gt;
+            &lt;section class=&quot;cobalt-panel cobalt-needs-panel cobalt-state-block cobalt-state-needs&quot; aria-label=&quot;Required actions&quot;&gt;
+              &lt;div class=&quot;cobalt-needs-head&quot;&gt;
+                &lt;strong&gt;2 things need you&lt;/strong&gt;
+                &lt;span&gt;Five other problems are retrying or paused safely&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div class=&quot;cobalt-issue&quot;&gt;
+                &lt;span class=&quot;cobalt-issue-number&quot;&gt;1&lt;/span&gt;
+                &lt;div class=&quot;cobalt-issue-copy&quot;&gt;&lt;strong&gt;40 RKLB shares have no matching order&lt;/strong&gt;&lt;span&gt;Close the shares and cancel their orders at Alpaca, then clear the record here.&lt;/span&gt;&lt;/div&gt;
+                &lt;button type=&quot;button&quot; class=&quot;cobalt-action&quot; data-mock-action data-confirm=&quot;true&quot; data-action-label=&quot;Clear RKLB&quot;&gt;Clear RKLB&lt;/button&gt;
+              &lt;/div&gt;
+              &lt;div class=&quot;cobalt-issue&quot;&gt;
+                &lt;span class=&quot;cobalt-issue-number&quot;&gt;2&lt;/span&gt;
+                &lt;div class=&quot;cobalt-issue-copy&quot;&gt;&lt;strong&gt;The robot and Alpaca disagree about held stocks&lt;/strong&gt;&lt;span&gt;New trades are paused. Existing protection remains in place.&lt;/span&gt;&lt;/div&gt;
+                &lt;button type=&quot;button&quot; class=&quot;cobalt-action&quot;&gt;See differences&lt;/button&gt;
+              &lt;/div&gt;
+            &lt;/section&gt;
+
+            &lt;div class=&quot;cobalt-top-grid&quot;&gt;
+              &lt;section class=&quot;cobalt-panel cobalt-performance&quot; aria-labelledby=&quot;cobalt-performance-title&quot;&gt;
+                &lt;div class=&quot;cobalt-section-head&quot;&gt;
+                  &lt;div&gt;
+                    &lt;div class=&quot;cobalt-eyebrow&quot;&gt;Performance&lt;/div&gt;
+                    &lt;h1 id=&quot;cobalt-performance-title&quot; data-performance-headline&gt;Up today&lt;/h1&gt;
+                  &lt;/div&gt;
+                  &lt;div class=&quot;cobalt-period-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;Performance period&quot;&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;day&quot; aria-selected=&quot;true&quot;&gt;Day&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;week&quot; aria-selected=&quot;false&quot;&gt;Week&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;month&quot; aria-selected=&quot;false&quot;&gt;Month&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;all&quot; aria-selected=&quot;false&quot;&gt;All&lt;/button&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+
+                &lt;div class=&quot;cobalt-performance-numbers&quot;&gt;
+                  &lt;div class=&quot;cobalt-equity-box&quot;&gt;
+                    &lt;span class=&quot;cobalt-equity-label&quot;&gt;Current equity&lt;/span&gt;
+                    &lt;strong class=&quot;cobalt-equity&quot; data-performance-equity&gt;$50,245.10&lt;/strong&gt;
+                    &lt;div class=&quot;cobalt-delta-line&quot;&gt;
+                      &lt;strong class=&quot;cobalt-delta-money cobalt-positive&quot; data-performance-delta&gt;+$245.10&lt;/strong&gt;
+                      &lt;span class=&quot;cobalt-delta-percent&quot; data-performance-percent&gt;↑ 0.49%&lt;/span&gt;
+                    &lt;/div&gt;
+                    &lt;span class=&quot;cobalt-chart-note&quot; data-performance-basis&gt;Compared with $50,000.00 at today&#x27;s open&lt;/span&gt;
+                  &lt;/div&gt;
+                  &lt;div class=&quot;cobalt-period-fact&quot;&gt;
+                    &lt;span class=&quot;cobalt-fact-label&quot; data-finished-label&gt;Finished trades today&lt;/span&gt;
+                    &lt;strong class=&quot;cobalt-positive&quot; data-finished-value&gt;+$51.10&lt;/strong&gt;
+                    &lt;small data-finished-note&gt;13 trades, 7 won&lt;/small&gt;
+                  &lt;/div&gt;
+                  &lt;div class=&quot;cobalt-period-fact&quot;&gt;
+                    &lt;span class=&quot;cobalt-fact-label&quot; data-open-label&gt;Open holdings since entry&lt;/span&gt;
+                    &lt;strong class=&quot;cobalt-positive&quot; data-open-value&gt;+$411.20&lt;/strong&gt;
+                    &lt;small data-open-note&gt;Independent from account change&lt;/small&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+
+                &lt;div class=&quot;cobalt-chart-head&quot;&gt;
+                  &lt;span class=&quot;cobalt-chart-title&quot; data-chart-heading&gt;Finished trade result today&lt;/span&gt;
+                  &lt;span class=&quot;cobalt-chart-note&quot; data-chart-caption&gt;Open holdings are not included&lt;/span&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-chart-wrap&quot;&gt;
+                  &lt;svg class=&quot;cobalt-chart&quot; data-performance-chart role=&quot;img&quot; aria-labelledby=&quot;cobalt-chart-title cobalt-chart-desc&quot;&gt;
+                    &lt;title id=&quot;cobalt-chart-title&quot;&gt;Selected performance period&lt;/title&gt;
+                    &lt;desc id=&quot;cobalt-chart-desc&quot;&gt;Finished trade result today rose from zero dollars to positive fifty one dollars and ten cents.&lt;/desc&gt;
+                    &lt;g data-chart-grid&gt;&lt;/g&gt;
+                    &lt;path class=&quot;cobalt-chart-area&quot; data-chart-area&gt;&lt;/path&gt;
+                    &lt;path class=&quot;cobalt-chart-line&quot; data-chart-line&gt;&lt;/path&gt;
+                    &lt;line class=&quot;cobalt-chart-guide&quot; data-chart-guide&gt;&lt;/line&gt;
+                    &lt;g data-chart-points&gt;&lt;/g&gt;
+                    &lt;g data-chart-labels&gt;&lt;/g&gt;
+                    &lt;rect class=&quot;cobalt-chart-hit&quot; data-chart-hit aria-label=&quot;Explore chart points&quot;&gt;&lt;/rect&gt;
+                    &lt;text class=&quot;cobalt-axis-title&quot; data-axis=&quot;y&quot;&gt;US dollars&lt;/text&gt;
+                    &lt;text class=&quot;cobalt-axis-title&quot; data-axis=&quot;x&quot;&gt;Time&lt;/text&gt;
+                  &lt;/svg&gt;
+                  &lt;div class=&quot;cobalt-tooltip&quot; role=&quot;tooltip&quot; data-chart-tooltip&gt;&lt;/div&gt;
+                &lt;/div&gt;
+              &lt;/section&gt;
+
+              &lt;aside class=&quot;cobalt-panel cobalt-next&quot; aria-labelledby=&quot;cobalt-next-title&quot;&gt;
+                &lt;div class=&quot;cobalt-section-head&quot;&gt;
+                  &lt;div&gt;
+                    &lt;div class=&quot;cobalt-eyebrow&quot;&gt;Now and next&lt;/div&gt;
+                    &lt;h2 id=&quot;cobalt-next-title&quot;&gt;The robot is managing 5&lt;/h2&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-robot-state&quot;&gt;
+                  &lt;strong&gt;Earliest automatic close · 3:55 PM&lt;/strong&gt;
+                  &lt;span&gt;No operator action is needed.&lt;/span&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-event-list&quot;&gt;
+                  &lt;div class=&quot;cobalt-event&quot;&gt;
+                    &lt;time&gt;2:00 PM&lt;/time&gt;
+                    &lt;span class=&quot;cobalt-event-dot&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+                    &lt;div&gt;&lt;strong&gt;Ride the Trend watches again&lt;/strong&gt;&lt;span&gt;Source backed event&lt;/span&gt;&lt;/div&gt;
+                  &lt;/div&gt;
+                  &lt;div class=&quot;cobalt-event&quot;&gt;
+                    &lt;time&gt;3:55 PM&lt;/time&gt;
+                    &lt;span class=&quot;cobalt-event-dot&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+                    &lt;div&gt;&lt;strong&gt;Quick trades close&lt;/strong&gt;&lt;span&gt;Stocks still open sell automatically&lt;/span&gt;&lt;/div&gt;
+                  &lt;/div&gt;
+                  &lt;div class=&quot;cobalt-event&quot;&gt;
+                    &lt;time&gt;4:00 PM&lt;/time&gt;
+                    &lt;span class=&quot;cobalt-event-dot&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;
+                    &lt;div&gt;&lt;strong&gt;Market closes&lt;/strong&gt;&lt;span&gt;Slow trades check after the close&lt;/span&gt;&lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-loss-limit&quot;&gt;
+                  &lt;div class=&quot;cobalt-loss-limit-line&quot;&gt;&lt;span&gt;Day loss limit remaining&lt;/span&gt;&lt;strong&gt;$1,446.99 of $1,500&lt;/strong&gt;&lt;/div&gt;
+                  &lt;div class=&quot;cobalt-loss-track&quot; aria-hidden=&quot;true&quot;&gt;&lt;div class=&quot;cobalt-loss-fill&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                &lt;/div&gt;
+              &lt;/aside&gt;
+            &lt;/div&gt;
+
+            &lt;div class=&quot;cobalt-lower-grid&quot;&gt;
+              &lt;section class=&quot;cobalt-panel cobalt-panel-pad&quot; aria-labelledby=&quot;cobalt-holdings-title&quot;&gt;
+                &lt;div class=&quot;cobalt-section-head&quot;&gt;
+                  &lt;div&gt;
+                    &lt;div class=&quot;cobalt-eyebrow&quot;&gt;Holdings&lt;/div&gt;
+                    &lt;h2 id=&quot;cobalt-holdings-title&quot;&gt;Five Quick stocks&lt;/h2&gt;
+                  &lt;/div&gt;
+                  &lt;span class=&quot;cobalt-chart-note&quot;&gt;Dollar and percent are since entry&lt;/span&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-holding-list&quot;&gt;
+                  &lt;button type=&quot;button&quot; class=&quot;cobalt-holding-row&quot; aria-pressed=&quot;false&quot; data-holding data-company=&quot;Apple&quot; data-symbol=&quot;AAPL&quot; data-entry=&quot;$236.10&quot; data-protection=&quot;$236.40&quot; data-sale=&quot;3:55 PM&quot; data-plan=&quot;Ride the Trend&quot; data-result=&quot;+$145.60 · +1.19%&quot;&gt;
+                    &lt;span class=&quot;cobalt-plan-mark&quot;&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-name&quot;&gt;&lt;strong&gt;Apple AAPL&lt;/strong&gt;&lt;span&gt;52 shares · bet it goes up&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-next&quot;&gt;&lt;strong&gt;Sells by 3:55 PM&lt;/strong&gt;&lt;span&gt;Protection $236.40&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-money cobalt-positive&quot;&gt;+$145.60&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-percent cobalt-positive&quot;&gt;+1.19%&lt;/span&gt;
+                    &lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;
+                  &lt;/button&gt;
+                  &lt;button type=&quot;button&quot; class=&quot;cobalt-holding-row&quot; aria-pressed=&quot;true&quot; data-holding data-company=&quot;Nvidia&quot; data-symbol=&quot;NVDA&quot; data-entry=&quot;$184.00&quot; data-protection=&quot;$177.56&quot; data-sale=&quot;$189.15&quot; data-plan=&quot;Big News&quot; data-result=&quot;+$59.40 · +0.60%&quot;&gt;
+                    &lt;span class=&quot;cobalt-plan-mark cobalt-mark-pink&quot;&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-name&quot;&gt;&lt;strong&gt;Nvidia NVDA&lt;/strong&gt;&lt;span&gt;54 shares · bet it goes up&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-next&quot;&gt;&lt;strong&gt;Sells by 3:55 PM&lt;/strong&gt;&lt;span&gt;Protection $177.56&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-money cobalt-positive&quot;&gt;+$59.40&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-percent cobalt-positive&quot;&gt;+0.60%&lt;/span&gt;
+                    &lt;span aria-hidden=&quot;true&quot;&gt;⌄&lt;/span&gt;
+                  &lt;/button&gt;
+                  &lt;button type=&quot;button&quot; class=&quot;cobalt-holding-row&quot; aria-pressed=&quot;false&quot; data-holding data-company=&quot;Microsoft&quot; data-symbol=&quot;MSFT&quot; data-entry=&quot;$512.00&quot; data-protection=&quot;$514.05&quot; data-sale=&quot;3:55 PM&quot; data-plan=&quot;Snap Back&quot; data-result=&quot;+$19.20 · +0.16%&quot;&gt;
+                    &lt;span class=&quot;cobalt-plan-mark&quot;&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-name&quot;&gt;&lt;strong&gt;Microsoft MSFT&lt;/strong&gt;&lt;span&gt;24 shares · bet it goes down&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-next&quot;&gt;&lt;strong&gt;Closes by 3:55 PM&lt;/strong&gt;&lt;span&gt;Protection $514.05&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-money cobalt-positive&quot;&gt;+$19.20&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-percent cobalt-positive&quot;&gt;+0.16%&lt;/span&gt;
+                    &lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;
+                  &lt;/button&gt;
+                  &lt;button type=&quot;button&quot; class=&quot;cobalt-holding-row&quot; aria-pressed=&quot;false&quot; data-holding data-company=&quot;Palantir&quot; data-symbol=&quot;PLTR&quot; data-entry=&quot;$41.20&quot; data-protection=&quot;Broker managed&quot; data-sale=&quot;11:00 AM&quot; data-plan=&quot;Opening Range&quot; data-result=&quot;+$117.00 · +1.58%&quot;&gt;
+                    &lt;span class=&quot;cobalt-plan-mark cobalt-mark-orange&quot;&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-name&quot;&gt;&lt;strong&gt;Palantir PLTR&lt;/strong&gt;&lt;span&gt;180 shares · bet it goes up&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-next&quot;&gt;&lt;strong&gt;Broker manages the exit&lt;/strong&gt;&lt;span&gt;Sells by 11:00 AM&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-money cobalt-positive&quot;&gt;+$117.00&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-percent cobalt-positive&quot;&gt;+1.58%&lt;/span&gt;
+                    &lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;
+                  &lt;/button&gt;
+                  &lt;button type=&quot;button&quot; class=&quot;cobalt-holding-row&quot; aria-pressed=&quot;false&quot; data-holding data-company=&quot;Tesla&quot; data-symbol=&quot;TSLA&quot; data-entry=&quot;$412.00&quot; data-protection=&quot;Two parts remain&quot; data-sale=&quot;Fixed sale plan&quot; data-plan=&quot;Tesla Morning Plan&quot; data-result=&quot;+$70.00 · +0.85%&quot;&gt;
+                    &lt;span class=&quot;cobalt-plan-mark cobalt-mark-gold&quot;&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-name&quot;&gt;&lt;strong&gt;Tesla TSLA&lt;/strong&gt;&lt;span&gt;20 shares · fixed plan&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-next&quot;&gt;&lt;strong&gt;Fixed sale plan&lt;/strong&gt;&lt;span&gt;Two parts remain&lt;/span&gt;&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-money cobalt-positive&quot;&gt;+$70.00&lt;/span&gt;
+                    &lt;span class=&quot;cobalt-holding-percent cobalt-positive&quot;&gt;+0.85%&lt;/span&gt;
+                    &lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;
+                  &lt;/button&gt;
+                  &lt;div class=&quot;cobalt-holding-detail cobalt-open&quot; data-holding-detail&gt;
+                    &lt;div&gt;
+                      &lt;div class=&quot;cobalt-section-head&quot;&gt;
+                        &lt;h3&gt;&lt;span data-detail-company&gt;Nvidia&lt;/span&gt; &lt;span data-detail-symbol&gt;NVDA&lt;/span&gt; · &lt;span class=&quot;cobalt-positive&quot; data-detail-result&gt;+$59.40 · +0.60%&lt;/span&gt;&lt;/h3&gt;
+                      &lt;/div&gt;
+                      &lt;div class=&quot;cobalt-detail-facts&quot;&gt;
+                        &lt;div class=&quot;cobalt-detail-fact&quot;&gt;&lt;span&gt;Bought at&lt;/span&gt;&lt;strong data-detail-entry&gt;$184.00&lt;/strong&gt;&lt;/div&gt;
+                        &lt;div class=&quot;cobalt-detail-fact&quot;&gt;&lt;span&gt;Protection&lt;/span&gt;&lt;strong data-detail-protection&gt;$177.56&lt;/strong&gt;&lt;/div&gt;
+                        &lt;div class=&quot;cobalt-detail-fact&quot;&gt;&lt;span&gt;Planned sale&lt;/span&gt;&lt;strong data-detail-sale&gt;$189.15&lt;/strong&gt;&lt;/div&gt;
+                        &lt;div class=&quot;cobalt-detail-fact&quot;&gt;&lt;span&gt;Plan&lt;/span&gt;&lt;strong data-detail-plan&gt;Big News&lt;/strong&gt;&lt;/div&gt;
+                      &lt;/div&gt;
+                    &lt;/div&gt;
+                    &lt;div class=&quot;cobalt-detail-actions&quot;&gt;
+                      &lt;button type=&quot;button&quot; class=&quot;cobalt-action cobalt-action-primary&quot; data-mock-action data-confirm=&quot;true&quot; data-action-label=&quot;Sell now&quot;&gt;Sell now&lt;/button&gt;
+                      &lt;button type=&quot;button&quot; class=&quot;cobalt-action&quot; data-mock-action data-action-label=&quot;Move protection to entry&quot;&gt;Move protection to entry&lt;/button&gt;
+                      &lt;span class=&quot;cobalt-action-result&quot; aria-live=&quot;polite&quot;&gt;&lt;/span&gt;
+                    &lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+              &lt;/section&gt;
+
+              &lt;section class=&quot;cobalt-panel cobalt-panel-pad&quot; aria-labelledby=&quot;cobalt-recent-title&quot;&gt;
+                &lt;div class=&quot;cobalt-section-head&quot;&gt;
+                  &lt;div&gt;
+                    &lt;div class=&quot;cobalt-eyebrow&quot;&gt;Recent history&lt;/div&gt;
+                    &lt;h2 id=&quot;cobalt-recent-title&quot;&gt;Five trading days&lt;/h2&gt;
+                  &lt;/div&gt;
+                  &lt;button type=&quot;button&quot; class=&quot;cobalt-action&quot; data-app-page=&quot;history&quot;&gt;Open History&lt;/button&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-history-rows&quot; data-recent-history&gt;&lt;/div&gt;
+                &lt;div class=&quot;cobalt-history-detail&quot; data-recent-detail&gt;&lt;/div&gt;
+              &lt;/section&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/section&gt;
+
+        &lt;section class=&quot;cobalt-content-page&quot; data-content-page=&quot;history&quot;&gt;
+          &lt;div class=&quot;cobalt-page&quot;&gt;
+            &lt;div class=&quot;cobalt-history-page-grid&quot;&gt;
+              &lt;section class=&quot;cobalt-panel cobalt-history-main&quot; aria-labelledby=&quot;cobalt-history-title&quot;&gt;
+                &lt;div class=&quot;cobalt-section-head&quot;&gt;
+                  &lt;div&gt;
+                    &lt;div class=&quot;cobalt-eyebrow&quot;&gt;History&lt;/div&gt;
+                    &lt;h1 id=&quot;cobalt-history-title&quot;&gt;Performance with full detail&lt;/h1&gt;
+                  &lt;/div&gt;
+                  &lt;div class=&quot;cobalt-period-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;History period&quot;&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;day&quot; aria-selected=&quot;true&quot;&gt;Day&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;week&quot; aria-selected=&quot;false&quot;&gt;Week&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;month&quot; aria-selected=&quot;false&quot;&gt;Month&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-period=&quot;all&quot; aria-selected=&quot;false&quot;&gt;All&lt;/button&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-chart-head&quot;&gt;
+                  &lt;span class=&quot;cobalt-chart-title&quot; data-history-chart-heading&gt;Finished trade result today&lt;/span&gt;
+                  &lt;span class=&quot;cobalt-chart-note&quot; data-history-range&gt;Tue, Sep 29&lt;/span&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-chart-wrap&quot;&gt;
+                  &lt;svg class=&quot;cobalt-chart&quot; data-history-chart role=&quot;img&quot; aria-label=&quot;History chart for the selected period&quot;&gt;
+                    &lt;g data-chart-grid&gt;&lt;/g&gt;
+                    &lt;path class=&quot;cobalt-chart-area&quot; data-chart-area&gt;&lt;/path&gt;
+                    &lt;path class=&quot;cobalt-chart-line&quot; data-chart-line&gt;&lt;/path&gt;
+                    &lt;line class=&quot;cobalt-chart-guide&quot; data-chart-guide&gt;&lt;/line&gt;
+                    &lt;g data-chart-points&gt;&lt;/g&gt;
+                    &lt;g data-chart-labels&gt;&lt;/g&gt;
+                    &lt;rect class=&quot;cobalt-chart-hit&quot; data-chart-hit aria-label=&quot;Explore history chart points&quot;&gt;&lt;/rect&gt;
+                    &lt;text class=&quot;cobalt-axis-title&quot; data-axis=&quot;y&quot;&gt;US dollars&lt;/text&gt;
+                    &lt;text class=&quot;cobalt-axis-title&quot; data-axis=&quot;x&quot;&gt;Time&lt;/text&gt;
+                  &lt;/svg&gt;
+                  &lt;div class=&quot;cobalt-tooltip&quot; role=&quot;tooltip&quot; data-chart-tooltip&gt;&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-section-head&quot; style=&quot;margin-top:12px&quot;&gt;
+                  &lt;div class=&quot;cobalt-breakdown-tabs&quot; role=&quot;tablist&quot; aria-label=&quot;History breakdown&quot;&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-breakdown=&quot;days&quot; aria-selected=&quot;true&quot;&gt;Days&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-breakdown=&quot;plans&quot; aria-selected=&quot;false&quot;&gt;Plans&lt;/button&gt;
+                    &lt;button type=&quot;button&quot; role=&quot;tab&quot; data-breakdown=&quot;trades&quot; aria-selected=&quot;false&quot;&gt;Trades&lt;/button&gt;
+                  &lt;/div&gt;
+                  &lt;span class=&quot;cobalt-chart-note&quot; data-history-completeness&gt;Complete sample history&lt;/span&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-breakdown-list&quot; data-breakdown-list&gt;&lt;/div&gt;
+                &lt;div class=&quot;cobalt-detail-drawer cobalt-open&quot; data-history-drawer&gt;&lt;/div&gt;
+              &lt;/section&gt;
+
+              &lt;aside class=&quot;cobalt-panel cobalt-history-summary&quot; aria-labelledby=&quot;cobalt-period-summary-title&quot;&gt;
+                &lt;div class=&quot;cobalt-section-head&quot;&gt;
+                  &lt;div&gt;
+                    &lt;div class=&quot;cobalt-eyebrow&quot;&gt;Selected period&lt;/div&gt;
+                    &lt;h2 id=&quot;cobalt-period-summary-title&quot; data-summary-title&gt;Today&lt;/h2&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-history-summary-numbers&quot;&gt;
+                  &lt;div class=&quot;cobalt-summary-fact&quot;&gt;&lt;span&gt;Account change&lt;/span&gt;&lt;strong class=&quot;cobalt-positive&quot; data-summary-delta&gt;+$245.10&lt;/strong&gt;&lt;/div&gt;
+                  &lt;div class=&quot;cobalt-summary-fact&quot;&gt;&lt;span&gt;Percent change&lt;/span&gt;&lt;strong class=&quot;cobalt-positive&quot; data-summary-percent&gt;+0.49%&lt;/strong&gt;&lt;/div&gt;
+                  &lt;div class=&quot;cobalt-summary-fact&quot;&gt;&lt;span&gt;Period opening&lt;/span&gt;&lt;strong data-summary-opening&gt;$50,000.00&lt;/strong&gt;&lt;/div&gt;
+                  &lt;div class=&quot;cobalt-summary-fact&quot;&gt;&lt;span&gt;Current equity&lt;/span&gt;&lt;strong data-summary-current&gt;$50,245.10&lt;/strong&gt;&lt;/div&gt;
+                  &lt;div class=&quot;cobalt-summary-fact&quot;&gt;&lt;span&gt;Finished trades&lt;/span&gt;&lt;strong data-summary-finished&gt;+$51.10&lt;/strong&gt;&lt;/div&gt;
+                  &lt;div class=&quot;cobalt-summary-fact&quot;&gt;&lt;span&gt;Trades&lt;/span&gt;&lt;strong data-summary-trades&gt;13&lt;/strong&gt;&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;cobalt-history-detail&quot; style=&quot;margin-top:10px&quot;&gt;
+                  &lt;div class=&quot;cobalt-history-detail-head&quot;&gt;
+                    &lt;strong data-best-day&gt;Best day · Tue, Sep 29&lt;/strong&gt;
+                    &lt;span class=&quot;cobalt-positive&quot; data-best-day-value&gt;+0.49% · +$245.10&lt;/span&gt;
+                  &lt;/div&gt;
+                  &lt;div class=&quot;cobalt-history-detail-head&quot; style=&quot;margin-top:8px&quot;&gt;
+                    &lt;strong data-worst-day&gt;Worst day · Tue, Sep 29&lt;/strong&gt;
+                    &lt;span class=&quot;cobalt-positive&quot; data-worst-day-value&gt;+0.49% · +$245.10&lt;/span&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;p class=&quot;cobalt-chart-note&quot; data-summary-note style=&quot;margin:10px 0 0&quot;&gt;Account change uses today&#x27;s opening equity. Finished trades and open holdings are separate facts.&lt;/p&gt;
+              &lt;/aside&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/section&gt;
+      &lt;/main&gt;
+
+      &lt;nav class=&quot;cobalt-phone-nav&quot; aria-label=&quot;Phone navigation&quot;&gt;
+        &lt;button type=&quot;button&quot; data-app-page=&quot;today&quot; aria-current=&quot;page&quot;&gt;Today&lt;/button&gt;
+        &lt;button type=&quot;button&quot;&gt;Holdings&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-app-page=&quot;history&quot;&gt;History&lt;/button&gt;
+        &lt;button type=&quot;button&quot;&gt;Controls&lt;/button&gt;
+      &lt;/nav&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;cobalt-sr-only&quot; aria-live=&quot;polite&quot; data-live-update&gt;&lt;/div&gt;
+
+  &lt;script&gt;
+    (() =&gt; {
+      const root = document.getElementById(&quot;cobalt-ledger-review&quot;);
+      const stage = root.querySelector(&quot;.cobalt-preview-stage&quot;);
+      const app = root.querySelector(&quot;.cobalt-app&quot;);
+      const liveUpdate = root.querySelector(&quot;[data-live-update]&quot;);
+
+      const prefs = {
+        radius: 8,
+        accent: &quot;#2b4bff&quot;,
+        compact: true,
+        chartFill: true
+      };
+
+      const periods = {
+        day: {
+          title: &quot;Today&quot;,
+          headline: &quot;Up today&quot;,
+          equity: 50245.10,
+          opening: 50000,
+          delta: 245.10,
+          percent: 0.49,
+          basis: &quot;Compared with $50,000.00 at today&#x27;s open&quot;,
+          finished: 51.10,
+          finishedLabel: &quot;Finished trades today&quot;,
+          finishedNote: &quot;13 trades, 7 won&quot;,
+          open: 411.20,
+          openLabel: &quot;Open holdings since entry&quot;,
+          openNote: &quot;Independent from account change&quot;,
+          chartHeading: &quot;Finished trade result today&quot;,
+          chartCaption: &quot;Open holdings are not included&quot;,
+          range: &quot;Tue, Sep 29&quot;,
+          xAxis: &quot;Eastern time&quot;,
+          yAxis: &quot;US dollars&quot;,
+          trades: 13,
+          best: [&quot;Tue, Sep 29&quot;, 0.49, 245.10],
+          worst: [&quot;Tue, Sep 29&quot;, 0.49, 245.10],
+          points: [
+            { label: &quot;9:30 AM&quot;, value: 0 },
+            { label: &quot;10:05 AM&quot;, value: 32.40 },
+            { label: &quot;10:48 AM&quot;, value: -18.60 },
+            { label: &quot;12:15 PM&quot;, value: 14.20 },
+            { label: &quot;2:32 PM&quot;, value: 67.30 },
+            { label: &quot;3:12 PM&quot;, value: 51.10 }
+          ]
+        },
+        week: {
+          title: &quot;Last 7 days&quot;,
+          headline: &quot;Up over 7 days&quot;,
+          equity: 50245.10,
+          opening: 49961.60,
+          delta: 283.50,
+          percent: 0.57,
+          basis: &quot;Compared with $49,961.60 seven calendar days ago&quot;,
+          finished: 338.30,
+          finishedLabel: &quot;Finished trades in period&quot;,
+          finishedNote: &quot;31 trades across 5 trading days&quot;,
+          open: 411.20,
+          openLabel: &quot;Open holdings since entry&quot;,
+          openNote: &quot;Not part of the period chart&quot;,
+          chartHeading: &quot;Closing equity by trading day&quot;,
+          chartCaption: &quot;The last point is live equity&quot;,
+          range: &quot;Sep 23 to Sep 29&quot;,
+          xAxis: &quot;Trading day&quot;,
+          yAxis: &quot;US dollars&quot;,
+          trades: 31,
+          best: [&quot;Tue, Sep 29&quot;, 0.49, 245.10],
+          worst: [&quot;Mon, Sep 28&quot;, -0.18, -90.00],
+          points: [
+            { label: &quot;Wed 23&quot;, value: 49961.60 },
+            { label: &quot;Thu 24&quot;, value: 50073.80 },
+            { label: &quot;Fri 25&quot;, value: 50015.60 },
+            { label: &quot;Mon 28&quot;, value: 50000.00 },
+            { label: &quot;Tue 29&quot;, value: 50245.10 }
+          ]
+        },
+        month: {
+          title: &quot;Last 30 days&quot;,
+          headline: &quot;Up over 30 days&quot;,
+          equity: 50245.10,
+          opening: 49612.00,
+          delta: 633.10,
+          percent: 1.28,
+          basis: &quot;Compared with $49,612.00 thirty calendar days ago&quot;,
+          finished: 701.40,
+          finishedLabel: &quot;Finished trades in period&quot;,
+          finishedNote: &quot;96 trades across 20 trading days&quot;,
+          open: 411.20,
+          openLabel: &quot;Open holdings since entry&quot;,
+          openNote: &quot;Not part of the period chart&quot;,
+          chartHeading: &quot;Closing equity by trading day&quot;,
+          chartCaption: &quot;Selected dates shown&quot;,
+          range: &quot;Aug 31 to Sep 29&quot;,
+          xAxis: &quot;Trading day&quot;,
+          yAxis: &quot;US dollars&quot;,
+          trades: 96,
+          best: [&quot;Tue, Sep 29&quot;, 0.49, 245.10],
+          worst: [&quot;Thu, Sep 10&quot;, -0.43, -214.70],
+          points: [
+            { label: &quot;Aug 31&quot;, value: 49612.00 },
+            { label: &quot;Sep 4&quot;, value: 49842.40 },
+            { label: &quot;Sep 10&quot;, value: 49627.70 },
+            { label: &quot;Sep 16&quot;, value: 49910.20 },
+            { label: &quot;Sep 22&quot;, value: 49961.60 },
+            { label: &quot;Sep 28&quot;, value: 50000.00 },
+            { label: &quot;Sep 29&quot;, value: 50245.10 }
+          ]
+        },
+        all: {
+          title: &quot;Since recorded history&quot;,
+          headline: &quot;Up since recorded history&quot;,
+          equity: 50245.10,
+          opening: 50000,
+          delta: 245.10,
+          percent: 0.49,
+          basis: &quot;Compared with the earliest complete durable opening&quot;,
+          finished: 1048.60,
+          finishedLabel: &quot;Finished trades recorded&quot;,
+          finishedNote: &quot;142 trades&quot;,
+          open: 411.20,
+          openLabel: &quot;Open holdings since entry&quot;,
+          openNote: &quot;Not part of historical finished trades&quot;,
+          chartHeading: &quot;Closing equity by recorded session&quot;,
+          chartCaption: &quot;Selected dates shown&quot;,
+          range: &quot;Since Sep 1&quot;,
+          xAxis: &quot;Recorded session&quot;,
+          yAxis: &quot;US dollars&quot;,
+          trades: 142,
+          best: [&quot;Tue, Sep 29&quot;, 0.49, 245.10],
+          worst: [&quot;Thu, Sep 10&quot;, -0.43, -214.70],
+          points: [
+            { label: &quot;Sep 1&quot;, value: 50000.00 },
+            { label: &quot;Sep 5&quot;, value: 49842.40 },
+            { label: &quot;Sep 10&quot;, value: 49627.70 },
+            { label: &quot;Sep 16&quot;, value: 49910.20 },
+            { label: &quot;Sep 22&quot;, value: 49961.60 },
+            { label: &quot;Sep 28&quot;, value: 50000.00 },
+            { label: &quot;Sep 29&quot;, value: 50245.10 }
+          ]
+        }
+      };
+
+      const days = [
+        { key: &quot;2026-09-29&quot;, label: &quot;Tue, Sep 29&quot;, sub: &quot;13 trades · 7 won, 6 lost&quot;, opening: 50000, closing: 50245.10, delta: 245.10, percent: 0.49, finished: 51.10, trades: 13 },
+        { key: &quot;2026-09-28&quot;, label: &quot;Mon, Sep 28&quot;, sub: &quot;3 trades · 1 won, 2 lost&quot;, opening: 50090, closing: 50000, delta: -90, percent: -0.18, finished: -90, trades: 3 },
+        { key: &quot;2026-09-25&quot;, label: &quot;Fri, Sep 25&quot;, sub: &quot;4 trades · 3 won, 1 lost&quot;, opening: 50073.80, closing: 50015.60, delta: -58.20, percent: -0.12, finished: -58.20, trades: 4 },
+        { key: &quot;2026-09-24&quot;, label: &quot;Thu, Sep 24&quot;, sub: &quot;6 trades · 4 won, 2 lost&quot;, opening: 49961.60, closing: 50073.80, delta: 112.20, percent: 0.22, finished: 112.20, trades: 6 },
+        { key: &quot;2026-09-23&quot;, label: &quot;Wed, Sep 23&quot;, sub: &quot;5 trades · daily total only&quot;, opening: 49920.50, closing: 49961.60, delta: 41.10, percent: 0.08, finished: 41.10, trades: 5, aggregateOnly: true }
+      ];
+
+      const plans = [
+        { key: &quot;ride&quot;, label: &quot;Ride the Trend&quot;, sub: &quot;18 loaded trades · 11 won&quot;, total: 286.40, contribution: &quot;Best plan&quot; },
+        { key: &quot;news&quot;, label: &quot;Big News&quot;, sub: &quot;12 loaded trades · 7 won&quot;, total: 173.20, contribution: &quot;Second&quot; },
+        { key: &quot;snap&quot;, label: &quot;Snap Back&quot;, sub: &quot;9 loaded trades · 4 won&quot;, total: -42.80, contribution: &quot;Needs review&quot; },
+        { key: &quot;open&quot;, label: &quot;Opening Range&quot;, sub: &quot;7 loaded trades · 4 won&quot;, total: 91.50, contribution: &quot;Complete&quot; },
+        { key: &quot;overnight&quot;, label: &quot;Overnight&quot;, sub: &quot;6 loaded trades · 3 won&quot;, total: 70.20, contribution: &quot;Complete&quot; }
+      ];
+
+      const trades = [
+        { key: &quot;t1&quot;, label: &quot;Apple AAPL&quot;, sub: &quot;Ride the Trend · sold 3:12 PM&quot;, total: 118.40, percent: 0.24, detail: &quot;52 shares · bought $236.10 · sold $238.38&quot; },
+        { key: &quot;t2&quot;, label: &quot;Nvidia NVDA&quot;, sub: &quot;Big News · sold 2:32 PM&quot;, total: 67.30, percent: 0.13, detail: &quot;54 shares · bought $184.00 · sold $185.25&quot; },
+        { key: &quot;t3&quot;, label: &quot;Microsoft MSFT&quot;, sub: &quot;Snap Back · covered 12:15 PM&quot;, total: -53.10, percent: -0.11, detail: &quot;24 shares · sold $512.00 · bought back $514.21&quot; },
+        { key: &quot;t4&quot;, label: &quot;Palantir PLTR&quot;, sub: &quot;Opening Range · sold 10:48 AM&quot;, total: -18.60, percent: -0.04, detail: &quot;180 shares · bought $41.20 · sold $41.10&quot; },
+        { key: &quot;t5&quot;, label: &quot;Tesla TSLA&quot;, sub: &quot;Tesla Morning Plan · sold 10:05 AM&quot;, total: 32.40, percent: 0.06, detail: &quot;20 shares · bought $412.00 · sold $413.62&quot; }
+      ];
+
+      let currentPeriod = &quot;day&quot;;
+      let currentBreakdown = &quot;days&quot;;
+      let currentPage = &quot;today&quot;;
+      let selectedHistoryKey = days[0].key;
+      let chartStates = new WeakMap();
+
+      function money(value, signed = false) {
+        const abs = Math.abs(value).toLocaleString(&quot;en-US&quot;, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (!signed || value === 0) return `$${abs}`;
+        return `${value &gt; 0 ? &quot;+&quot; : &quot;−&quot;}$${abs}`;
+      }
+
+      function percent(value, signed = false) {
+        if (!signed || value === 0) return `${Math.abs(value).toFixed(2)}%`;
+        return `${value &gt; 0 ? &quot;+&quot; : &quot;−&quot;}${Math.abs(value).toFixed(2)}%`;
+      }
+
+      function toneClass(value) {
+        return value &lt; 0 ? &quot;cobalt-negative&quot; : &quot;cobalt-positive&quot;;
+      }
+
+      function applyPreferences() {
+        root.style.setProperty(&quot;--cobalt-accent&quot;, prefs.accent);
+        root.style.setProperty(&quot;--cobalt-radius&quot;, `${prefs.radius}px`);
+        app.classList.toggle(&quot;cobalt-dense&quot;, prefs.compact);
+        root.querySelectorAll(&quot;[data-chart-area]&quot;).forEach((area) =&gt; {
+          area.style.display = prefs.chartFill ? &quot;&quot; : &quot;none&quot;;
+        });
+      }
+
+      function selectPeriod(name, announce = true) {
+        currentPeriod = name;
+        const data = periods[name];
+        root.querySelectorAll(&quot;[data-period]&quot;).forEach((button) =&gt; {
+          button.setAttribute(&quot;aria-selected&quot;, button.dataset.period === name ? &quot;true&quot; : &quot;false&quot;);
+        });
+        root.querySelectorAll(&quot;[data-performance-equity]&quot;).forEach((node) =&gt; node.textContent = money(data.equity));
+        root.querySelectorAll(&quot;[data-performance-headline]&quot;).forEach((node) =&gt; node.textContent = data.headline);
+        root.querySelectorAll(&quot;[data-performance-delta]&quot;).forEach((node) =&gt; {
+          node.textContent = money(data.delta, true);
+          node.className = `cobalt-delta-money ${toneClass(data.delta)} cobalt-flash`;
+        });
+        root.querySelectorAll(&quot;[data-performance-percent]&quot;).forEach((node) =&gt; {
+          node.textContent = `${data.percent &gt;= 0 ? &quot;↑&quot; : &quot;↓&quot;} ${Math.abs(data.percent).toFixed(2)}%`;
+          node.style.background = data.percent &lt; 0 ? &quot;var(--cobalt-negative-soft)&quot; : &quot;var(--cobalt-positive-soft)&quot;;
+          node.style.color = data.percent &lt; 0 ? &quot;var(--cobalt-negative)&quot; : &quot;var(--cobalt-positive)&quot;;
+        });
+        root.querySelectorAll(&quot;[data-performance-basis]&quot;).forEach((node) =&gt; node.textContent = data.basis);
+        root.querySelectorAll(&quot;[data-finished-label]&quot;).forEach((node) =&gt; node.textContent = data.finishedLabel);
+        root.querySelectorAll(&quot;[data-finished-value]&quot;).forEach((node) =&gt; {
+          node.textContent = money(data.finished, true);
+          node.className = toneClass(data.finished);
+        });
+        root.querySelectorAll(&quot;[data-finished-note]&quot;).forEach((node) =&gt; node.textContent = data.finishedNote);
+        root.querySelectorAll(&quot;[data-open-label]&quot;).forEach((node) =&gt; node.textContent = data.openLabel);
+        root.querySelectorAll(&quot;[data-open-value]&quot;).forEach((node) =&gt; {
+          node.textContent = money(data.open, true);
+          node.className = toneClass(data.open);
+        });
+        root.querySelectorAll(&quot;[data-open-note]&quot;).forEach((node) =&gt; node.textContent = data.openNote);
+        root.querySelectorAll(&quot;[data-chart-heading]&quot;).forEach((node) =&gt; node.textContent = data.chartHeading);
+        root.querySelectorAll(&quot;[data-chart-caption]&quot;).forEach((node) =&gt; node.textContent = data.chartCaption);
+        root.querySelectorAll(&quot;[data-history-chart-heading]&quot;).forEach((node) =&gt; node.textContent = data.chartHeading);
+        root.querySelectorAll(&quot;[data-history-range]&quot;).forEach((node) =&gt; node.textContent = data.range);
+        root.querySelectorAll(&quot;[data-summary-title]&quot;).forEach((node) =&gt; node.textContent = data.title);
+        root.querySelectorAll(&quot;[data-summary-delta]&quot;).forEach((node) =&gt; {
+          node.textContent = money(data.delta, true);
+          node.className = toneClass(data.delta);
+        });
+        root.querySelectorAll(&quot;[data-summary-percent]&quot;).forEach((node) =&gt; {
+          node.textContent = percent(data.percent, true);
+          node.className = toneClass(data.percent);
+        });
+        root.querySelectorAll(&quot;[data-summary-opening]&quot;).forEach((node) =&gt; node.textContent = money(data.opening));
+        root.querySelectorAll(&quot;[data-summary-current]&quot;).forEach((node) =&gt; node.textContent = money(data.equity));
+        root.querySelectorAll(&quot;[data-summary-finished]&quot;).forEach((node) =&gt; node.textContent = money(data.finished, true));
+        root.querySelectorAll(&quot;[data-summary-trades]&quot;).forEach((node) =&gt; node.textContent = String(data.trades));
+        root.querySelectorAll(&quot;[data-best-day]&quot;).forEach((node) =&gt; node.textContent = `Best day · ${data.best[0]}`);
+        root.querySelectorAll(&quot;[data-best-day-value]&quot;).forEach((node) =&gt; {
+          node.textContent = `${percent(data.best[1], true)} · ${money(data.best[2], true)}`;
+          node.className = toneClass(data.best[1]);
+        });
+        root.querySelectorAll(&quot;[data-worst-day]&quot;).forEach((node) =&gt; node.textContent = `Worst day · ${data.worst[0]}`);
+        root.querySelectorAll(&quot;[data-worst-day-value]&quot;).forEach((node) =&gt; {
+          node.textContent = `${percent(data.worst[1], true)} · ${money(data.worst[2], true)}`;
+          node.className = toneClass(data.worst[1]);
+        });
+        root.querySelectorAll(&quot;[data-summary-note]&quot;).forEach((node) =&gt; {
+          node.textContent = name === &quot;day&quot;
+            ? &quot;Account change uses today&#x27;s opening equity. Finished trades and open holdings are separate facts.&quot;
+            : &quot;Account change uses the earliest complete opening equity in this period.&quot;;
+        });
+        root.querySelectorAll(&quot;[data-performance-chart], [data-history-chart]&quot;).forEach((svg) =&gt; drawChart(svg, data));
+        renderBreakdown();
+        if (announce) liveUpdate.textContent = `${data.title}. Account change ${money(data.delta, true)}, ${percent(data.percent, true)}.`;
+      }
+
+      function formatAxis(value, compact) {
+        const sign = value &lt; 0 ? &quot;−&quot; : &quot;&quot;;
+        if (compact &amp;&amp; Math.abs(value) &gt;= 1000) return `${sign}$${(Math.abs(value) / 1000).toFixed(1)}k`;
+        return `${sign}${money(Math.abs(value))}`;
+      }
+
+      function sampleCoordinates(coords, count) {
+        if (coords.length === count) return coords;
+        const out = [];
+        for (let i = 0; i &lt; count; i += 1) {
+          const position = (i / Math.max(1, count - 1)) * (coords.length - 1);
+          const left = Math.floor(position);
+          const right = Math.min(coords.length - 1, Math.ceil(position));
+          const mix = position - left;
+          out.push({
+            x: coords[left].x + (coords[right].x - coords[left].x) * mix,
+            y: coords[left].y + (coords[right].y - coords[left].y) * mix
+          });
+        }
+        return out;
+      }
+
+      function pathFrom(coords) {
+        return coords.map((point, index) =&gt; `${index === 0 ? &quot;M&quot; : &quot;L&quot;}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(&quot; &quot;);
+      }
+
+      function areaFrom(coords, baseline) {
+        if (!coords.length) return &quot;&quot;;
+        return `${pathFrom(coords)} L${coords[coords.length - 1].x.toFixed(2)},${baseline.toFixed(2)} L${coords[0].x.toFixed(2)},${baseline.toFixed(2)} Z`;
+      }
+
+      function drawChart(svg, data) {
+        const width = Math.max(320, svg.parentElement.getBoundingClientRect().width);
+        const height = stage.classList.contains(&quot;cobalt-phone-preview&quot;) ? 204 : 216;
+        const margin = { top: 18, right: 22, bottom: 42, left: width &lt; 430 ? 54 : 68 };
+        const innerW = width - margin.left - margin.right;
+        const innerH = height - margin.top - margin.bottom;
+        const values = data.points.map((point) =&gt; point.value);
+        let min = Math.min(...values);
+        let max = Math.max(...values);
+        const spread = Math.max(1, max - min);
+        min -= spread * 0.16;
+        max += spread * 0.16;
+        if (data === periods.day) {
+          min = Math.min(min, 0);
+          max = Math.max(max, 0);
+        }
+        const x = (index) =&gt; margin.left + (index / Math.max(1, data.points.length - 1)) * innerW;
+        const y = (value) =&gt; margin.top + ((max - value) / Math.max(1, max - min)) * innerH;
+        const coords = data.points.map((point, index) =&gt; ({ x: x(index), y: y(point.value), point }));
+        const zeroY = y(data === periods.day ? 0 : min);
+        svg.setAttribute(&quot;viewBox&quot;, `0 0 ${width} ${height}`);
+        svg.setAttribute(&quot;aria-label&quot;, `${data.chartHeading}. ${data.points[0].label} ${formatAxis(data.points[0].value, false)}. ${data.points[data.points.length - 1].label} ${formatAxis(data.points[data.points.length - 1].value, false)}.`);
+        const description = svg.querySelector(&quot;desc&quot;);
+        if (description) description.textContent = svg.getAttribute(&quot;aria-label&quot;);
+
+        const grid = svg.querySelector(&quot;[data-chart-grid]&quot;);
+        const ticks = [max, (max + min) / 2, min];
+        grid.innerHTML = ticks.map((tick) =&gt; {
+          const tickY = y(tick);
+          return `&lt;line class=&quot;cobalt-chart-grid&quot; x1=&quot;${margin.left}&quot; y1=&quot;${tickY}&quot; x2=&quot;${width - margin.right}&quot; y2=&quot;${tickY}&quot;&gt;&lt;/line&gt;&lt;text x=&quot;${margin.left - 8}&quot; y=&quot;${tickY + 4}&quot; text-anchor=&quot;end&quot;&gt;${formatAxis(tick, width &lt; 430)}&lt;/text&gt;`;
+        }).join(&quot;&quot;) + (data === periods.day ? `&lt;line class=&quot;cobalt-chart-zero&quot; x1=&quot;${margin.left}&quot; y1=&quot;${y(0)}&quot; x2=&quot;${width - margin.right}&quot; y2=&quot;${y(0)}&quot;&gt;&lt;/line&gt;` : &quot;&quot;);
+
+        const labels = svg.querySelector(&quot;[data-chart-labels]&quot;);
+        const maxLabels = width &lt; 430 ? 3 : 6;
+        const labelIndexes = new Set();
+        const labelCount = Math.min(maxLabels, data.points.length);
+        for (let slot = 0; slot &lt; labelCount; slot += 1) {
+          labelIndexes.add(Math.round((slot / Math.max(1, labelCount - 1)) * (data.points.length - 1)));
+        }
+        labels.innerHTML = data.points.map((point, index) =&gt; {
+          const show = labelIndexes.has(index);
+          if (!show) return &quot;&quot;;
+          const anchor = index === 0 ? &quot;start&quot; : index === data.points.length - 1 ? &quot;end&quot; : &quot;middle&quot;;
+          return `&lt;text x=&quot;${x(index)}&quot; y=&quot;${height - 19}&quot; text-anchor=&quot;${anchor}&quot;&gt;${point.label}&lt;/text&gt;`;
+        }).join(&quot;&quot;) + `&lt;text class=&quot;cobalt-chart-end&quot; x=&quot;${coords[coords.length - 1].x}&quot; y=&quot;${Math.max(14, coords[coords.length - 1].y - 10)}&quot; text-anchor=&quot;end&quot;&gt;${formatAxis(data.points[data.points.length - 1].value, width &lt; 430)}&lt;/text&gt;`;
+
+        const pointGroup = svg.querySelector(&quot;[data-chart-points]&quot;);
+        pointGroup.innerHTML = coords.map((coord) =&gt; `&lt;circle class=&quot;cobalt-chart-point&quot; cx=&quot;${coord.x}&quot; cy=&quot;${coord.y}&quot; r=&quot;4&quot;&gt;&lt;/circle&gt;`).join(&quot;&quot;);
+
+        const hit = svg.querySelector(&quot;[data-chart-hit]&quot;);
+        hit.setAttribute(&quot;x&quot;, String(margin.left));
+        hit.setAttribute(&quot;y&quot;, String(margin.top));
+        hit.setAttribute(&quot;width&quot;, String(innerW));
+        hit.setAttribute(&quot;height&quot;, String(innerH));
+        const guide = svg.querySelector(&quot;[data-chart-guide]&quot;);
+        guide.setAttribute(&quot;y1&quot;, String(margin.top));
+        guide.setAttribute(&quot;y2&quot;, String(margin.top + innerH));
+        svg.querySelector(&#x27;[data-axis=&quot;y&quot;]&#x27;).setAttribute(&quot;transform&quot;, `translate(14 ${margin.top + innerH / 2}) rotate(-90)`);
+        svg.querySelector(&#x27;[data-axis=&quot;x&quot;]&#x27;).setAttribute(&quot;x&quot;, String(margin.left + innerW / 2));
+        svg.querySelector(&#x27;[data-axis=&quot;x&quot;]&#x27;).setAttribute(&quot;y&quot;, String(height - 2));
+        svg.querySelector(&#x27;[data-axis=&quot;x&quot;]&#x27;).setAttribute(&quot;text-anchor&quot;, &quot;middle&quot;);
+        svg.querySelector(&#x27;[data-axis=&quot;y&quot;]&#x27;).textContent = data.yAxis;
+        svg.querySelector(&#x27;[data-axis=&quot;x&quot;]&#x27;).textContent = data.xAxis;
+
+        const line = svg.querySelector(&quot;[data-chart-line]&quot;);
+        const area = svg.querySelector(&quot;[data-chart-area]&quot;);
+        const old = chartStates.get(svg);
+        const reduced = window.matchMedia(&quot;(prefers-reduced-motion: reduce)&quot;).matches;
+        const target = sampleCoordinates(coords, 24);
+        const finish = () =&gt; {
+          line.setAttribute(&quot;d&quot;, pathFrom(target));
+          area.setAttribute(&quot;d&quot;, areaFrom(target, data === periods.day ? y(0) : margin.top + innerH));
+          chartStates.set(svg, target);
+        };
+        if (!old || reduced) {
+          finish();
+        } else {
+          const start = sampleCoordinates(old, 24);
+          const begun = performance.now();
+          const animate = (now) =&gt; {
+            const progress = Math.min(1, (now - begun) / 200);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const frame = target.map((point, index) =&gt; ({
+              x: start[index].x + (point.x - start[index].x) * eased,
+              y: start[index].y + (point.y - start[index].y) * eased
+            }));
+            line.setAttribute(&quot;d&quot;, pathFrom(frame));
+            area.setAttribute(&quot;d&quot;, areaFrom(frame, data === periods.day ? y(0) : margin.top + innerH));
+            if (progress &lt; 1) requestAnimationFrame(animate);
+            else chartStates.set(svg, target);
+          };
+          requestAnimationFrame(animate);
+        }
+
+        const tooltip = svg.parentElement.querySelector(&quot;[data-chart-tooltip]&quot;);
+        const explore = (event) =&gt; {
+          const rect = svg.getBoundingClientRect();
+          const localX = ((event.clientX - rect.left) / rect.width) * width;
+          let nearest = coords[0];
+          coords.forEach((coord) =&gt; {
+            if (Math.abs(coord.x - localX) &lt; Math.abs(nearest.x - localX)) nearest = coord;
+          });
+          guide.style.display = &quot;block&quot;;
+          guide.setAttribute(&quot;x1&quot;, String(nearest.x));
+          guide.setAttribute(&quot;x2&quot;, String(nearest.x));
+          tooltip.innerHTML = `&lt;strong&gt;${nearest.point.label}&lt;/strong&gt;${formatAxis(nearest.point.value, false)}`;
+          tooltip.style.left = `${(nearest.x / width) * 100}%`;
+          tooltip.style.top = `${(nearest.y / height) * 100}%`;
+          tooltip.classList.add(&quot;cobalt-tooltip-visible&quot;);
+        };
+        hit.onpointermove = explore;
+        hit.onpointerdown = explore;
+        hit.onpointerleave = () =&gt; {
+          guide.style.display = &quot;none&quot;;
+          tooltip.classList.remove(&quot;cobalt-tooltip-visible&quot;);
+        };
+      }
+
+      function renderRecentHistory() {
+        const list = root.querySelector(&quot;[data-recent-history]&quot;);
+        list.innerHTML = days.map((day) =&gt; `
+          &lt;button type=&quot;button&quot; class=&quot;cobalt-history-row&quot; data-recent-day=&quot;${day.key}&quot; aria-pressed=&quot;${day.key === selectedHistoryKey}&quot;&gt;
+            &lt;span class=&quot;cobalt-history-date&quot;&gt;&lt;strong&gt;${day.label}&lt;/strong&gt;&lt;span&gt;${day.sub}&lt;/span&gt;&lt;/span&gt;
+            &lt;span class=&quot;cobalt-history-money ${toneClass(day.delta)}&quot;&gt;${money(day.delta, true)}&lt;/span&gt;
+            &lt;span class=&quot;cobalt-history-percent ${toneClass(day.percent)}&quot;&gt;${percent(day.percent, true)}&lt;/span&gt;
+            &lt;span aria-hidden=&quot;true&quot;&gt;${day.key === selectedHistoryKey ? &quot;⌄&quot; : &quot;›&quot;}&lt;/span&gt;
+          &lt;/button&gt;
+        `).join(&quot;&quot;);
+        const selected = days.find((day) =&gt; day.key === selectedHistoryKey) || days[0];
+        const detail = root.querySelector(&quot;[data-recent-detail]&quot;);
+        detail.innerHTML = `
+          &lt;div class=&quot;cobalt-history-detail-head&quot;&gt;&lt;strong&gt;${selected.label}&lt;/strong&gt;&lt;span&gt;${selected.aggregateOnly ? &quot;Daily total only&quot; : &quot;Complete detail&quot;}&lt;/span&gt;&lt;/div&gt;
+          &lt;div class=&quot;cobalt-mini-facts&quot;&gt;
+            &lt;div class=&quot;cobalt-mini-fact&quot;&gt;&lt;span&gt;Opening&lt;/span&gt;&lt;strong&gt;${money(selected.opening)}&lt;/strong&gt;&lt;/div&gt;
+            &lt;div class=&quot;cobalt-mini-fact&quot;&gt;&lt;span&gt;Closing&lt;/span&gt;&lt;strong&gt;${money(selected.closing)}&lt;/strong&gt;&lt;/div&gt;
+            &lt;div class=&quot;cobalt-mini-fact&quot;&gt;&lt;span&gt;Account change&lt;/span&gt;&lt;strong class=&quot;${toneClass(selected.delta)}&quot;&gt;${money(selected.delta, true)}&lt;/strong&gt;&lt;/div&gt;
+            &lt;div class=&quot;cobalt-mini-fact&quot;&gt;&lt;span&gt;Finished trades&lt;/span&gt;&lt;strong class=&quot;${toneClass(selected.finished)}&quot;&gt;${money(selected.finished, true)}&lt;/strong&gt;&lt;/div&gt;
+          &lt;/div&gt;
+        `;
+      }
+
+      function breakdownData() {
+        if (currentBreakdown === &quot;plans&quot;) return plans;
+        if (currentBreakdown === &quot;trades&quot;) return trades;
+        if (currentPeriod === &quot;day&quot;) return days.slice(0, 1);
+        return days;
+      }
+
+      function renderBreakdown() {
+        const list = root.querySelector(&quot;[data-breakdown-list]&quot;);
+        const rows = breakdownData();
+        list.innerHTML = rows.map((row, index) =&gt; {
+          if (currentBreakdown === &quot;days&quot;) {
+            return `
+              &lt;button type=&quot;button&quot; class=&quot;cobalt-breakdown-row&quot; data-breakdown-key=&quot;${row.key}&quot; aria-pressed=&quot;${index === 0}&quot;&gt;
+                &lt;span&gt;&lt;strong&gt;${row.label}&lt;/strong&gt;&lt;span&gt;${row.sub}&lt;/span&gt;&lt;/span&gt;
+                &lt;span class=&quot;cobalt-number-cell cobalt-hide-phone&quot;&gt;${money(row.opening)}&lt;/span&gt;
+                &lt;span class=&quot;cobalt-number-cell ${toneClass(row.delta)}&quot;&gt;${money(row.delta, true)}&lt;/span&gt;
+                &lt;span class=&quot;cobalt-number-cell ${toneClass(row.percent)}&quot;&gt;${percent(row.percent, true)}&lt;/span&gt;
+                &lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;
+              &lt;/button&gt;
+            `;
+          }
+          if (currentBreakdown === &quot;plans&quot;) {
+            return `
+              &lt;button type=&quot;button&quot; class=&quot;cobalt-breakdown-row&quot; data-breakdown-key=&quot;${row.key}&quot; aria-pressed=&quot;${index === 0}&quot;&gt;
+                &lt;span&gt;&lt;strong&gt;${row.label}&lt;/strong&gt;&lt;span&gt;${row.sub}&lt;/span&gt;&lt;/span&gt;
+                &lt;span class=&quot;cobalt-number-cell cobalt-hide-phone&quot;&gt;${row.contribution}&lt;/span&gt;
+                &lt;span class=&quot;cobalt-number-cell ${toneClass(row.total)}&quot;&gt;${money(row.total, true)}&lt;/span&gt;
+                &lt;span class=&quot;cobalt-number-cell cobalt-hide-phone&quot;&gt;Loaded&lt;/span&gt;
+                &lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;
+              &lt;/button&gt;
+            `;
+          }
+          return `
+            &lt;button type=&quot;button&quot; class=&quot;cobalt-breakdown-row&quot; data-breakdown-key=&quot;${row.key}&quot; aria-pressed=&quot;${index === 0}&quot;&gt;
+              &lt;span&gt;&lt;strong&gt;${row.label}&lt;/strong&gt;&lt;span&gt;${row.sub}&lt;/span&gt;&lt;/span&gt;
+              &lt;span class=&quot;cobalt-number-cell cobalt-hide-phone&quot;&gt;${row.detail.split(&quot; · &quot;)[0]}&lt;/span&gt;
+              &lt;span class=&quot;cobalt-number-cell ${toneClass(row.total)}&quot;&gt;${money(row.total, true)}&lt;/span&gt;
+              &lt;span class=&quot;cobalt-number-cell ${toneClass(row.percent)}&quot;&gt;${percent(row.percent, true)}&lt;/span&gt;
+              &lt;span aria-hidden=&quot;true&quot;&gt;›&lt;/span&gt;
+            &lt;/button&gt;
+          `;
+        }).join(&quot;&quot;);
+        renderHistoryDrawer(rows[0]);
+        const completeness = root.querySelector(&quot;[data-history-completeness]&quot;);
+        if (currentBreakdown === &quot;plans&quot;) {
+          completeness.textContent = &quot;Loaded trades only until server period totals exist&quot;;
+        } else if (currentBreakdown === &quot;trades&quot;) {
+          completeness.textContent = &quot;Selected sample trades for layout review&quot;;
+        } else if (currentPeriod === &quot;day&quot;) {
+          completeness.textContent = &quot;Complete sample day&quot;;
+        } else if (currentPeriod === &quot;week&quot;) {
+          completeness.textContent = &quot;Complete 7 day sample&quot;;
+        } else {
+          completeness.textContent = &quot;Selected rows shown, totals use complete session summaries&quot;;
+        }
+      }
+
+      function renderHistoryDrawer(row) {
+        const drawer = root.querySelector(&quot;[data-history-drawer]&quot;);
+        if (!row) {
+          drawer.innerHTML = &quot;&quot;;
+          return;
+        }
+        if (currentBreakdown === &quot;days&quot;) {
+          drawer.innerHTML = `
+            &lt;h3&gt;${row.label} · ${money(row.delta, true)} · ${percent(row.percent, true)}&lt;/h3&gt;
+            &lt;p&gt;${row.aggregateOnly ? &quot;Only the daily total is available. Individual trades are not invented.&quot; : `${row.trades} finished trades. Opening ${money(row.opening)}, closing ${money(row.closing)}.`}&lt;/p&gt;
+            ${row.aggregateOnly ? &quot;&quot; : `&lt;div class=&quot;cobalt-detail-trades&quot;&gt;&lt;div class=&quot;cobalt-detail-trade&quot;&gt;&lt;strong&gt;Ride the Trend · Apple&lt;/strong&gt;&lt;span class=&quot;cobalt-positive&quot;&gt;+$118.40&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;cobalt-detail-trade&quot;&gt;&lt;strong&gt;Big News · Nvidia&lt;/strong&gt;&lt;span class=&quot;cobalt-positive&quot;&gt;+$67.30&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;cobalt-detail-trade&quot;&gt;&lt;strong&gt;Snap Back · Microsoft&lt;/strong&gt;&lt;span class=&quot;cobalt-negative&quot;&gt;−$53.10&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;`}
+          `;
+        } else if (currentBreakdown === &quot;plans&quot;) {
+          drawer.innerHTML = `&lt;h3&gt;${row.label} · ${money(row.total, true)}&lt;/h3&gt;&lt;p&gt;${row.sub}. This prototype labels plan totals as loaded until the server supplies complete period aggregates.&lt;/p&gt;`;
+        } else {
+          drawer.innerHTML = `&lt;h3&gt;${row.label} · ${money(row.total, true)} · ${percent(row.percent, true)}&lt;/h3&gt;&lt;p&gt;${row.detail}. Select the real row to open entry, exit, direction, shares, result, and exit reason.&lt;/p&gt;`;
+        }
+      }
+
+      function setBreakdown(name) {
+        currentBreakdown = name;
+        root.querySelectorAll(&quot;[data-breakdown]&quot;).forEach((button) =&gt; {
+          button.setAttribute(&quot;aria-selected&quot;, button.dataset.breakdown === name ? &quot;true&quot; : &quot;false&quot;);
+        });
+        renderBreakdown();
+        liveUpdate.textContent = `History grouped by ${name}.`;
+      }
+
+      function setPage(name) {
+        currentPage = name;
+        root.querySelectorAll(&quot;[data-content-page]&quot;).forEach((page) =&gt; {
+          page.classList.toggle(&quot;cobalt-page-visible&quot;, page.dataset.contentPage === name);
+        });
+        root.querySelectorAll(&quot;[data-review-page]&quot;).forEach((button) =&gt; {
+          button.setAttribute(&quot;aria-pressed&quot;, button.dataset.reviewPage === name ? &quot;true&quot; : &quot;false&quot;);
+        });
+        root.querySelectorAll(&quot;[data-app-page]&quot;).forEach((button) =&gt; {
+          if (button.dataset.appPage === name) button.setAttribute(&quot;aria-current&quot;, &quot;page&quot;);
+          else button.removeAttribute(&quot;aria-current&quot;);
+        });
+        requestAnimationFrame(() =&gt; {
+          root.querySelectorAll(&quot;[data-performance-chart], [data-history-chart]&quot;).forEach((svg) =&gt; drawChart(svg, periods[currentPeriod]));
+        });
+      }
+
+      function setState(name) {
+        stage.dataset.state = name;
+        root.querySelectorAll(&quot;[data-review-state]&quot;).forEach((button) =&gt; {
+          button.setAttribute(&quot;aria-pressed&quot;, button.dataset.reviewState === name ? &quot;true&quot; : &quot;false&quot;);
+        });
+      }
+
+      function setViewport(name) {
+        stage.dataset.viewport = name;
+        stage.classList.toggle(&quot;cobalt-phone-preview&quot;, name === &quot;phone&quot;);
+        root.querySelectorAll(&quot;[data-review-viewport]&quot;).forEach((button) =&gt; {
+          button.setAttribute(&quot;aria-pressed&quot;, button.dataset.reviewViewport === name ? &quot;true&quot; : &quot;false&quot;);
+        });
+        requestAnimationFrame(() =&gt; {
+          root.querySelectorAll(&quot;[data-performance-chart], [data-history-chart]&quot;).forEach((svg) =&gt; drawChart(svg, periods[currentPeriod]));
+        });
+      }
+
+      function selectHolding(button) {
+        root.querySelectorAll(&quot;[data-holding]&quot;).forEach((row) =&gt; {
+          const selected = row === button;
+          row.setAttribute(&quot;aria-pressed&quot;, selected ? &quot;true&quot; : &quot;false&quot;);
+          row.lastElementChild.textContent = selected ? &quot;⌄&quot; : &quot;›&quot;;
+        });
+        const detail = root.querySelector(&quot;[data-holding-detail]&quot;);
+        const mapping = {
+          &quot;[data-detail-company]&quot;: button.dataset.company,
+          &quot;[data-detail-symbol]&quot;: button.dataset.symbol,
+          &quot;[data-detail-entry]&quot;: button.dataset.entry,
+          &quot;[data-detail-protection]&quot;: button.dataset.protection,
+          &quot;[data-detail-sale]&quot;: button.dataset.sale,
+          &quot;[data-detail-plan]&quot;: button.dataset.plan,
+          &quot;[data-detail-result]&quot;: button.dataset.result
+        };
+        Object.entries(mapping).forEach(([selector, value]) =&gt; {
+          const target = detail.querySelector(selector);
+          if (target) target.textContent = value;
+        });
+        detail.classList.remove(&quot;cobalt-open&quot;);
+        void detail.offsetWidth;
+        detail.classList.add(&quot;cobalt-open&quot;);
+      }
+
+      function handleMockAction(button) {
+        const label = button.dataset.actionLabel || button.textContent.trim();
+        const result = button.parentElement.querySelector(&quot;.cobalt-action-result&quot;);
+        const confirm = button.dataset.confirm === &quot;true&quot;;
+        const phase = button.dataset.phase || &quot;idle&quot;;
+        if (confirm &amp;&amp; phase === &quot;idle&quot;) {
+          button.dataset.phase = &quot;confirm&quot;;
+          button.classList.add(&quot;cobalt-action-danger&quot;);
+          button.textContent = &quot;Tap again to confirm&quot;;
+          window.setTimeout(() =&gt; {
+            if (button.dataset.phase === &quot;confirm&quot;) {
+              button.dataset.phase = &quot;idle&quot;;
+              button.classList.remove(&quot;cobalt-action-danger&quot;);
+              button.textContent = label;
+            }
+          }, 4000);
+          return;
+        }
+        button.dataset.phase = &quot;sending&quot;;
+        button.disabled = true;
+        button.classList.remove(&quot;cobalt-action-danger&quot;);
+        button.textContent = &quot;Sent, checking&quot;;
+        if (result) result.textContent = &quot;Waiting for a fresh update&quot;;
+        window.setTimeout(() =&gt; {
+          button.dataset.phase = &quot;done&quot;;
+          button.textContent = &quot;Confirmed&quot;;
+          if (result) result.textContent = &quot;The new state was verified&quot;;
+          window.setTimeout(() =&gt; {
+            button.dataset.phase = &quot;idle&quot;;
+            button.disabled = false;
+            button.textContent = label;
+            if (result) result.textContent = &quot;&quot;;
+          }, 1800);
+        }, 900);
+      }
+
+      root.addEventListener(&quot;click&quot;, (event) =&gt; {
+        const target = event.target;
+        const reviewPage = target.closest(&quot;[data-review-page]&quot;);
+        if (reviewPage) {
+          setPage(reviewPage.dataset.reviewPage);
+          return;
+        }
+        const reviewState = target.closest(&quot;[data-review-state]&quot;);
+        if (reviewState) {
+          setState(reviewState.dataset.reviewState);
+          return;
+        }
+        const reviewViewport = target.closest(&quot;[data-review-viewport]&quot;);
+        if (reviewViewport) {
+          setViewport(reviewViewport.dataset.reviewViewport);
+          return;
+        }
+        const appPage = target.closest(&quot;[data-app-page]&quot;);
+        if (appPage) {
+          setPage(appPage.dataset.appPage);
+          return;
+        }
+        const period = target.closest(&quot;[data-period]&quot;);
+        if (period) {
+          selectPeriod(period.dataset.period);
+          return;
+        }
+        const breakdown = target.closest(&quot;[data-breakdown]&quot;);
+        if (breakdown) {
+          setBreakdown(breakdown.dataset.breakdown);
+          return;
+        }
+        const holding = target.closest(&quot;[data-holding]&quot;);
+        if (holding) {
+          selectHolding(holding);
+          return;
+        }
+        const recentDay = target.closest(&quot;[data-recent-day]&quot;);
+        if (recentDay) {
+          selectedHistoryKey = recentDay.dataset.recentDay;
+          renderRecentHistory();
+          return;
+        }
+        const breakdownRow = target.closest(&quot;[data-breakdown-key]&quot;);
+        if (breakdownRow) {
+          root.querySelectorAll(&quot;[data-breakdown-key]&quot;).forEach((row) =&gt; row.setAttribute(&quot;aria-pressed&quot;, row === breakdownRow ? &quot;true&quot; : &quot;false&quot;));
+          const selected = breakdownData().find((row) =&gt; row.key === breakdownRow.dataset.breakdownKey);
+          renderHistoryDrawer(selected);
+          return;
+        }
+        const action = target.closest(&quot;[data-mock-action]&quot;);
+        if (action) handleMockAction(action);
+      });
+
+      renderRecentHistory();
+      renderBreakdown();
+      applyPreferences();
+      selectPeriod(&quot;day&quot;, false);
+
+      const observer = new ResizeObserver(() =&gt; {
+        root.querySelectorAll(&quot;[data-performance-chart], [data-history-chart]&quot;).forEach((svg) =&gt; drawChart(svg, periods[currentPeriod]));
+      });
+      root.querySelectorAll(&quot;.cobalt-chart-wrap&quot;).forEach((wrap) =&gt; observer.observe(wrap));
+
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({ container: app, onChange: applyPreferences });
+        tweak.addSlider(prefs, &quot;radius&quot;, { label: &quot;Surface radius&quot;, min: 4, max: 16, unit: &quot;px&quot;, reference: &quot;--cobalt-radius&quot; });
+        tweak.addColorPicker(prefs, &quot;accent&quot;, { label: &quot;Product accent&quot;, reference: &quot;--cobalt-accent&quot; });
+        tweak.addToggle(prefs, &quot;compact&quot;, { label: &quot;Compact spacing&quot;, reference: &quot;cobalt.compact&quot; });
+        tweak.addToggle(prefs, &quot;chartFill&quot;, { label: &quot;Chart area fill&quot;, reference: &quot;cobalt.chartFill&quot; });
+      }
+    })();
+  &lt;/script&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

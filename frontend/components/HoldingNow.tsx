@@ -95,6 +95,17 @@ function HoldingRow({
   const why = kind === "adaptive" && ctx ? adaptiveWhy(ctx, position.shares, isLong) : null;
   const movedFrom = position.initial_stop != null && stop != null && Math.abs(position.initial_stop - stop) > 0.004 ? position.initial_stop : null;
   const bracketed = kind === "adaptive" && position.bracket_status != null;
+  const entryValue = Math.abs(position.shares * position.entry_price);
+  const unrealizedPercent =
+    entryValue > 0 && Number.isFinite(position.unrealized_pnl)
+      ? (position.unrealized_pnl / entryValue) * 100
+      : null;
+  const percentLabel =
+    unrealizedPercent === null
+      ? "Unavailable"
+      : `${unrealizedPercent > 0 ? "+" : unrealizedPercent < 0 ? "−" : ""}${Math.abs(
+          unrealizedPercent,
+        ).toFixed(2)}%`;
 
   return (
     <div className="rise flex flex-col overflow-hidden rounded-2xl border border-line bg-white" data-testid={`holding-row-${position.symbol}`}>
@@ -132,10 +143,12 @@ function HoldingRow({
             </div>
           </div>
           <div
-            className="rounded-full px-3 py-1 text-sm font-bold tabular-nums"
+            className="min-w-[104px] rounded-lg px-3 py-1.5 text-right tabular-nums"
             style={won ? { background: "#E9F8F0", color: "#0A7D53" } : { background: "#FFEFEA", color: "#C2300F" }}
+            aria-label={`Open result ${formatSignedMoney(position.unrealized_pnl)}, ${percentLabel}`}
           >
-            {formatSignedMoney(position.unrealized_pnl)}
+            <span className="block text-sm font-bold">{formatSignedMoney(position.unrealized_pnl)}</span>
+            <span className="block text-xs font-semibold">{percentLabel}</span>
           </div>
         </div>
 
@@ -263,7 +276,7 @@ export default function HoldingNow({ positions, marketContext, onFlattenPosition
   if (positions.length === 0) return null;
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="font-display text-lg font-semibold text-ink">Holding now</h2>
+      <h2 className="text-lg font-semibold text-ink">Holding now</h2>
       <div className="flex flex-col gap-2">
         {positions.map((p) => (
           <HoldingRow key={p.symbol} position={p} marketContext={marketContext} onFlattenPosition={onFlattenPosition} onTightenStop={onTightenStop} />

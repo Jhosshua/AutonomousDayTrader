@@ -5,6 +5,8 @@ export interface AccountState {
   buying_power: number;
   daily_pnl: number;
   daily_pnl_pct: number;
+  /** Opening account equity for the current Eastern trading date. */
+  daily_starting_equity?: number;
   daily_drawdown: number;
   daily_drawdown_pct: number;
   is_circuit_broken: boolean;
@@ -360,12 +362,25 @@ export interface RecoveredSessionSummary {
   session_date: string;
   opening_equity: number;
   closing_equity: number;
+  /** Account equity movement for this session. */
+  account_change?: number;
+  /** Finished trade result. Null when detailed trade coverage is incomplete. */
+  finished_trade_result?: number | null;
   realized_pnl: number;
   trades_count: number;
+  wins?: number | null;
+  losses?: number | null;
   fees: number;
+  fees_known?: boolean;
   source: string;
   aggregate_only: boolean;
-  strategies?: Record<string, { trades_count: number; realized_pnl: number }>;
+  trade_detail_complete?: boolean;
+  strategies?: Record<string, {
+    trades_count: number;
+    realized_pnl: number;
+    wins?: number;
+    losses?: number;
+  }>;
   note?: string;
 }
 
@@ -387,6 +402,10 @@ export interface TradeHistoryResponse {
   items: TradeRecord[];
   recovered_sessions: RecoveredSessionSummary[];
   sessions?: RecoveredSessionSummary[];
+  coverage?: {
+    detailed_trade_rows: number;
+    session_count: number;
+  };
   next_cursor: string | null;
 }
 
