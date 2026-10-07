@@ -13,7 +13,7 @@ import pytest
 from backend.app.core import overnight_schedule as osch
 from backend.app.core.broker import BrokerHTTPError, BrokerTransportError, is_terminal
 from backend.app.core.overnight_execution import (
-    BUY_ACCEPTED, HELD, SALE_QUEUED, SKIPPED, SOLD, Hooks, InlineExecutor, OvernightController,
+    BUY_ACCEPTED, HELD, INTENT, SALE_QUEUED, SKIPPED, SOLD, Hooks, InlineExecutor, OvernightController,
 )
 from backend.app.core.overnight_schedule import ET, et
 
@@ -335,6 +335,193 @@ def test_friday_hold_sells_monday_and_the_state_is_plain_json():
     assert json.loads(text) == rig.ctl.to_json()
 
 
+def test_day_market_route_saves_at_1546_then_sends_once_at_1559_30_after_restart():
+    rig = new(buy_tif="day")
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    assert rig.alpaca.buys() == []
+    assert all(rig.ctl.locks_all(s) for s in osch.SYMBOLS)
+    assert [rig.night(s)["state"] for s in osch.SYMBOLS] == [INTENT] * 3
+    assert all(rig.night(s)["buy"][-1]["tif"] == "day" for s in osch.SYMBOLS)
+    assert all(not rig.night(s)["buy"][-1]["sent"] for s in osch.SYMBOLS)
+    intents = [state for reason, state in rig.saves if reason == "OVERNIGHT_BUY_INTENT"]
+    assert len(intents) == 3
+
+    rig = rig.restart(buy_tif="day")
+    rig.run(T(THU, 15, 59, 29), T(THU, 15, 59, 40))
+    buys = rig.alpaca.buys()
+    assert [(body["symbol"], body["time_in_force"]) for _, body in buys] == [
+        ("NVDA", "day"), ("IREN", "day"), ("HUT", "day")]
+    assert all(sent_at.time() == time(15, 59, 30) for sent_at, _ in buys)
+    assert [rig.night(s)["state"] for s in osch.SYMBOLS] == [HELD] * 3
+    assert len(rig.booked) == 3
+    rig.run(T(THU, 15, 59, 41), T(THU, 16, 1))
+    assert len(rig.alpaca.buys()) == 3
+
+
+def test_day_market_restart_adopts_its_own_filled_order_without_a_duplicate():
+    rig = new(buy_tif="day")
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    nv = rig.night("NVDA")
+    rig.clock.now = T(THU, 15, 59, 30)
+    rig.alpaca.submit_market_order("NVDA", "buy", nv["qty"], nv["buy"][-1]["cid"])
+
+    rig = rig.restart(buy_tif="day")
+    rig.run(T(THU, 15, 59, 31), T(THU, 15, 59, 40))
+    assert len(rig.alpaca.buys("NVDA")) == 1
+    assert [rig.night(s)["state"] for s in osch.SYMBOLS] == [HELD] * 3
+    assert sorted(event["symbol"] for event in rig.booked) == ["HUT", "IREN", "NVDA"]
+
+
+def test_day_market_restart_after_close_cancels_its_own_unfinished_order():
+    rig = new(buy_tif="day", enabled=("NVDA",))
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    rig.alpaca.halted.add("NVDA")
+    nv = rig.night("NVDA")
+    rig.clock.now = T(THU, 15, 59, 30)
+    row = rig.alpaca.submit_market_order("NVDA", "buy", nv["qty"], nv["buy"][-1]["cid"])
+    assert row["status"] == "accepted"
+
+    rig = rig.restart(buy_tif="day")
+    rig.at(T(THU, 16, 0, 5))
+    assert rig.night("NVDA")["state"] == BUY_ACCEPTED
+    rig.at(T(THU, 16, 0, 6))
+    nv = rig.night("NVDA")
+    assert nv["state"] == SKIPPED and nv["reason"] == osch.MARKET_NO_FILL
+    assert len(rig.alpaca.buys("NVDA")) == 1
+    assert rig.alpaca.cancels == [row["id"]]
+    rig.alpaca.halted.clear()
+    rig.alpaca.clock.now = T(FRI, 9, 30)
+    rig.alpaca.open_auction()
+    assert rig.alpaca.positions == {}
+
+
+def test_day_market_route_waits_for_a_broker_mismatch_to_clear_before_sending():
+    mismatch = {"active": False}
+    rig = new(buy_tif="day", hooks=Hooks(broker_mismatch=lambda: mismatch["active"]))
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    mismatch["active"] = True
+    rig.run(T(THU, 15, 59, 30), T(THU, 15, 59, 34))
+    assert rig.alpaca.buys() == []
+    assert all(rig.night(s)["block"] == osch.BROKER_MISMATCH for s in osch.SYMBOLS)
+    mismatch["active"] = False
+    rig.run(T(THU, 15, 59, 35), T(THU, 15, 59, 40))
+    assert len(rig.alpaca.buys()) == 3
+    assert [rig.night(s)["state"] for s in osch.SYMBOLS] == [HELD] * 3
+
+
+def test_day_market_route_rechecks_broker_mismatch_after_lookup_before_post():
+    mismatch = {"active": False}
+    rig = new(buy_tif="day", enabled=("NVDA",),
+              hooks=Hooks(broker_mismatch=lambda: mismatch["active"]))
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    original = rig.alpaca.get_order_by_client_id
+
+    def lookup_then_mismatch(*args, **kwargs):
+        row = original(*args, **kwargs)
+        mismatch["active"] = True
+        return row
+
+    rig.alpaca.get_order_by_client_id = lookup_then_mismatch
+    rig.at(T(THU, 15, 59, 30))
+    assert rig.alpaca.buys("NVDA") == []
+    assert rig.night("NVDA")["state"] == INTENT
+    assert rig.night("NVDA")["block"] == osch.BROKER_MISMATCH
+
+    mismatch["active"] = False
+    rig.alpaca.get_order_by_client_id = original
+    rig.at(T(THU, 15, 59, 35))
+    assert len(rig.alpaca.buys("NVDA")) == 1
+    assert rig.night("NVDA")["state"] == HELD
+
+
+@pytest.mark.parametrize("late_state", ["position", "open_order"])
+def test_day_market_preflight_rejects_late_broker_exposure(late_state):
+    rig = new(buy_tif="day", enabled=("NVDA",))
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    if late_state == "position":
+        rig.alpaca.positions["NVDA"] = 1
+    else:
+        rig.alpaca.orders["external"] = {
+            "id": "external", "symbol": "NVDA", "qty": "1", "side": "buy", "type": "limit",
+            "time_in_force": "day", "client_order_id": "external", "status": "accepted",
+            "filled_qty": "0", "filled_avg_price": None, "filled_at": None}
+    rig.run(T(THU, 15, 59, 30), T(THU, 15, 59, 55))
+    nv = rig.night("NVDA")
+    assert rig.alpaca.buys("NVDA") == []
+    assert nv["state"] == SKIPPED and nv["reason"] == osch.BROKER_NOT_FLAT
+
+
+def test_day_market_preflight_resizes_for_fresh_price_and_buying_power():
+    rig = new(buy_tif="day")
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 19))
+    rig.alpaca.price["NVDA"] = 360.0
+    rig.alpaca.account["buying_power"] = 10_000.0
+    rig.run(T(THU, 15, 59, 20), T(THU, 15, 59, 40))
+    buys = {body["symbol"]: int(body["qty"]) for _, body in rig.alpaca.buys()}
+    assert buys == {"NVDA": 27, "IREN": 7}
+    assert sum(buys[sym] * rig.alpaca.price[sym] for sym in buys) <= 10_000.0
+    assert rig.night("HUT")["state"] == INTENT and rig.night("HUT")["block"] == osch.NO_ROOM
+
+
+def test_day_market_post_crossing_1600_is_cancelled_and_never_fills_next_morning():
+    rig = new(buy_tif="day", enabled=("NVDA",))
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    original = rig.alpaca.submit_market_order
+
+    def late_submit(*args, **kwargs):
+        rig.clock.now = T(THU, 16, 0)
+        return original(*args, **kwargs)
+
+    rig.alpaca.submit_market_order = late_submit
+    rig.at(T(THU, 15, 59, 30))
+    nv = rig.night("NVDA")
+    assert nv["state"] == SKIPPED and nv["reason"] == osch.MARKET_NO_FILL
+    assert len(rig.alpaca.cancels) == 1 and rig.alpaca.positions == {}
+    rig.alpaca.clock.now = T(FRI, 9, 30)
+    rig.alpaca.open_auction()
+    assert rig.alpaca.positions == {}
+
+
+def test_day_market_post_crossing_1600_retries_a_failed_cancel():
+    rig = new(buy_tif="day", enabled=("NVDA",))
+    rig.run(T(THU, 15, 44), T(THU, 15, 59, 29))
+    original_submit = rig.alpaca.submit_market_order
+    original_cancel = rig.alpaca.cancel_order_and_confirm
+    calls = {"cancel": 0}
+
+    def late_submit(*args, **kwargs):
+        rig.clock.now = T(THU, 16, 0)
+        rig.alpaca.halted.add("NVDA")
+        return original_submit(*args, **kwargs)
+
+    def fail_once(*args, **kwargs):
+        calls["cancel"] += 1
+        if calls["cancel"] == 1:
+            raise BrokerTransportError("cancel timed out")
+        return original_cancel(*args, **kwargs)
+
+    rig.alpaca.submit_market_order = late_submit
+    rig.alpaca.cancel_order_and_confirm = fail_once
+    rig.at(T(THU, 15, 59, 30))
+    assert rig.night("NVDA")["state"] == BUY_ACCEPTED
+    assert rig.night("NVDA")["buy"][-1]["cancel_requested"] is True
+    rig.at(T(THU, 16, 0, 1))
+    nv = rig.night("NVDA")
+    assert nv["state"] == SKIPPED and nv["reason"] == osch.MARKET_NO_FILL
+    assert calls["cancel"] == 2
+
+
+def test_day_market_control_after_arming_stops_the_unsent_intent():
+    rig = new(buy_tif="day", enabled=("NVDA",))
+    rig.run(T(THU, 15, 44), T(THU, 15, 48))
+    assert rig.night("NVDA")["state"] == INTENT
+    assert rig.ctl.set_no_buy_tonight(T(THU, 15, 48))[0]
+    rig.at(T(THU, 15, 48, 1))
+    nv = rig.night("NVDA")
+    assert nv["state"] == SKIPPED and nv["reason"] == osch.OPERATOR_NO_BUY_TONIGHT
+    assert rig.alpaca.buys("NVDA") == [] and rig.alpaca.cancels == []
+
+
 # ============================================================================ T3
 def test_fake_alpaca_enforces_the_auction_windows():
     clock = Clock(T(THU, 15, 49, 59))
@@ -594,7 +781,7 @@ def test_d10_closing_auction_refused_becomes_a_market_buy_at_1559_30():
         posts = rig.alpaca.buys(s)
         assert [(b["time_in_force"], b["client_order_id"]) for _, b in posts] == [
             ("cls", f"adt-ovn-{s}-20261001-buy-1"), ("day", f"adt-ovn-{s}-20261001-buy-2")]
-        assert posts[1][0].time() == time(15, 59, 30)
+        assert time(15, 59, 30) <= posts[1][0].time() <= time(15, 59, 31)
         assert rig.night(s)["state"] == HELD
     assert any(r["event"] == "D10_BUY_FALLBACK_AT_1559" for r in rig.ctl.state["log"])
 

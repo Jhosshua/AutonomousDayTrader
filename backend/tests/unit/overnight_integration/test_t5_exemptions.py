@@ -39,14 +39,14 @@ def _generic_orders(h):
 
 
 def test_buy_orders_survive_1550_1555_1558_and_1600(main_runtime):
-    """The closing auction buys rest at Alpaca from 15:46 to 16:00. The 15:50 purge, the 15:55
-    flatten, the 15:58 audit and the 16:00 close must never cancel them."""
+    """The durable intents survive the 15:50, 15:55 and 15:58 flatten phases. The market buys
+    sent at 15:59:30 must remain owned by the overnight controller."""
     h = MainOvernight(main_runtime, at(THU, 15, 40))
     buy_night(h, THU)
     fe = h.r.flattening_engine                          # the flatten phases ran on main's real clock
     assert fe.phase1_executed and fe.phase2_executed and fe.phase3_executed and fe.phase4_executed
     assert _deletes_of_overnight(h) == []
-    assert [b["time_in_force"] for b in h.alpaca.posts() if b["side"] == "buy"] == ["cls"] * 3
+    assert [b["time_in_force"] for b in h.alpaca.posts() if b["side"] == "buy"] == ["day"] * 3
     assert _held(h) == SHARES
     assert h.local() == h.alpaca.signed_positions()
     assert not h.r.engine.working_orders                # no overnight order ever rests in the engine (R4)

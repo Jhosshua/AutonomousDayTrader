@@ -531,3 +531,11 @@ right. Run the mutation check.
 **What worked instead.** Run the harness with system `python3` and scope Plans and Trades controls to the history explorer.
 
 **Note for next time.** Scope repeated labels to their component before clicking them in strict browser tests.
+
+## October 7, 2026 Overnight verification needed isolated environments
+
+**What did not work.** System Python had no Pytest. Existing environments split the required project, NumPy, and Playwright packages. The first full root run mixed unrelated absolute path failures with a missing browser. Running browser tests beside backend port hygiene also occupied port 3005 and caused six false backend failures. Frontend wording checks needed two updates after the execution timeline changed.
+
+**What worked instead.** An isolated temporary environment installed the project and verification packages. Playwright used a temporary browser directory. Browser checks and backend port hygiene ran sequentially. The final backend, focused overnight, frontend, build, browser, research, and port checks then passed.
+
+**Note for next time.** Check interpreter imports first. Keep any test that owns port 3005 separate from the backend port hygiene suite. Update timeline sentence assertions when execution times change.

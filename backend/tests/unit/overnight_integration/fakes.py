@@ -244,6 +244,7 @@ class MainOvernight:
     def price(self, sym: str, px: float) -> None:
         self.alpaca.prices[sym] = px
         self.r.latest_market_prices[sym] = px
+        self.r.latest_market_price_times[sym] = self.clock.now
 
     def quote(self, sym: str, px: float, spread: float = 0.02) -> None:
         from backend.app.models.events import QuoteEvent
@@ -277,9 +278,12 @@ PRICES = {"NVDA": 180.0, "IREN": 40.0, "HUT": 50.0}
 
 
 def buy_night(h: MainOvernight, d: date, close: Optional[Dict[str, float]] = None, start=(15, 40)) -> None:
-    """Run main's clock from 15:40 through the closing auction and the booking (16:00:30)."""
+    """Run main's clock through the 15:59:30 market buy and its booking."""
     h.set(at(d, *start))
     for sym, px in PRICES.items():
+        h.price(sym, px)
+    h.run(at(d, 15, 59, 25), every=5)
+    for sym, px in (close or PRICES).items():
         h.price(sym, px)
     h.run(at(d, 15, 59, 59), every=5)
     h.set(at(d, 16, 0))

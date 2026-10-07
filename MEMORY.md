@@ -809,3 +809,15 @@ DAY_ONE_BUILD_REVISION=7c51e646... set with --skip-deploys, then push main. Veri
 3. What was rejected and why. Synthetic intraday equity, inferred trade details, duplicate destructive controls, a new chart dependency, and persistence decoder changes were rejected because they could misstate money, widen action scope, add supply chain risk, or break checkpoint compatibility.
 4. Verification. Frontend tests include 57 performance checks and 8 history checks. The production build passes. Responsive browser verification passes 31 checks at 1440, 390, and 320 pixels. Backend verification passes 1,513 tests with 6 intentional skips when the unrelated hardcoded `/Users/mo` stress file is excluded.
 5. Deployment gate. The operator authorized deployment. At 19:48 ET production was healthy, ready, durable, broker mismatch false, and flat with no positions or overnight holds. `main.py` changed, so `DAY_ONE_BUILD_REVISION` must be updated with `--skip-deploys` before the GitHub push.
+
+## October 7, 2026 Overnight buy execution fix
+
+1. What was decided. Production overnight entries prepare one durable intent at 3:46 PM, refresh account and broker state at 3:59:20 PM, then send an ordinary day market order from 3:59:30 PM to 3:59:55 PM. The next morning opening order remains `opg`.
+
+2. Why. On October 6, Alpaca accepted `cls` buys for 40 NVDA, 233 IREN, and 106 HUT shares, but all three expired with zero fills after 4:00 PM. No operator control blocked them.
+
+3. Safety rules. Final sizing uses fresh equity, buying power, and timestamped prices. Broker positions and open orders are checked during batch preflight and again immediately before each order. A restart adopts its own order by client identity. Any unfinished day order found after 4:00 PM is cancelled so it cannot wait for the next open.
+
+4. What was rejected and why. Continuing `cls` was rejected because accepted orders repeatedly expired. An after hours limit chase was rejected because it changes the tested entry. Sending a day market order without final account, price, and broker checks was rejected because the ten minute delay can invalidate the earlier sizing.
+
+5. Verification. The final backend run passed 1,549 tests with six intentional skips and one unrelated absolute path test excluded. The focused overnight run passed 167 tests. Frontend checks, the production build, port hygiene, and the research parity suite passed. Browser checks passed 301 tests with seven unrelated absolute path tests excluded, and the one transient local server reset passed on immediate isolated rerun. Independent review found no remaining P0 or P1 issue.

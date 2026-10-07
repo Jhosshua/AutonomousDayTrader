@@ -107,13 +107,15 @@ class OvernightIntegration:
             broker=broker, executor=self.executor, calendar=calendar or osch.TradingWindowsCalendar(),
             clock=clock or (lambda: datetime.now(timezone.utc)), book=self._book, checkpoint=self._durable,
             bar_count=bar_count or self._relay_bar_count, last_price=last_price or self._last_price,
+            fresh_prices=self._fresh_prices,
             alert=self._alert, hooks=Hooks(day_shares=self._day_shares, close_day_trade=self._close_day_trade,
                                            cancel_day_entries=self._cancel_day_entries,
                                            broker_mismatch=self._broker_mismatch, held_by_other=self._held_by_other,
                                            swing_market_value=self._swing_value, on_release=self._on_release,
                                            overnight_shares=self._overnight_shares),
             mode=mode, enabled=tuple(enabled if enabled is not None else cfg["enabled"]),
-            pct=cfg["pct"] if pct is None else pct, cap=cfg["cap"], room_multiple=cfg["room_multiple"])
+            pct=cfg["pct"] if pct is None else pct, cap=cfg["cap"], room_multiple=cfg["room_multiple"],
+            buy_tif="day")
         pending = self._pending
         self.controller = OvernightController.from_json((pending or {}).get("controller"), **deps)
         self.init_error = None
@@ -192,9 +194,9 @@ class OvernightIntegration:
                 self.ledger[k] = led[k]
         if self.controller is not None:           # a controller already built re-reads its state
             deps = {k: getattr(self.controller, k) for k in ("broker", "executor", "calendar", "clock", "book",
-                                                             "checkpoint", "bar_count", "last_price", "alert",
+                                                             "checkpoint", "bar_count", "last_price", "fresh_prices", "alert",
                                                              "hooks", "mode", "enabled", "pct", "cap",
-                                                             "room_multiple")}
+                                                             "room_multiple", "buy_tif")}
             self.controller = OvernightController.from_json(self._pending.get("controller"), **deps)
 
     def apply_risk_offset(self) -> None:
@@ -325,6 +327,22 @@ class OvernightIntegration:
             px = self._fallback_price.get(sym)
         return float(px) if px else None
 
+    def _fresh_prices(self, symbols: Tuple[str, ...], now: datetime) -> Dict[str, float]:
+        """Latest timestamped feed prices used by the final market order preflight."""
+        out = {}
+        for symbol in symbols:
+            sym = symbol.upper()
+            px = self.r.latest_market_prices.get(sym)
+            at = self.r.latest_market_price_times.get(sym)
+            if not isinstance(px, (int, float)) or not math.isfinite(px) or px <= 0 or not isinstance(at, datetime):
+                raise RuntimeError(f"{sym} has no fresh market price")
+            stamp = at if at.tzinfo is not None else at.replace(tzinfo=timezone.utc)
+            age = (now - stamp).total_seconds()
+            if not -1.0 <= age <= 120.0:
+                raise RuntimeError(f"{sym} market price is {age:.1f} seconds old")
+            out[sym] = float(px)
+        return out
+
     def _relay_bar_count(self, symbol: str, session_date: date) -> Tuple[int, bool]:
         """Worker thread. X2: SIP REST bars (regular session only) through main's
         _fetch_session_minutes; only bars that start before 15:45 count. A failure raises, which the
@@ -359,7 +377,7 @@ class OvernightIntegration:
                 (pos.side.value == "SHORT" and order.side.value == "BUY")))
             if not protective:
                 r.engine.cancel_order(oid, reason="OVERNIGHT_RESERVED_ENTRY_CANCEL")
-                log.warning("Overnight %s: cancelled day entry %s before the closing auction buy", sym, oid)
+                log.warning("Overnight %s: cancelled day entry %s before the near close buy", sym, oid)
         r._release_dead_entry_brackets()
         if pos is None:
             r.bracket_manager.cancel_pending_entry_bracket(sym)
@@ -393,7 +411,7 @@ class OvernightIntegration:
         self.ledger["x6"][sym] = {"order_id": order.id, "date": today.isoformat(), "attempt": 1, "qty": pos.shares,
                                   "side": side.value.lower(), "booked": {}, "done": False,
                                   "strategy_id": getattr(pos, "strategy_id", None), "filled_at": None}
-        log.warning("Overnight %s: closing the day trade (%d shares) early for the closing auction buy (X6)",
+        log.warning("Overnight %s: closing the day trade (%d shares) early for the near close buy (X6)",
                     sym, pos.shares)
         self._x6_step(sym)
 
@@ -916,7 +934,7 @@ class OvernightIntegration:
                 "sale_date": sale.isoformat() if sale else None}
 
     def x6_view(self, now: datetime) -> List[Dict[str, Any]]:
-        """Day trades closed early for a closing auction buy (X6), for the page. Only jobs from the last
+        """Day trades closed early for a near close buy (X6), for the page. Only jobs from the last
         5 calendar days (ET), so a weekend or holiday morning can still say what happened before the
         night. The page matches each one to its night by date. Read only."""
         today = et_date(now)

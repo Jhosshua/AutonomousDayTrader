@@ -32,7 +32,12 @@ def test_day_limit_entry_working_at_1546_is_cancelled_before_the_buy(main_runtim
     assert entry.status.value == "CANCELLED"
     assert entry.audit_trail[-1].reason == "OVERNIGHT_RESERVED_ENTRY_CANCEL"
     assert "NVDA" not in h.r.bracket_manager.symbol_to_bracket
-    assert [b["time_in_force"] for b in h.alpaca.posts("NVDA")] == ["cls"]
+    assert h.alpaca.posts("NVDA") == []
+    assert h.night("NVDA", THU)["state"] == "INTENT"
+    h.run(at(THU, 15, 59, 19))
+    _prices(h)
+    h.run(at(THU, 15, 59, 35))
+    assert [b["time_in_force"] for b in h.alpaca.posts("NVDA")] == ["day"]
 
 
 def test_day_stop_firing_at_154530_still_works(main_runtime):
@@ -61,7 +66,16 @@ def test_day_trade_closed_first_recorded_then_the_buy_goes_in(main_runtime):
              for b in posts]
     assert kinds[0] == ("buy", "day", "day")                 # the day trade's entry
     assert kinds[1] == ("sell", "day", "x6")                 # X6: closed through the controller's close
-    assert kinds[2] == ("buy", "cls", "buy")                 # then the closing auction buy
+    assert len(kinds) == 2                                    # the overnight buy is queued, not sent early
+    h.run(at(THU, 15, 59, 19))
+    h.price("NVDA", 181.0)
+    h.price("IREN", 40.0)
+    h.price("HUT", 50.0)
+    h.run(at(THU, 15, 59, 35))
+    posts = h.alpaca.posts("NVDA")
+    kinds = [(b["side"], b["time_in_force"], b["client_order_id"].split("-")[4]
+              if b["client_order_id"].startswith("adt-ovn") else "day") for b in posts]
+    assert kinds[2] == ("buy", "day", "buy")                 # then the near close market buy
     assert int(posts[1]["qty"]) == 20
     assert h.alpaca.wash_refusals == []
     trade = h.r.pending_trade_records.get(bracket_id)
@@ -154,7 +168,7 @@ def test_stock_held_by_orb_is_skipped(main_runtime, monkeypatch):
     assert h.night("HUT", THU)["state"] == "SKIPPED"
     assert h.night("HUT", THU)["reason"] == osch.HELD_BY_OTHER_STRATEGY
     assert [b for b in h.alpaca.posts("HUT")] == []
-    assert h.night("NVDA", THU)["state"] == "BUY_ACCEPTED"
+    assert h.night("NVDA", THU)["state"] == "INTENT"
 
 
 def test_an_unsold_hold_does_not_use_a_day_slot_or_the_sector_limit(main_runtime):

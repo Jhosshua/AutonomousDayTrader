@@ -102,7 +102,7 @@ export default function SafetyCard({
         <Moon className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#2B4BFF" }} aria-hidden="true" />
         <div className="text-[13px] leading-snug">
           {ovn && ovn.buysOn ? (
-            <><b>{`Most quick trades close at 3:55 PM, but a quick trade in ${names} closes at 3:46 PM on a night the robot buys that stock.`}</b> Slow trades can stay open for days. Overnight holds buy at the 4:00 PM close and sell at the next 9:30 AM open.</>
+            <><b>{`Most quick trades close at 3:55 PM, but a quick trade in ${names} closes at 3:46 PM on a night the robot buys that stock.`}</b> Slow trades can stay open for days. Overnight holds buy near the 4:00 PM close and sell at the next 9:30 AM open.</>
           ) : (
             <><b>Quick trades start closing at 3:55 PM.</b> Slow trades can stay open for days.</>
           )}

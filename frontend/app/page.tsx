@@ -169,7 +169,7 @@ export default function Home() {
       : [];
   const overnightSummary =
     ovnBuysOn && tradingDayToday && !tooLate && etMin < 15 * 60 + 45 && plannedTonight.length > 0
-      ? `Tonight it buys ${joinNames(plannedTonight.map((r) => r.symbol))} at the 4:00 PM close and sells at the next 9:30 AM open.`
+      ? `Tonight it buys ${joinNames(plannedTonight.map((r) => r.symbol))} near the 4:00 PM close and sells at the next 9:30 AM open.`
       : null;
   // unsold after 9:31 AM: the backend list, plus any hold whose sale time is more than a minute past
   const unsold = Array.from(new Set([

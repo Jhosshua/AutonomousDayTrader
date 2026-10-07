@@ -1,5 +1,5 @@
 # @steered SNARE-2 2026-09-30
-"""Overnight holds controller (NVDA, IREN, HUT): buy at the close, sell at the next open.
+"""Overnight holds controller (NVDA, IREN, HUT): buy near the close, sell at the next open.
 
 PLAN_2026_09_30_overnight_holds.md section 3. This controller places, tracks and books its own
 Alpaca paper orders; the generic engine never sees them (R4). Everything it needs is injected
@@ -54,7 +54,7 @@ SKIPPED = "SKIPPED"
 HOLD_STATES = (HELD, SALE_QUEUED)
 BUY_STATES = (IDLE, INTENT, BUY_SENT)
 
-BUY_STUCK_AFTER = dtime(16, 5)          # an auction or fallback buy not final by now is cancelled
+BUY_STUCK_AFTER = dtime(16, 5)          # a buy not final by now is cancelled
 FALLBACK_BUY_END = dtime(15, 59, 55)    # a plain market buy never goes out at or after the close
 OPEN_ORDER_PREFIX = "adt-ovn-"
 
@@ -119,11 +119,15 @@ class OvernightController:
     def __init__(self, *, broker: Any, executor: Any, calendar: Any, clock: Callable[[], datetime],
                  book: Callable[[Dict[str, Any]], Any], checkpoint: Callable[[str], bool],
                  bar_count: Callable[[str, date], Tuple[int, bool]], last_price: Callable[[str], Optional[float]],
+                 fresh_prices: Optional[Callable[[Tuple[str, ...], datetime], Dict[str, float]]] = None,
                  alert: Optional[Callable[[str, str, Dict[str, Any]], None]] = None, hooks: Optional[Hooks] = None,
                  mode: str = "live", enabled: Tuple[str, ...] = osch.SYMBOLS, pct: float = 0.20,
-                 cap: float = 25_000.0, room_multiple: float = 2.0, state: Optional[Dict[str, Any]] = None) -> None:
+                 cap: float = 25_000.0, room_multiple: float = 2.0, buy_tif: str = "cls",
+                 state: Optional[Dict[str, Any]] = None) -> None:
         if mode not in ("live", "off"):
             raise ValueError("OVERNIGHT_MODE must be live or off")
+        if buy_tif not in ("cls", "day"):
+            raise ValueError("overnight buy_tif must be cls or day")
         self.broker = broker
         self.executor = executor
         self.calendar = calendar
@@ -132,14 +136,18 @@ class OvernightController:
         self.checkpoint = checkpoint
         self.bar_count = bar_count
         self.last_price = last_price
+        self.fresh_prices = fresh_prices or (
+            lambda symbols, _now: {symbol: self.last_price(symbol) for symbol in symbols})
         self.alert = alert or (lambda kind, text, fields: log.warning("OVERNIGHT ALERT %s: %s", kind, text))
         self.hooks = hooks or Hooks()
         self.mode = mode
         self.enabled = tuple(s for s in osch.SYMBOLS if s in {e.upper() for e in enabled})
         self.pct, self.cap, self.room_multiple = pct, cap, room_multiple
+        self.buy_tif = buy_tif
         self.state = state if state is not None else self.empty_state()
         self._jobs: Dict[str, Future] = {}
         self._last: Dict[str, datetime] = {}
+        self._market_ready: set[Tuple[str, str]] = set()
 
     # ------------------------------------------------------------ persistence
     @staticmethod
@@ -416,6 +424,7 @@ class OvernightController:
         now = now or self.clock()
         before = self._signature()
         self._ensure_tonight(now)
+        self._market_preflight(now)
         for n in self._nights():
             try:
                 self._step(n, now)
@@ -466,7 +475,9 @@ class OvernightController:
     def _alerts(self, now: datetime) -> None:
         for n in self._nights():
             d = self._bd(n)
-            if (n["state"] in BUY_STATES and not n["fallback_buy"] and not n["alerted_1547"]
+            att = n["buy"][-1] if n["buy"] else None
+            queued_market = bool(att and not att["final"] and not att["sent"] and att["tif"] == "day")
+            if (n["state"] in BUY_STATES and not n["fallback_buy"] and not queued_market and not n["alerted_1547"]
                     and et(d, osch.BUY_ALERT) <= now < et(d, osch.BUY_GIVE_UP)):
                 n["alerted_1547"] = True
                 self._needs_look(n, osch.NO_ORDER_BY_1547, now, f"Last block: {n.get('block') or 'none'}.")
@@ -523,11 +534,134 @@ class OvernightController:
             return osch.DAY_TRADE_NOT_CLOSED
         return None
 
+    def _market_preflight(self, now: datetime) -> None:
+        """Refresh every value that can make a delayed market buy unsafe, then save resized intents."""
+        d = et_date(now)
+        if not et(d, osch.MARKET_PREFLIGHT_AT) <= now < et(d, FALLBACK_BUY_END):
+            return
+        pending = []
+        for n in self._nights():
+            if n["buy_date"] != d.isoformat() or n["state"] not in BUY_STATES or not n["buy"]:
+                continue
+            att = n["buy"][-1]
+            ready_key = (n["buy_date"], n["symbol"])
+            if not att["final"] and not att["sent"] and att["tif"] == "day" and ready_key not in self._market_ready:
+                pending.append((n, att))
+        if not pending or self.broker is None:
+            return
+        symbols = tuple(n["symbol"] for n, _att in pending)
+        broker = self.broker
+
+        def work() -> Dict[str, Any]:
+            out: Dict[str, Any] = {}
+            try:
+                out["account"] = broker.get_account_fields()
+            except Exception as exc:
+                out["account_err"] = str(exc)[:200]
+            try:
+                out["prices"] = self.fresh_prices(symbols, self.clock())
+            except Exception as exc:
+                out["prices_err"] = str(exc)[:200]
+            for n, att in pending:
+                sym = n["symbol"]
+                try:
+                    existing = self._lookup(att)
+                    if existing is not None:
+                        out.setdefault("existing", {})[sym] = existing
+                        continue
+                    out.setdefault("positions", {})[sym] = broker.position_qty(sym)
+                    out.setdefault("open_orders", {})[sym] = len(broker.list_open_orders(sym))
+                except Exception as exc:
+                    out.setdefault("flat_err", {})[sym] = str(exc)[:200]
+            return out
+
+        done, out, exc = self._io(f"market-preflight:{d.isoformat()}", work, now, osch.BUY_RETRY_SEC)
+        if not done:
+            return
+        existing = out.get("existing", {}) if exc is None else {}
+        for n, att in pending:
+            row = existing.get(n["symbol"])
+            if row is not None:
+                self._apply_buy_row(n, att, row, now)
+        pending = [(n, att) for n, att in pending if n["symbol"] not in existing]
+        if not pending:
+            return
+        symbols = tuple(n["symbol"] for n, _att in pending)
+        reason = None
+        acct = out.get("account") if exc is None else None
+        prices = out.get("prices") if exc is None else None
+        if exc is not None or out.get("flat_err"):
+            reason = osch.BROKER_UNREACHABLE
+        elif out.get("account_err") or not acct or not acct.get("equity") or acct.get("buying_power") is None:
+            reason = osch.ACCOUNT_UNAVAILABLE
+        elif out.get("prices_err") or not isinstance(prices, dict) or any(
+                not isinstance(prices.get(sym), (int, float)) or not math.isfinite(float(prices[sym]))
+                or float(prices[sym]) <= 0 for sym in symbols):
+            reason = osch.NO_PRICE
+        elif any(out["positions"].get(sym) != 0 or out["open_orders"].get(sym) for sym in symbols):
+            reason = osch.BROKER_NOT_FLAT
+        if reason is not None:
+            for n, _att in pending:
+                self._block(n, reason)
+            return
+
+        saved = self.to_json()
+        self.state["account"] = {"date": d.isoformat(), "read_at": _iso(now), **acct}
+        ready = []
+        for n, _att in pending:
+            n["qty"] = None
+        for n, att in pending:
+            qty = self._size(n, float(prices[n["symbol"]]), acct, now, self._ratio_of(n))
+            att["qty"] = qty
+            if qty < 1:
+                self._block(n, osch.NO_ROOM)
+                continue
+            n["block"] = None
+            ready.append(n)
+        if not self.checkpoint("OVERNIGHT_BUY_PREFLIGHT"):
+            self.state.clear()
+            self.state.update(saved)
+            for n, _att in self._nights_for_symbols(d, symbols):
+                self._block(n, osch.INTENT_NOT_DURABLE)
+            return
+        for n in ready:
+            self._market_ready.add((n["buy_date"], n["symbol"]))
+        self._log(None, "MARKET_PREFLIGHT", now, symbols=list(symbols),
+                  quantities={n["symbol"]: n.get("qty") for n, _att in pending})
+
+    def _nights_for_symbols(self, d: date, symbols: Tuple[str, ...]) -> List[Tuple[Dict[str, Any], Dict[str, Any]]]:
+        out = []
+        for sym in symbols:
+            n = self.state["nights"].get(f"{sym}:{d.isoformat()}")
+            if n is not None and n["buy"]:
+                out.append((n, n["buy"][-1]))
+        return out
+
     def _step_buy(self, n: Dict[str, Any], now: datetime) -> None:
         d = self._bd(n)
         give_up = et(d, osch.BUY_GIVE_UP)
         att = n["buy"][-1] if n["buy"] else None
         if att is not None and not att["final"]:
+            if not att["sent"] and att["tif"] == "day":
+                reason = self._final_gate(n)
+                if reason is not None:
+                    att.update(final=True, status="not_sent")
+                    self._skip(n, reason, now)
+                    return
+                reason = self._local_gates(n, now)
+                if reason is not None:
+                    self._block(n, reason)
+                    if now >= et(d, FALLBACK_BUY_END):
+                        att.update(final=True, status="not_sent")
+                        self._skip(n, reason, now)
+                    return
+                if now < et(d, osch.BUY_FALLBACK_AT):
+                    return
+                if now >= et(d, FALLBACK_BUY_END):
+                    self._buy_attempt_io(n, att, now, allow=False)
+                    return
+                if (n["buy_date"], n["symbol"]) not in self._market_ready:
+                    return
             allow = self._buy_send_allowed(n, att, now)
             self._buy_attempt_io(n, att, now, allow and self.broker is not None)
             return
@@ -636,7 +770,7 @@ class OvernightController:
             self._block(n, osch.NO_ROOM)
             return
         n["block"] = None
-        self._new_buy_attempt(n, "cls", now)
+        self._new_buy_attempt(n, self.buy_tif, now)
 
     # Reg T style initial margin: a stock Alpaca does not lend on needs its full price, any other
     # at least 50%. Slow trades held tonight are counted at 50%.
@@ -739,10 +873,12 @@ class OvernightController:
             self._log(n, "INTENT_NOT_DURABLE", now, cid=att["cid"])
             return
         self._log(n, "BUY_INTENT", now, cid=att["cid"], qty=att["qty"], tif=tif, ref_price=n["ref_price"])
+        if tif == "day":
+            return
         self._buy_attempt_io(n, att, now, allow=True)
 
     def _fallback_buy(self, n: Dict[str, Any], now: datetime) -> None:
-        """D10: after a definite closing auction refusal, a plain market buy at 15:59:30."""
+        """After a definite restored closing auction refusal, send a market buy at 15:59:30."""
         d = self._bd(n)
         if now < et(d, osch.BUY_FALLBACK_AT):
             return
@@ -760,7 +896,8 @@ class OvernightController:
         """New buys obey the current settings and clock, including restored intents and slow I/O.
         Existing broker orders are always looked up even when new buys are disabled."""
         d = self._bd(n)
-        if self.mode != "live" or n["symbol"] not in self.enabled or self._control_active(d):
+        if (self.mode != "live" or n["symbol"] not in self.enabled or self._control_active(d)
+                or self.hooks.broker_mismatch()):
             return False
         if att["tif"] == "cls":
             return et(d, osch.BUY_WINDOW_START) <= now < et(d, osch.BUY_GIVE_UP)
@@ -776,8 +913,22 @@ class OvernightController:
 
         def work():
             row = self._lookup(att)
-            if row is not None or not allow or not self._buy_send_allowed(n, att, self.clock()):
+            if row is not None or not allow:
                 return "found", row
+            if not self._buy_send_allowed(n, att, self.clock()):
+                if self.hooks.broker_mismatch():
+                    return "preflight_block", osch.BROKER_MISMATCH
+                return "found", None
+            if att["tif"] == "day":
+                try:
+                    if broker.position_qty(sym) != 0 or broker.list_open_orders(sym):
+                        return "preflight_block", osch.BROKER_NOT_FLAT
+                except Exception:
+                    return "preflight_block", osch.BROKER_UNREACHABLE
+                if not self._buy_send_allowed(n, att, self.clock()):
+                    if self.hooks.broker_mismatch():
+                        return "preflight_block", osch.BROKER_MISMATCH
+                    return "found", None
             try:
                 if att["tif"] == "day":
                     row = broker.submit_market_order(sym, "buy", att["qty"], att["cid"])
@@ -785,6 +936,12 @@ class OvernightController:
                     row = broker.submit_on_auction(sym, "buy", att["qty"], att["cid"], att["tif"])
             except Exception as exc:
                 return "post_error", exc
+            if att["tif"] == "day" and self.clock() >= et(self._bd(n), osch.FULL_DAY_CLOSE) and not is_terminal(row):
+                try:
+                    row = broker.cancel_order_and_confirm(row.get("id"))
+                except Exception:
+                    return "sent_late", row
+                return "sent_late", row
             return "sent", row
 
         done, res, exc = self._io(f"buy:{sym}:{n['buy_date']}", work, now, osch.BUY_RETRY_SEC)
@@ -797,11 +954,19 @@ class OvernightController:
         if kind == "post_error":
             self._buy_refused(n, att, value, now)
             return
+        if kind == "preflight_block":
+            att["sent"] = False
+            n["state"] = INTENT
+            self._block(n, value)
+            return
+        if kind == "sent_late":
+            att["cancel_requested"] = True
         if value is None:                   # Alpaca has no order with this id and none may be sent now
             att.update(final=True, status="not_found")
             n["late_check"] = True          # the POST may still surface; looked up once after the close
             reason = self._final_gate(n) or (
-                n.get("block") or (osch.BUY_REFUSED if att["tif"] == "day" else osch.MISSED_BUY_WINDOW))
+                n.get("block") or (
+                    osch.BUY_REFUSED if att["tif"] == "day" and att["sent"] else osch.MISSED_BUY_WINDOW))
             self._skip(n, reason, now)
             return
         att["ambiguous"] = False
@@ -847,11 +1012,13 @@ class OvernightController:
             return
         if status == "canceled":
             reason = osch.OPERATOR_NO_BUY_TONIGHT if att["cancel_requested"] and self._control_active(
-                self._bd(n)) else (osch.AUCTION_NO_FILL if att["cancel_requested"] else osch.CANCELED_AT_ALPACA)
+                self._bd(n)) else (
+                (osch.AUCTION_NO_FILL if att["tif"] == "cls" else osch.MARKET_NO_FILL)
+                if att["cancel_requested"] else osch.CANCELED_AT_ALPACA)
         elif status == "rejected":
             reason = osch.BUY_REFUSED
         else:
-            reason = osch.AUCTION_NO_FILL
+            reason = osch.AUCTION_NO_FILL if att["tif"] == "cls" else osch.MARKET_NO_FILL
         self._skip(n, reason, now)
 
     def _to_held(self, n: Dict[str, Any], now: datetime) -> None:
@@ -867,7 +1034,9 @@ class OvernightController:
     def _step_buy_accepted(self, n: Dict[str, Any], now: datetime) -> None:
         att, d = n["buy"][-1], self._bd(n)
         stuck = now >= et(d, BUY_STUCK_AFTER)
-        cancel = (self._control_active(d) and att["tif"] == "cls") or stuck
+        day_past_close = att["tif"] == "day" and now >= et(d, osch.FULL_DAY_CLOSE)
+        cancel = att["cancel_requested"] or day_past_close or (
+            self._control_active(d) and att["tif"] == "cls") or stuck
         if cancel:
             att["cancel_requested"] = True
 

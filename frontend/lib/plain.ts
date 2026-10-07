@@ -128,15 +128,15 @@ export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
   // Overnight holds: one ink colour for all three (they are the only plays that run past the close).
   overnight_nvda: {
     name: "NVDA overnight", band: "#E3E6F1", ink: "#0E1330", tint: "#F1F3FA", bar: "#0E1330", track: "#DFE3F0",
-    what: "Buys NVDA at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
+    what: "Buys NVDA near the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
   },
   overnight_iren: {
     name: "IREN overnight", band: "#E3E6F1", ink: "#0E1330", tint: "#F1F3FA", bar: "#0E1330", track: "#DFE3F0",
-    what: "Buys IREN at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
+    what: "Buys IREN near the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
   },
   overnight_hut: {
     name: "HUT overnight", band: "#E3E6F1", ink: "#0E1330", tint: "#F1F3FA", bar: "#0E1330", track: "#DFE3F0",
-    what: "Buys HUT at the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
+    what: "Buys HUT near the 4:00 PM close and sells it at the next 9:30 AM open. No stop.",
   },
 };
 
@@ -809,8 +809,9 @@ export function overnightReasonText(code: string | null | undefined): string {
     WASH_TRADE_REFUSED: "Alpaca refused the buy because of another open order in this stock.",
     BUYING_POWER_REFUSED: "Alpaca said there was not enough buying power.",
     BROKER_UNREACHABLE: "Alpaca did not answer.",
-    MISSED_BUY_WINDOW: "No buy could be sent by 3:49:30 PM.",
+    MISSED_BUY_WINDOW: "The buy window ended before an order could be sent.",
     AUCTION_NO_FILL: "The closing buy did not fill.",
+    MARKET_NO_FILL: "The near close market buy did not fill.",
     CANCELED_AT_ALPACA: "The buy was cancelled in the Alpaca app.",
     BOOK_MORE_THAN_ALPACA: "The robot's book shows more shares of this stock than Alpaca holds. Check the Alpaca app.",
     SYMBOL_CHANGE_UNCLEAR: "This stock had a company change the robot cannot handle alone. Check the Alpaca app.",
@@ -834,7 +835,7 @@ export interface HoldLineInputs {
 /** One line per hold. Always names the sale day. */
 export function holdLine(h: HoldLineInputs): string {
   if (h.bookOnly) return `Alpaca already sold ${h.symbol}, but the robot's book still shows ${h.shares} shares. Check the Alpaca app.`;
-  const bought = h.buyPrice != null ? ` bought at ${formatMoney(h.buyPrice)} at the close` : " bought at the close";
+  const bought = h.buyPrice != null ? ` bought at ${formatMoney(h.buyPrice)} near the close` : " bought near the close";
   const day = dayLabel(h.saleDate);
   const over = h.nights === "weekend" ? "Held over the weekend, sells" : h.nights === "holiday" ? "Held over the holiday, sells" : "Sells";
   const sale = day ? `${over} at the 9:30 AM open on ${day}.` : `${over} at the next 9:30 AM open.`;
@@ -868,7 +869,7 @@ export function tonightStatusLine(row: TonightRowLike, o: { modeOn: boolean; noB
     if (row.state && ["HELD", "SALE_QUEUED"].includes(row.state)) return `No buy tonight. ${overnightReasonText("EARLIER_HOLD_UNSOLD")}`;
     if (o.noBuyTonight) return "No buy tonight. You turned it off.";
     if (o.etMin >= 15 * 60 + 50) return "No buy tonight. No order went in by 3:49:30 PM.";
-    return "Buys at the 4:00 PM close. The order goes in at 3:46 PM.";
+    return "Buys near the 4:00 PM close. The order goes in at 3:59:30 PM.";
   }
   const st = tonight.state;
   if (HELD_STATES.includes(st)) return null;
@@ -876,13 +877,14 @@ export function tonightStatusLine(row: TonightRowLike, o: { modeOn: boolean; noB
   const shares = tonight.qty != null ? `${tonight.qty} shares` : "shares";
   if (st === "BUY_ACCEPTED") {
     return o.etMin < 16 * 60
-      ? `Buy for ${shares} is waiting at Alpaca. It fills at the 4:00 PM close.`
-      : `Waiting for Alpaca to report the closing buy of ${shares}.`;
+      ? `Buy for ${shares} was sent near the close. Waiting for Alpaca.`
+      : `Waiting for Alpaca to report the buy of ${shares}.`;
   }
   if (BUY_WAITING.includes(st) && tonight.block) {
-    return `Not bought yet. ${overnightReasonText(tonight.block)} It keeps trying until 3:49:30 PM.`;
+    return `Not bought yet. ${overnightReasonText(tonight.block)} It keeps checking until 3:59:55 PM.`;
   }
-  if (st === "INTENT" || st === "BUY_SENT") return `Sending a buy for ${shares} at the 4:00 PM close.`;
+  if (st === "INTENT") return `Buy for ${shares} is prepared. It sends at 3:59:30 PM.`;
+  if (st === "BUY_SENT") return `Sending a market buy for ${shares} near the close.`;
   return "Checking tonight's buy.";
 }
 
@@ -1150,7 +1152,8 @@ export interface OvernightRowInputs {
 export interface OvnChip { label: string; tone: "sage" | "lavender" | "grey" | "amber"; breathing: boolean }
 
 const LOCKOUT_MIN = 15 * 60 + 45;
-const BUY_SEND_MIN = 15 * 60 + 46;
+const BUY_PREP_MIN = 15 * 60 + 46;
+const MARKET_BUY_MIN = 15 * 60 + 59;
 const CLOSE_MIN = 16 * 60;
 const SALE_QUEUE_MIN = 19 * 60;
 const OPEN_MIN = 9 * 60 + 30;
@@ -1204,11 +1207,14 @@ export function overnightChip(i: OvernightRowInputs): OvnChip {
     if (live.some((r) => r.state === "BUY_ACCEPTED") && i.etMin >= CLOSE_MIN) {
       return { label: "Checking the closing buy", tone: "sage", breathing: true };
     }
-    return { label: "Buying at the close", tone: "sage", breathing: true };
+    if (live.some((r) => r.state === "INTENT")) {
+      return { label: "Buy prepared for 3:59 PM", tone: "sage", breathing: true };
+    }
+    return { label: "Buying near the close", tone: "sage", breathing: true };
   }
   if (i.noBuyActive) return { label: "No buy tonight", tone: "grey", breathing: false };
   if (i.etMin >= LOCKOUT_MIN + 5) return { label: "No buy tonight", tone: "amber", breathing: false };
-  return { label: "Buys at the 4 PM close", tone: "lavender", breathing: false };
+  return { label: "Buys near the 4 PM close", tone: "lavender", breathing: false };
 }
 
 /** Draw the 3:45 to 4:00 PM handoff stripes on the hours bars: today is a full day and a buy can happen. */
@@ -1240,15 +1246,15 @@ export function x6NoteFor(strategyId: string, i: OvernightRowInputs): string | n
   for (const j of jobs) {
     if ((j.filled_qty ?? 0) > 0 && !j.done) {
       if (i.tooLate) continue;
-      return `Closing ${j.symbol} now so Overnight can buy it at the close (${j.filled_qty} of ${j.qty ?? "?"} shares closed).`;
+      return `Closing ${j.symbol} now so Overnight can buy it near the close (${j.filled_qty} of ${j.qty ?? "?"} shares closed).`;
     }
     if ((j.filled_qty ?? 0) > 0) {
       const at = j.filled_at ? etTimeLabel(j.filled_at) : "";
       const m = minutesOfIso(j.filled_at);
       const early = m != null && 15 * 60 + 55 - m > 0 ? `, ${15 * 60 + 55 - m} minutes early,` : "";
-      return `${j.symbol} closed${at ? ` at ${at}` : ""}${early} so Overnight could buy it at the close.`;
+      return `${j.symbol} closed${at ? ` at ${at}` : ""}${early} so Overnight could buy it near the close.`;
     }
-    if (!j.done && i.etMin >= BUY_SEND_MIN && !i.tooLate) return `Closing ${j.symbol} now so Overnight can buy it at the close.`;
+    if (!j.done && i.etMin >= BUY_PREP_MIN && !i.tooLate) return `Closing ${j.symbol} now so Overnight can buy it near the close.`;
   }
   return null;
 }
@@ -1299,32 +1305,32 @@ export function overnightSteps(i: OvernightRowInputs, nameOf: (strategyId: strin
     x6 = { key: "x6", time: "3:46 PM", status: "now", text: `Closing the day trade in ${joinNames(closing.map((j) => j.symbol))}.` };
   } else if (closing.length > 0) {
     x6 = { key: "x6", time: "3:46 PM", status: "problem", text: `The day trade in ${joinNames(closing.map((j) => j.symbol))} was not fully closed in time.` };
-  } else if (at(BUY_SEND_MIN) && !allSkipped) {
+  } else if (at(BUY_PREP_MIN) && !allSkipped) {
     x6 = { key: "x6", time: "3:46 PM", status: "done", text: "No day trade needed closing." };
   } else {
     x6 = { key: "x6", time: "3:46 PM", status: allSkipped ? skipStatus : "next", text: allSkipped ? "No early close, no buy tonight." : "A day trade in one of them is closed early." };
   }
   steps.push(x6);
 
-  const sent = has(["BUY_SENT", "BUY_ACCEPTED", "HELD", "SALE_QUEUED", "SOLD"]);
-  const blocked = live.filter((r) => ["IDLE", "INTENT", "BUY_SENT"].includes(r.state || "") && r.block);
-  if (allSkipped) steps.push({ key: "send", time: "3:46 PM", status: skipStatus, text: `No buy sent. ${skipText}` });
-  else if (blocked.length > 0 && !past) steps.push({ key: "send", time: "3:46 PM", status: "problem", text: `${names(blocked)} not sent yet. ${overnightReasonText(blocked[0].block)}` });
-  else if (sent.length > 0 && sent.length === live.length) steps.push({ key: "send", time: "3:46 PM", status: "done", text: `Buy sent for ${names(sent)} at the closing price.` });
-  else if (live.length > 0 && at(BUY_SEND_MIN)) steps.push({ key: "send", time: "3:46 PM", status: "now", text: `Sending the buy for ${names(live)}.` });
-  else steps.push({ key: "send", time: "3:46 PM", status: "next", text: "The buy goes in at the closing price." });
-
   if (allSkipped) steps.push({ key: "last", time: "3:49:30 PM", status: skipStatus, text: "Nothing to stop tonight." });
   else if (past || i.tooLate) steps.push({ key: "last", time: "3:49:30 PM", status: "done", text: "Too late to stop tonight's buy." });
-  else if (at(BUY_SEND_MIN)) steps.push({ key: "last", time: "3:49:30 PM", status: "now", text: "Last moment to tap No overnight buy tonight." });
+  else if (at(BUY_PREP_MIN)) steps.push({ key: "last", time: "3:49:30 PM", status: "now", text: "Last moment to tap No overnight buy tonight." });
   else steps.push({ key: "last", time: "3:49:30 PM", status: "next", text: "Last moment to tap No overnight buy tonight." });
+
+  const sent = has(["BUY_SENT", "BUY_ACCEPTED", "HELD", "SALE_QUEUED", "SOLD"]);
+  const blocked = live.filter((r) => ["IDLE", "INTENT", "BUY_SENT"].includes(r.state || "") && r.block);
+  if (allSkipped) steps.push({ key: "send", time: "3:59:30 PM", status: skipStatus, text: `No buy sent. ${skipText}` });
+  else if (blocked.length > 0 && !past) steps.push({ key: "send", time: "3:59:30 PM", status: "problem", text: `${names(blocked)} not sent yet. ${overnightReasonText(blocked[0].block)}` });
+  else if (sent.length > 0 && sent.length === live.length) steps.push({ key: "send", time: "3:59:30 PM", status: "done", text: `Market buy sent for ${names(sent)} near the close.` });
+  else if (live.length > 0 && at(MARKET_BUY_MIN)) steps.push({ key: "send", time: "3:59:30 PM", status: "now", text: `Sending the market buy for ${names(live)}.` });
+  else steps.push({ key: "send", time: "3:59:30 PM", status: "next", text: "The market buy goes in near the close." });
 
   const bought = has(["HELD", "SALE_QUEUED", "SOLD"]);
   const notBought = live.filter((r) => !bought.includes(r));
   if (allSkipped) steps.push({ key: "bought", time: "4:00 PM", status: skipStatus, text: "No buy tonight." });
-  else if (bought.length > 0) steps.push({ key: "bought", time: "4:00 PM", status: "done", text: `Bought ${names(bought)} at the close.${notBought.length > 0 ? ` ${names(notBought)} not bought yet.` : ""}${skipped.length > 0 ? ` ${names(skipped)} skipped.` : ""}` });
-  else if (has(["BUY_ACCEPTED"]).length > 0 && (past || i.tooLate)) steps.push({ key: "bought", time: "4:00 PM", status: "now", text: "Waiting for the closing price." });
-  else steps.push({ key: "bought", time: "4:00 PM", status: "next", text: "Bought at the close." });
+  else if (bought.length > 0) steps.push({ key: "bought", time: "4:00 PM", status: "done", text: `Bought ${names(bought)} near the close.${notBought.length > 0 ? ` ${names(notBought)} not bought yet.` : ""}${skipped.length > 0 ? ` ${names(skipped)} skipped.` : ""}` });
+  else if (has(["BUY_ACCEPTED"]).length > 0 && (past || i.tooLate)) steps.push({ key: "bought", time: "4:00 PM", status: "now", text: "Waiting for Alpaca to confirm the buy." });
+  else steps.push({ key: "bought", time: "4:00 PM", status: "next", text: "Bought near the close." });
 
   const queued = has(["SALE_QUEUED", "SOLD"]);
   if (allSkipped) steps.push({ key: "queue", time: "7:00 PM", status: skipStatus, text: "No sale to queue." });

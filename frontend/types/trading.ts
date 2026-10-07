@@ -291,7 +291,7 @@ export interface OvernightPayload {
   no_buy_tonight?: boolean;
   no_buy_until?: string;
   unsold_after_0931?: string[];
-  /** X6: day trades closed early for a closing auction buy, last 5 days (new backend only). */
+  /** X6: day trades closed early for a near close buy, last 5 days (new backend only). */
   x6?: OvernightX6[];
   /** Today's calendar as the closing buy judges it: full_day false on an early close or a closed market (new backend only). */
   today?: { date: string; full_day: boolean; reason: string | null; sale_date: string | null };

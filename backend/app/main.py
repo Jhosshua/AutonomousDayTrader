@@ -188,6 +188,7 @@ def or15_now() -> datetime:
 
 # Real-time symbol market price cache for pre-trade risk valuation
 latest_market_prices: Dict[str, float] = {}
+latest_market_price_times: Dict[str, datetime] = {}
 today_open_prices: Dict[str, float] = {}
 market_history: Dict[str, List[Dict[str, Any]]] = {}
 entry_order_to_bracket: Dict[str, str] = {}
@@ -1717,6 +1718,7 @@ def _check_session_boundary(now_dt: datetime) -> None:
     recent_news.clear()
     today_open_prices.clear()
     latest_market_prices.clear()
+    latest_market_price_times.clear()
     if state_store is not None:
         state_store.wal_checkpoint("PASSIVE")
     _checkpoint_runtime(
@@ -2520,6 +2522,7 @@ async def handle_bar_event(bar: BarEvent, durable_replay: bool = False) -> None:
             # Must not escape: a leaked in-flight event key freezes tri management.
             log.exception("Tri-engine bar handling failed for %s", bar.symbol)
     latest_market_prices[bar.symbol.upper()] = bar.close
+    latest_market_price_times[bar.symbol.upper()] = bar.timestamp
     _mark_feed_event("bar")
     if bar.symbol.upper() in ("SPY", "QQQ"):
         market_filter.on_bar(bar)
@@ -2700,6 +2703,7 @@ async def handle_quote_event(quote: QuoteEvent) -> None:
         if not should_process:
             return
     latest_market_prices[quote.symbol.upper()] = (quote.bid_price + quote.ask_price) / 2.0
+    latest_market_price_times[quote.symbol.upper()] = quote.timestamp
     orb.note_price(quote.symbol, (quote.bid_price + quote.ask_price) / 2.0, quote.timestamp, "quote_mid")
     _mark_feed_event("quote")
     try:
@@ -3175,6 +3179,7 @@ async def handle_trade_event(trade: TradeEvent) -> None:
     """Track the latest trade print price; fold the print into the Ride the Trend tick tape."""
     if isinstance(trade.price, (int, float)) and math.isfinite(trade.price) and trade.price > 0:
         latest_market_prices[trade.symbol.upper()] = trade.price
+        latest_market_price_times[trade.symbol.upper()] = trade.timestamp
         orb.note_price(trade.symbol, trade.price, trade.timestamp, "sip_trade")
     _mark_feed_event("trade")
     try:
@@ -3261,6 +3266,7 @@ def reset_runtime_state(starting_equity: Optional[float] = None) -> None:
     pending_processed_events.clear()
     inflight_event_keys.clear()
     latest_market_prices.clear()
+    latest_market_price_times.clear()
     today_open_prices.clear()
     for _feed in feed_last_event:
         feed_last_event[_feed] = None

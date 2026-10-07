@@ -147,7 +147,7 @@ export default function OvernightPlaybookRow({ inputs, realizedToday, sizeNote, 
           <div className="flex flex-col gap-1">
             <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: theme.ink }}>How it works</div>
             <p className="text-sm leading-relaxed text-[#2A3150]">
-              {syms ? `Buys ${syms} at the 4:00 PM close and sells at the next 9:30 AM open. No stop.` : "No stock is switched on."} From 3:45 PM until the sale, the day playbooks don&apos;t trade these stocks, and a day trade in one of them is closed at 3:46 PM.
+              {syms ? `Buys ${syms} near the 4:00 PM close and sells at the next 9:30 AM open. No stop.` : "No stock is switched on."} From 3:45 PM until the sale, the day playbooks don&apos;t trade these stocks, and a day trade in one of them is closed at 3:46 PM.
             </p>
             <a href="#overnight-holds" className="self-start text-sm font-semibold text-[#2B4BFF] underline-offset-2 hover:underline" data-testid="overnight-holds-link">
               Stop tonight&apos;s buy with the button in the Overnight holds box at the top

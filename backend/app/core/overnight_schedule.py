@@ -49,7 +49,8 @@ BUY_WINDOW_START = dtime(15, 46, 5)
 BUY_ALERT = dtime(15, 47, 30)
 BUY_GIVE_UP = dtime(15, 49, 30)
 CLS_CUTOFF = dtime(15, 50)                 # Alpaca refuses closing auction orders after this
-BUY_FALLBACK_AT = dtime(15, 59, 30)        # D10 plain market buy when cls is refused
+MARKET_PREFLIGHT_AT = dtime(15, 59, 20)    # refresh account, prices and broker flatness
+BUY_FALLBACK_AT = dtime(15, 59, 30)        # plain market buy near the close
 BUY_POLL_FROM = dtime(16, 0, 5)
 FIDELITY_CLOSE_AT = dtime(16, 15)
 SALE_QUEUE_AT = dtime(19, 0, 30)
@@ -94,6 +95,7 @@ BUYING_POWER_REFUSED = "BUYING_POWER_REFUSED"
 BROKER_UNREACHABLE = "BROKER_UNREACHABLE"
 MISSED_BUY_WINDOW = "MISSED_BUY_WINDOW"
 AUCTION_NO_FILL = "AUCTION_NO_FILL"
+MARKET_NO_FILL = "MARKET_NO_FILL"
 CANCELED_AT_ALPACA = "CANCELED_AT_ALPACA"
 # Needs look (the hold still sells).
 NO_ORDER_BY_1547 = "NO_ORDER_BY_1547"

@@ -35,11 +35,12 @@ check(Math.abs(seg.left - 1.128) < 0.01 && Math.abs(seg.left + seg.width - 20.31
 eq(rangesToSegments([["09:30", "16:00"]])[0], { left: 0, width: 100 }, "axis: segments without night unchanged");
 
 // --- chip ---------------------------------------------------------------------------------------------
-eq(chip({}).label, "Buys at the 4 PM close", "chip: morning of a full day");
+eq(chip({}).label, "Buys near the 4 PM close", "chip: morning of a full day");
 eq(chip({}).tone, "lavender", "chip: waiting tone is calm");
-check(!chip({}).label.includes("3:46"), "chip: never says 3:46 (the buy is at the close)");
+check(!chip({}).label.includes("3:46"), "chip: never says 3:46");
 eq(chip({ noBuyActive: true }), { label: "No buy tonight", tone: "grey", breathing: false }, "chip: operator turned the buy off is grey");
-eq(chip({ etMin: T(15, 47), rows: tonight("BUY_SENT") }).label, "Buying at the close", "chip: 3:47 PM buy sent");
+eq(chip({ etMin: T(15, 47), rows: tonight("INTENT") }).label, "Buy prepared for 3:59 PM", "chip: 3:47 PM buy prepared");
+eq(chip({ etMin: T(15, 59), rows: tonight("BUY_SENT") }).label, "Buying near the close", "chip: 3:59 PM buy sent");
 eq(chip({ etMin: T(15, 47), rows: tonight("IDLE", { block: "BROKER_MISMATCH" }) }), { label: "Not bought yet", tone: "amber", breathing: false }, "chip: blocked buy is amber");
 eq(chip({ etMin: T(16, 1), rows: tonight("BUY_ACCEPTED") }).label, "Checking the closing buy", "chip: accepted after 4 PM");
 eq(chip({ etMin: T(15, 46), rows: tonight("SKIPPED", { reason: "OPERATOR_NO_BUY_TONIGHT", reserved: false }) }).tone, "grey", "chip: all skipped by the operator is grey");
@@ -52,7 +53,7 @@ eq(chip({ modeOn: false, holds: [{ symbol: "NVDA", saleDate: MON }], etMin: T(9,
 eq(chip({ holds: [{ symbol: "NVDA", saleDate: MON }], etMin: T(9, 40) }).label, "Selling", "chip: past 9:30 with a hold left");
 eq(chip({ running: false }).label, "Not running", "chip: not running");
 eq(chip({ enabled: [] }).label, "Switched off", "chip: nothing enabled");
-eq(chip({ today: null, tradingDay: true }).label, "Buys at the 4 PM close", "chip: backend without `today` falls back to the trading day flag");
+eq(chip({ today: null, tradingDay: true }).label, "Buys near the 4 PM close", "chip: backend without `today` falls back to the trading day flag");
 
 // --- band and note ----------------------------------------------------------------------------------------
 check(showHandoffBand(base()), "band: full day, buys on");
@@ -73,13 +74,13 @@ eq(handoffNote(base({ etMin: T(9, 0), rows: tonight("SALE_QUEUED", { buy_date: F
 
 // --- X6 note ------------------------------------------------------------------------------------------
 const job = (o = {}) => ({ symbol: "NVDA", date: MON, done: true, strategy_id: "vwap_pullback", filled_at: "2026-10-05T15:46:20-04:00", filled_qty: 20, ...o });
-eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 47), x6: [job()] })), "NVDA closed at 3:46 PM, 9 minutes early, so Overnight could buy it at the close.", "x6: filled note");
+eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 47), x6: [job()] })), "NVDA closed at 3:46 PM, 9 minutes early, so Overnight could buy it near the close.", "x6: filled note");
 eq(x6NoteFor("orb", base({ etMin: T(15, 47), x6: [job()] })), null, "x6: only on the playbook that owned the trade");
 eq(x6NoteFor("vwap_pullback", base({ todayEt: TUE, x6: [job()] })), null, "x6: yesterday's close is not shown today");
-eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 46), x6: [job({ done: false, filled_qty: 0, filled_at: null })] })), "Closing NVDA now so Overnight can buy it at the close.", "x6: closing now");
+eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 46), x6: [job({ done: false, filled_qty: 0, filled_at: null })] })), "Closing NVDA now so Overnight can buy it near the close.", "x6: closing now");
 eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 52), tooLate: true, x6: [job({ done: false, filled_qty: 0, filled_at: null })] })), null, "x6: 'now' never sticks after 3:49:30 PM");
 eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 47), x6: [job({ filled_qty: 0, filled_at: null })] })), null, "x6: done with nothing filled says nothing");
-eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 58), x6: [job({ filled_at: "2026-10-05T15:57:00-04:00" })] })), "NVDA closed at 3:57 PM so Overnight could buy it at the close.", "x6: no negative minutes");
+eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 58), x6: [job({ filled_at: "2026-10-05T15:57:00-04:00" })] })), "NVDA closed at 3:57 PM so Overnight could buy it near the close.", "x6: no negative minutes");
 
 // --- steps --------------------------------------------------------------------------------------------
 const st = (o) => overnightSteps(base(o), names);
@@ -87,13 +88,13 @@ const status = (o) => (st(o) || []).map((s) => s.status).join(",");
 eq(st({ etMin: T(16, 30), rows: [] }), null, "steps: nothing planned or open after the close");
 eq(status({ etMin: T(10, 0) }), "next,next,next,next,next,next,next", "steps: morning plan, all next");
 eq(status({ noBuyActive: true }), "next,skipped,skipped,skipped,skipped,skipped,skipped", "steps: operator stopped tonight's buy before 3:45");
-eq(status({ etMin: T(15, 47), rows: tonight("BUY_SENT"), x6: [job()] }), "done,done,done,now,next,next,next", "steps: 3:47 PM with an early close");
-eq(status({ etMin: T(15, 47), rows: tonight("BUY_ACCEPTED") }), "done,done,done,now,next,next,next", "steps: one Now at a time (accepted before 3:49:30)");
+eq(status({ etMin: T(15, 47), rows: tonight("INTENT"), x6: [job()] }), "done,done,now,next,next,next,next", "steps: 3:47 PM with an early close");
+eq(status({ etMin: T(15, 59), tooLate: true, rows: tonight("BUY_SENT") }), "done,done,done,done,next,next,next", "steps: market buy sent at 3:59 PM");
 eq(status({ etMin: T(15, 55), tooLate: true, rows: tonight("BUY_ACCEPTED") }), "done,done,done,done,now,next,next", "steps: waiting for the close after 3:49:30");
-const s347 = st({ etMin: T(15, 47), rows: tonight("BUY_SENT"), x6: [job()] });
+const s347 = st({ etMin: T(15, 47), rows: tonight("INTENT"), x6: [job()] });
 eq(s347[1].text, "Ride the Trend's NVDA trade was closed early at 3:46 PM.", "steps: early close names the playbook");
-eq(s347[2].text, "Buy sent for NVDA, IREN and HUT at the closing price.", "steps: buy sent");
-eq(st({ etMin: T(15, 47), rows: tonight("BUY_SENT") })[1].text, "No day trade needed closing.", "steps: no early close needed");
+eq(s347[3].text, "The market buy goes in near the close.", "steps: buy is prepared");
+eq(st({ etMin: T(15, 47), rows: tonight("INTENT") })[1].text, "No day trade needed closing.", "steps: no early close needed");
 eq(status({ etMin: T(16, 30), tooLate: true, rows: tonight("HELD") }), "done,done,done,done,done,next,next", "steps: 4:30 PM bought");
 eq(status({ etMin: T(19, 10), tooLate: true, rows: tonight("SALE_QUEUED") }), "done,done,done,done,done,done,next", "steps: 7:10 PM sale queued");
 const morning = { todayEt: TUE, etMin: T(9, 0), today: { full_day: true, reason: null, sale_date: "2026-10-07" }, rows: tonight("SALE_QUEUED") };
@@ -108,14 +109,14 @@ const weekend = { todayEt: SAT, today: { full_day: false, reason: "NOT_TRADING_D
 eq(st(weekend)[6].text, "Sold at the open on Mon Oct 5. Then the day playbooks can trade them again.", "steps: weekend names Monday");
 eq(status({ etMin: T(15, 46), rows: tonight("SKIPPED", { reason: "OPERATOR_NO_BUY_TONIGHT", reserved: false }) }), "done,skipped,skipped,skipped,skipped,skipped,skipped", "steps: operator skip is grey skipped");
 eq(status({ etMin: T(15, 50), tooLate: true, rows: tonight("SKIPPED", { reason: "BUY_REFUSED", reserved: false }) }), "done,problem,problem,problem,problem,problem,problem", "steps: refused buy is a problem");
-eq(st({ etMin: T(15, 50), tooLate: true, rows: tonight("SKIPPED", { reason: "BUY_REFUSED", reserved: false }) })[2].text, "No buy sent. Alpaca refused the buy.", "steps: refusal reason in plain words");
-eq(st({ etMin: T(15, 47), rows: tonight("IDLE", { block: "BROKER_MISMATCH" }) })[2].status, "problem", "steps: blocked send is a problem");
+eq(st({ etMin: T(15, 50), tooLate: true, rows: tonight("SKIPPED", { reason: "BUY_REFUSED", reserved: false }) })[3].text, "No buy sent. Alpaca refused the buy.", "steps: refusal reason in plain words");
+eq(st({ etMin: T(15, 47), rows: tonight("IDLE", { block: "BROKER_MISMATCH" }) })[3].status, "problem", "steps: blocked send is a problem");
 eq(st({ today: { full_day: false, reason: "EARLY_CLOSE", sale_date: null } }), null, "steps: early close day with nothing open shows no steps");
 
 // --- Codex review fixes ---------------------------------------------------------------------------------
 eq(chip({ todayEt: "2026-10-07", etMin: T(8, 0), holds: [{ symbol: "IREN", saleDate: TUE }] }).label, "Selling", "codex: a hold past its sale day is never green before the next open");
-eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 47), x6: [job({ qty: 100, filled_qty: 1, done: false })] })), "Closing NVDA now so Overnight can buy it at the close (1 of 100 shares closed).", "codex: a partial early close is not called closed");
-eq(st({ etMin: T(15, 47), rows: tonight("BUY_SENT"), x6: [job({ qty: 100, filled_qty: 1, done: false })] })[1].status, "now", "codex: partial early close step is Now, not Done");
+eq(x6NoteFor("vwap_pullback", base({ etMin: T(15, 47), x6: [job({ qty: 100, filled_qty: 1, done: false })] })), "Closing NVDA now so Overnight can buy it near the close (1 of 100 shares closed).", "codex: a partial early close is not called closed");
+eq(st({ etMin: T(15, 47), rows: tonight("INTENT"), x6: [job({ qty: 100, filled_qty: 1, done: false })] })[1].status, "now", "codex: partial early close step is Now, not Done");
 eq(st({ etMin: T(15, 52), tooLate: true, rows: tonight("BUY_ACCEPTED"), x6: [job({ qty: 100, filled_qty: 1, done: false })] })[1].text, "The day trade in NVDA was not fully closed in time.", "codex: a partial early close after 3:49:30 is a problem, never 'no day trade'");
 const mixQ = [row("NVDA", { state: "SALE_QUEUED", buy_date: MON, sale_date: TUE, reserved: true }), row("IREN", { state: "HELD", buy_date: MON, sale_date: TUE, reserved: true })];
 eq(st({ etMin: T(20, 0), tooLate: true, rows: mixQ })[5].text, "Sale queued for NVDA. IREN not queued yet.", "codex: one queued sale does not mark the queue step done");

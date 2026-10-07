@@ -89,8 +89,8 @@ def test_no_buy_tonight_not_applied_when_the_save_fails(main_runtime, monkeypatc
 
 def test_lifespan_build_with_its_worker_pool_and_the_relay_bar_count(main_runtime, monkeypatch):
     """The production build path: start() with the default thread pool and the relay REST count
-    through main's _fetch_session_minutes (patched to answer like the relay). The tick only starts
-    and collects jobs; the buy goes out from the pool."""
+    through main's _fetch_session_minutes (patched to answer like the relay). The durable intent is
+    prepared at 15:46 and the market buy goes out from the pool at 15:59:30."""
     r = main_runtime
     h = MainOvernight(r, at(THU, 15, 46, 4), build=False)
     for sym, px in PRICES.items():
@@ -111,14 +111,39 @@ def test_lifespan_build_with_its_worker_pool_and_the_relay_bar_count(main_runtim
     assert type(r.overnight.executor).__name__ == "ThreadPoolExecutor"
     h.set(at(THU, 15, 46, 5))
     deadline = _time.monotonic() + 10
-    while _time.monotonic() < deadline and ctl.state["nights"].get("HUT:2026-10-01", {}).get("state") != "BUY_ACCEPTED":
+    while _time.monotonic() < deadline and ctl.state["nights"].get("HUT:2026-10-01", {}).get("state") != "INTENT":
         r.overnight.tick(h.clock.now)
         _time.sleep(0.02)
     assert {n["symbol"]: n["state"] for n in ctl.state["nights"].values()} == {
-        "NVDA": "BUY_ACCEPTED", "IREN": "BUY_ACCEPTED", "HUT": "BUY_ACCEPTED"}
+        "NVDA": "INTENT", "IREN": "INTENT", "HUT": "INTENT"}
+    assert h.alpaca.posts() == []
     assert {n["symbol"]: n["bars"]["count"] for n in ctl.state["nights"].values()} == {"NVDA": 375, "IREN": 375, "HUT": 375}
     assert sorted(c[0][0] for c in calls) == ["HUT", "IREN", "NVDA"]
+    h.set(at(THU, 15, 59, 30))
+    for sym, px in PRICES.items():
+        h.price(sym, px)
+    deadline = _time.monotonic() + 10
+    while _time.monotonic() < deadline and ctl.state["nights"].get("HUT:2026-10-01", {}).get("state") != "HELD":
+        r.overnight.tick(h.clock.now)
+        _time.sleep(0.02)
+    assert {n["symbol"]: n["state"] for n in ctl.state["nights"].values()} == {
+        "NVDA": "HELD", "IREN": "HELD", "HUT": "HELD"}
+    assert [body["time_in_force"] for body in h.alpaca.posts()] == ["day"] * 3
     r.overnight.shutdown()
+
+
+@pytest.mark.parametrize("age_seconds", [None, 121.0, -2.0])
+def test_production_market_preflight_rejects_missing_stale_or_future_price_times(
+        main_runtime, age_seconds):
+    r = main_runtime
+    h = MainOvernight(r, at(THU, 15, 59, 20))
+    h.price("NVDA", PRICES["NVDA"])
+    if age_seconds is None:
+        del r.latest_market_price_times["NVDA"]
+    else:
+        r.latest_market_price_times["NVDA"] = h.clock.now - timedelta(seconds=age_seconds)
+    with pytest.raises(RuntimeError, match="NVDA"):
+        r.overnight._fresh_prices(("NVDA",), h.clock.now)
 
 
 def test_relay_failure_is_a_logged_skip_at_154930(main_runtime, monkeypatch):

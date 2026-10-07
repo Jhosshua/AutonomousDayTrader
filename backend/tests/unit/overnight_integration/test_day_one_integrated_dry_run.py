@@ -39,7 +39,7 @@ def test_spy_coin_and_all_three_overnight_holds_share_one_account_without_races(
         },
     )
 
-    # Sep 30 closing auction buys all three established overnight holds.
+    # Sep 30 near close market buys established all three overnight holds.
     buy_night(h, sep30)
     assert set(h.alpaca.signed_positions()) == set(PRICES)
     queue_sales(h, sep30)
