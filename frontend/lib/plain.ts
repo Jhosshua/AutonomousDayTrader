@@ -341,7 +341,7 @@ export interface RightNowInputs {
   strategies: RightNowStrategy[];
   positionsCount: number;
   maxDailyLossDollars?: number | null;
-  /** The overnight holds exist on this robot. A loss limit day still buys at the close (D5), so the
+  /** The overnight holds exist on this robot. A loss limit day still buys near the close (D5), so the
    * stop is worded as day trading only. Absent on an older backend: the old words stay. */
   overnightOn?: boolean;
   /** One sentence about the overnight holds held right now (built by the caller), or null. */

@@ -79,7 +79,7 @@ export default function SafetyCard({
         </div>
         <div className="text-xs" style={{ color: "#0B5A3C" }}>
           {ovn
-            ? `${maxDailyLossDollars != null ? `If day trades ever lose ${formatMoney(maxDailyLossDollars)} in a day` : "If day trades ever hit the daily loss limit"}, it stops day trading for the day on its own. The daily loss limit covers day trades only.${ovn.buysOn ? " The overnight buy still goes in at the close." : ""}`
+            ? `${maxDailyLossDollars != null ? `If day trades ever lose ${formatMoney(maxDailyLossDollars)} in a day` : "If day trades ever hit the daily loss limit"}, it stops day trading for the day on its own. The daily loss limit covers day trades only.${ovn.buysOn ? " The overnight buy still goes in near the close." : ""}`
             : maxDailyLossDollars != null
             ? `If it ever loses ${formatMoney(maxDailyLossDollars)} in a day, it stops for the day on its own.`
             : "If it ever hits its daily loss limit, it stops for the day on its own."}
