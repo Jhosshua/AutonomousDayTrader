@@ -146,6 +146,8 @@ export interface StrategyState {
     tranches: FixedTranche[];
   };
   orb?: {
+    rules?: string;
+    rules_version?: string;
     mode: string;
     mode_text: string;
     step: string | null;
@@ -522,4 +524,5 @@ export interface BrokerInfo {
   mode: "simulated" | "alpaca_paper" | string;
   account_number: string | null;
   mismatch: boolean;
+  alpaca_positions?: Record<string, unknown>;
 }

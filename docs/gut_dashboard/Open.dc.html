@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cobalt Ledger home, trades open</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2B4BFF}a:hover{color:#1A33C8}
+.num{font-family:'Bricolage Grotesque',sans-serif;font-variant-numeric:tabular-nums}
+.card{background:#fff;border:1px solid #E2E5F0;border-radius:16px}
+.btn{font:600 15px 'Instrument Sans',sans-serif;min-height:48px;border-radius:12px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 16px;width:100%}
+.btn:focus-visible{outline:3px solid #2B4BFF;outline-offset:2px}
+.row{display:flex;align-items:center;gap:10px;min-height:48px;padding:5px 0;border-top:1px solid #EEF0F6}
+.row:first-child{border-top:0}
+.sub{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+details>summary{list-style:none;cursor:pointer}
+details>summary::-webkit-details-marker{display:none}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(10,125,83,.45)}60%{box-shadow:0 0 0 7px rgba(10,125,83,0)}}
+.live{animation:pulse 2.4s ease-out infinite}
+@keyframes flash{0%{background:#C6F432}100%{background:transparent}}
+.flash{animation:flash .5s ease-out both;border-radius:6px;padding:0 4px;margin-right:-4px}
+@keyframes shimmer{0%{background-position:0 0}100%{background-position:40px 0}}
+.open{background-image:repeating-linear-gradient(90deg,#2B4BFF 0 12px,#7A8CFF 12px 20px);background-size:40px 100%;animation:shimmer 1.2s linear infinite}
+@media (prefers-reduced-motion:reduce){.live,.flash,.open{animation:none}}
+</style>
+</helmet>
+<div style="width: 390px; min-height: 1560px; box-sizing: border-box; background: #F4F5FA; color: #0E1330; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 1.35; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 12px">
+
+  <div style="display: flex; align-items: center; gap: 10px; min-height: 44px">
+    <div style="width: 36px; height: 36px; border-radius: 10px; background: #2B4BFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9" stroke="#fff"></path><path d="M7.5 15l3.5-3.5 2.5 2L20 4M15.5 4H20v4.5" stroke="#C6F432"></path></svg>
+    </div>
+    <div style="font: 700 19px 'Bricolage Grotesque', sans-serif; flex: 1">Cobalt Ledger</div>
+    <div style="display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #E2E5F0; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 600; color: #0A7D53; white-space: nowrap">
+      <span class="live" style="width: 9px; height: 9px; border-radius: 50%; background: #0A7D53; display: inline-block"></span>Trading · updated 3 s ago
+    </div>
+  </div>
+
+  <!-- status sentence + the one alarm, with its action inside -->
+  <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border-color: #F2C94C">
+    <div style="display: flex; gap: 12px; align-items: flex-start">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: #FFF4DB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #8A4B00">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5L7 3M20 5.5L17 3M7.5 19l-1.5 2M16.5 19l1.5 2M12 9.5V13M12 16h.01M19 13a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"></path></svg>
+      </div>
+      <div style="font: 600 17px/1.3 'Bricolage Grotesque', sans-serif">In 1 trade: short Tesla, up $77. One thing needs you.</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+      <span style="display: inline-flex; align-items: center; gap: 6px; background: #8A4B00; color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700">1 needs a look</span>
+      <span style="font-size: 13px; color: #5B6180">Wed Oct 7 · 9:52 AM · closes in 6h 08m</span>
+    </div>
+    <div style="background: #FFF4DB; color: #8A4B00; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 13px; line-height: 1.4"><span style="font-weight: 700">IREN overnight did not sell at the 9:30 open.</span> 251 shares still held, down $33. The robot keeps retrying; you can sell now instead.</div>
+      <button type="button" class="btn" style="background: #8A4B00; color: #fff; min-height: 44px; font-size: 14px" onClick="{{tapIren}}">{{irenLabel}}</button>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+    <div class="card" style="padding: 12px 12px 10px; min-width: 0">
+      <div class="sub" style="color: #5B6180; font-weight: 600; font-size: 12px">Account</div>
+      <div class="num" style="font-size: clamp(17px, 5vw, 20px); font-weight: 800; letter-spacing: -.02em; margin-top: 2px; white-space: nowrap">$48,973</div>
+      <div class="sub" style="color: #5B6180">2 open · $49.8k at work</div>
+    </div>
+    <div class="card" style="padding: 12px 12px 10px; border-color: #BFE6D4; min-width: 0">
+      <div class="sub" style="color: #5B6180; font-weight: 600; font-size: 12px">Today</div>
+      <div class="num" style="font-size: clamp(17px, 5vw, 20px); font-weight: 800; letter-spacing: -.02em; margin-top: 2px; color: #0A7D53; white-space: nowrap">+$173</div>
+      <div class="sub" style="color: #0A7D53">$129 banked + $44 open</div>
+    </div>
+    <div class="card" style="padding: 12px 12px 10px; min-width: 0">
+      <div class="sub" style="color: #5B6180; font-weight: 600; font-size: 12px">Loss stop</div>
+      <div class="num" style="font-size: clamp(17px, 5vw, 20px); font-weight: 800; letter-spacing: -.02em; margin-top: 2px; white-space: nowrap">$1,243</div>
+      <div style="height: 6px; background: #EEF0F6; border-radius: 3px; margin-top: 7px; overflow: hidden"><div style="width: 3%; height: 100%; background: #0A7D53"></div></div>
+    </div>
+  </div>
+
+  <!-- holdings, live -->
+  <div class="card" style="padding: 12px 16px 6px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <h2 style="margin: 0; font: 700 16px 'Bricolage Grotesque', sans-serif; flex: 1">Holding now</h2>
+      <span style="font-size: 12px; color: #0A7D53; font-weight: 600">live prices</span>
+    </div>
+
+    <!-- TSLA short -->
+    <div class="row" style="flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 0 12px">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: #2B4BFF; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12H4.5A1.5 1.5 0 0 0 3 13.5v6A1.5 1.5 0 0 0 4.5 21h6a1.5 1.5 0 0 0 1.5-1.5V16M6 17L19 4M14 4h5v5M11.5 8.5h3v3M18 13l-2 3.5h3L17 20"></path></svg>
+        </div>
+        <div style="flex: 1; min-width: 0">
+          <div style="display: flex; align-items: baseline; gap: 6px"><span class="num" style="font-weight: 800; font-size: 16px">TSLA</span><span style="font-size: 13px; color: #5B6180">short 107 sh · in at $376.12</span></div>
+          <div style="font-size: 12px; color: #5B6180">Tesla plan · stop and both targets sit at the broker</div>
+        </div>
+        <div style="text-align: right">
+          <div class="num flash" style="font-weight: 800; font-size: 16px; color: #0A7D53">+$77</div>
+          <div class="num" style="font-size: 12px; color: #5B6180">now $375.40</div>
+        </div>
+      </div>
+      <!-- price strip: flat zones, each label at its real place -->
+      <div style="position: relative; height: 46px">
+        <div style="position: absolute; left: 0; right: 0; top: 14px; height: 12px; border-radius: 6px; overflow: hidden; display: flex">
+          <div style="width: 66.7%; background: #BFE6D4"></div><div style="width: 18.3%; background: #EEF0F6"></div><div style="width: 15%; background: #F3D5CB"></div>
+        </div>
+        <div class="num" style="position: absolute; left: 0; top: 0; font-size: 10px; font-weight: 700; color: #0A7D53">$368.96 target</div>
+        <div style="position: absolute; left: 16.7%; top: 12px; width: 2px; height: 16px; background: #0A7D53"></div>
+        <div class="num" style="position: absolute; left: 16.7%; top: 30px; font-size: 10px; font-weight: 700; color: #0A7D53; transform: translateX(-50%)">$370.75</div>
+        <div style="position: absolute; left: 66.7%; top: 12px; width: 2px; height: 16px; background: #0E1330"></div>
+        <div class="num" style="position: absolute; left: 66.7%; top: 30px; font-size: 10px; font-weight: 700; color: #0E1330; transform: translateX(-50%)">entry $376.12</div>
+        <div style="position: absolute; left: 60%; top: 10px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; background: #fff; border: 4px solid #2B4BFF; box-sizing: border-box"></div>
+        <div class="num" style="position: absolute; left: 60%; top: 0; font-size: 10px; font-weight: 700; color: #2B4BFF; transform: translateX(-50%)">now</div>
+        <div class="num" style="position: absolute; right: 0; top: 30px; font-size: 10px; font-weight: 700; color: #C2300F">stop $379.70</div>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button type="button" class="btn" style="background: #fff; color: #0E1330; border: 1.5px solid #0E1330; min-height: 44px; font-size: 14px" onClick="{{tapStop}}">{{stopLabel}}</button>
+        <button type="button" class="btn" style="background: #0E1330; color: #fff; min-height: 44px; font-size: 14px" onClick="{{tapSell}}">{{sellLabel}}</button>
+      </div>
+    </div>
+
+    <!-- IREN leftover overnight, one line; its action lives in the alarm card above -->
+    <div class="row">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: #FFF4DB; color: #8A4B00; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.65 14.31A5.85 5.85 0 1 1 8.29 7.95 4.55 4.55 0 0 0 14.65 14.31zM11 4.5c4.5-2 9 0 10 5.5M18.6 7.6L21 10l2-2.6"></path></svg>
+      </div>
+      <div style="flex: 1; min-width: 0">
+        <div style="display: flex; align-items: baseline; gap: 6px"><span class="num" style="font-weight: 800; font-size: 16px">IREN</span><span style="font-size: 13px; color: #5B6180">251 sh · in at $38.69</span></div>
+        <div style="font-size: 12px; color: #8A4B00; font-weight: 600">Overnight · sale retrying, see above</div>
+      </div>
+      <div style="text-align: right">
+        <div class="num" style="font-weight: 800; font-size: 16px; color: #C2300F">−$33</div>
+        <div class="num" style="font-size: 12px; color: #5B6180">now $38.56</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- playbooks, morning, with a now line -->
+  <div class="card" style="padding: 12px 16px 6px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <h2 style="margin: 0; font: 700 16px 'Bricolage Grotesque', sans-serif; flex: 1">The 7 playbooks</h2>
+      <span style="font-size: 12px; color: #5B6180">bar = its hours today · line = now</span>
+    </div>
+    <sc-for list="{{plays}}" as="p" hint-placeholder-count="7">
+      <a href="Main.dc.html" class="row" style="text-decoration: none; color: inherit">
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: {{p.bg}}; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{p.d}}"></path></svg>
+        </div>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-weight: 600; font-size: 15px">{{p.name}}</div>
+          <div class="clamp" style="font-size: 12px; color: #5B6180">{{p.status}}</div>
+        </div>
+        <div style="position: relative; width: 48px; height: 8px; border-radius: 4px; background: #EEF0F6; flex-shrink: 0">
+          <div class="{{p.cls}}" style="position: absolute; left: {{p.pre}}%; width: {{p.len}}%; top: 0; height: 100%; background: {{p.bg}}; border-radius: 4px"></div>
+          <div style="position: absolute; left: 5.6%; top: -3px; width: 2px; height: 14px; background: #0E1330"></div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6180" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+    </sc-for>
+  </div>
+
+  <!-- controls -->
+  <div class="card" style="padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: baseline; gap: 8px">
+      <h2 style="margin: 0; font: 700 16px 'Bricolage Grotesque', sans-serif; flex: 1">Controls</h2>
+      <span style="font-size: 12px; color: #5B6180">tap twice to confirm</span>
+    </div>
+    <button type="button" class="btn" style="background: #0E1330; color: #fff" onClick="{{tapFlatten}}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M8 4v10M5 11l3 3 3-3M16 4v10M13 11l3 3 3-3"></path></svg>{{flattenLabel}}
+    </button>
+    <button type="button" class="btn" style="background: #fff; color: #1F2A6B; border: 1.5px solid #1F2A6B" onClick="{{tapNight}}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.75 12.59A6.75 6.75 0 1 1 11.41 5.25 5.25 5.25 0 0 0 18.75 12.59zM4 4l16 16"></path></svg>{{nightLabel}}
+    </button>
+    <div style="font-size: 12px; color: #5B6180; margin-top: -4px">Tonight's overnight buy (NVDA, IREN, HUT at 3:59 PM) locks at 3:49 PM.</div>
+  </div>
+
+  <details class="card" style="padding: 0 16px">
+    <summary style="display: flex; align-items: center; gap: 8px; min-height: 48px; font-size: 14px; font-weight: 600; color: #5B6180">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>Pro details
+    </summary>
+    <div style="font-size: 13px; color: #5B6180; padding: 0 0 14px; display: flex; flex-direction: column; gap: 4px">
+      <div>Alpaca paper PA3CSVDZMMPY · broker and robot agree on 2 positions · swing trades: none</div>
+      <div>VIX 17.2, calm trend · feeds stock, news, VIX connected</div>
+      <div>Tesla plan bracket confirmed at the broker (stop $379.69, targets $370.75 and $368.96)</div>
+      <div>Signals today 19 · orders 1 · blocked 18 (ORB sat out)</div>
+    </div>
+  </details>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1560}}'>
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { flat: 0, night: 0, stop: 0, sell: 0, iren: 0 }; }
+  renderVals() {
+    const two = (k, a, b, c) => this.state[k] === 0 ? a : this.state[k] === 1 ? b : c;
+    const cyc = (k) => () => this.setState({ [k]: (this.state[k] + 1) % 3 });
+    const plays = [
+      { name: 'Opening Range Breakout', status: 'Decided 9:38: sat out, calm trend. Watching for late breakouts until 10:15.', bg: '#E85A1B', pre: 2, len: 11, cls: '', d: 'M13 10H4.5A1.5 1.5 0 0 0 3 11.5v7A1.5 1.5 0 0 0 4.5 20h7a1.5 1.5 0 0 0 1.5-1.5V15M6 16l3-3 2 1.5L20 5M15 5h5v5' },
+      { name: 'Ride the Trend', status: 'Watching for a quiet pullback until 11:30.', bg: '#0E8C7F', pre: 0, len: 31, cls: '', d: 'M3 17L17 10.8M3 11c2.5-4 4.5-4.5 6-2.5s2 4.5 3 4.5c2 0 4-5 8-9M15 4h5v5' },
+      { name: 'Big News', status: 'Watching the news tape until 3:45.', bg: '#D6307A', pre: 0, len: 96, cls: '', d: 'M4 10h3l7-4v12l-7-4H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1zM7 14l1.2 5H10M19 6l-2.5 4.5H20L17.5 15' },
+      { name: 'Snap Back', status: 'Starts at 10:00. Fades stretched moves until 3:45.', bg: '#6B3FD6', pre: 8, len: 88, cls: '', d: 'M3 17h3l3.5-12L12 13M14 7c3.5 0 6 3 6 8M17.5 12.5L20 15l2.5-2.5' },
+      { name: 'Tesla plan', status: 'In a trade: short 107 sh since 9:48, up $77. Half out at $370.75, half at $368.96.', bg: '#2B4BFF', pre: 4, len: 27, cls: 'open', d: 'M9 12H4.5A1.5 1.5 0 0 0 3 13.5v6A1.5 1.5 0 0 0 4.5 21h6a1.5 1.5 0 0 0 1.5-1.5V16M6 17L19 4M14 4h5v5M11.5 8.5h3v3M18 13l-2 3.5h3L17 20' },
+      { name: 'Coeur plan', status: 'Watching for its setup until 12:00.', bg: '#5C4A00', pre: 4, len: 35, cls: '', d: 'M9 12H4.5A1.5 1.5 0 0 0 3 13.5v6A1.5 1.5 0 0 0 4.5 21h6a1.5 1.5 0 0 0 1.5-1.5V16M6 17L19 4M14 4h5v5M11.5 8.5h3v3M17.5 14l2.5 3-2.5 3-2.5-3z' },
+      { name: 'Overnight', status: 'Sold HUT at the open, +$129. IREN sale still retrying.', bg: '#1F2A6B', pre: 0, len: 4, cls: '', d: 'M14.65 14.31A5.85 5.85 0 1 1 8.29 7.95 4.55 4.55 0 0 0 14.65 14.31zM11 4.5c4.5-2 9 0 10 5.5M18.6 7.6L21 10l2-2.6' }
+    ];
+    return {
+      plays,
+      stopLabel: two('stop', 'Move stop to entry', 'Tap again to move it', 'Stop now $376.12'),
+      sellLabel: two('sell', 'Sell now', 'Tap again to sell', 'Selling…'),
+      irenLabel: two('iren', 'Sell IREN now', 'Tap again to sell 251 IREN', 'Sell order sent'),
+      flattenLabel: two('flat', 'Close all day trades now', 'Tap again to close 1 trade', 'Closing Tesla…'),
+      nightLabel: two('night', 'Skip tonight’s overnight buy', 'Tap again to skip tonight', 'Skipping tonight · tap to undo'),
+      tapStop: cyc('stop'), tapSell: cyc('sell'), tapIren: cyc('iren'), tapFlatten: cyc('flat'), tapNight: cyc('night')
+    };
+  }
+}
+</script>
+</body>
+</html>

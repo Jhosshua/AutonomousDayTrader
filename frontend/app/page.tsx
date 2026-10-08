@@ -1,82 +1,36 @@
-// @steered SNARE-2 2026-09-30
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTradingStream } from "@/hooks/useTradingStream";
 import { useLedger, useTodayLedger } from "@/hooks/useTodayLedger";
 import { useHealthLimits } from "@/hooks/useHealthLimits";
-import Header, { useProWordsToggle } from "@/components/Header";
-import SegmentedModeToggle, { TradingMode } from "@/components/SegmentedModeToggle";
-import RightNowCard from "@/components/RightNowCard";
-import StrategyTable, { StrategyTableOvernight } from "@/components/StrategyTable";
-import HoldingNow from "@/components/HoldingNow";
-import MarketMoodCard from "@/components/MarketMoodCard";
-import SafetyCard from "@/components/SafetyCard";
-import SwingTelemetryBar from "@/components/SwingTelemetryBar";
-import SwingCandidateWatchlist from "@/components/SwingCandidateWatchlist";
-import ActiveSwingPositionsTable from "@/components/ActiveSwingPositionsTable";
-import ExecutionLog from "@/components/ExecutionLog";
-import OvernightHolds, { HoldView } from "@/components/OvernightHolds";
-import DashboardNavigation, {
-  DashboardDestination,
-  DashboardPage,
-} from "@/components/DashboardNavigation";
-import PerformancePanel, {
-  PerformancePeriod,
-} from "@/components/PerformancePanel";
-import HistoryExplorer, {
-  HistoryPeriod,
-} from "@/components/HistoryExplorer";
-import RecentHistory from "@/components/RecentHistory";
-import { AlertTriangle, WifiOff } from "lucide-react";
-import { aggregatePerformance, PerformanceAggregation } from "@/lib/performance";
+import type { StrategyTableOvernight } from "@/components/StrategyTable";
+import type { HoldView } from "@/components/OvernightHolds";
+import HistoryExplorer, { HistoryPeriod } from "@/components/HistoryExplorer";
+import { aggregatePerformance, type PerformancePeriod, type PerformanceAggregation } from "@/lib/performance";
 import { buildHistoryView } from "@/lib/historyView";
-import {
-  collectAttention,
-  companyName,
-  countdownToClose,
-  etDateKey,
-  etDateOfIso,
-  etMinutesOfDay,
-  etParts,
-  etTimeLabel,
-  groupLedgerByStrategy,
-  historyDateLabel,
-  isFeedDown,
-  isOvernightPosition,
-  joinNames,
-  noBuyDisabledReason,
-  overnightHoldingSentence,
-  rightNowSentence,
-  tonightStatusLine,
-  unsoldBannerText,
-  strategyTheme,
-} from "@/lib/plain";
+import { collectAttention, companyName, etDateKey, etDateOfIso, etMinutesOfDay, etTimeLabel, groupLedgerByStrategy, historyDateLabel, isFeedDown, isOvernightPosition, joinNames, noBuyDisabledReason, overnightHoldingSentence, rightNowSentence, tonightStatusLine, unsoldBannerText, strategyTheme } from "@/lib/plain";
+import { clockLine, firstAlarmAction, isMarketOpen, playbooksInitiallyOpen, lockCountdown, resultsDays, tradingDayOf, weekResultByStrategy } from "@/lib/gut";
+import TopBar from "@/components/gut/TopBar";
+import StatusCard from "@/components/gut/StatusCard";
+import MoneyTiles from "@/components/gut/MoneyTiles";
+import Holdings from "@/components/gut/Holdings";
+import ResultsBars from "@/components/gut/ResultsBars";
+import PlaybookPanel from "@/components/gut/PlaybookPanel";
+import ControlsCard from "@/components/gut/ControlsCard";
+import ProDetails from "@/components/gut/ProDetails";
+import Intro from "@/components/gut/Intro";
 
 export default function Home() {
-  const {
-    state,
-    isConnected,
-    hasReceivedData,
-    connectionState,
-    flattenPosition,
-    flattenAll,
-    tightenStop,
-    swingExitNextOpen,
-    swingExitImmediate,
-    swingTightenStop,
-    setNoBuyTonight,
-  } = useTradingStream();
-
-  const [showPro, setShowPro] = useProWordsToggle();
-  const [mode, setMode] = useState<TradingMode>("intraday");
-  const [page, setPage] = useState<DashboardPage>("today");
-  const [performancePeriod, setPerformancePeriod] =
-    useState<PerformancePeriod>("day");
-
+  const { state, isConnected, hasReceivedData, connectionState, flattenPosition, flattenAll, tightenStop,
+    swingExitNextOpen, swingExitImmediate, swingTightenStop, setNoBuyTonight } = useTradingStream();
+  const [playbookOpen, setPlaybookOpen] = useState<boolean | null>(null);
+  const [page, setPage] = useState<"today" | "history">("today");
+  const [performancePeriod, setPerformancePeriod] = useState<PerformancePeriod>("day");
   const todayLedger = useTodayLedger(state.ledger_revision, isConnected);
   // every day and every trade since the start: the Results panel and the Balance card's "Since start" line
   const allLedger = useLedger("all", state.ledger_revision, isConnected);
+  const weekLedger = useLedger("7d", state.ledger_revision, isConnected);
   const healthLimits = useHealthLimits();
 
   // F4: recovered aggregate sessions add their strategy aggregates to the per-strategy totals
@@ -107,15 +61,11 @@ export default function Home() {
     [state.all_positions, swingSymbols]
   );
 
-  const tradesToday = todayLedger.summary?.trades_count ?? 0;
-  const wins = todayLedger.summary?.wins ?? 0;
-  const losses = todayLedger.summary?.losses ?? 0;
-
-  const firstTradingDayFlag = state.strategies.find((s) => s.window)?.window?.trading_day;
 
   // Overnight holds (PLAN_2026_09_30_overnight_holds.md section 5). Everything below reads the
   // websocket "overnight" payload and the positions. With neither (older backend) nothing changes.
-  const now = new Date();
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => { const id = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(id); }, []);
   const nowMs = now.getTime();
   const etMin = etMinutesOfDay(now);
   const todayEt = etDateKey(now);
@@ -138,7 +88,11 @@ export default function Home() {
   const overnightOn = ovn != null || holdViews.length > 0;
   const ovnRunning = ovn?.state?.running === true;
   const ovnBuysOn = ovnRunning && ovn?.state?.mode === "live";
-  const tradingDayToday = firstTradingDayFlag ?? (etParts(now).weekday !== 0 && etParts(now).weekday !== 6);
+  const tradingDayToday = tradingDayOf(state.strategies, now);
+  const marketOpen = isMarketOpen(state.market_context.market_status, tradingDayToday);
+  useEffect(() => {
+    if (hasReceivedData) setPlaybookOpen(previous => previous ?? playbooksInitiallyOpen(state.strategies, intradayPositions.length));
+  }, [hasReceivedData, state.strategies, intradayPositions.length]);
   const noBuyActive = ovn?.no_buy_tonight === true;
   const ovnRows = (ovn?.rows ?? []).filter((r) => (ovn?.settings?.enabled ?? []).includes(r.symbol) || r.enabled);
   // a stock still counts as planned tonight until its night is skipped or bought
@@ -180,11 +134,6 @@ export default function Home() {
   ]));
   const firstSale = holdViews.filter((h) => !h.bookOnly).map((h) => h.saleDate).filter((d): d is string => !!d).sort()[0] ?? null;
   const pastSale = state.all_positions.some((p) => isOvernightPosition(p) && p.exit_due && nowMs >= Date.parse(p.exit_due));
-  // X6: a quick trade in a stock bought overnight tonight closes at 3:46 PM, not 3:55 PM
-  const x6Symbol =
-    ovnBuysOn && etMin < 15 * 60 + 46
-      ? intradayPositions.find((p) => plannedTonight.some((r) => r.symbol === p.symbol))?.symbol ?? null
-      : null;
   // The Overnight playbook row and the 3:45 PM handoff (PLAN_2026_10_05). Only with the overnight payload.
   const tableOvernight: StrategyTableOvernight | null = ovn
     ? {
@@ -253,7 +202,6 @@ export default function Home() {
     todayEt,
     todayLedger,
   ]);
-  const selectedPerformance = performanceByPeriod[performancePeriod];
   const historyData = useMemo(
     () =>
       buildHistoryView({
@@ -272,95 +220,9 @@ export default function Home() {
       }),
     [allLedger.items, allLedger.sessions, performanceByPeriod, state.strategies],
   );
-  const performanceLedger =
-    performancePeriod === "day" ? todayLedger : allLedger;
-  const performanceHeadline =
-    selectedPerformance.accountChange.direction === "unknown"
-      ? "Account performance unavailable"
-      : performancePeriod === "all"
-        ? "Since recorded history"
-        : `${selectedPerformance.accountChange.direction === "flat"
-            ? "Flat"
-            : selectedPerformance.accountChange.direction === "up"
-              ? "Up"
-              : "Down"} ${
-            performancePeriod === "day"
-              ? "today"
-              : performancePeriod === "week"
-                ? "this week"
-                : "this month"
-          }`;
-  const performanceStatus =
-    performanceLedger.error !== null
-      ? { kind: "error" as const, message: performanceLedger.error }
-      : connectionState !== "live"
-        ? {
-            kind: "reconnecting" as const,
-            message: "Showing the latest saved performance while reconnecting.",
-          }
-        : performanceLedger.loading && performanceLedger.items.length === 0
-          ? { kind: "loading" as const, message: "Loading recorded performance" }
-          : { kind: "ready" as const };
-  const partialHistory =
-    selectedPerformance.completeness.partialLabels.length > 0
-      ? {
-          kind: "partial" as const,
-          message: selectedPerformance.completeness.partialLabels.join(" "),
-        }
-      : { kind: "complete" as const };
-  const historyPeriod: HistoryPeriod =
-    performancePeriod === "day"
-      ? "Day"
-      : performancePeriod === "week"
-        ? "Week"
-        : performancePeriod === "month"
-          ? "Month"
-          : "All";
-  const chartPoints = selectedPerformance.chart.points.map((point) => ({
-    value: point.value,
-    label:
-      point.source === "live"
-        ? `Live ${etTimeLabel(point.at)}`
-        : point.source === "finished-trade"
-          ? etTimeLabel(point.at)
-          : historyDateLabel(point.at),
-  }));
-  const fact = (day: PerformanceAggregation["bestDay"]) =>
-    day
-      ? {
-          dateLabel: historyDateLabel(day.date),
-          dollarChange: day.accountChange.signedDollars ?? Number.NaN,
-          percentChange: day.accountChange.percent ?? Number.NaN,
-        }
-      : null;
-
-  const navigate = (destination: DashboardDestination) => {
-    if (destination === "history") {
-      setPage("history");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    setPage("today");
-    if (destination === "plans" || destination === "controls") {
-      setMode("intraday");
-    }
-    requestAnimationFrame(() => {
-      if (destination === "today") {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-      const target = document.getElementById(destination);
-      target?.scrollIntoView({ behavior: "smooth", block: "start" });
-      target?.focus({ preventScroll: true });
-    });
-  };
-
-  const countdownValue = countdownToClose(now, firstTradingDayFlag, x6Symbol ? 15 * 60 + 46 : undefined);
-  const countdownLabel = x6Symbol ? `${x6Symbol} quick trade closes in` : "Quick trades close in";
-
   const heroSentence = rightNowSentence({
     isCircuitBroken: state.account.is_circuit_broken,
-    marketStatus: state.market_context.market_status,
+    marketStatus: tradingDayToday ? state.market_context.market_status : "CLOSED",
     strategies: state.strategies,
     positionsCount: intradayPositions.length,
     maxDailyLossDollars: healthLimits.maxDailyLossDollars,
@@ -390,239 +252,62 @@ export default function Home() {
       ])),
     },
     ledgerError: !!todayLedger.error,
-    resultsError: !!allLedger.error,
+    resultsError: !!allLedger.error || !!weekLedger.error,
+    riskDrawdown: state.account.risk_drawdown ?? state.account.daily_drawdown,
+    maxDailyLossDollars: healthLimits.maxDailyLossDollars,
+    swingDataWithheld: state.swing?.last_close_entries_withheld,
     positions: intradayPositions,
   });
 
-  // F7: the brand header is static copy, not account data, so it renders immediately - only
-  // the financial content area waits for a real snapshot instead of showing synthetic zeros.
-  if (!hasReceivedData) {
-    return (
-      <main className="min-h-screen bg-ground px-3 py-4 sm:px-6 sm:py-5">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-          <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro} />
-          <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-line border-t-darkcard" aria-hidden="true" />
-            <p className="text-sm text-muted">Connecting to the robot…</p>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  const weekResults = weekResultByStrategy(weekLedger.items, weekLedger.recoveredSessions);
+  const days = resultsDays(weekLedger.items, weekLedger.sessions, todayEt);
+  const action = firstAlarmAction(attention, intradayPositions);
+  const alarmTexts: Record<string, string> = {
+    unsold: unsoldBannerText(unsold),
+    mismatch: "The robot's positions don't match the Alpaca account. New trades are paused until they match.",
+    feed: "Price feed is down, it can't trade right now.",
+    saving: "Saving problems: new trades are paused until this is fixed.",
+    breaker: "Day trading stopped for today. It hit the daily loss limit.",
+  };
+  const firstAlarm = attention[0] ? { text: alarmTexts[attention[0].key] ?? attention[0].label,
+    action: action ? { label: action.label, onConfirm: () => flattenPosition(action.symbol) } : undefined } : null;
+  const historyPeriod = ({ day: "Day", week: "Week", month: "Month", all: "All" } as const)[performancePeriod];
+  const changeHistoryPeriod = (period: HistoryPeriod) => setPerformancePeriod(({ Day: "day", Week: "week", Month: "month", All: "all" } as const)[period]);
+  const openHistory = () => { setPerformancePeriod("week"); setPage("history"); window.scrollTo({ top: 0 }); };
 
-  return (
-    <main className="relative min-h-screen overflow-x-hidden bg-ground px-3 py-4 sm:px-6 sm:py-5">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col gap-3">
-        <Header isConnected={isConnected} broker={state.broker} showPro={showPro} onTogglePro={setShowPro}>
-          <SegmentedModeToggle mode={mode} onModeChange={setMode} />
-        </Header>
-        <DashboardNavigation page={page} onNavigate={navigate} />
-
-        {showPro && (
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-white/70 px-4 py-2 text-xs text-muted">
-            <span>VIX regime: {state.market_context.vix_regime} ({state.market_context.vix != null ? state.market_context.vix.toFixed(1) : "no reading"})</span>
-            {Object.entries(state.ingestion || {}).map(([feed, status]) => (
-              <span key={feed} className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: status === "connected" ? "#0A7D53" : "#C2300F" }}
-                />
-                {feed}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {connectionState !== "live" && (
-          <div
-            role="status"
-            className="rounded-2xl border px-4 py-3 text-sm flex items-center gap-2"
-            style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}
-          >
-            <WifiOff className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            {connectionState === "reconnecting"
-              ? "Lost connection to the robot. Showing the last numbers it sent. Reconnecting..."
-              : "Numbers may be old. Still trying to reach the robot."}
-          </div>
-        )}
-        {feedDown && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
-            <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
-            Price feed is down, it can't trade right now.
-          </div>
-        )}
-        {state.broker?.mismatch && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
-            <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
-            The robot's positions don't match the Alpaca account. New trades are paused until they match.
-          </div>
-        )}
-        {savingProblem && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
-            <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
-            Saving problems: new trades are paused until this is fixed.
-          </div>
-        )}
-        {unsold.length > 0 && (
-          <div role="alert" className="rounded-2xl border px-4 py-3 text-sm font-semibold" style={{ borderColor: "#F5B7A8", background: "#FFEFEA", color: "#C2300F" }} data-testid="overnight-unsold-banner">
-            <AlertTriangle className="mr-2 inline h-4 w-4" aria-hidden="true" />
-            {unsoldBannerText(unsold)}
-          </div>
-        )}
-        {state.account.is_circuit_broken && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#F0D79A", background: "#FFF4DB", color: "#8A4B00" }}>
-            {overnightOn ? "Day trading stopped for today. It hit the daily loss limit." : "Stopped for today. It hit the daily loss limit."}
-          </div>
-        )}
-        {state.swing?.last_close_entries_withheld && (
-          <div role="status" className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "#DDD2FF", background: "#F0EBFF", color: "#4A2AB5" }}>
-            Slow trades: last close data was incomplete, so no new slow trades were bought overnight.
-          </div>
-        )}
-
-        {/* Rendered once, above both views (as on main), so a tap-to-confirm in flight survives Quick/Slow switches. */}
-        {overnightOn && (
-          <OvernightHolds
-            holds={holdViews}
-            tonight={tonightLines}
-            summary={overnightSummary}
-            noBuyActive={noBuyActive}
-            disabledReason={disabledReason}
-            onSetNoBuy={setNoBuyTonight}
-          />
-        )}
-
-        <PerformancePanel
-          period={performancePeriod}
-          onPeriodChange={setPerformancePeriod}
-          headline={performanceHeadline}
-          equity={selectedPerformance.currentEquity}
-          dollarChange={selectedPerformance.accountChange.signedDollars}
-          percentChange={selectedPerformance.accountChange.percent}
-          comparisonBasis={selectedPerformance.comparisonLabel}
-          finishedTradeResult={selectedPerformance.finishedTradeResult.signedDollars}
-          openHoldingsResult={selectedPerformance.openHoldingResult.signedDollars}
-          tradeCount={selectedPerformance.tradeCount}
-          chartLabel={
-            selectedPerformance.chart.kind === "cumulative-finished-trade-result"
-              ? "Cumulative finished trade result"
-              : "Closing account equity"
-          }
-          chartPoints={chartPoints}
-          bestDay={fact(selectedPerformance.bestDay)}
-          worstDay={fact(selectedPerformance.worstDay)}
-          status={performanceStatus}
-          historyState={partialHistory}
-        />
-
-        {page === "history" ? (
-          <HistoryExplorer
-            data={historyData}
-            period={historyPeriod}
-            onPeriodChange={(period) =>
-              setPerformancePeriod(
-                period === "Day"
-                  ? "day"
-                  : period === "Week"
-                    ? "week"
-                    : period === "Month"
-                      ? "month"
-                      : "all",
-              )
-            }
-            title="Detailed account history"
-          />
-        ) : (
-          <>
-            <RightNowCard
-              sentence={heroSentence}
-              tradesToday={tradesToday}
-              wins={wins}
-              losses={losses}
-              countdownLabel={countdownLabel}
-              countdownValue={countdownValue}
-              attention={attention}
-            />
-
-            {mode === "intraday" ? (
-              <div className="fadein grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_420px]">
-                <div className="flex min-w-0 flex-col gap-3">
-                  <div id="holdings" tabIndex={-1} className="scroll-mt-4 outline-none">
-                    <HoldingNow
-                      positions={intradayPositions}
-                      marketContext={state.market_context}
-                      onFlattenPosition={flattenPosition}
-                      onTightenStop={tightenStop}
-                    />
-                    {intradayPositions.length === 0 && (
-                      <section className="rounded-xl border border-line bg-white px-4 py-5">
-                        <h2 className="text-lg font-semibold text-ink">Holdings</h2>
-                        <p className="mt-1 text-sm text-muted">No quick trade holdings are open.</p>
-                      </section>
-                    )}
-                  </div>
-
-                  <MarketMoodCard context={state.market_context} tradingDay={firstTradingDayFlag} />
-
-                  <div id="plans" tabIndex={-1} className="scroll-mt-4 outline-none">
-                    <StrategyTable
-                      strategies={state.strategies}
-                      ledgerByStrategy={ledgerByStrategy}
-                      showPro={showPro}
-                      overnight={tableOvernight}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-3">
-                  <RecentHistory
-                    days={performanceByPeriod.all.days}
-                    onOpenHistory={() => navigate("history")}
-                  />
-                  <div id="controls" tabIndex={-1} className="scroll-mt-4 outline-none">
-                    <SafetyCard
-                      drawdownDollars={state.account.risk_drawdown ?? state.account.daily_drawdown}
-                      maxDailyLossDollars={healthLimits.maxDailyLossDollars}
-                      baseTradeRiskPct={healthLimits.baseTradeRiskPct}
-                      intradayPositionsCount={intradayPositions.length}
-                      onFlattenAll={flattenAll}
-                      overnight={
-                        overnightOn
-                          ? {
-                              buysOn:
-                                ovnBuysOn &&
-                                (ovn?.settings?.enabled?.length ?? 0) > 0,
-                              symbols: ovn?.settings?.enabled ?? [],
-                              pct: ovn?.settings?.pct ?? null,
-                              resultToday:
-                                state.account.overnight_realized_today ?? null,
-                              holdsCount: holdViews.length,
-                            }
-                          : null
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="fadein flex flex-col gap-4">
-                <SwingTelemetryBar swingState={state.swing} showPro={showPro} />
-                <div id="holdings" tabIndex={-1} className="scroll-mt-4 outline-none">
-                  <ActiveSwingPositionsTable
-                    positions={state.swing?.positions ?? []}
-                    onExitNextOpen={swingExitNextOpen}
-                    onExitImmediate={swingExitImmediate}
-                    onTightenStop={swingTightenStop}
-                  />
-                </div>
-                <SwingCandidateWatchlist candidates={state.swing?.candidates ?? []} />
-              </div>
-            )}
-          </>
-        )}
-
-        {showPro && <ExecutionLog records={state.recent_activity} maxItems={20} />}
-      </div>
-    </main>
-  );
+  return <main className="gut-main">
+    <Intro hasReceivedData={hasReceivedData} attentionCount={attention.length} playbookCount={state.strategies.length + (ovn ? 1 : 0)} />
+    <div className="gut-shell">
+      <TopBar lastUpdated={hasReceivedData ? state.lastUpdated : null} connectionState={connectionState} marketOpen={hasReceivedData && marketOpen} />
+      {!hasReceivedData ? <section data-testid="first-frame-skeleton" aria-busy="true" className="gut-skeleton">
+        <p role="status" className="text-sm text-muted">Connecting to the robot…</p>
+        <div className="gut-card h-32" /><div className="grid grid-cols-3 gap-2"><div className="gut-card h-28" /><div className="gut-card h-28" /><div className="gut-card h-28" /></div><div className="gut-card h-48" /><div className="gut-card h-40" />
+      </section> : page === "history" ? <div>
+        <button type="button" onClick={() => setPage("today")} className="mb-3 min-h-[44px] text-sm font-semibold text-darkcard" data-testid="back-to-today">← Back to today</button>
+        {attention.length > 0 && <div className="gut-alarm mb-3" data-testid="history-alarms"><strong>{attention.length === 1 ? "1 thing needs a look" : `${attention.length} things need a look`}:</strong> {firstAlarm?.text ?? attention[0].label}{attention.length > 1 && ` · ${attention.slice(1).map(a => a.label).join(" · ")}`} <button type="button" onClick={() => setPage("today")} className="font-semibold underline">Back to today</button></div>}
+        {allLedger.error && <p className="gut-alarm">History did not refresh. Showing the last recorded results.</p>}
+        <HistoryExplorer data={historyData} period={historyPeriod} onPeriodChange={changeHistoryPeriod} title="Detailed account history" />
+      </div> : <div className="gut-grid">
+        <StatusCard sentence={heroSentence} attention={attention} firstAlarm={firstAlarm}
+          clock={clockLine(now, marketOpen, tradingDayToday, state.strategies.find(s => s.window?.next_change_at)?.window?.next_change_at)}
+          lockCountdown={lockCountdown(ovn?.no_buy_until, now, tradingDayToday && ovnBuysOn && !noBuyActive && plannedTonight.length > 0)}
+          stateIcon={!marketOpen ? "closed" : state.account.is_circuit_broken ? "paused" : intradayPositions.length ? "running" : "flat"}
+          unsoldText={unsold.length ? unsoldBannerText(unsold) : null}
+          reconnecting={connectionState === "live" ? null : connectionState === "reconnecting" ? "Lost connection to the robot. Showing the last numbers it sent. Reconnecting..." : "Numbers may be old. Still trying to reach the robot."} />
+        <MoneyTiles account={state.account} today={todayLedger.summary} week={weekLedger.summary} todayError={!!todayLedger.error} weekError={!!weekLedger.error} />
+        <Holdings day={{ positions: intradayPositions, marketContext: state.market_context, onFlattenPosition: flattenPosition, onTightenStop: tightenStop }}
+          overnightPositions={state.all_positions.filter(isOvernightPosition)} holds={holdViews}
+          swing={{ positions: state.swing?.positions ?? [], onExitNextOpen: swingExitNextOpen, onExitImmediate: swingExitImmediate, onTightenStop: swingTightenStop }}
+          marketOpen={marketOpen} etMin={etMin} tradingDay={tradingDayToday} mismatch={!!state.broker?.mismatch} />
+        <ResultsBars days={days} total={weekLedger.summary?.realized_pnl ?? null} loading={weekLedger.loading} error={weekLedger.error} onOpenHistory={openHistory} />
+        <PlaybookPanel strategies={state.strategies} ledgerByStrategy={ledgerByStrategy} showPro={false} overnight={tableOvernight}
+          dayCount={intradayPositions.length} overnightCount={holdViews.length} weekResults={weekResults}
+          savedOpen={playbookOpen} onOpenChange={setPlaybookOpen} />
+        <ControlsCard marketOpen={marketOpen} dayCount={intradayPositions.length} workingOrders={state.working_orders_count}
+          stopped={state.account.is_circuit_broken || state.strategies.every(s => ["PAUSED", "DONE_FOR_DAY"].includes(s.window?.state ?? ""))}
+          onFlattenAll={flattenAll} noBuy={{ noBuyActive, disabledReason, summary: overnightSummary, onSetNoBuy: setNoBuyTonight }} tonight={tonightLines} />
+        <ProDetails state={state} limits={healthLimits} tradingDay={tradingDayToday} />
+      </div>}
+    </div>
+  </main>;
 }

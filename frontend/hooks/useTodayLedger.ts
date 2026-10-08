@@ -5,7 +5,7 @@ import { RecoveredSessionSummary, TradeHistoryResponse, TradeRecord } from "@/ty
 import { apiBase } from "@/lib/apiBase";
 import { dedupeTrades, etDateKey } from "@/lib/plain";
 
-export type LedgerRange = "today" | "all";
+export type LedgerRange = "today" | "7d" | "all";
 
 export interface LedgerState {
   items: TradeRecord[];

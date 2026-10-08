@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Retired 2026-10-07: layout replaced by scripts/verify_gut_dashboard.py; retained for reference.
 """scripts/verify_compact_dashboard.py
 
 QA for PLAN_2026_09_29_compact_dashboard.md: the "Quick trades" view keeps every piece of information but

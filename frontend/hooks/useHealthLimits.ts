@@ -6,6 +6,7 @@ import { apiBase } from "@/lib/apiBase";
 export interface HealthLimits {
   maxDailyLossDollars: number | null;
   baseTradeRiskPct: number | null;
+  research?: { written?: number; errors?: number; pending?: number };
 }
 
 const POLL_MS = 60000;
@@ -27,6 +28,7 @@ export function useHealthLimits(): HealthLimits {
         setLimits({
           maxDailyLossDollars: data?.limits?.max_daily_loss_dollars ?? null,
           baseTradeRiskPct: data?.limits?.base_trade_risk_pct ?? null,
+          research: data.research,
         });
       } catch {
         // keep last-known limits (or the initial null, which callers must handle by hiding it)

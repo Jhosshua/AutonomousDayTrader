@@ -1,5 +1,6 @@
 "use client";
 
+import PlaybookIcon from "./gut/PlaybookIcon";
 import { useState } from "react";
 import { ChevronDown, Moon } from "lucide-react";
 import { ROW_GRID, NightPart, HandoffBand } from "./StrategyCard";
@@ -19,6 +20,7 @@ import {
 
 interface OvernightPlaybookRowProps {
   inputs: OvernightRowInputs;
+  weekResult?: number;
   /** account.overnight_realized_today: the same number the Safety card shows */
   realizedToday: number | null;
   sizeNote: string | null;
@@ -67,7 +69,7 @@ function Steps({ steps }: { steps: OvnStep[] }) {
 
 /** The 7th playbook row: the overnight holds as one playbook, in the same columns as the day playbooks.
  * Holds and the "No overnight buy tonight" control stay in OvernightHolds above both views (PLAN_2026_10_05 F3). */
-export default function OvernightPlaybookRow({ inputs, realizedToday, sizeNote, nameOf }: OvernightPlaybookRowProps) {
+export default function OvernightPlaybookRow({ inputs, realizedToday, sizeNote, nameOf, weekResult }: OvernightPlaybookRowProps) {
   const [open, setOpen] = useState(false);
   const theme = strategyTheme("overnight_nvda", "Overnight");
   const chip = overnightChip(inputs);
@@ -99,7 +101,7 @@ export default function OvernightPlaybookRow({ inputs, realizedToday, sizeNote, 
         >
           <span className="col-span-2 col-start-1 row-start-1 flex min-w-0 items-center gap-2.5 lg:col-span-1">
             <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: theme.bar, opacity: resting ? 0.6 : 1 }} aria-hidden="true">
-              <Moon className="h-4 w-4 text-white" strokeWidth={2} />
+              <PlaybookIcon name="overnight" className="h-5 w-5 text-white" />
             </span>
             <span className="flex min-w-0 flex-col">
               <span className="font-display text-[15px] font-semibold leading-tight" style={{ color: theme.ink }} data-testid="strategy-name">Overnight</span>
@@ -136,6 +138,7 @@ export default function OvernightPlaybookRow({ inputs, realizedToday, sizeNote, 
 
           <span className="col-start-3 row-start-1 text-right text-sm font-bold tabular-nums lg:col-start-4" style={{ color: pnlColor }} data-testid="strategy-pnl">
             {pnl !== 0 ? formatSignedMoney(pnl) : "$0"}
+            {weekResult != null && <span className="block text-[10px] font-medium text-muted" data-testid="strategy-week-result">7d {formatSignedMoney(weekResult)}</span>}
           </span>
 
           <ChevronDown className="col-start-4 row-start-1 h-4 w-4 text-muted transition-transform lg:col-start-5" style={{ transform: open ? "rotate(180deg)" : undefined }} aria-hidden="true" />
@@ -149,8 +152,8 @@ export default function OvernightPlaybookRow({ inputs, realizedToday, sizeNote, 
             <p className="text-sm leading-relaxed text-[#2A3150]">
               {syms ? `Buys ${syms} near the 4:00 PM close and sells at the next 9:30 AM open. No stop.` : "No stock is switched on."} From 3:45 PM until the sale, the day playbooks don&apos;t trade these stocks, and a day trade in one of them is closed at 3:46 PM.
             </p>
-            <a href="#overnight-holds" className="self-start text-sm font-semibold text-[#2B4BFF] underline-offset-2 hover:underline" data-testid="overnight-holds-link">
-              Stop tonight&apos;s buy with the button in the Overnight holds box at the top
+            <a href="#no-buy-tonight" className="self-start text-sm font-semibold text-[#2B4BFF] underline-offset-2 hover:underline" data-testid="overnight-holds-link">
+              Skip tonight&apos;s buy with the button in Controls
             </a>
           </div>
           {steps ? (

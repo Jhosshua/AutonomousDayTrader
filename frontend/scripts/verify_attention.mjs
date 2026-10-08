@@ -111,6 +111,23 @@ check(orbProblemOf({ id: "orb", orb: { init_error: null, errors: [{ alarm: "orb_
 check(orbProblemOf({ id: "orb", orb: { init_error: null, errors: [{ alarm: "x", symbol: "A" }], orphans: [{ symbol: "A", text: "t" }] } }) === null, "an orphan's own error is not a 'reported a problem'");
 check(orbProblemOf({ id: "orb", orb: { init_error: null, errors: [{ alarm: "x", symbol: "B" }], orphans: [{ symbol: "A", text: "t" }] } }) !== null, "any other error is");
 
+// R2/R8: freshness and lock are not additional attention sources.
+{
+ const i = calmInputs();
+ i.riskDrawdown = 501; i.maxDailyLossDollars = 1000;
+ check(keys(i).includes("loss-stop"), "more than 50% loss stop used is one alarm");
+ i.riskDrawdown = 500;
+ check(keys(i).length === 0, "exactly 50% is not an alarm");
+ i.riskDrawdown = 700; i.maxDailyLossDollars = null;
+ check(keys(i).length === 0, "missing limit is not guessed");
+ i.maxDailyLossDollars = 1000; i.breakerHit = true;
+ check(keys(i).join() === "breaker", "breaker replaces half-used loss alarm");
+ const quiet = { ...calmInputs(), frameAgeSec: 120, lockCountdown: 14 };
+ check(keys(quiet).length === 0, "no additional age alarm or lock alarm (R2/R8)");
+ quiet.swingDataWithheld = true;
+ check(keys(quiet).join() === "swing-data", "existing slow-data warning counted by attention");
+}
+
 // negative control: the checks above can fail
 {
   const i = calmInputs();

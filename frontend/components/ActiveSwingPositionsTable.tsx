@@ -7,6 +7,8 @@ import { companyName, formatMoney, formatSignedMoney } from "@/lib/plain";
 
 interface ActiveSwingPositionsTableProps {
   positions?: SwingPosition[];
+  compact?: boolean;
+  marketOpen?: boolean;
   onExitNextOpen: (symbol: string) => boolean;
   onExitImmediate: (symbol: string) => boolean;
   onTightenStop: (symbol: string, newStop: number) => boolean;
@@ -14,11 +16,13 @@ interface ActiveSwingPositionsTableProps {
 
 function Row({
   pos,
+  marketOpen = true,
   onExitNextOpen,
   onExitImmediate,
   onTightenStop,
 }: {
   pos: SwingPosition;
+  marketOpen?: boolean;
   onExitNextOpen: (symbol: string) => boolean;
   onExitImmediate: (symbol: string) => boolean;
   onTightenStop: (symbol: string, newStop: number) => boolean;
@@ -71,6 +75,7 @@ function Row({
           </div>
           <div className="text-sm text-muted">
             Day {holdingDays} of {maxHoldingDays} &middot; bought at {formatMoney(pos.entry_price)}
+            <span className="block">{formatMoney(pos.market_price)} {!marketOpen && pos.market_price === pos.entry_price ? "last close price" : "now"}</span>
           </div>
         </div>
         <div
@@ -151,14 +156,17 @@ function Row({
 /** F1/F12: swing (multi-day) holdings only shown here, on the Slow tab. */
 export default function ActiveSwingPositionsTable({
   positions = [],
+  compact = false,
+  marketOpen = true,
   onExitNextOpen,
   onExitImmediate,
   onTightenStop,
 }: ActiveSwingPositionsTableProps) {
+  if (compact && positions.length === 0) return <div data-testid="active-swing-positions" />;
   if (positions.length === 0) {
     return (
       <section className="flex flex-col gap-3" data-testid="active-swing-positions">
-        <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Holding now</h2>
+        {!compact && <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Holding now</h2>}
         <div className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-muted">
           Nothing held right now.
         </div>
@@ -168,10 +176,10 @@ export default function ActiveSwingPositionsTable({
 
   return (
     <section className="flex flex-col gap-3" data-testid="active-swing-positions">
-      <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Holding now</h2>
+      {!compact && <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Holding now</h2>}
       <div className="flex flex-col gap-3">
         {positions.map((pos) => (
-          <Row key={pos.symbol} pos={pos} onExitNextOpen={onExitNextOpen} onExitImmediate={onExitImmediate} onTightenStop={onTightenStop} />
+          <Row key={pos.symbol} pos={pos} marketOpen={marketOpen} onExitNextOpen={onExitNextOpen} onExitImmediate={onExitImmediate} onTightenStop={onTightenStop} />
         ))}
       </div>
     </section>

@@ -17,12 +17,13 @@ interface StrategyTableProps {
   strategies: StrategyState[];
   ledgerByStrategy: Record<string, StrategyLedgerAgg>;
   showPro: boolean;
+  weekResults?: Record<string, number>;
   /** Present only when the backend sends the overnight payload: adds the Overnight row and the night axis. */
   overnight?: StrategyTableOvernight | null;
 }
 
 /** The registered playbooks as one compact table: one row each, click a row for how it works. */
-export default function StrategyTable({ strategies, ledgerByStrategy, showPro, overnight = null }: StrategyTableProps) {
+export default function StrategyTable({ strategies, ledgerByStrategy, showPro, overnight = null, weekResults }: StrategyTableProps) {
   const night = overnight != null;
   const total = strategies.length + (night ? 1 : 0);
   const band = night && showHandoffBand(overnight.inputs);
@@ -31,7 +32,7 @@ export default function StrategyTable({ strategies, ledgerByStrategy, showPro, o
     <section className="overflow-hidden rounded-[22px] border border-line bg-white" data-testid="strategy-table">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-4 pb-2 pt-3">
         <h2 className="font-display text-lg font-semibold text-ink">
-          The {total} ways it trades
+          The {total} playbooks
           {night && <span className="ml-2 text-xs font-normal text-muted" data-testid="playbook-split">{strategies.length} by day, 1 overnight</span>}
         </h2>
         <div className="text-xs text-muted">
@@ -70,6 +71,7 @@ export default function StrategyTable({ strategies, ledgerByStrategy, showPro, o
           strategy={s}
           ledgerAgg={ledgerByStrategy[s.id]}
           showPro={showPro}
+          weekResult={weekResults?.[s.id] ?? (weekResults ? 0 : undefined)}
           nightAxis={night}
           handoffBand={band}
           x6Note={night ? x6NoteFor(s.id, overnight.inputs) : null}
@@ -78,6 +80,7 @@ export default function StrategyTable({ strategies, ledgerByStrategy, showPro, o
       {night && (
         <OvernightPlaybookRow
           inputs={overnight.inputs}
+          weekResult={weekResults?.overnight}
           realizedToday={overnight.realizedToday}
           sizeNote={overnight.sizeNote}
           nameOf={overnight.nameOf}

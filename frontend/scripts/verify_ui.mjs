@@ -111,7 +111,7 @@ for (const action of [
 console.log("  ✅ Verified WebSocket action payloads are unchanged (port 8005, all 6 actions)");
 
 // 5. Never use window.confirm/alert/prompt anywhere in components/hooks/app.
-const scannedDirs = ["app", "components", "hooks", "lib"];
+const scannedDirs = ["app", "components", "components/gut", "hooks", "lib"];
 for (const dir of scannedDirs) {
   const full = path.join(FRONTEND_DIR, dir);
   if (!fs.existsSync(full)) continue;
@@ -125,7 +125,7 @@ console.log("  ✅ Verified no window.confirm/alert/prompt usage");
 
 // 6. Verify data-testids are present on their equivalent new elements (rule 6 of the plan).
 const testidLocations = {
-  "risk-telemetry": "components/SafetyCard.tsx",
+  "risk-telemetry": "components/gut/ProDetails.tsx",
   "segmented-mode-toggle": "components/SegmentedModeToggle.tsx",
   "mode-tab-intraday": "components/SegmentedModeToggle.tsx",
   "mode-tab-swing": "components/SegmentedModeToggle.tsx",
@@ -192,9 +192,10 @@ assert(holding.includes("unrealizedPercent") && holding.includes("percentLabel")
 console.log("  ✅ Verified all five strategy themes and OR15 fixed protection controls");
 
 const page = fs.readFileSync(path.join(FRONTEND_DIR, "app/page.tsx"), "utf8");
-assert(page.includes("<PerformancePanel"), "The real dashboard must render the performance panel");
+assert(page.includes("<StatusCard") && page.includes("<MoneyTiles") && page.includes("<Holdings") && page.includes("<ResultsBars"), "The dashboard must render the gut layout");
 assert(page.includes("<HistoryExplorer"), "The real dashboard must render detailed history");
-assert(page.includes("<DashboardNavigation"), "The real dashboard must render primary navigation");
+assert(page.includes("<PlaybookPanel") && page.includes("<ControlsCard") && page.includes("<ProDetails"), "The gut dashboard must render playbooks, controls and pro details");
+assert(page.includes("first-frame-skeleton") && page.includes("back-to-today"), "The first-frame gate and history Back action must remain");
 assert(!page.includes("<BalanceCard"), "The old balance card must not compete with the performance panel");
 assert(!page.includes("<ResultsPanel"), "The old results panel must not compete with detailed history");
 assert(layout.includes('title: "Cobalt Ledger"'), "The browser metadata must use the Cobalt Ledger product name");

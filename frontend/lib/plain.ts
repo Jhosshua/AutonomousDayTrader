@@ -76,8 +76,8 @@ export const STRATEGY_THEMES: Record<string, StrategyTheme> = {
     what: "Trades a confirmed morning bounce or breakdown. Splits the position into two equal parts, each with a fixed target and closing time.",
   },
   cde_asymmetric_dual: {
-    name: "Coeur Morning Plan", band: "#FBEBB8", ink: "#7A5900", tint: "#FFF6DD",
-    bar: "#B88600", track: "#F7EDC8",
+    name: "Coeur Morning Plan", band: "#EFE6C3", ink: "#3D3100", tint: "#F8F3E3",
+    bar: "#5C4A00", track: "#EAE1C2",
     what: "Trades Coeur Mining after a morning bounce or breakdown, with QQQ confirmation. Uses one fixed target and a three-hour limit.",
   },
   tsla_or15_retest: {
@@ -915,12 +915,9 @@ export function overnightBalanceNote(totalAtBuyPrice: number): string {
   return `Includes ${formatMoney(totalAtBuyPrice)} in overnight holds at their buy price. Their real value is known at 9:30 AM.`;
 }
 
-/** Red banner while any hold is still unsold after 9:31 AM. */
+/** R1: informational alarm; the day-flatten handler cannot sell overnight holds. */
 export function unsoldBannerText(symbols: string[]): string {
-  const names = joinNames(symbols.map((s) => `${s} overnight`));
-  return symbols.length === 1
-    ? `${names} is not sold yet after 9:31 AM, or the robot's book and Alpaca disagree on it. Check the Alpaca app.`
-    : `${names} are not sold yet after 9:31 AM, or the robot's book and Alpaca disagree on them. Check the Alpaca app.`;
+  return symbols.map(symbol => `${symbol} overnight did not sell at the 9:30 open. The robot keeps retrying. To sell it by hand use the Alpaca app.`).join(" ");
 }
 
 /** The "Right now" sentence part for holds. `saleDate` is the earliest sale day, `pastSale` true once its 9:30 AM passed. */
@@ -1028,6 +1025,9 @@ export interface AttentionItem {
 }
 
 export interface AttentionInputs {
+  riskDrawdown?: number | null;
+  maxDailyLossDollars?: number | null;
+  swingDataWithheld?: boolean;
   connectionState: string;
   feedDown: boolean;
   brokerMismatch: boolean;
@@ -1068,6 +1068,8 @@ export function collectAttention(i: AttentionInputs): AttentionItem[] {
   guard(() => { if (i.savingProblem) add("saving", "saving problem"); });
   guard(() => { if (i.unsold.length > 0) add("unsold", `${joinNames(i.unsold)} not sold yet`); });
   guard(() => { if (i.breakerHit) add("breaker", "daily loss limit hit"); });
+  guard(() => { if (i.maxDailyLossDollars && i.maxDailyLossDollars > 0 && (i.riskDrawdown ?? 0) / i.maxDailyLossDollars > 0.5 && !i.breakerHit) add("loss-stop", "more than half the daily loss limit used"); });
+  guard(() => { if (i.swingDataWithheld) add("swing-data", "slow trades skipped because last close data was incomplete"); });
   for (const s of i.strategies) {
     guard(() => {
       const label = s.name || strategyTheme(s.id, s.id).name;

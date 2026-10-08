@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cobalt Ledger desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F5FA}
+a{color:#2B4BFF}a:hover{color:#1A33C8}
+.num{font-family:'Bricolage Grotesque',sans-serif;font-variant-numeric:tabular-nums}
+.card{background:#fff;border:1px solid #E2E5F0;border-radius:16px}
+.btn{font:600 15px 'Instrument Sans',sans-serif;min-height:48px;border-radius:12px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 16px;width:100%}
+.btn:focus-visible{outline:3px solid #2B4BFF;outline-offset:2px}
+.row{display:flex;align-items:center;gap:10px;min-height:52px;padding:6px 0;border-top:1px solid #EEF0F6}
+.row:first-child{border-top:0}
+.bar{border-radius:4px 4px 2px 2px;width:100%}
+h2{margin:0;font:700 16px 'Bricolage Grotesque',sans-serif;flex:1}
+details>summary{list-style:none;cursor:pointer}
+details>summary::-webkit-details-marker{display:none}
+@keyframes rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.grow{transform-origin:bottom;animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes wide{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.growx{transform-origin:left;animation:wide .6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(10,125,83,.45)}60%{box-shadow:0 0 0 7px rgba(10,125,83,0)}}
+.live{animation:pulse 2.4s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.grow,.growx,.live{animation:none}}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 1180px; background: #F4F5FA; color: #0E1330; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 1.35; padding: 16px">
+<div style="max-width: 1248px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px">
+
+  <!-- top bar -->
+  <div style="display: flex; align-items: center; gap: 12px; min-height: 48px; flex-wrap: wrap">
+    <div style="width: 40px; height: 40px; border-radius: 12px; background: #2B4BFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9" stroke="#fff"></path><path d="M7.5 15l3.5-3.5 2.5 2L20 4M15.5 4H20v4.5" stroke="#C6F432"></path></svg>
+    </div>
+    <div style="font: 700 22px 'Bricolage Grotesque', sans-serif">Cobalt Ledger</div>
+    <div style="font-size: 13px; color: #5B6180">Alpaca paper · real orders, practice money</div>
+    <div style="flex: 1"></div>
+    <span style="display: inline-flex; align-items: center; gap: 6px; background: #C6F432; color: #0E1330; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 700">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"></path></svg>No alarms
+    </span>
+    <div style="display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #E2E5F0; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #0A7D53">
+      <span style="width: 9px; height: 9px; border-radius: 50%; background: #0A7D53; display: inline-block"></span>Running · updated 12 s ago · Wed Oct 7, 9:03 PM
+    </div>
+  </div>
+
+  <!-- status + money band -->
+  <div style="display: flex; flex-wrap: wrap; gap: 12px">
+    <div class="card" style="flex: 999 1 420px; min-width: 0; padding: 16px 18px; display: flex; gap: 14px; align-items: center">
+      <div style="width: 44px; height: 44px; border-radius: 12px; background: #EEF0F6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #5B6180">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.85 12.87A7.65 7.65 0 1 1 10.53 4.55 5.95 5.95 0 0 0 18.85 12.87zM19 2.5v4M17 4.5h4"></path></svg>
+      </div>
+      <div>
+        <div style="font: 600 19px/1.3 'Bricolage Grotesque', sans-serif">Market closed. Holding 3 stocks overnight. They sell at the 9:30 AM open, Thu Oct 8.</div>
+        <div style="font-size: 13px; color: #5B6180; margin-top: 4px">Next open in 12h 27m · overnight buys for tonight are done</div>
+      </div>
+    </div>
+    <div style="flex: 1 1 360px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+      <div class="card" style="padding: 14px 16px 12px">
+        <div style="font-size: 12px; color: #5B6180; font-weight: 600">Account</div>
+        <div class="num" style="font-size: 24px; font-weight: 800; letter-spacing: -.02em">$48,741</div>
+        <div style="font-size: 12px; color: #5B6180">$19,559 cash</div>
+      </div>
+      <div class="card" style="padding: 14px 16px 12px; border-color: #F3D5CB">
+        <div style="font-size: 12px; color: #5B6180; font-weight: 600">Today</div>
+        <div class="num" style="font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: #C2300F">−$39</div>
+        <div style="font-size: 12px; color: #C2300F">−0.08% · 1 trade</div>
+      </div>
+      <div class="card" style="padding: 14px 16px 12px">
+        <div style="font-size: 12px; color: #5B6180; font-weight: 600">Last 7 days</div>
+        <div class="num" style="font-size: 24px; font-weight: 800; letter-spacing: -.02em">−$16</div>
+        <div style="font-size: 12px; color: #5B6180">25 trades · 14 won</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- two columns -->
+  <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start">
+    <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+
+      <div class="card" style="padding: 12px 18px 6px">
+        <div style="display: flex; align-items: baseline; gap: 8px"><h2>Holding now</h2><span style="font-size: 12px; color: #5B6180">3 overnight · $29,182 bought · prices return at 9:30 AM · IREN and HUT are both bitcoin miners and move together</span></div>
+        <sc-for list="{{holds}}" as="h" hint-placeholder-count="3">
+          <div class="row">
+            <div style="width: 40px; height: 40px; border-radius: 12px; background: #1F2A6B; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.65 14.31A5.85 5.85 0 1 1 8.29 7.95 4.55 4.55 0 0 0 14.65 14.31zM11 4.5c4.5-2 9 0 10 5.5M18.6 7.6L21 10l2-2.6"></path></svg>
+            </div>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: baseline; gap: 8px"><span class="num" style="font-weight: 800; font-size: 16px">{{h.sym}}</span><span style="font-size: 13px; color: #5B6180">{{h.shares}} sh · bought {{h.value}} at {{h.entry}}</span></div>
+              <div style="font-size: 12px; color: #5B6180">Overnight · sells at the 9:30 AM open · no stop, by design</div>
+            </div>
+            <div style="font-size: 12px; color: #5B6180; white-space: nowrap">price at 9:30</div>
+            <button type="button" class="btn" style="width: auto; min-height: 40px; padding: 0 12px; background: #fff; color: #0E1330; border: 1.5px solid #0E1330; font-size: 13px">Sell at open</button>
+          </div>
+        </sc-for>
+      </div>
+
+      <div class="card" style="padding: 12px 18px 6px">
+        <div style="display: flex; align-items: baseline; gap: 8px"><h2>The 7 playbooks</h2><span style="font-size: 12px; color: #5B6180">click one for its rules · bar = its trading hours, 9:30 to 4:00</span></div>
+        <sc-for list="{{plays}}" as="p" hint-placeholder-count="7">
+          <div class="row" style="min-height: 48px">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: {{p.bg}}; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{p.d}}"></path></svg>
+            </div>
+            <div style="width: 190px; font-weight: 600; font-size: 15px; flex-shrink: 0">{{p.name}}</div>
+            <div style="flex: 1; min-width: 0; font-size: 13px; color: #5B6180; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.status}}</div>
+            <div style="width: 120px; height: 8px; border-radius: 4px; background: #EEF0F6; overflow: hidden; display: flex; flex-shrink: 0">
+              <div style="width: {{p.pre}}%; height: 100%"></div><div style="width: {{p.len}}%; height: 100%; background: {{p.bg}}; border-radius: 4px"></div>
+            </div>
+            <div class="num" style="font-weight: 700; font-size: 14px; color: {{p.resColor}}; width: 56px; text-align: right">{{p.result}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+
+      <div class="card" style="padding: 12px 18px 14px">
+        <div style="display: flex; align-items: baseline; gap: 8px"><h2>Results</h2><span style="font-size: 12px; color: #5B6180">finished trades per day, last 7 days</span></div>
+        <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-items: end; height: 120px; margin-top: 10px">
+          <sc-for list="{{days}}" as="d" hint-placeholder-count="5">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px">
+              <div class="num" style="font-size: 11px; font-weight: 700; color: {{d.color}}">{{d.label}}</div>
+              <div class="grow bar" style="height: {{d.h}}px; background: {{d.color}}"></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 6px; font-size: 12px; color: #5B6180; text-align: center"><div>Thu 1</div><div>Fri 2</div><div>Mon 5</div><div>Tue 6</div><div>Wed 7</div></div>
+        <div style="font-size: 13px; font-weight: 600; margin: 14px 0 6px">By playbook, same 7 days</div>
+        <sc-for list="{{pb7}}" as="p" hint-placeholder-count="7">
+          <div style="display: grid; grid-template-columns: 10px 110px 1fr 60px; gap: 8px; align-items: center; min-height: 26px">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: {{p.color}}; display: block"></span>
+            <div style="font-size: 13px; font-weight: 600; color: #0E1330; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.name}}</div>
+            <div style="height: 10px; background: #EEF0F6; border-radius: 5px; overflow: hidden"><div class="growx" style="height: 100%; width: {{p.w}}%; background: {{p.color}}; border-radius: 5px"></div></div>
+            <div class="num" style="font-size: 13px; font-weight: 700; text-align: right; color: {{p.sign}}">{{p.label}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div class="card" style="padding: 12px 18px 16px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: baseline; gap: 8px"><h2>Controls</h2><span style="font-size: 12px; color: #5B6180">nothing to act on until 9:30 AM</span></div>
+        <button type="button" class="btn" style="background: #EEF0F6; color: #5B6180" disabled="{{true}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M8 4v10M5 11l3 3 3-3M16 4v10M13 11l3 3 3-3"></path></svg>Close all day trades · nothing open</button>
+        <button type="button" class="btn" style="background: #EEF0F6; color: #5B6180" disabled="{{true}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.75 12.59A6.75 6.75 0 1 1 11.41 5.25 5.25 5.25 0 0 0 18.75 12.59zM4 4l16 16"></path></svg>Skip tonight’s overnight buy · locked at 3:49 PM</button>
+        <div style="font-size: 12px; color: #5B6180; margin-top: -4px">Tonight's buys are done. Tomorrow you can skip until 3:49 PM. Buttons go dark when they can act.</div>
+      </div>
+
+      <details class="card" style="padding: 0 18px">
+        <summary style="display: flex; align-items: center; gap: 8px; min-height: 48px; font-size: 14px; font-weight: 600; color: #5B6180"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>Pro details</summary>
+        <div style="font-size: 13px; color: #5B6180; padding: 0 0 14px; display: flex; flex-direction: column; gap: 4px">
+          <div>Alpaca paper account PA3CSVDZMMPY · broker and robot agree on 3 positions</div>
+          <div>Feeds: stock, news, VIX connected · 0 outages open · daily loss stop $1,243, used $39</div>
+          <div>ORB rules adaptive-v1.7.1, deal rule on · research log 483 rows, 0 errors</div>
+        </div>
+      </details>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const G = '#0A7D53', L = '#C2300F', M = '#5B6180';
+    const days = [
+      { label: '−$1,107', v: -1106.97 }, { label: '+$656', v: 655.86 }, { label: '+$393', v: 393.18 }, { label: '+$81', v: 80.92 }, { label: '−$39', v: -39.14 }
+    ].map(d => ({ ...d, h: Math.max(4, Math.round(Math.abs(d.v) / 1107 * 92)), color: d.v < 0 ? L : G }));
+    const pb7 = [
+      ['Night HUT', 429.59, '#1F2A6B'], ['Night IREN', 207.27, '#1F2A6B'], ['Night NVDA', 124.48, '#1F2A6B'],
+      ['Snap Back', -103.15, '#6B3FD6'], ['Coeur plan', -141.53, '#5C4A00'], ['Tesla plan', -202.64, '#2B4BFF'], ['Opening Range', -330.17, '#E85A1B']
+    ].map(([name, v, color]) => ({ name, color, sign: v < 0 ? L : G, w: Math.max(3, Math.round(Math.abs(v) / 430 * 100)), label: (v < 0 ? '−$' : '+$') + Math.abs(Math.round(v)) }));
+    const plays = [
+      { name: 'Opening Range Breakout', status: 'Done for today · decided 9:38: sat out, calm trend, nothing cleared the bar', result: '$0', resColor: M, bg: '#E85A1B', pre: 2, len: 11, d: 'M13 10H4.5A1.5 1.5 0 0 0 3 11.5v7A1.5 1.5 0 0 0 4.5 20h7a1.5 1.5 0 0 0 1.5-1.5V15M6 16l3-3 2 1.5L20 5M15 5h5v5' },
+      { name: 'Ride the Trend', status: 'Done for today · no quiet pullback came before 11:30', result: '$0', resColor: M, bg: '#0E8C7F', pre: 0, len: 31, d: 'M3 17L17 10.8M3 11c2.5-4 4.5-4.5 6-2.5s2 4.5 3 4.5c2 0 4-5 8-9M15 4h5v5' },
+      { name: 'Big News', status: 'Done for today · nothing strong enough on the tape', result: '$0', resColor: M, bg: '#D6307A', pre: 0, len: 96, d: 'M4 10h3l7-4v12l-7-4H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1zM7 14l1.2 5H10M19 6l-2.5 4.5H20L17.5 15' },
+      { name: 'Snap Back', status: 'Done for today · no stretched move to fade', result: '$0', resColor: M, bg: '#6B3FD6', pre: 8, len: 88, d: 'M3 17h3l3.5-12L12 13M14 7c3.5 0 6 3 6 8M17.5 12.5L20 15l2.5-2.5' },
+      { name: 'Tesla plan', status: 'Finished · short 107 sh at 9:48, out on the time limit', result: '−$39', resColor: L, bg: '#2B4BFF', pre: 4, len: 27, d: 'M9 12H4.5A1.5 1.5 0 0 0 3 13.5v6A1.5 1.5 0 0 0 4.5 21h6a1.5 1.5 0 0 0 1.5-1.5V16M6 17L19 4M14 4h5v5M11.5 8.5h3v3M18 13l-2 3.5h3L17 20' },
+      { name: 'Coeur plan', status: 'No qualifying setup today', result: '$0', resColor: M, bg: '#5C4A00', pre: 4, len: 35, d: 'M9 12H4.5A1.5 1.5 0 0 0 3 13.5v6A1.5 1.5 0 0 0 4.5 21h6a1.5 1.5 0 0 0 1.5-1.5V16M6 17L19 4M14 4h5v5M11.5 8.5h3v3M17.5 14l2.5 3-2.5 3-2.5-3z' },
+      { name: 'Overnight', status: 'Holding NVDA, IREN, HUT · bought 3:59 PM · sells 9:30 AM', result: 'open', resColor: '#1F2A6B', bg: '#1F2A6B', pre: 96, len: 4, d: 'M14.65 14.31A5.85 5.85 0 1 1 8.29 7.95 4.55 4.55 0 0 0 14.65 14.31zM11 4.5c4.5-2 9 0 10 5.5M18.6 7.6L21 10l2-2.6' }
+    ];
+    const holds = [
+      { sym: 'NVDA', shares: 41, entry: '$237.47', pnl: '$0', value: '$9,736' },
+      { sym: 'IREN', shares: 251, entry: '$38.69', pnl: '$0', value: '$9,711' },
+      { sym: 'HUT', shares: 109, entry: '$89.31', pnl: '$0', value: '$9,735' }
+    ];
+    return {
+      days, pb7, plays, holds };
+  }
+}
+</script>
+</body>
+</html>

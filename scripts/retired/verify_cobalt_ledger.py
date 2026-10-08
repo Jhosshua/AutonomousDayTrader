@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Retired 2026-10-07: layout replaced by scripts/verify_gut_dashboard.py; retained for reference.
 """Responsive visual verification for the Cobalt Ledger dashboard."""
 
 from __future__ import annotations

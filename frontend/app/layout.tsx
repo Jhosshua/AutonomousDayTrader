@@ -24,7 +24,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   // F16: no maximumScale/userScalable lock — people must be able to pinch-zoom.
   viewportFit: "cover",
-  themeColor: "#EEF1FA",
+  themeColor: "#2B4BFF",
 };
 
 export default function RootLayout({

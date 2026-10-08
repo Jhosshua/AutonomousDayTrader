@@ -110,7 +110,7 @@ must never look like a loss.
 | theme | new band | new ink | new tint | new bar | new track |
 |---|---|---|---|---|---|
 | Tesla (both plans) | #DDE4FF | #1E36B8 | #EEF1FF | #2B4BFF | #E1E7FF |
-| Coeur | #FBEBB8 | #7A5900 | #FFF6DD | #B88600 | #F7EDC8 |
+| Coeur | #EFE6C3 | #3D3100 | #F8F3E3 | #5C4A00 | #EAE1C2 |
 | Opening Range Breakout | #FFDFCF | #8F3600 | #FFF0E8 | #E85A1B | #FCE5D9 |
 | Ride the Trend | #CDEFF1 | #06707A | #E6F7F8 | #0A8F9C | #D5F0F2 |
 | Big News | #FFD6EA | #A3135B | #FFEAF4 | #D61F7A | #FBDDEC |

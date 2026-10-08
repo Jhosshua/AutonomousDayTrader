@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Retired 2026-10-07: layout replaced by scripts/verify_gut_dashboard.py; retained for reference.
 """scripts/verify_bright_dashboard.py
 
 QA for PLAN_2026_10_04_bright_operator_dashboard.md (section 11 wins): the bright operator dashboard.

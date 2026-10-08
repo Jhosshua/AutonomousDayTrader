@@ -1,5 +1,6 @@
 "use client";
 
+import PlaybookIcon from "./gut/PlaybookIcon";
 import { CircleHelp, Lock, ScanSearch, SlidersHorizontal } from "lucide-react";
 import { MarketContext, Position } from "@/types/trading";
 import { useActionButton } from "@/hooks/useActionButton";
@@ -21,6 +22,8 @@ import {
 
 interface HoldingNowProps {
   positions: Position[];
+  compact?: boolean;
+  marketOpen?: boolean;
   marketContext?: MarketContext | null;
   onFlattenPosition: (symbol: string) => boolean;
   onTightenStop: (symbol: string, newStop: number) => boolean;
@@ -49,10 +52,14 @@ function Tile({ label, children, testid }: { label: string; children: React.Reac
 function HoldingRow({
   position,
   marketContext,
+  marketOpen = true,
+  compact = false,
   onFlattenPosition,
   onTightenStop,
 }: {
   position: Position;
+  compact?: boolean;
+  marketOpen?: boolean;
   marketContext?: MarketContext | null;
   onFlattenPosition: (symbol: string) => boolean;
   onTightenStop: (symbol: string, newStop: number) => boolean;
@@ -107,6 +114,30 @@ function HoldingRow({
           unrealizedPercent,
         ).toFixed(2)}%`;
 
+  if (compact) {
+    const target = position.tranches?.find(t => t.closed_qty < t.qty)?.target ?? (position.target_1_filled === true ? (position.runner_policy === "TRAIL_ONLY" ? null : position.take_profit_2 ?? null) : position.take_profit_1 ?? null);
+    const prices = [entry, market, stop, target].filter((n): n is number => n != null && Number.isFinite(n));
+    const low = Math.min(...prices), high = Math.max(...prices);
+    const pct = (v: number) => high > low ? Math.max(2, Math.min(98, (v-low)/(high-low)*100)) : 50;
+    return <div className="gut-day-row" data-testid={`holding-row-${position.symbol}`}>
+      <div className="flex items-start gap-2">
+        <span className="gut-icon text-white" style={{ background: theme.bar }}><PlaybookIcon name={position.strategy_id ?? "flat"} /></span>
+        <div className="min-w-0 flex-1"><div className="font-display font-bold">{position.symbol} <span className="font-body text-xs font-normal text-muted">{isLong ? "long" : "short"} {position.shares} sh</span></div><p className="text-xs text-muted">{theme.name} · in at {formatMoney(entry)}</p><p className="text-xs text-muted">{position.fixed_protection ? "Stop and targets stay fixed at the broker" : kind === "orb" ? "ORB moves its own stop at Alpaca" : "Day trade"}</p></div>
+        <div className="text-right text-xs"><strong className={position.unrealized_pnl < 0 ? "text-loss" : position.unrealized_pnl > 0 ? "text-gain" : "text-muted"}>{formatSignedMoney(position.unrealized_pnl)}</strong><span className="block text-muted">{percentLabel}</span></div>
+      </div>
+      <div className="text-xs text-muted">{formatMoney(market)} {!marketOpen && market === entry ? "last close price" : "now"}</div>
+      <div className="gut-stop-strip" aria-label="Entry, current price, safety exit and target">
+        <div className="gut-price-labels"><span className={isLong ? "text-loss" : "text-gain"}>{isLong ? "Safety exit" : "Target"}<br /><b>{(isLong ? stop : target) == null ? "Not set" : formatMoney((isLong ? stop : target)!)}</b></span><span>Entry<br /><b>{formatMoney(entry)}</b></span><span className={isLong ? "text-gain" : "text-loss"}>{isLong ? "Target" : "Safety exit"}<br /><b>{(isLong ? target : stop) == null ? (isLong && position.target_1_filled ? "Trailing, no fixed target" : "Not set") : formatMoney((isLong ? target : stop)!)}</b></span></div>
+        <div className="gut-price-track"><span className="gut-price-tick bg-ink" style={{ left: `${pct(entry)}%` }} title="Entry" />{stop != null && <span className="gut-price-tick bg-loss" style={{ left: `${pct(stop)}%` }} title="Safety exit" />}{target != null && <span className="gut-price-tick bg-gain" style={{ left: `${pct(target)}%` }} title="Target" />}<span className="gut-price-now" style={{ left: `${pct(market)}%` }} title="Now" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={breakEvenButton.trigger} disabled={!breakEvenEnabled || breakEvenButton.phase === "sending"} data-testid={`btn-break-even-${position.symbol}`} className="gut-button gut-stop-button">{position.strategy_id === "orb" ? "ORB moves its own stop" : position.fixed_protection ? "Safety exit stays fixed" : beLabel}</button>
+        <button type="button" onClick={sellButton.trigger} disabled={sellButton.phase === "sending"} data-testid={`btn-sell-now-${position.symbol}`} className="gut-button">{sellButton.phase === "failed" ? "Didn't go through, try again" : sellLabel}</button>
+      </div>
+      {position.exit_due && <p className="text-xs text-muted">Closes by {etTimeLabel(position.exit_due)}{position.tranches && " · each part has its own target and time limit"}</p>}
+    </div>;
+  }
+
   return (
     <div className="rise flex flex-col overflow-hidden rounded-2xl border border-line bg-white" data-testid={`holding-row-${position.symbol}`}>
       {/* Phone: strategy line, plan, note, buttons. Desktop: the two buttons get their own column on the right. */}
@@ -115,7 +146,7 @@ function HoldingRow({
           <div
             className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg px-2.5 py-1.5"
             style={{
-              background: theme.band,
+              background: position.strategy_id === "cde_asymmetric_dual" ? theme.tint : theme.band,
               color: theme.ink,
               borderBottom: kind === "orb" ? `2px dashed ${theme.ink}` : undefined,
             }}
@@ -140,6 +171,7 @@ function HoldingRow({
             <div className="text-xs text-muted">
               {isLong ? "bet it goes up" : "bet it goes down"} &middot; {position.shares} shares &middot; {isLong ? "bought" : "sold short"} at {formatMoney(entry)}
               {decided && <> &middot; decided at {decided}</>}
+              <span className="block">{formatMoney(market)} {!marketOpen && market === entry ? "last close price" : "now"}</span>
             </div>
           </div>
           <div
@@ -272,14 +304,14 @@ function HoldingRow({
 
 /** F1: quick-trade holdings only (arm split happens in the caller). Replaces the old
  * ActivePositionTray bottom sheet. Hidden entirely when there are no intraday positions. */
-export default function HoldingNow({ positions, marketContext, onFlattenPosition, onTightenStop }: HoldingNowProps) {
+export default function HoldingNow({ positions, marketContext, compact = false, marketOpen = true, onFlattenPosition, onTightenStop }: HoldingNowProps) {
   if (positions.length === 0) return null;
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-lg font-semibold text-ink">Holding now</h2>
+      {!compact && <h2 className="text-lg font-semibold text-ink">Holding now</h2>}
       <div className="flex flex-col gap-2">
         {positions.map((p) => (
-          <HoldingRow key={p.symbol} position={p} marketContext={marketContext} onFlattenPosition={onFlattenPosition} onTightenStop={onTightenStop} />
+          <HoldingRow key={p.symbol} position={p} marketContext={marketContext} marketOpen={marketOpen} compact={compact} onFlattenPosition={onFlattenPosition} onTightenStop={onTightenStop} />
         ))}
       </div>
     </section>

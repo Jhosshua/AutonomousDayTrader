@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Retired 2026-10-07: layout replaced by scripts/verify_gut_dashboard.py; retained for reference.
 """scripts/verify_holding_mood.py
 
 Visual and behaviour QA for PLAN_2026_09_29_holding_card_and_market_mood.md ("Holding now" says which

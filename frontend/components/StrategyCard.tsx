@@ -1,5 +1,6 @@
 "use client";
 
+import PlaybookIcon from "./gut/PlaybookIcon";
 import { useState } from "react";
 import { ChevronDown, Sunrise, Waves, Zap, Undo2, CornerDownRight } from "lucide-react";
 import { apiBase } from "@/lib/apiBase";
@@ -24,19 +25,11 @@ import {
   triErrorOf,
 } from "@/lib/plain";
 
-const ICONS: Record<string, typeof Sunrise> = {
-  orb: Sunrise,
-  vwap_pullback: Waves,
-  news_momentum: Zap,
-  mean_reversion: Undo2,
-  tsla_or15_retest: CornerDownRight,
-  tsla_asymmetric_dual: CornerDownRight,
-  cde_asymmetric_dual: Waves,
-};
 
 interface StrategyCardProps {
   strategy: StrategyState;
   ledgerAgg?: StrategyLedgerAgg;
+  weekResult?: number;
   showPro: boolean;
   /** Overnight on: the hours bar gets a night part (9:30 to 4 PM on 0 to 88%). */
   nightAxis?: boolean;
@@ -124,10 +117,9 @@ export function HandoffBand() {
   );
 }
 
-export default function StrategyCard({ strategy, ledgerAgg, showPro, nightAxis = false, handoffBand = false, x6Note = null }: StrategyCardProps) {
+export default function StrategyCard({ strategy, ledgerAgg, weekResult, showPro, nightAxis = false, handoffBand = false, x6Note = null }: StrategyCardProps) {
   const [open, setOpen] = useState(false);
   const theme = strategyTheme(strategy.id, strategy.name);
-  const Icon = ICONS[strategy.id] || Waves;
   const win = strategy.window;
   const baseChip = windowToChip(win);
   // ORB's off/shadow states arrive as a long blocker or a generic "limited" state; keep the chip short and true.
@@ -194,7 +186,7 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, nightAxis =
             style={{ background: theme.bar, opacity: resting ? 0.6 : 1 }}
             aria-hidden="true"
           >
-            <Icon className="h-4 w-4 text-white" strokeWidth={2} />
+            <PlaybookIcon name={strategy.id} className="h-5 w-5 text-white" />
           </span>
           <span className="font-display text-[15px] font-semibold leading-tight" style={{ color: theme.ink }} data-testid="strategy-name">
             {theme.name}
@@ -231,12 +223,13 @@ export default function StrategyCard({ strategy, ledgerAgg, showPro, nightAxis =
           )}
         </span>
 
-        <span className={`${UNDER_ROW} row-start-3 text-[13px] leading-snug text-[#2A3150] lg:row-start-2`} data-testid="strategy-decisions">
+        <span className={`${UNDER_ROW} ${open ? "" : "line-clamp-2"} row-start-3 text-[13px] leading-snug text-[#2A3150] lg:row-start-2`} data-testid="strategy-decisions">
           {note}
         </span>
 
         <span className="col-start-3 row-start-1 text-right text-sm font-bold tabular-nums lg:col-start-4" style={{ color: pnlColor }} data-testid="strategy-pnl">
           {tradesCount > 0 ? formatSignedMoney(pnl) : "$0"}
+          {weekResult != null && <span className="block text-[10px] font-medium text-muted" data-testid="strategy-week-result">7d {formatSignedMoney(weekResult)}</span>}
         </span>
 
         <ChevronDown

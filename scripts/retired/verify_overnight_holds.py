@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Retired 2026-10-07: layout replaced by scripts/verify_gut_dashboard.py; retained for reference.
 # @steered SNARE-2 2026-09-30
 """scripts/verify_overnight_holds.py
 

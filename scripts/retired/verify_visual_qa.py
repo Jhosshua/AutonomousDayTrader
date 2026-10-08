@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Retired 2026-10-07: layout replaced by scripts/verify_gut_dashboard.py; retained for reference.
 """scripts/verify_visual_qa.py
 Visual QA smoke test for the plain-language redesign (PLAN_2026_09_24_plain_language_ui.md).
 

@@ -199,3 +199,101 @@ a:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* Gut dashboard: canvas geometry, existing palette tokens, phone DOM order. */
+.gut-main { min-height: 100vh; padding: 14px 16px 24px; }
+.gut-shell { max-width: 1248px; margin: 0 auto; }
+.gut-topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 44px; margin-bottom: 12px; }
+.gut-brand { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 28%; background: #2B4BFF; padding: 6px; }
+.gut-brand svg { width: 100%; height: 100%; }
+.gut-freshness { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #DDE2F2; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 600; }
+.gut-grid { display: grid; gap: 12px; grid-template-columns: minmax(0,1fr); }
+.gut-grid > * { min-width: 0; }
+.gut-card { background: #FFFFFF; border: 1px solid #DDE2F2; border-radius: 16px; padding: 10px 16px; min-width: 0; }
+.gut-card-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-bottom: 4px; }
+.gut-card-heading h2 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 16px; }
+.gut-card-heading > span { font-size: 12px; color: #5B6283; }
+.gut-status { display: flex; flex-direction: column; gap: 10px; }
+.gut-icon { display: inline-flex; width: 36px; height: 36px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 10px; }
+.gut-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
+.gut-alarm { background: #FFF4DB; color: #8A4B00; border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.4; }
+.gut-alarm .gut-button { margin-top: 8px; }
+.gut-lock { border-radius: 10px; background: #F1F3FA; padding: 10px 12px; font-size: 14px; font-weight: 600; }
+.gut-money { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.gut-money .gut-card { padding: 10px; }
+.gut-money h2 { font-size: 11px; font-weight: 600; line-height: 1.3; min-height: 29px; color: #5B6283; }
+.gut-number { font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(16px,4.5vw,22px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.gut-money p { font-size: 11px; color: #5B6283; line-height: 1.35; margin-top: 2px; overflow-wrap: anywhere; }
+.gut-overnight-row { border-top: 1px solid #DDE2F2; }
+.gut-overnight-row summary { display: flex; align-items: center; gap: 8px; min-height: 50px; cursor: pointer; list-style: none; }
+.gut-overnight-row summary::-webkit-details-marker, .gut-summary::-webkit-details-marker { display: none; }
+.gut-chevron { font-size: 24px; line-height: 1; transition: transform .2s; }
+.gut-overnight-row[open] > summary .gut-chevron, details[open] > .gut-summary > .gut-chevron { transform: rotate(90deg); }
+.gut-chart { display: grid; gap: 8px; height: 116px; margin-top: 6px; }
+.gut-bar-column { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 4px; min-width: 0; text-align: center; }
+.gut-bar-label { font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.gut-bar { border-radius: 4px 4px 2px 2px; transform-origin: bottom; animation: gut-rise .6s ease-out both; }
+.gut-day-label { font-size: 11px; color: #5B6283; }
+.gut-chart-loading { height: 140px; display: grid; place-content: center; font-size: 13px; color: #5B6283; }
+.gut-playbooks, .gut-pro { padding-top: 0; padding-bottom: 0; }
+.gut-summary { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 0; cursor: pointer; list-style: none; font-size: 14px; font-weight: 600; }
+.gut-playbooks [data-testid="strategy-table"] { border: 0; border-radius: 0; margin: 0 -8px 6px; }
+.gut-playbooks [data-testid="strategy-table"] > div:first-child { display: none; }
+.gut-playbooks [data-testid="strategy-row-toggle"] { padding-left: 8px; padding-right: 8px; column-gap: 8px; grid-template-columns: minmax(90px,1fr) minmax(0,1fr) auto 16px; }
+.gut-playbooks [data-testid="window-badge"] { max-width: 100%; font-size: 11px; padding: 3px 6px; overflow-wrap: anywhere; }
+.gut-playbooks [data-testid="strategy-name"] { font-size: 14px; }
+.gut-playbooks [data-testid="strategy-decisions"] { font-size: 12px; }
+.gut-controls { display: flex; flex-direction: column; gap: 10px; }
+.gut-button { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; border-radius: 12px; background: #0E1330; color: #FFFFFF; font-size: 14px; font-weight: 600; line-height: 1.25; padding: 8px 12px; cursor: pointer; }
+.gut-button:disabled { background: #EEF1FA; color: #5B6283; cursor: default; }
+.gut-main button:focus-visible, .gut-main summary:focus-visible, .gut-main a:focus-visible { outline: 3px solid #2B4BFF; outline-offset: 3px; }
+.gut-holdings [data-testid^="holding-row-"], .gut-holdings [data-testid^="active-swing-row-"] { border: 0; border-radius: 0; border-bottom: 1px solid #DDE2F2; padding-left: 0; padding-right: 0; }
+.gut-pro { overflow-wrap: anywhere; }
+.gut-pro [data-testid="swing-telemetry"] { grid-template-columns: minmax(0,1fr); }
+.gut-pro [data-testid="swing-telemetry"] > div { padding: 12px; overflow: hidden; }
+.gut-skeleton { display: flex; flex-direction: column; gap: 12px; }
+.gut-skeleton .gut-card { background: #E6EAF5; border: 0; }
+.gut-intro { position: fixed; inset: 0; z-index: 50; background: #2B4BFF; color: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; pointer-events: none; animation: gut-fade .3s ease-in .9s both; }
+.gut-intro .gut-ring { stroke-dasharray: 60; animation: gut-ring .35s ease-out .05s both; }
+.gut-intro .gut-arrow { stroke-dasharray: 40; animation: gut-arrow .3s ease-out .3s both; }
+.gut-intro-dot { height: 14px; width: 14px; border-radius: 50%; animation: gut-pop .28s ease-out both; }
+.gut-intro-word { animation: gut-word .3s ease-out .35s both; }
+.gut-intro-skip { position: absolute; top: 32px; right: 16px; min-height: 44px; padding: 10px 14px; border-radius: 999px; background: #0E1330; color: #FFFFFF; pointer-events: auto; }
+@keyframes gut-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes gut-ring { from { stroke-dashoffset: 60; } to { stroke-dashoffset: 0; } }
+@keyframes gut-arrow { from { stroke-dashoffset: 40; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes gut-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes gut-word { from { transform: translateY(18px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes gut-fade { from { opacity: 1; } to { opacity: 0; } }
+@media (min-width: 1024px) {
+  .gut-grid { grid-template-columns: minmax(0,1.25fr) minmax(0,1fr); grid-template-areas: "status money" "holdings results" "playbooks controls" "playbooks pro"; align-items: start; }
+  .gut-status { grid-area: status; }
+  .gut-money { grid-area: money; }
+  .gut-holdings { grid-area: holdings; }
+  .gut-results { grid-area: results; }
+  .gut-playbooks { grid-area: playbooks; }
+  .gut-controls { grid-area: controls; }
+  .gut-pro { grid-area: pro; }
+  .gut-playbooks [data-testid="strategy-row-toggle"] { grid-template-columns: minmax(0,1.1fr) minmax(90px,.8fr) minmax(30px,.5fr) auto 16px; }
+}
+@media (max-width: 359px) {
+  .gut-main { padding-left: 12px; padding-right: 12px; }
+  .gut-card { padding-left: 12px; padding-right: 12px; }
+  .gut-money { gap: 6px; }
+  .gut-money .gut-card { padding: 8px; }
+  .gut-number { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gut-bar, .gut-intro, .gut-intro * { animation: none !important; }
+  .gut-chevron { transition: none; }
+}
+.gut-day-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 12px; }
+.gut-price-labels { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; font-size: 10px; color: #5B6283; }
+.gut-price-labels span:nth-child(2) { text-align: center; }
+.gut-price-labels span:last-child { text-align: right; }
+.gut-price-track { position: relative; height: 12px; border-radius: 6px; background: #DDE2F2; margin: 8px 0; }
+.gut-price-tick { position: absolute; top: -2px; height: 16px; width: 2px; }
+.gut-price-now { position: absolute; top: -4px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; border: 4px solid #2B4BFF; background: #FFFFFF; }
+.gut-stop-button:not(:disabled) { border: 1px solid #0E1330; background: #FFFFFF; color: #0E1330; }
+/* The compact Pro disclosure does not use the old slow-trade decorative blobs. */
+.gut-pro .drift, .gut-pro .drift2 { display: none; }
