@@ -539,3 +539,8 @@ right. Run the mutation check.
 **What worked instead.** An isolated temporary environment installed the project and verification packages. Playwright used a temporary browser directory. Browser checks and backend port hygiene ran sequentially. The final backend, focused overnight, frontend, build, browser, research, and port checks then passed.
 
 **Note for next time.** Check interpreter imports first. Keep any test that owns port 3005 separate from the backend port hygiene suite. Update timeline sentence assertions when execution times change.
+
+## 2026-10-07 gut dashboard build
+- What did not work: plan ruling R5 gave Coeur `band #5C4A00` with `ink #3D3100` (1.49:1); `verify_palette.mjs` requires ink-on-band ≥ 4.5:1, so Codex's `npm test` failed on my spec. What worked: light band `#EFE6C3`, dark ink, dark bar `#5C4A00` (same pattern as every other theme). Note: every theme's band is a LIGHT header fill; the hue lives in `bar`.
+- What did not work: `codex review --uncommitted "<prompt>"` (exit 2, flag cannot take a prompt). What worked: `codex review --uncommitted` bare after `git add -N` on new files; ~9 min, 5 real findings.
+- What did not work: headless Chrome `--window-size=390,…` screenshots of the live page looked cut off on the right. Cause: Chrome's 500-px minimum window, not the page. What worked: `scripts/verify_gut_dashboard.py`'s Playwright viewports, or a 10-line Playwright script with `viewport={"width":390}`.
