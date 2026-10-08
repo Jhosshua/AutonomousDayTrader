@@ -821,3 +821,41 @@ DAY_ONE_BUILD_REVISION=7c51e646... set with --skip-deploys, then push main. Veri
 4. What was rejected and why. Continuing `cls` was rejected because accepted orders repeatedly expired. An after hours limit chase was rejected because it changes the tested entry. Sending a day market order without final account, price, and broker checks was rejected because the ten minute delay can invalidate the earlier sizing.
 
 5. Verification. The final backend run passed 1,549 tests with six intentional skips and one unrelated absolute path test excluded. The focused overnight run passed 167 tests. Frontend checks, the production build, port hygiene, and the research parity suite passed. Browser checks passed 301 tests with seven unrelated absolute path tests excluded, and the one transient local server reset passed on immediate isolated rerun. Independent review found no remaining P0 or P1 issue.
+
+## 2026-10-07 evening: full dashboard redesign DESIGNED (not built yet)
+
+Overlaps the 10-06 operator-first plan (docs/operator_first_ui*, PLAN_2026_10_06_*) and the Cobalt Ledger
+Performance/History panels deployed 19:48 ET today by another session; this canvas is the operator's own
+"gut job" brief and should be reconciled with those before any build.
+
+Operator asked for a gut job: "operator first, compact, simple, animation colorful", iPhone bookmark icon,
+quick animated intro. Design canvas (6 boards: intro, 9 PM home, 9:52 AM home with an alarm, 3:35 PM
+lock screen, icon family + app icon, desktop): https://claude.ai/artifact/28eny44kozerbmPtn7M9nA
+
+**What was wrong on the live page (verified 21:03 ET):** first paint is a spinner "Connecting to the robot";
+Holdings card says "No quick trade holdings are open" while 3 overnight stocks sit above it (page.tsx filters
+overnight out of `all_positions`); the only chart is cumulative finished-trade P&L for the day = one dot on a
+one-trade day; "Best day / worst day" show the same day in Day view; after the close overnight rows report
+market_price == entry and $0 unrealized (stale, not real); on a phone the Quick/Slow toggle and tabs run off
+the right edge; no favicon / apple-touch-icon / manifest exist at all.
+
+**Rulings in the design (two critique agents, operator + iPhone/visual):**
+- Order: one plain status sentence, money (Account / Today / Last 7 days, one window), Holding now (EVERY
+  position incl. overnight; after close say "price at 9:30", never a fake $0), results = bars per day from
+  /api/trades?range=7d by session_date, playbook rows (collapsed after the close, with 7-day result per
+  strategy_id), Controls, Pro details collapsed.
+- No Pause button (no endpoint exists). Buttons that cannot act are disabled from the start. Two taps to confirm.
+- Header pill "Running · updated N s ago", amber if the frame is older than 60 s. Dot pulses only while trading.
+- Alarm list to add to collectAttention: overnight sale unfilled, broker/robot mismatch, no stop at broker,
+  loss stop >50% used, feed stale >60 s, order rejected, overnight lock within 20 min. The alarm card carries
+  its own action button (e.g. "Sell IREN now").
+- Palette keeps docs/bright_dashboard/palette_map.md families; Coeur darkened to #5C4A00 (colour-blind
+  separation from ORB orange). Fonts unchanged (Bricolage Grotesque + Instrument Sans).
+- Intro: 1.2 s once per cold launch (sessionStorage), Skip link, off under reduced motion; CSS keyframes
+  cannot use var()/calc() for stagger, use animation-delay per dot.
+- App icon: cobalt square, white open ring, lime arrow; favicon 32 px = arrow only. Ship as
+  frontend/app/apple-icon.png + icon.png + manifest.
+- Oct 1 2026 was a Thursday; the 5 bars Thu 1 / Fri 2 / Mon 5 / Tue 6 / Wed 7 are complete, no missing day.
+
+Next: build plan (display-only, backend unchanged except the overnight filter and an "updated at" field),
+Sonnet build, Codex diff review, then verify_bright_dashboard.py needs a new baseline.
